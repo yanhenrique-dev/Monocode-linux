@@ -1,90 +1,182 @@
-
-> **MonoCode Linux — interface desktop para seus agentes de código, exclusiva para Linux.**
-> Mantido por [yanhenrique-dev](https://github.com/yanhenrique-dev) · Builds `.deb` + AppImage · Licença [MIT](LICENSE).
-
 <p align="center">
-  <img src="public/monocode.png" alt="MonoCode" width="88" />
+  <img src="public/monocode.png" alt="MonoCode Linux" width="88" />
 </p>
 
 <h1 align="center">MonoCode Linux</h1>
 
 <p align="center">
-  <strong>A desktop UI for your coding agents — Linux only.</strong>
+  <strong>Interface desktop para seus agentes de código — exclusiva para Linux.</strong>
 </p>
 
 <p align="center">
-  <img width="1680" height="1050" alt="Screenshot 2026-09-04 at 06 34 00" src="https://github.com/user-attachments/assets/2cd4a6ec-eb1e-4b45-8627-a76442ea3874" />
+  <a href="https://github.com/yanhenrique-dev/Monocode-linux/actions/workflows/ci.yml"><img src="https://github.com/yanhenrique-dev/Monocode-linux/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/yanhenrique-dev/Monocode-linux/releases/latest"><img src="https://img.shields.io/github/v/release/yanhenrique-dev/Monocode-linux?label=release" alt="Release" /></a>
+  <img src="https://img.shields.io/badge/plataforma-Linux%20x86__64-blue" alt="Linux x86_64" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-green" alt="MIT" /></a>
 </p>
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, fx, and Hermes Agent. If they’re installed and logged in, MonoCode can run them. Tabs are sessions. The composer is the input. MonoCode does not sell tokens.
+> **Aviso de fork:** este projeto é um fork de [hardbeat920/monocode](https://github.com/hardbeat920/monocode.git), adaptado e mantido com foco total na plataforma Linux. O crédito pela base original vai para o autor e os contribuidores do upstream.
 
-> 📘 Usuário Linux? Comece por **[docs/linux.md](docs/linux.md)** — guia de instalação, dependências, build `.deb`/AppImage e solução de problemas.
+---
 
-## Install
+## Índice
 
-> Install and log in to at least one provider first:
->
-> - [Claude Code](https://claude.com/product/claude-code) - `claude auth login`
-> - [Codex](https://developers.openai.com/codex/cli) - `codex login`
-> - [Cursor CLI](https://cursor.com/cli) - `agent login`
-> - [Grok Build](https://docs.x.ai/build/overview) - `curl -fsSL https://x.ai/cli/install.sh | bash` then `grok login`
-> - [OpenCode](https://opencode.ai) - `opencode auth login`
-> - [Pi](https://pi.dev/) - `npm install -g @earendil-works/pi-coding-agent`
-> - [omp](https://omp.sh) - `curl -fsSL https://omp.sh/install | sh`
-> - [fx](https://fx.sh) - `curl -fsSL https://fx.sh/setup.sh | bash` then `fx login`
-> - [Hermes Agent](https://github.com/NousResearch/hermes-agent) - Linux: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`, then run `hermes model`
+- [O que é](#o-que-é)
+- [Recursos](#recursos)
+- [Provedores suportados](#provedores-suportados)
+- [Instalação](#instalação)
+- [Compilando do código-fonte](#compilando-do-código-fonte)
+- [Uso](#uso)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Scripts disponíveis](#scripts-disponíveis)
+- [CI e releases](#ci-e-releases)
+- [Contribuindo](#contribuindo)
+- [Licença](#licença)
 
-Linux (x86_64): download the `.deb` or AppImage from [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest). Install the `.deb` with `sudo apt install ./MonoCode_*.deb`, or make the AppImage executable with `chmod +x MonoCode_*.AppImage` and run it directly.
+## O que é
 
-## About this project
+O **MonoCode Linux** é um aplicativo desktop (Tauri + React) que coloca todos os seus agentes de código em uma única interface: abas são sessões, o composer é a entrada, e cada provedor roda com a sua própria assinatura — o app não vende tokens.
 
-- **O que é:** interface desktop para agentes de código (Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, fx, Hermes Agent), exclusiva para Linux.
-- **Mantenedor:** [yanhenrique-dev](https://github.com/yanhenrique-dev).
-- **Distribuição:** pacotes `.deb` e AppImage via [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest), com guia em [docs/linux.md](docs/linux.md).
-- **Licença:** [MIT](LICENSE). Provider names and logos are trademarks of their owners - see [NOTICE](NOTICE).
+Nesta versão, todo o esforço de empacotamento, documentação e automação é direcionado a **Linux x86_64**, com distribuição em `.deb` e AppImage. Suporte a macOS e Windows não existe neste fork.
 
-## Some notes
+## Recursos
 
-This is very early and you should expect bugs.
+- **Sessões em abas** — cada aba é uma sessão independente com um agente.
+- **Composer unificado** — mesma entrada para todos os provedores, com anexos de arquivos, menções e skills.
+- **Multi-provedor** — Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, fx e Hermes Agent.
+- **Terminal GPU** — renderização acelerada do terminal com chave mestra de hardware em Configurações.
+- **Explorador e diffs** — navegação de arquivos, preview e revisão de mudanças lado a lado.
+- **Orquestração** — agentes trabalhadores com diretórios isolados, pausa, retomada e retry.
+- **Sessões persistentes** — histórico, grupos de projetos, lembretes e notificações por projeto.
+- **Atualizações** — verificação de updates com download direto dos Releases do GitHub.
 
-Small, focused pull requests are welcome. Anything large is worth an issue first - see [CONTRIBUTING.md](CONTRIBUTING.md).
+## Provedores suportados
 
-## Build from source
+Instale e autentique **pelo menos um** provedor antes de abrir o app:
 
-Linux only (x86_64).
+| Provedor | Instalação | Login |
+|---|---|---|
+| Claude Code | [claude.com/product/claude-code](https://claude.com/product/claude-code) | `claude auth login` |
+| Codex | [developers.openai.com/codex/cli](https://developers.openai.com/codex/cli) | `codex login` |
+| Cursor CLI | [cursor.com/cli](https://cursor.com/cli) | `agent login` |
+| Grok Build | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `grok login` |
+| OpenCode | [opencode.ai](https://opencode.ai) | `opencode auth login` |
+| Pi | `npm install -g @earendil-works/pi-coding-agent` | — |
+| omp | `curl -fsSL https://omp.sh/install \| sh` | — |
+| fx | `curl -fsSL https://fx.sh/setup.sh \| bash` | `fx login` |
+| Hermes Agent | `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash` | `hermes model` |
 
-Need Node.js 20+ and a current stable Rust toolchain, plus the standard Tauri prerequisites (e.g. `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `libjavascriptcoregtk-4.1-dev`).
+Um provedor basta: o app detecta os CLIs na inicialização e desabilita os ausentes com dica de instalação.
+
+## Instalação
+
+Baixe a versão mais recente em [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
+
+```bash
+# Pacote .deb (Ubuntu/Debian x86_64)
+sudo apt install ./MonoCode_*.deb
+
+# AppImage (qualquer distro x86_64)
+chmod +x MonoCode_*.AppImage
+./MonoCode_*.AppImage
+```
+
+Guia detalhado com dependências e solução de problemas: [docs/linux.md](docs/linux.md).
+
+## Compilando do código-fonte
+
+Pré-requisitos:
+
+- **Node.js 20+**
+- **Toolchain Rust estável** (`rustup default stable`)
+- **Dependências Tauri/WebKit** (ex.: `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `libjavascriptcoregtk-4.1-dev`)
+
+No Ubuntu/Debian, instale as dependências nativas com o script do repositório:
+
+```bash
+npm run setup:linux:deb
+```
+
+Build dos pacotes distribuíveis (saída em `target/release/bundle/`):
+
+```bash
+npm ci
+npm run build:linux
+```
+
+Modo desenvolvimento (hot-reload):
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-### Ubuntu / Debian packages
-
-On an Ubuntu/Debian workstation, the repository can install the native Tauri prerequisites and build distributable Linux packages directly:
+Verificação completa (o mesmo que o CI roda):
 
 ```bash
-npm run setup:linux:deb
-npm ci
-npm run build:linux
+npm run check        # web + rust
+npm run check:web    # vitest + tsc
+npm run check:rust   # cargo fmt, clippy e testes
 ```
 
-The Linux build emits `.deb` and AppImage bundles under `target/release/bundle/`.
-Tauri loads `src-tauri/tauri.linux.conf.json` automatically for Linux development and builds.
-Full details: [docs/linux.md](docs/linux.md).
+## Uso
 
-## Project layout
+1. Abra o app e escolha um projeto (ou crie um).
+2. Selecione o provedor/modelo no composer.
+3. Digite a tarefa — cada aba mantém sua sessão e histórico.
+4. Acompanhe diffs, terminais e aprovações direto na interface.
+5. Ajuste GPU do terminal, temas e notificações em **Configurações**.
 
-- `src/chrome/` — window frame: title bar, sidebar, composer, tabs, model picker
-- `src/surfaces/` — panes inside a tab: transcript, file editor, diff, terminal
-- `src/app/` — app-level hooks (sessions, tabs, composer, orchestration)
-- `src/lib/` — shared libs (`harness/` has one adapter per provider)
-- `src-tauri/src/` — Rust side: PTYs, filesystem/git, session storage, native window
-- `scripts/` — helpers (`install-linux-deps-debian.sh` for Ubuntu/Debian)
-- `docs/` — guides (`linux.md` is the Linux entry point)
-- `.github/workflows/` — CI (`ci.yml`) + release (`release.yml`)
+## Estrutura do projeto
 
-## License
+```
+.
+├── src/
+│   ├── app/        # hooks de app (sessões, abas, composer, orquestração)
+│   ├── chrome/     # moldura da janela (título, sidebar, composer, tabs)
+│   ├── surfaces/   # painéis da aba (transcript, editor, diff, terminal)
+│   ├── lib/        # libs compartilhadas (harness/, adapters por provedor)
+│   └── hooks/      # hooks React reutilizáveis
+├── src-tauri/
+│   ├── src/        # lado Rust (PTYs, filesystem/git, sessões, janela)
+│   └── tauri.linux.conf.json  # config Tauri do Linux
+├── scripts/
+│   └── install-linux-deps-debian.sh  # dependências Ubuntu/Debian
+├── docs/
+│   └── linux.md    # guia Linux completo
+└── .github/workflows/  # CI (ci.yml) e release (release.yml), só Linux
+```
 
-[MIT](LICENSE). Provider names and logos are trademarks of their owners - see [NOTICE](NOTICE).
+## Scripts disponíveis
+
+| Script | O que faz |
+|---|---|
+| `npm run dev` | frontend Vite em modo dev |
+| `npm run build` | `tsc` + build Vite |
+| `npm test` / `test:watch` | suíte Vitest |
+| `npm run check` | validação total (web + rust) |
+| `npm run tauri dev` | app desktop em desenvolvimento |
+| `npm run setup:linux:deb` | instala dependências no Debian/Ubuntu |
+| `npm run build:linux` | gera `.deb` + AppImage |
+| `npm run set-version` | sincroniza versão nos manifestos |
+
+## CI e releases
+
+- **CI** (`.github/workflows/ci.yml`): roda no `ubuntu-latest` a cada push/PR — Vitest, `tsc`, `cargo fmt`, Clippy e `cargo test`.
+- **Release** (`.github/workflows/release.yml`): ao criar uma tag `v*`, valida a versão nos manifestos + CHANGELOG, compila `.deb` e AppImage e publica no GitHub Release.
+
+Para lançar uma versão:
+
+```bash
+npm run set-version 0.1.51
+# atualize o CHANGELOG.md e commite
+git tag v0.1.51 && git push origin v0.1.51
+```
+
+## Contribuindo
+
+Projeto mantido por [yanhenrique-dev](https://github.com/yanhenrique-dev), com foco em **Linux**. Pull requests pequenos e focados são bem-vindos; mudanças grandes merecem uma issue antes — veja [CONTRIBUTING.md](CONTRIBUTING.md). Conduta: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Falhas de segurança: reporte em privado via [Security Advisories](https://github.com/yanhenrique-dev/Monocode-linux/security/advisories/new), nunca em issue pública.
+
+## Licença
+
+[MIT](LICENSE). Nomes e logos de provedores são marcas de seus respectivos donos — veja [NOTICE](NOTICE).
