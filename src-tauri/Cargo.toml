@@ -1,0 +1,41 @@
+[package]
+name = "monocode"
+version.workspace = true
+edition.workspace = true
+description = "MonoCode Linux — interface desktop para agentes de código, exclusiva para Linux"
+authors = ["yanhenrique-dev"]
+repository = "https://github.com/yanhenrique-dev/Monocode-linux"
+homepage = "https://github.com/yanhenrique-dev/Monocode-linux"
+license.workspace = true
+
+[lib]
+name = "monocode_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.22"
+tauri-plugin-dialog = { version = "2", default-features = false, features = ["xdg-portal"] }
+rusqlite = { version = "0.40.2", features = ["bundled"], default-features = false }
+ureq = { version = "2.12.1", default-features = false, features = ["tls", "gzip"] }
+url = "2.5"
+tauri-plugin-process = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+notify-rust = "4.18"
+tauri-plugin-window-state = "2.4.1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
