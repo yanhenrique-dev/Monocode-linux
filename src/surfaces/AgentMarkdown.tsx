@@ -626,6 +626,29 @@ export function MarkdownSourceHighlight({ text }: { text: string }) {
   );
 }
 
+const mermaidSvgCache = new Map<string, string>();
+const MERMAID_CACHE_LIMIT = 20;
+
+function cachedMermaidSvg(key: string): string | undefined {
+  const hit = mermaidSvgCache.get(key);
+  if (hit === undefined) return undefined;
+  // Refresh recency so steady diagrams are not evicted by churn elsewhere.
+  mermaidSvgCache.delete(key);
+  mermaidSvgCache.set(key, hit);
+  return hit;
+}
+
+function storeMermaidSvg(key: string, svg: string) {
+  mermaidSvgCache.set(key, svg);
+  while (mermaidSvgCache.size > MERMAID_CACHE_LIMIT) {
+    const oldest = mermaidSvgCache.keys().next();
+    if (oldest.done) break;
+    mermaidSvgCache.delete(oldest.value);
+  }
+}
+
+let mermaidInstanceCounter = 0;
+
 function MermaidBlock({
   code,
   incomplete,
@@ -636,6 +659,10 @@ function MermaidBlock({
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const colorScheme = useColorScheme();
+  // Stable per mount: Date.now() here defeated caching and forced a fresh
+  // render id on every parent render.
+  const instanceId = useRef(0);
+  if (instanceId.current === 0) instanceId.current = ++mermaidInstanceCounter;
 
   useEffect(() => {
     if (incomplete) {
@@ -643,10 +670,16 @@ function MermaidBlock({
       setFailed(false);
       return;
     }
+    const cacheKey = `${colorScheme}:${code}`;
+    const cached = cachedMermaidSvg(cacheKey);
+    if (cached !== undefined) {
+      setSvg(cached);
+      setFailed(false);
+      return;
+    }
     let cancelled = false;
-    setSvg(null);
     setFailed(false);
-    const id = `mermaid-${Math.abs(hashCode(code)).toString(36)}-${Date.now().toString(36)}`;
+    const id = `mermaid-${Math.abs(hashCode(code)).toString(36)}-${instanceId.current.toString(36)}`;
     void mermaid
       .getMermaid({
         ...MERMAID_BASE_CONFIG,
@@ -655,6 +688,7 @@ function MermaidBlock({
       .render(id, code)
       .then((result) => {
         if (cancelled) return;
+        storeMermaidSvg(cacheKey, result.svg);
         setSvg(result.svg);
       })
       .catch(() => {

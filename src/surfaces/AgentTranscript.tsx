@@ -197,6 +197,7 @@ function AgentTranscriptContent({
   const prependHeight = useRef<number | null>(null);
   const wasVisible = useRef(false);
   const [scrollerEl, setScrollerEl] = useState<HTMLDivElement | null>(null);
+  const scrollIdleTimer = useRef<number | null>(null);
   const [visibleTurnCount, setVisibleTurnCount] = useState(INITIAL_TURNS);
   // Turns whose folded work the reader has opened, by turn id.
   const [openWork, setOpenWork] = useState<Record<string, boolean>>({});
@@ -273,8 +274,26 @@ function AgentTranscriptContent({
   useEffect(() => {
     if (!visible || !scrollerEl) return;
     syncPinned(scrollerEl);
-    const onScroll = () => syncPinned(scrollerEl);
+    // While pixels are moving, freeze the continuous animations inside the
+    // list (shimmer sweeps, thinking pulse, tool spin). They force repaints
+    // on every frame under WebKit software compositing; the class drops off
+    // 150ms after the last scroll/wheel event. Direct classList, no render.
+    const markScrolling = () => {
+      scrollerEl.classList.add("is-scrolling");
+      if (scrollIdleTimer.current != null) {
+        window.clearTimeout(scrollIdleTimer.current);
+      }
+      scrollIdleTimer.current = window.setTimeout(() => {
+        scrollIdleTimer.current = null;
+        scrollerEl.classList.remove("is-scrolling");
+      }, 150);
+    };
+    const onScroll = () => {
+      markScrolling();
+      syncPinned(scrollerEl);
+    };
     const onWheel = (e: WheelEvent) => {
+      markScrolling();
       if (e.deltaY < 0) {
         stickToBottom.current = false;
         setShowJump(true);
@@ -285,6 +304,11 @@ function AgentTranscriptContent({
     return () => {
       scrollerEl.removeEventListener("scroll", onScroll);
       scrollerEl.removeEventListener("wheel", onWheel);
+      if (scrollIdleTimer.current != null) {
+        window.clearTimeout(scrollIdleTimer.current);
+        scrollIdleTimer.current = null;
+      }
+      scrollerEl.classList.remove("is-scrolling");
     };
   }, [scrollerEl, setShowJump, syncPinned, visible]);
 
@@ -341,9 +365,12 @@ function AgentTranscriptContent({
     return () => observer.disconnect();
   }, [scrollerEl, setShowJump, visible]);
 
-  const turns = groupTurns(blocks, managed);
+  const turns = useMemo(() => groupTurns(blocks, managed), [blocks, managed]);
   const firstVisibleTurn = Math.max(0, turns.length - visibleTurnCount);
-  const visibleTurns = turns.slice(firstVisibleTurn);
+  const visibleTurns = useMemo(
+    () => turns.slice(firstVisibleTurn),
+    [turns, firstVisibleTurn],
+  );
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
   const visibleTurnCountRef = useRef(visibleTurnCount);
@@ -2475,11 +2502,20 @@ function useElapsedFrom(
       pausedMs.current += Date.now() - pauseStarted.current;
       pauseStarted.current = null;
     }
-    const tick = () =>
+    const tick = () => {
+      // A hidden window has nothing to paint: skip the state write so the
+      // live fold does not re-render every second while minimized.
+      if (typeof document !== "undefined" && document.hidden) return;
       setElapsedMs(Math.max(0, Date.now() - start - pausedMs.current));
+    };
     tick();
     const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
+    const onVisible = () => tick();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [startedAt, paused]);
 
   return elapsedMs;
@@ -2991,12 +3027,25 @@ function pinToBottom(el: HTMLElement | null) {
 }
 
 /** Keep the live turn's min-height in lockstep with the visible transcript. */
+const viewportPadCache = new WeakMap<
+  HTMLElement,
+  { height: number; pad: number }
+>();
+function transcriptViewportPad(el: HTMLElement): number {
+  const inner = el.firstElementChild as HTMLElement | null;
+  if (!inner) return 0;
+  // Padding comes from CSS, not content: re-read only when the viewport
+  // height itself changes. Content growth changes scrollHeight, so the
+  // cached value survives streaming frames without a forced style recalc.
+  const cached = viewportPadCache.get(el);
+  if (cached && cached.height === el.clientHeight) return cached.pad;
+  const pad = Number.parseFloat(getComputedStyle(inner).paddingBottom) || 0;
+  viewportPadCache.set(el, { height: el.clientHeight, pad });
+  return pad;
+}
 function syncTranscriptViewport(el: HTMLElement | null) {
   if (!el || el.clientHeight <= 0) return;
-  const inner = el.firstElementChild as HTMLElement | null;
-  const pad = inner
-    ? Number.parseFloat(getComputedStyle(inner).paddingBottom) || 0
-    : 0;
+  const pad = transcriptViewportPad(el);
   const next = `${Math.max(0, el.clientHeight - pad)}px`;
   if (el.style.getPropertyValue("--transcript-viewport") === next) return;
   el.style.setProperty("--transcript-viewport", next);
