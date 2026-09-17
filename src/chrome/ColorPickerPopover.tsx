@@ -11,7 +11,28 @@ import { Pipette } from "./icons";
 type Props = {
   value: string;
   onChange: (hex: string) => void;
+  /** Live drag feedback: must stay cheap (paint only, no persist). */
+  onPreview?: (hex: string) => void;
+  /** Drag end: persist + parent state. */
+  onCommit?: (hex: string) => void;
 };
+
+// While a color drag is active, popover backdrop blurs are suspended (see
+// `html.picking-color` in index.css): sampling the backdrop under the finger
+// every pointermove is the most expensive thing WebKit does here.
+let pickingCount = 0;
+function beginPicking() {
+  pickingCount += 1;
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.add("picking-color");
+  }
+}
+function endPicking() {
+  pickingCount = Math.max(0, pickingCount - 1);
+  if (pickingCount === 0 && typeof document !== "undefined") {
+    document.documentElement.classList.remove("picking-color");
+  }
+}
 
 export function ColorSwatchRow({
   colors,
@@ -100,10 +121,23 @@ export function ColorSwatchRow({
   );
 }
 
-export function ColorPickerPopover({ value, onChange }: Props) {
+export function ColorPickerPopover({
+  value,
+  onChange,
+  onPreview,
+  onCommit,
+}: Props) {
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value));
   const svRef = useRef<HTMLDivElement>(null);
   const hueRef = useRef<HTMLDivElement>(null);
+  const previewFn = onPreview ?? onChange;
+  const commitFn = onCommit ?? onChange;
+  const previewRef = useRef(previewFn);
+  previewRef.current = previewFn;
+  const commitRef = useRef(commitFn);
+  commitRef.current = commitFn;
+  const previewRaf = useRef(0);
+  const latestHex = useRef<string | null>(null);
   // Drag listeners remove themselves on pointerup/cancel; this covers
   // unmount mid-drag (e.g. the popover closing while dragging). A set, so
   // concurrent drags on both sliders are each retained.
@@ -113,6 +147,10 @@ export function ColorPickerPopover({ value, onChange }: Props) {
     return () => {
       for (const cleanup of cleanups) cleanup();
       cleanups.clear();
+      if (previewRaf.current) {
+        cancelAnimationFrame(previewRaf.current);
+        previewRaf.current = 0;
+      }
     };
   }, []);
 
@@ -123,16 +161,32 @@ export function ColorPickerPopover({ value, onChange }: Props) {
     );
   }, [value]);
 
+  const flushPreview = (hex: string) => {
+    latestHex.current = hex;
+    if (previewRaf.current) return;
+    previewRaf.current = requestAnimationFrame(() => {
+      previewRaf.current = 0;
+      const pending = latestHex.current;
+      if (pending) previewRef.current(pending);
+    });
+  };
+
   const applyHsv = useCallback(
     (updater: Hsv | ((prev: Hsv) => Hsv)) => {
       setHsv((prev) => {
         const next = typeof updater === "function" ? updater(prev) : updater;
-        onChange(hsvToHex(next.h, next.s, next.v));
+        flushPreview(hsvToHex(next.h, next.s, next.v));
         return next;
       });
     },
-    [onChange],
+    [],
   );
+
+  const commitHex = useCallback(() => {
+    const hex = latestHex.current;
+    latestHex.current = null;
+    if (hex) commitRef.current(hex);
+  }, []);
 
   const onHexInput = (raw: string) => {
     const trimmed = raw.trim();
@@ -140,7 +194,8 @@ export function ColorPickerPopover({ value, onChange }: Props) {
     const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
     const next = hexToHsv(hex);
     setHsv(next);
-    onChange(normalizeHex(hex));
+    latestHex.current = null;
+    commitRef.current(normalizeHex(hex));
   };
 
   const onSvPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -148,6 +203,7 @@ export function ColorPickerPopover({ value, onChange }: Props) {
     if (!el) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    beginPicking();
 
     const update = (clientX: number, clientY: number) => {
       const rect = el.getBoundingClientRect();
@@ -163,6 +219,8 @@ export function ColorPickerPopover({ value, onChange }: Props) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       dragCleanups.current.delete(onUp);
+      commitHex();
+      endPicking();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -175,6 +233,7 @@ export function ColorPickerPopover({ value, onChange }: Props) {
     if (!el) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    beginPicking();
 
     const update = (clientX: number) => {
       const rect = el.getBoundingClientRect();
@@ -189,6 +248,8 @@ export function ColorPickerPopover({ value, onChange }: Props) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       dragCleanups.current.delete(onUp);
+      commitHex();
+      endPicking();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);

@@ -12,6 +12,7 @@ import {
 } from "../chrome/icons";
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -47,6 +48,7 @@ import {
   applyThemeDarkLightness,
   applyThemePreference,
   applyThemeTint,
+  cancelSidebarBlurPreview,
   BODY_GLASS_DEFAULT,
   ACCENT_COLOR_DEFAULT,
   CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT,
@@ -70,6 +72,7 @@ import {
   loadThemeSaturation,
   loadTranscriptLayout,
   loadTranscriptAnchor,
+  previewSidebarBlur,
   saveBodyGlass,
   saveAccentColor,
   saveChatBackgroundEmptyOpacity,
@@ -291,7 +294,12 @@ export function SettingsView({
   const [revealed, setRevealed] = useState<string | null>(anchor);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const appearance = useAppearanceSettings();
+  // Appearance state lives in AppearancePage, not here: a slider drag must
+  // not re-render the header, the search box, or the other pages.
+  const restoreAppearanceRef = useRef(() => {});
+  const onRestoreAppearanceReady = useCallback((restore: () => void) => {
+    restoreAppearanceRef.current = restore;
+  }, []);
 
   useEffect(() => setRevealed(anchor), [anchor, notificationSettingsRequest]);
 
@@ -357,7 +365,7 @@ export function SettingsView({
           {section === "appearance" ? (
             <button
               type="button"
-              onClick={appearance.restoreDefaults}
+              onClick={() => restoreAppearanceRef.current()}
               className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
             >
               <RotateCcw className="size-3.5" strokeWidth={1.75} />
@@ -395,7 +403,7 @@ export function SettingsView({
                 <GeneralPage onOpenWhatsNew={onOpenWhatsNew} />
               ) : null}
               {section === "appearance" ? (
-                <AppearancePage appearance={appearance} />
+                <AppearancePage onRestoreReady={onRestoreAppearanceReady} />
               ) : null}
               {section === "chat" ? <ChatPage /> : null}
               {section === "keybindings" ? <KeybindingsPage /> : null}
@@ -1456,6 +1464,51 @@ function useAppearanceSettings() {
     setAccentColor(next);
   }, []);
 
+  // Drag preview: paint only. No persist, no parent-wide side effects; the
+  // exact value is committed on release via the onX handler.
+  const previewAccentColor = useCallback((value: string | null) => {
+    applyAccentColor(value);
+  }, []);
+
+  const previewTint = useCallback((hue: number, saturation: number) => {
+    const next = applyThemeTint(hue, saturation);
+    setThemeHue(next.hue);
+    setThemeSaturation(next.saturation);
+  }, []);
+
+  const previewDarkLightness = useCallback((value: number) => {
+    setThemeDarkLightness(applyThemeDarkLightness(value));
+  }, []);
+
+  const previewOpacity = useCallback((percent: number) => {
+    setOpacity(applySidebarOpacity(percent / 100));
+  }, []);
+
+  const previewBlur = useCallback((radius: number) => {
+    setBlur(previewSidebarBlur(radius));
+  }, []);
+
+  const previewChatBackgroundEmptyOpacity = useCallback((percent: number) => {
+    setChatBackgroundEmptyOpacity(
+      applyChatBackgroundEmptyOpacity(percent / 100),
+    );
+  }, []);
+
+  const previewChatBackgroundSessionOpacity = useCallback(
+    (percent: number) => {
+      setChatBackgroundSessionOpacity(
+        applyChatBackgroundSessionOpacity(percent / 100),
+      );
+    },
+    [],
+  );
+
+  const previewUiScale = useCallback((percent: number) => {
+    // No setZoom while dragging: relayouting the whole app under the pointer
+    // fights the drag. The zoom commits on release.
+    setUiScale(percent / 100);
+  }, []);
+
   const onOpacity = useCallback((percent: number) => {
     const next = applySidebarOpacity(percent / 100);
     saveSidebarOpacity(next);
@@ -1463,6 +1516,7 @@ function useAppearanceSettings() {
   }, []);
 
   const onBlur = useCallback((radius: number) => {
+    cancelSidebarBlurPreview();
     const next = applySidebarBlur(radius);
     saveSidebarBlur(next);
     setBlur(next);
@@ -1610,12 +1664,48 @@ function useAppearanceSettings() {
     onChatBackgroundScope,
     onUiScale,
     restoreDefaults,
+    previewAccentColor,
+    previewTint,
+    previewDarkLightness,
+    previewOpacity,
+    previewBlur,
+    previewChatBackgroundEmptyOpacity,
+    previewChatBackgroundSessionOpacity,
+    previewUiScale,
   };
 }
 
-function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
+function AppearancePage({
+  onRestoreReady,
+}: {
+  onRestoreReady?: (restore: () => void) => void;
+}) {
+  const appearance = useAppearanceSettings();
+  const { restoreDefaults } = appearance;
+  useEffect(() => {
+    onRestoreReady?.(restoreDefaults);
+  }, [onRestoreReady, restoreDefaults]);
   const percent = Math.round(appearance.opacity * 100);
   const glassDisabled = useColorScheme() === "light";
+  // Stable per-value identities: without these, the inline arrows below
+  // would defeat memo(Slider) and re-render the sibling row on every tick.
+  const onHuePreview = useCallback(
+    (value: number) =>
+      appearance.previewTint(value, appearance.themeSaturation),
+    [appearance.previewTint, appearance.themeSaturation],
+  );
+  const onHueCommit = useCallback(
+    (value: number) => appearance.onTint(value, appearance.themeSaturation),
+    [appearance.onTint, appearance.themeSaturation],
+  );
+  const onSaturationPreview = useCallback(
+    (value: number) => appearance.previewTint(appearance.themeHue, value),
+    [appearance.previewTint, appearance.themeHue],
+  );
+  const onSaturationCommit = useCallback(
+    (value: number) => appearance.onTint(appearance.themeHue, value),
+    [appearance.onTint, appearance.themeHue],
+  );
 
   return (
     <>
@@ -1646,6 +1736,7 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
         >
           <AccentColorPicker
             value={appearance.accentColor}
+            onPreview={appearance.previewAccentColor}
             onChange={appearance.onAccentColor}
           />
         </Row>
@@ -1666,9 +1757,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             display={`${appearance.themeHue}°`}
             min={THEME_HUE_MIN}
             max={THEME_HUE_MAX}
-            onChange={(value) =>
-              appearance.onTint(value, appearance.themeSaturation)
-            }
+            onPreview={onHuePreview}
+            onCommit={onHueCommit}
           />
         </Row>
         <Row
@@ -1682,7 +1772,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             display={`${appearance.themeSaturation}%`}
             min={THEME_SATURATION_MIN}
             max={THEME_SATURATION_MAX}
-            onChange={(value) => appearance.onTint(appearance.themeHue, value)}
+            onPreview={onSaturationPreview}
+            onCommit={onSaturationCommit}
           />
         </Row>
         <Row
@@ -1700,7 +1791,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             display={`${appearance.themeDarkLightness}%`}
             min={THEME_DARK_LIGHTNESS_MIN}
             max={THEME_DARK_LIGHTNESS_MAX}
-            onChange={appearance.onDarkLightness}
+            onPreview={appearance.previewDarkLightness}
+            onCommit={appearance.onDarkLightness}
             disabled={glassDisabled}
           />
         </Row>
@@ -1725,7 +1817,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             display={`${percent}%`}
             min={Math.round(SIDEBAR_OPACITY_MIN * 100)}
             max={Math.round(SIDEBAR_OPACITY_MAX * 100)}
-            onChange={appearance.onOpacity}
+            onPreview={appearance.previewOpacity}
+            onCommit={appearance.onOpacity}
             disabled={glassDisabled}
           />
         </Row>
@@ -1740,7 +1833,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             display={String(appearance.blur)}
             min={SIDEBAR_BLUR_MIN}
             max={SIDEBAR_BLUR_MAX}
-            onChange={appearance.onBlur}
+            onPreview={appearance.previewBlur}
+            onCommit={appearance.onBlur}
             disabled={glassDisabled}
           />
         </Row>
@@ -1773,7 +1867,8 @@ function AppearancePage({ appearance }: { appearance: AppearanceSettings }) {
             min={Math.round(UI_SCALE_MIN * 100)}
             max={Math.round(UI_SCALE_MAX * 100)}
             step={10}
-            onChange={appearance.onUiScale}
+            onPreview={appearance.previewUiScale}
+            onCommit={appearance.onUiScale}
           />
         </Row>
       </Group>
@@ -1885,7 +1980,8 @@ function ChatBackgroundCard({
               display={`${emptyVisibility}%`}
               min={Math.round(CHAT_BACKGROUND_OPACITY_MIN * 100)}
               max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
-              onChange={appearance.onChatBackgroundEmptyOpacity}
+              onPreview={appearance.previewChatBackgroundEmptyOpacity}
+              onCommit={appearance.onChatBackgroundEmptyOpacity}
             />
           </Row>
           <Row
@@ -1898,7 +1994,8 @@ function ChatBackgroundCard({
               display={`${sessionVisibility}%`}
               min={Math.round(CHAT_BACKGROUND_OPACITY_MIN * 100)}
               max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
-              onChange={appearance.onChatBackgroundSessionOpacity}
+              onPreview={appearance.previewChatBackgroundSessionOpacity}
+              onCommit={appearance.onChatBackgroundSessionOpacity}
             />
           </Row>
         </>
@@ -2447,14 +2544,15 @@ function Segmented<T extends string>({
   );
 }
 
-function Slider({
+const Slider = memo(function Slider({
   label,
   value,
   display,
   min,
   max,
   step = 1,
-  onChange,
+  onPreview,
+  onCommit,
   disabled = false,
 }: {
   label: string;
@@ -2463,9 +2561,51 @@ function Slider({
   min: number;
   max: number;
   step?: number;
-  onChange: (value: number) => void;
+  /** Live drag feedback, rAF-throttled. Must stay cheap: no persist, no IPC. */
+  onPreview?: (value: number) => void;
+  /** Discrete commit: track click, arrow key, and drag release. */
+  onCommit: (value: number) => void;
   disabled?: boolean;
 }) {
+  // Semi-controlled thumb: while dragging, the thumb follows local state so
+  // it tracks the pointer 1:1 with zero parent renders; the parent only
+  // learns about the drag via rAF-throttled previews and the final commit.
+  const [dragValue, setDragValue] = useState<number | null>(null);
+  const dragging = useRef(false);
+  const previewRaf = useRef(0);
+  const latest = useRef(value);
+  useEffect(
+    () => () => {
+      if (previewRaf.current) cancelAnimationFrame(previewRaf.current);
+    },
+    [],
+  );
+
+  const flushPreview = (next: number) => {
+    latest.current = next;
+    if (!onPreview) {
+      onCommit(next);
+      return;
+    }
+    if (previewRaf.current) return;
+    previewRaf.current = requestAnimationFrame(() => {
+      previewRaf.current = 0;
+      onPreview(latest.current);
+    });
+  };
+
+  const endDrag = (commit: boolean) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (previewRaf.current) {
+      cancelAnimationFrame(previewRaf.current);
+      previewRaf.current = 0;
+    }
+    const finalValue = latest.current;
+    setDragValue(null);
+    if (commit) onCommit(finalValue);
+  };
+
   return (
     <div
       className={`flex w-56 max-w-full items-center gap-3 ${disabled ? "opacity-40" : ""}`}
@@ -2475,21 +2615,37 @@ function Slider({
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={dragValue ?? value}
         aria-valuemin={min}
         aria-valuemax={max}
-        aria-valuenow={value}
+        aria-valuenow={dragValue ?? value}
         aria-label={label}
         disabled={disabled}
         className="sidebar-opacity-slider min-w-0 flex-1 disabled:cursor-not-allowed"
-        onChange={(event) => onChange(Number(event.target.value))}
+        onPointerDown={() => {
+          dragging.current = true;
+        }}
+        onPointerUp={() => endDrag(true)}
+        onPointerCancel={() => endDrag(false)}
+        onLostPointerCapture={() => endDrag(true)}
+        onBlur={() => endDrag(dragValue != null)}
+        onChange={(event) => {
+          const next = Number(event.target.value);
+          if (dragging.current && onPreview) {
+            setDragValue(next);
+            flushPreview(next);
+          } else {
+            // Keyboard step or track click: commit immediately.
+            onCommit(next);
+          }
+        }}
       />
       <span className="w-10 shrink-0 text-right text-[12px] text-content tabular-nums">
         {display}
       </span>
     </div>
   );
-}
+});
 
 const ACCENT_COLOR_PRESETS = [
   "#4da3f5",
@@ -2502,9 +2658,11 @@ const ACCENT_COLOR_PRESETS = [
 
 function AccentColorPicker({
   value,
+  onPreview,
   onChange,
 }: {
   value: string | null;
+  onPreview?: (value: string | null) => void;
   onChange: (value: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -2546,6 +2704,8 @@ function AccentColorPicker({
           <ColorPickerPopover
             value={value ?? ACCENT_COLOR_PRESETS[0]}
             onChange={onChange}
+            onPreview={onPreview ? (hex) => onPreview(hex) : undefined}
+            onCommit={onChange}
           />
         </Popover>
       ) : null}
@@ -2573,7 +2733,7 @@ function NotificationsBlocked() {
   );
 }
 
-function Toggle({
+const Toggle = memo(function Toggle({
   label,
   on,
   onChange,
@@ -2606,7 +2766,7 @@ function Toggle({
       />
     </button>
   );
-}
+});
 
 /** Theme-aware dropdown for a Settings row: a trigger button opening a Popover listbox. Used instead of a native select, whose option popup is OS-rendered and unreadable in dark mode on Windows/Linux. */
 function Select({
