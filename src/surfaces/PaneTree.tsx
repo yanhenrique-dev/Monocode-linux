@@ -20,6 +20,7 @@ import type { EditorNavigationTarget } from "../lib/search";
 import {
   layoutLeaves,
   layoutSashes,
+  PANE_RESIZE_END_EVENT,
   setSplitRatio,
   type EditorPane,
   type LayoutNode,
@@ -560,6 +561,11 @@ function Sash({
           const parent = containerRef.current;
           if (!parent) return;
           handle.setPointerCapture(e.pointerId);
+          // Same contract as useDragResize: while a sash moves, the tree
+          // re-renders every frame and the whole window relayouts. Mark it so
+          // continuous animations, cover images and backdrop blurs can stand
+          // down until the drop (see html.is-resizing in index.css).
+          document.documentElement.classList.add("is-resizing");
           const rect = parent.getBoundingClientRect();
           const restoreSelection = suppressTextSelection();
           const previousCursor = document.body.style.cursor;
@@ -597,6 +603,8 @@ function Sash({
             window.removeEventListener("keydown", keydown);
             restoreSelection();
             document.body.style.cursor = previousCursor;
+            document.documentElement.classList.remove("is-resizing");
+            window.dispatchEvent(new Event(PANE_RESIZE_END_EVENT));
             if (!moved) return;
             if (commit) onCommit(nextBoundary);
             else onCancel();

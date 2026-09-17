@@ -322,6 +322,45 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     let lastRows = 0;
     let raf = 0;
     let tuiMode = false;
+    // A pane resize refits every frame, but each resizePty is an IPC round
+    // trip plus a pty ioctl and a shell redraw behind it. The local xterm
+    // grid fits every frame; the backend learns the size at most ~8Hz, with
+    // a trailing commit carrying the exact final grid.
+    let lastPtyResizeAt = 0;
+    let pendingPtyResize: { cols: number; rows: number } | null = null;
+    let ptyResizeTimer: number | null = null;
+    const PTY_RESIZE_MIN_INTERVAL_MS = 120;
+
+    const sendPtyResize = (cols: number, rows: number) => {
+      lastPtyResizeAt = Date.now();
+      pendingPtyResize = null;
+      void starting
+        .then(() => (closed ? undefined : resizePty(id, cols, rows)))
+        .catch(() => {
+          lastCols = 0;
+          lastRows = 0;
+        });
+    };
+
+    const schedulePtyResize = (cols: number, rows: number) => {
+      pendingPtyResize = { cols, rows };
+      const wait =
+        PTY_RESIZE_MIN_INTERVAL_MS - (Date.now() - lastPtyResizeAt);
+      if (wait <= 0) {
+        if (ptyResizeTimer != null) {
+          clearTimeout(ptyResizeTimer);
+          ptyResizeTimer = null;
+        }
+        sendPtyResize(cols, rows);
+        return;
+      }
+      if (ptyResizeTimer != null) return;
+      ptyResizeTimer = window.setTimeout(() => {
+        ptyResizeTimer = null;
+        const pending = pendingPtyResize;
+        if (pending) sendPtyResize(pending.cols, pending.rows);
+      }, wait);
+    };
 
     const fitMode = (): TerminalFitMode =>
       term.buffer.active.type === "alternate" ? "tui" : "shell";
@@ -345,12 +384,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       if (cols === lastCols && rows === lastRows) return;
       lastCols = cols;
       lastRows = rows;
-      void starting
-        .then(() => (closed ? undefined : resizePty(id, cols, rows)))
-        .catch(() => {
-          lastCols = 0;
-          lastRows = 0;
-        });
+      schedulePtyResize(cols, rows);
     };
 
     const schedule = () => {
@@ -375,6 +409,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       closed = true;
       cancelAnimationFrame(frame);
       if (raf) cancelAnimationFrame(raf);
+      if (ptyResizeTimer != null) clearTimeout(ptyResizeTimer);
       observer.disconnect();
       outer.classList.remove("monocode-terminal--alt-screen");
       applySizeRef.current = () => {};
