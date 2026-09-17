@@ -78,6 +78,31 @@ Instale e autentique pelo menos um antes de abrir o app:
 - Exclusivo para Linux: CI, release, docs e empacotamento só para `.deb` + AppImage.
 - Mantenedor: [yanhenrique-dev](https://github.com/yanhenrique-dev).
 
+## Fluidez e composição (WebKit)
+
+O interruptor "aceleração de hardware" nas Configurações só desliga os
+desfoques (`backdrop-blur`) e o renderizador GPU do terminal. Composição GPU
+de verdade no WebKitGTK depende do sistema, não do app. Se a rolagem ou as
+Configurações parecerem pesadas, experimente antes de mexer no código:
+
+```bash
+# Desliga a composição acelerada (útil para comparar: se melhorar, o
+# gargalo está no caminho GPU do WebKit, não no JavaScript)
+WEBKIT_DISABLE_COMPOSITING_MODE=1 ./MonoCode_*.AppImage
+
+# Força o renderizador DMA-BUF (Wayland + Mesa recentes)
+WEBKIT_DMABUF_RENDERER=1 ./MonoCode_*.AppImage
+```
+
+Para medir com dados, abra o app com o inspetor remoto e grave um trace:
+
+```bash
+WEBKIT_INSPECTOR_HTTP_SERVER=127.0.0.1:9222 ./MonoCode_*.AppImage
+```
+
+Se alguma flag ajudar de forma consistente, vale registrar aqui o hardware
+e o driver onde foi testada.
+
 ## Verificação
 
 ```bash
