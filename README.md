@@ -143,7 +143,10 @@ npm run check:rust   # cargo fmt, clippy e testes
 ├── scripts/
 │   └── install-linux-deps-debian.sh  # dependências Ubuntu/Debian
 ├── docs/
-│   └── linux.md    # guia Linux completo
+│   ├── linux.md            # guia Linux completo
+│   ├── CONTRIBUTING.md     # como contribuir
+│   ├── CODE_OF_CONDUCT.md  # código de conduta
+│   └── SECURITY.md         # política de segurança
 └── .github/workflows/  # CI (ci.yml) e release (release.yml), só Linux
 ```
 
@@ -175,7 +178,7 @@ git tag v0.1.51 && git push origin v0.1.51
 
 ## Contribuindo
 
-Projeto mantido por [yanhenrique-dev](https://github.com/yanhenrique-dev), com foco em **Linux**. Pull requests pequenos e focados são bem-vindos; mudanças grandes merecem uma issue antes — veja [CONTRIBUTING.md](CONTRIBUTING.md). Conduta: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Falhas de segurança: reporte em privado via [Security Advisories](https://github.com/yanhenrique-dev/Monocode-linux/security/advisories/new), nunca em issue pública.
+Projeto mantido por [yanhenrique-dev](https://github.com/yanhenrique-dev), com foco em **Linux**. Pull requests pequenos e focados são bem-vindos; mudanças grandes merecem uma issue antes — veja [CONTRIBUTING.md](docs/CONTRIBUTING.md). Conduta: [CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md). Falhas de segurança: reporte em privado via [Security Advisories](https://github.com/yanhenrique-dev/Monocode-linux/security/advisories/new), nunca em issue pública.
 
 ## Licença
 
