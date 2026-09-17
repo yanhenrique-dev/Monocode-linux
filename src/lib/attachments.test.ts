@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { filesFromClipboard, mergeAttachments } from "./attachments";
+import { describe, expect, it, vi } from "vitest";
+import {
+  clipboardImageTypes,
+  filesFromClipboard,
+  mergeAttachments,
+  readClipboardImageFile,
+} from "./attachments";
 import type { Attachment } from "./session";
 
 function file(name: string, type: string, body = "x") {
@@ -86,5 +91,62 @@ describe("filesFromClipboard", () => {
         items: [item(png), item(tiff)],
       }),
     ).toEqual([png, tiff]);
+  });
+});
+
+describe("clipboardImageTypes", () => {
+  it("finds image types while ignoring text", () => {
+    expect(
+      clipboardImageTypes(["text/plain", "text/html", "image/png"]),
+    ).toEqual(["image/png"]);
+  });
+
+  it("returns empty for missing or text-only types", () => {
+    expect(clipboardImageTypes(null)).toEqual([]);
+    expect(clipboardImageTypes(undefined)).toEqual([]);
+    expect(clipboardImageTypes(["text/plain", "Files"])).toEqual([]);
+  });
+});
+
+describe("readClipboardImageFile", () => {
+  it("converts the first clipboard image item into a File", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const blob = new Blob([bytes], { type: "image/png" });
+    const read = vi.fn(async () => [
+      {
+        types: ["text/plain", "image/png"],
+        getType: async (type: string) => {
+          expect(type).toBe("image/png");
+          return blob;
+        },
+      },
+    ]);
+    const result = await readClipboardImageFile({ read });
+    expect(read).toHaveBeenCalledOnce();
+    expect(result).toBeInstanceOf(File);
+    expect(result?.type).toBe("image/png");
+    expect(result?.size).toBe(3);
+  });
+
+  it("returns null when no provider, no items, or no image type", async () => {
+    expect(await readClipboardImageFile(null)).toBeNull();
+    expect(await readClipboardImageFile({})).toBeNull();
+    expect(
+      await readClipboardImageFile({
+        read: async () => [
+          {
+            types: ["text/plain"],
+            getType: async () => new Blob(["x"], { type: "text/plain" }),
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when the clipboard read rejects", async () => {
+    const read = vi.fn(async () => {
+      throw new DOMException("denied", "NotAllowedError");
+    });
+    expect(await readClipboardImageFile({ read })).toBeNull();
   });
 });
