@@ -19,7 +19,6 @@
   },
   "bundle": {
     "targets": [
-      "deb",
       "appimage"
     ],
     "createUpdaterArtifacts": false,

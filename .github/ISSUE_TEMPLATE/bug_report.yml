@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        MonoCode Linux supports Linux only (x86_64, .deb / AppImage).
+        MonoCode Linux supports Linux only (x86_64 AppImage).
 
   - type: input
     id: version

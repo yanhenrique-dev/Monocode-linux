@@ -1,21 +1,19 @@
 # MonoCode Linux — Guia Linux
 
-> Interface desktop para seus agentes de código, exclusiva para Linux (Debian/Ubuntu e AppImage genérico).
+> Interface desktop para seus agentes de código, exclusiva para Linux, distribuída como AppImage.
 
 Este documento concentra tudo que é específico de Linux. Para uso geral, veja o [README](../README.md).
 
-## Instalação (binários)
+## Instalação
 
-Baixe o `.deb` ou o AppImage na página [Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
+Baixe o AppImage na página [Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
 
 ```bash
-# .deb (Ubuntu/Debian x86_64)
-sudo apt install ./MonoCode_*.deb
-
-# AppImage (qualquer distro x86_64)
 chmod +x MonoCode_*.AppImage
 ./MonoCode_*.AppImage
 ```
+
+Funciona em qualquer distro x86_64, sem instalar nada.
 
 ## Pré-requisitos para build
 
@@ -24,10 +22,10 @@ chmod +x MonoCode_*.AppImage
 - Dependências Tauri/WebKit no Debian/Ubuntu:
 
 ```bash
-npm run setup:linux:deb
+npm run setup:linux
 ```
 
-O script `scripts/install-linux-deps-debian.sh` instala:
+O script `scripts/install-linux-deps.sh` instala:
 
 - `build-essential`, `curl`, `file`, `wget`, `patchelf`, `zenity`
 - `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`
@@ -42,10 +40,7 @@ npm ci
 npm run build:linux
 ```
 
-Saída em `target/release/bundle/`:
-
-- `deb/` — pacote `.deb`
-- `appimage/` — `.AppImage` executável
+Saída em `target/release/bundle/appimage/`: o `.AppImage` executável.
 
 Para desenvolvimento com hot-reload:
 
@@ -55,7 +50,7 @@ npm run tauri dev
 ```
 
 O Tauri carrega automaticamente `src-tauri/tauri.linux.conf.json` no Linux
-(janela sem decoração nativa, bundles `deb` + `appimage`).
+(janela sem decoração nativa, bundle `appimage`).
 
 ## Provedores (CLIs)
 
@@ -75,7 +70,7 @@ Instale e autentique pelo menos um antes de abrir o app:
 
 ## Sobre o projeto
 
-- Exclusivo para Linux: CI, release, docs e empacotamento só para `.deb` + AppImage.
+- Exclusivo para Linux: CI, release, docs e empacotamento só para AppImage.
 - Mantenedor: [yanhenrique-dev](https://github.com/yanhenrique-dev).
 
 ## Fluidez e composição (WebKit)

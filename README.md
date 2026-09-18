@@ -37,7 +37,7 @@
 
 O MonoCode Linux é um aplicativo desktop (Tauri + React) que reúne seus agentes de código numa interface só. Abas são sessões, o composer é a entrada, e cada provedor roda com a sua própria assinatura. O app não vende tokens.
 
-Empacotamento, documentação e automação miram um alvo só: Linux x86_64, distribuído em `.deb` e AppImage. Não há suporte a macOS nem Windows neste fork.
+Empacotamento, documentação e automação miram um alvo só: Linux x86_64, distribuído como AppImage. Não há suporte a macOS nem Windows neste fork.
 
 ## Recursos
 
@@ -73,13 +73,11 @@ Um provedor basta: o app detecta os CLIs na inicialização e desabilita os ause
 Baixe a versão mais recente em [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
 
 ```bash
-# Pacote .deb (Ubuntu/Debian x86_64)
-sudo apt install ./MonoCode_*.deb
-
-# AppImage (qualquer distro x86_64)
 chmod +x MonoCode_*.AppImage
 ./MonoCode_*.AppImage
 ```
+
+Funciona em qualquer distro x86_64, sem instalar nada.
 
 Dependências e solução de problemas em detalhe: [docs/linux.md](docs/linux.md).
 
@@ -94,10 +92,10 @@ Pré-requisitos:
 No Ubuntu/Debian, o script do repositório instala as dependências nativas:
 
 ```bash
-npm run setup:linux:deb
+npm run setup:linux
 ```
 
-Build dos pacotes distribuíveis (saída em `target/release/bundle/`):
+Build do AppImage distribuível (saída em `target/release/bundle/appimage/`):
 
 ```bash
 npm ci
@@ -141,7 +139,7 @@ npm run check:rust   # cargo fmt, clippy e testes
 │   ├── src/        # lado Rust (PTYs, filesystem/git, sessões, janela)
 │   └── tauri.linux.conf.json  # config Tauri do Linux
 ├── scripts/
-│   └── install-linux-deps-debian.sh  # dependências Ubuntu/Debian
+│   └── install-linux-deps.sh  # dependências Ubuntu/Debian
 ├── docs/
 │   ├── linux.md            # guia Linux completo
 │   ├── CONTRIBUTING.md     # como contribuir
@@ -159,14 +157,14 @@ npm run check:rust   # cargo fmt, clippy e testes
 | `npm test` / `test:watch` | suíte Vitest |
 | `npm run check` | validação total (web + rust) |
 | `npm run tauri dev` | app desktop em desenvolvimento |
-| `npm run setup:linux:deb` | instala dependências no Debian/Ubuntu |
-| `npm run build:linux` | gera `.deb` + AppImage |
+| `npm run setup:linux` | instala dependências no Debian/Ubuntu |
+| `npm run build:linux` | gera o AppImage |
 | `npm run set-version` | sincroniza versão nos manifestos |
 
 ## CI e releases
 
 - CI (`.github/workflows/ci.yml`): roda no `ubuntu-latest` a cada push/PR com Vitest, `tsc`, `cargo fmt`, Clippy e `cargo test`.
-- Release (`.github/workflows/release.yml`): a cada tag `v*`, confere a versão nos manifestos e no CHANGELOG, compila `.deb` e AppImage e publica no GitHub Release.
+- Release (`.github/workflows/release.yml`): a cada tag `v*`, confere a versão nos manifestos e no CHANGELOG, compila o AppImage e publica no GitHub Release.
 
 Para lançar uma versão:
 

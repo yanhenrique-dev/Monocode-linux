@@ -18,7 +18,7 @@ You need Node.js 20+, a current stable Rust toolchain, and at least one provider
 - [fx](https://fx.sh) - `curl -fsSL https://fx.sh/setup.sh | bash` then `fx login`
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) - Linux: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`; then run `hermes model`
 
-Linux is the only supported target. On Debian/Ubuntu, `npm run setup:linux:deb` installs the native Tauri build dependencies.
+Linux is the only supported target. On Debian/Ubuntu, `npm run setup:linux` installs the native Tauri build dependencies.
 
 ```bash
 npm install

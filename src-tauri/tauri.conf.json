@@ -42,7 +42,6 @@
     "createUpdaterArtifacts": true,
     "active": true,
     "targets": [
-      "deb",
       "appimage"
     ],
     "icon": [

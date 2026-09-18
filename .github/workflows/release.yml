@@ -1,8 +1,8 @@
 name: Release
 
-# Linux-only fork: builds .deb + AppImage on Ubuntu and attaches them
-# to the GitHub Release. macOS (.dmg) and Windows (.exe) jobs from the
-# upstream were removed.
+# Linux-only fork: builds the AppImage on Ubuntu and attaches it to the
+# GitHub Release. Other bundles (.deb, macOS .dmg, Windows .exe) were
+# removed: AppImage is the only distributed artifact.
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   linux:
-    name: Linux packages + GitHub Release
+    name: Linux AppImage + GitHub Release
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux system dependencies
-        run: bash scripts/install-linux-deps-debian.sh
+        run: bash scripts/install-linux-deps.sh
 
       - run: npm ci
 
@@ -56,7 +56,7 @@ jobs:
           }
           NODE
 
-      - name: Build Linux packages
+      - name: Build Linux AppImage
         run: npm run build:linux
 
       - name: GitHub Release
@@ -65,14 +65,13 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          deb=(target/release/bundle/deb/*.deb)
           appimage=(target/release/bundle/appimage/*.AppImage)
-          if (( ${#deb[@]} != 1 || ${#appimage[@]} != 1 )); then
-            echo "Expected exactly one .deb and one AppImage" >&2
+          if (( ${#appimage[@]} != 1 )); then
+            echo "Expected exactly one AppImage" >&2
             exit 1
           fi
           VERSION="${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" \
             --title "MonoCode Linux $VERSION" \
             --notes "See CHANGELOG.md for details." \
-            "${deb[0]}" "${appimage[0]}"
+            "${appimage[0]}"
