@@ -594,7 +594,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
                     aria-label="Jump to latest"
                     data-jump-to-bottom
                     onClick={() => jumpToBottomRef.current?.()}
-                    className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-content/10 text-content shadow-md hover:bg-content/5 backdrop-blur-md"
+                    className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-background-base/95 text-content shadow-md hover:bg-content/5"
                   >
                     <ChevronDown className="size-4" strokeWidth={2} />
                   </button>
