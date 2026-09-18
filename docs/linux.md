@@ -119,6 +119,20 @@ libwayland do host. Se ainda assim abrir preto numa versão antiga:
 ./squashfs-root/AppRun
 ```
 
+## Links não abrem no navegador
+
+O empacotador incluía o `xdg-open` do Ubuntu 22.04, que não conhece o
+Plasma 6: com `KDE_SESSION_VERSION=6` ele não executa nada e sai com
+sucesso — o clique no link morria em silêncio. Desde a versão com o fix, o
+`scripts/repack-appimage.sh` também remove esse `xdg-open` embutido e o app
+usa o do sistema. Se um link mesmo assim não abrir, teste no terminal:
+
+```bash
+/usr/bin/xdg-open "https://example.com"
+```
+
+e confira o navegador padrão com `xdg-settings get default-web-browser`.
+
 ## Verificação
 
 ```bash
