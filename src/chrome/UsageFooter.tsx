@@ -21,6 +21,8 @@ import {
   idleRateLimits,
   RATE_LIMIT_POLL_MS,
   shouldFetchProvider,
+  subscribeUsageStale,
+  TURN_MIN_REFETCH_MS,
   type ProviderRateLimits,
   type RateLimitProvider,
 } from "../lib/rateLimits";
@@ -46,6 +48,12 @@ import {
 } from "../lib/providerAccounts";
 
 const CLOCK_MS = 30_000;
+
+type RefreshScope = {
+  /** Limit the fetch to the listed providers; omitted means all three. */
+  providers?: RateLimitProvider[];
+  minAgeMs?: number;
+};
 
 export type UsageFooterSession = {
   id?: string;
@@ -93,6 +101,7 @@ export function UsageFooter({
   const [refreshing, setRefreshing] = useState(false);
   const [, setAccountsVersion] = useState(0);
   const inflight = useRef<Promise<void> | null>(null);
+  const pendingForce = useRef(false);
   const claudeRef = useRef(claude);
   const codexRef = useRef(codex);
   const opencodeRef = useRef(opencode);
@@ -120,57 +129,85 @@ export function UsageFooter({
     [],
   );
 
-  const refresh = useCallback(
-    (force = false) => {
-      if (inflight.current) return inflight.current;
-      const visible = document.visibilityState === "visible";
-      const fetchClaude =
-        wantClaude &&
-        shouldFetchProvider(claudeRef.current, { force, visible });
-      const fetchCodex =
-        wantCodex && shouldFetchProvider(codexRef.current, { force, visible });
-      const fetchOpencode =
-        wantOpencode &&
-        shouldFetchProvider(opencodeRef.current, { force, visible });
-      if (!fetchClaude && !fetchCodex && !fetchOpencode) return;
-      if (force) setRefreshing(true);
-      const jobs: Promise<void>[] = [];
-      if (fetchClaude) {
-        const accountId = claudeAccountId;
-        setClaude((current) => fetchingRateLimits("claude", current));
-        jobs.push(
-          fetchClaudeRateLimits(accountId).then((value) => {
-            if (accountId === claudeAccountRef.current) setClaude(value);
-          }),
-        );
-      }
-      if (fetchCodex) {
-        const accountId = codexAccountId;
-        setCodex((current) => fetchingRateLimits("codex", current));
-        jobs.push(
-          fetchCodexRateLimits(accountId).then((value) => {
-            if (accountId === codexAccountRef.current) setCodex(value);
-          }),
-        );
-      }
-      if (fetchOpencode) {
-        setOpencode((current) => fetchingRateLimits("opencode", current));
-        jobs.push(
-          fetchOpencodeGoRateLimits().then((value) => {
-            setOpencode(value);
-          }),
-        );
-      }
-      const run = Promise.allSettled(jobs)
-        .then(() => undefined)
-        .finally(() => {
-          inflight.current = null;
+  // The return annotation is required: the queued-force retry below refers to
+  // start from inside its own body.
+  const start = useCallback(function start(
+    force: boolean,
+    scope?: RefreshScope,
+  ): Promise<void> | undefined {
+    const visible = document.visibilityState === "visible";
+    const wants = (provider: RateLimitProvider, limits: ProviderRateLimits) =>
+      (!scope?.providers || scope.providers.includes(provider)) &&
+      shouldFetchProvider(limits, {
+        force,
+        visible,
+        minAgeMs: scope?.minAgeMs,
+      });
+    const fetchClaude =
+      wantClaude && wants("claude", claudeRef.current);
+    const fetchCodex =
+      wantCodex && wants("codex", codexRef.current);
+    const fetchOpencode =
+      wantOpencode && wants("opencode", opencodeRef.current);
+    if (!fetchClaude && !fetchCodex && !fetchOpencode) {
+      setRefreshing(false);
+      return;
+    }
+    if (force) setRefreshing(true);
+    const jobs: Promise<void>[] = [];
+    if (fetchClaude) {
+      const accountId = claudeAccountId;
+      setClaude((current) => fetchingRateLimits("claude", current));
+      jobs.push(
+        fetchClaudeRateLimits(accountId).then((value) => {
+          if (accountId === claudeAccountRef.current) setClaude(value);
+        }),
+      );
+    }
+    if (fetchCodex) {
+      const accountId = codexAccountId;
+      setCodex((current) => fetchingRateLimits("codex", current));
+      jobs.push(
+        fetchCodexRateLimits(accountId).then((value) => {
+          if (accountId === codexAccountRef.current) setCodex(value);
+        }),
+      );
+    }
+    if (fetchOpencode) {
+      setOpencode((current) => fetchingRateLimits("opencode", current));
+      jobs.push(
+        fetchOpencodeGoRateLimits().then((value) => {
+          setOpencode(value);
+        }),
+      );
+    }
+    const run = Promise.allSettled(jobs)
+      .then(() => undefined)
+      .finally(() => {
+        inflight.current = null;
+        if (!pendingForce.current) {
           setRefreshing(false);
-        });
-      inflight.current = run;
-      return run;
+          return;
+        }
+        pendingForce.current = false;
+        void start(true);
+      });
+    inflight.current = run;
+    return run;
+  }, [claudeAccountId, codexAccountId, wantClaude, wantCodex, wantOpencode]);
+
+  const refresh = useCallback(
+    (force = false, scope?: RefreshScope) => {
+      if (!inflight.current) return start(force, scope);
+      // A click landing mid-poll must not be swallowed: the Codex probe owns a
+      // single child process, so queue the forced run instead of racing it.
+      if (force) {
+        pendingForce.current = true;
+        setRefreshing(true);
+      }
+      return inflight.current;
     },
-    [claudeAccountId, codexAccountId, wantClaude, wantCodex, wantOpencode],
+    [start],
   );
 
   useEffect(() => {
@@ -196,9 +233,13 @@ export function UsageFooter({
       if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
+    const stopTurns = subscribeUsageStale((provider) => {
+      void refresh(false, { providers: [provider], minAgeMs: TURN_MIN_REFETCH_MS });
+    });
     return () => {
       window.clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
+      stopTurns();
     };
   }, [refresh]);
 
