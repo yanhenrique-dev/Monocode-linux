@@ -191,6 +191,68 @@ function arrayLike<T>(list: ArrayLike<T> | null | undefined): T[] {
   return list ? Array.from(list) : [];
 }
 
+/** DataTransfer type strings that promise image bytes. */
+export function clipboardImageTypes(
+  types: ArrayLike<string> | readonly string[] | null | undefined,
+): string[] {
+  if (!types) return [];
+  const out: string[] = [];
+  for (const type of Array.from(types as ArrayLike<string>)) {
+    if (typeof type === "string" && type.toLowerCase().startsWith("image/")) {
+      out.push(type);
+    }
+  }
+  return out;
+}
+
+type AsyncClipboardItem = {
+  types: readonly string[];
+  getType: (type: string) => Promise<Blob>;
+};
+
+type AsyncClipboardProvider = {
+  read?: () => Promise<AsyncClipboardItem[]>;
+};
+
+/**
+ * Last-resort image paste: some webviews (notably WebKitGTK on Wayland)
+ * expose zero files/items for image pastes even though the OS clipboard
+ * holds image data. The async clipboard API can still reach those bytes.
+ * Paste counts as user activation, so permission normally holds. Returns
+ * null when unavailable — callers must fall back to guidance text.
+ */
+export async function readClipboardImageFile(
+  clipboard?: AsyncClipboardProvider | null,
+): Promise<File | null> {
+  try {
+    const provider =
+      clipboard ??
+      (typeof navigator !== "undefined"
+        ? (navigator as Navigator & { clipboard?: AsyncClipboardProvider })
+            .clipboard
+        : undefined);
+    const items = await provider?.read?.();
+    if (!items) return null;
+    for (const item of items) {
+      const imageType = item.types.find((type) =>
+        type.toLowerCase().startsWith("image/"),
+      );
+      if (!imageType) continue;
+      const blob = await item.getType(imageType);
+      if (!blob || blob.size <= 0) continue;
+      const name = fallbackName(imageType.toLowerCase());
+      const withExt =
+        name.includes(".") || !imageType.includes("/")
+          ? name
+          : `${name}.${imageType.split("/")[1]?.split("+")[0] ?? "png"}`;
+      return new File([blob], withExt, { type: imageType });
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** macOS often exposes the same screenshot as PNG and an unnamed TIFF. */
 function dropMacScreenshotTwins(files: File[]): File[] {
   const unnamedTiff = (file: File) => {

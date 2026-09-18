@@ -31,9 +31,11 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   attachmentsFromFiles,
   attachmentsFromPaths,
+  clipboardImageTypes,
   filesFromClipboard,
   mergeAttachments,
   pickAttachments,
+  readClipboardImageFile,
   revokeAttachment,
 } from "../lib/attachments";
 import { resizeComposer } from "../lib/composerResize";
@@ -592,6 +594,39 @@ export function Composer({
     syncHasValue(ref.current?.value ?? "", attachmentsRef.current);
   }, [inboxCard, noteCard, handoffCard, syncHasValue]);
 
+  // Transient, self-clearing note for attachment failures (image paste with
+  // no readable bytes, unsupported provider, …). Pastes used to die silent.
+  const [attachNotice, setAttachNotice] = useState<string | null>(null);
+  const attachNoticeTimer = useRef<number | null>(null);
+  const dismissAttachNotice = useCallback(() => {
+    if (attachNoticeTimer.current != null) {
+      window.clearTimeout(attachNoticeTimer.current);
+      attachNoticeTimer.current = null;
+    }
+    setAttachNotice(null);
+  }, []);
+  const showAttachNotice = useCallback(
+    (message: string) => {
+      if (attachNoticeTimer.current != null) {
+        window.clearTimeout(attachNoticeTimer.current);
+      }
+      setAttachNotice(message);
+      attachNoticeTimer.current = window.setTimeout(() => {
+        attachNoticeTimer.current = null;
+        setAttachNotice(null);
+      }, 4500);
+    },
+    [],
+  );
+  useEffect(
+    () => () => {
+      if (attachNoticeTimer.current != null) {
+        window.clearTimeout(attachNoticeTimer.current);
+      }
+    },
+    [],
+  );
+
   const addAttachments = useCallback(
     (incoming: Attachment[]) => {
       if (!harnessSupportsAttachments(harness) || incoming.length === 0) return;
@@ -600,9 +635,10 @@ export function Composer({
         syncHasValue(ref.current?.value ?? "", next);
         return next;
       });
+      dismissAttachNotice();
       ref.current?.focus();
     },
-    [harness, syncHasValue],
+    [dismissAttachNotice, harness, syncHasValue],
   );
 
   const removeAttachment = useCallback(
@@ -953,7 +989,12 @@ export function Composer({
       if (!attachmentsSupported) return;
       if (Date.now() - nativeDropAt < 250) return;
       const files = [...data.files];
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        showAttachNotice(
+          "Couldn't read the dropped item. Drag the file from your file manager instead.",
+        );
+        return;
+      }
       void attachmentsFromFiles(files).then(addAttachments);
     };
 
@@ -1202,10 +1243,67 @@ export function Composer({
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = filesFromClipboard(e.clipboardData);
-    if (files.length === 0) return;
+    if (files.length > 0) {
+      e.preventDefault();
+      if (!attachmentsSupported) {
+        showAttachNotice(
+          `${HARNESS_TITLE[harness]} does not accept attachments, so the pasted files were ignored.`,
+        );
+        return;
+      }
+      void attachmentsFromFiles(files).then(
+        (result) => {
+          if (result.length === 0) {
+            showAttachNotice(
+              "Couldn't read the pasted files. Save them and drag the files onto the composer instead.",
+            );
+            return;
+          }
+          addAttachments(result);
+        },
+        () => {
+          showAttachNotice(
+            "Couldn't read the pasted files. Save them and drag the files onto the composer instead.",
+          );
+        },
+      );
+      return;
+    }
+    // No File objects exposed. Some webviews (notably WebKitGTK on Wayland)
+    // hand paste events with zero files even though the OS clipboard holds
+    // image data — without this branch the image silently vanishes.
+    const offeredImages = clipboardImageTypes(e.clipboardData?.types);
+    if (offeredImages.length === 0) return;
     e.preventDefault();
-    if (!attachmentsSupported) return;
-    void attachmentsFromFiles(files).then(addAttachments);
+    if (!attachmentsSupported) {
+      showAttachNotice(
+        `${HARNESS_TITLE[harness]} does not accept attachments, so the pasted image was ignored.`,
+      );
+      return;
+    }
+    void (async () => {
+      const file = await readClipboardImageFile();
+      if (!file) {
+        showAttachNotice(
+          "Couldn't grab that image from the clipboard. Save the screenshot as a file and drag it onto the composer.",
+        );
+        return;
+      }
+      try {
+        const result = await attachmentsFromFiles([file]);
+        if (result.length === 0) {
+          showAttachNotice(
+            "Couldn't grab that image from the clipboard. Save the screenshot as a file and drag it onto the composer.",
+          );
+          return;
+        }
+        addAttachments(result);
+      } catch {
+        showAttachNotice(
+          "Couldn't grab that image from the clipboard. Save the screenshot as a file and drag it onto the composer.",
+        );
+      }
+    })();
   };
 
   const attachFromPicker = () => {
@@ -1394,6 +1492,15 @@ export function Composer({
                   onRemove={() => removeAttachment(file.id)}
                 />
               ))}
+            </div>
+          ) : null}
+
+          {attachNotice ? (
+            <div
+              role="status"
+              className="px-3 pt-2 text-[12px] leading-snug text-content/60"
+            >
+              {attachNotice}
             </div>
           ) : null}
 
