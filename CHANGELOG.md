@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.62] - 2026-09-18
+
+### Added
+
+- Clock timestamps on user messages, including card-only ones.
+
+### Fixed
+
+- Image paste on WebKitGTK/Wayland when the webview hides clipboard
+  types: the async clipboard read is now attempted instead of silently
+  dropping the image.
+- Stale approval requests are settled when turns end, so old Allow/Deny
+  controls stop being actionable.
+- Open editors reconcile on the first mtime sample instead of only
+  establishing a baseline.
+
 ## [0.1.61] - 2026-09-18
 
 ### Fixed
