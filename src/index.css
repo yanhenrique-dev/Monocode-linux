@@ -297,6 +297,16 @@ html.hw-reduced [class*="backdrop-blur"] {
   -webkit-backdrop-filter: none;
 }
 
+/*
+ * User preference: "Interface blur" off. Same swap as hw-reduced, but
+ * independent — the window stays composited, only the CSS blur sampling
+ * goes away. Applies on top of hw-reduced: either switch kills the blur.
+ */
+html.no-ui-blur .glass-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* Same switch also freezes the always-on animations: with compositing off,
    shimmer sweeps, mascot loops and zen spinners each force a full repaint. */
 html.hw-reduced .shimmer-text,
