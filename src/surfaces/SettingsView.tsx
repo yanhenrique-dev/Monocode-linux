@@ -1856,7 +1856,7 @@ function AppearancePage({
         <Row
           id="interface-blur"
           label="Interface blur"
-          description="Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces keep their tint, just flat."
+          description="Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces go solid instead of translucent."
         >
           <Toggle
             label="Interface blur"

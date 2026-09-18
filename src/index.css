@@ -313,6 +313,18 @@ html.hw-reduced .glass-blur {
 html.no-ui-blur .glass-blur {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  /* Translucent fills relied on the blur for legibility; go solid instead. */
+  background-color: var(--color-background-base);
+}
+
+/*
+ * Popover/modal/toast backdrops are ~transparent by design (2% content):
+ * without sampled blur they vanish entirely, so pin them solid while any
+ * blur switch is off — same fill the light theme already uses.
+ */
+html.no-ui-blur .popover-backdrop,
+html.hw-reduced .popover-backdrop {
+  background: var(--color-background-base);
 }
 
 /* Same switch also freezes the always-on animations: with compositing off,
