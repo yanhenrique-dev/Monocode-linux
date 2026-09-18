@@ -53,6 +53,8 @@ export interface ShortcutAction {
   onFocusDir: (dir: import("../lib/layout").FocusDir) => void;
   onToggleSidebar: () => void;
   onGoToFile: () => void;
+  onOpenCommandPalette: () => void;
+  onReload: () => void;
   onFindInProject: () => void;
   onOpenSearch: () => void;
   onOpenInbox: () => void;
@@ -115,6 +117,8 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     onFocusDir,
     onToggleSidebar,
     onGoToFile,
+    onOpenCommandPalette,
+    onReload,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -180,6 +184,8 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     onFocusDir,
     onToggleSidebar,
     onGoToFile,
+    onOpenCommandPalette,
+    onReload,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -209,6 +215,8 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     onFocusDir,
     onToggleSidebar,
     onGoToFile,
+    onOpenCommandPalette,
+    onReload,
     onFindInProject,
     onOpenSearch,
     onOpenInbox,
@@ -373,6 +381,18 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
         run("go_to_file", actions.current.onGoToFile);
         return;
       }
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        e.stopPropagation();
+        run("open_command_palette", actions.current.onOpenCommandPalette);
+        return;
+      }
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        e.stopPropagation();
+        run("reload", actions.current.onReload);
+        return;
+      }
       if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
         const target = e.target instanceof Element ? e.target : null;
         if (target?.closest(".monocode-terminal") && e.ctrlKey && !e.metaKey) {
@@ -448,7 +468,11 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
       listen("open_project", () => {
         void actions.current.pickProject();
       }),
-      listen("go_to_file", () => actions.current.onGoToFile()),
+      listen("go_to_file", () => run("go_to_file", actions.current.onGoToFile)),
+      listen("open_command_palette", () =>
+        run("open_command_palette", actions.current.onOpenCommandPalette),
+      ),
+      listen("reload", () => run("reload", actions.current.onReload)),
       listen("open_search", () => actions.current.onOpenSearch()),
       listen("open_inbox", () => actions.current.onOpenInbox()),
       listen("open_notes", () => actions.current.onOpenNotes()),

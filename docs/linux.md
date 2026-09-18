@@ -68,6 +68,26 @@ Instale e autentique pelo menos um antes de abrir o app:
 | fx | `curl -fsSL https://fx.sh/setup.sh \| bash` | `fx login` |
 | Hermes Agent | `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash` | `hermes model` |
 
+### OpenCode: MCP, config e auth
+
+O MonoCode não gerencia MCP nem escreve `opencode.json`. O `opencode serve`
+que o app sobe lê a config normal do OpenCode: `opencode.json[c]` do projeto
+para cima mais `~/.config/opencode/`. MCPs (`opencode mcp list`), skills
+(`opencode debug skill`) e providers (`opencode providers list`) continuam
+sendo configurados no próprio OpenCode.
+
+O que o MonoCode faz por sessão: `PATCH /session` com regras de permissão
+conforme o modo de acesso (supervised, auto-accept-edits, auto, full-access).
+`question` é sempre permitido, `allow` vira `once` (a sessão pergunta de novo
+na próxima vez). Cheque `opencode debug config` se algo parecer ignorado.
+
+Auth é por provider dentro do OpenCode, então não há botão de login no app
+para ele. Se o turno falhar com modelo não encontrado, rode
+`opencode models <provider>` e escolha um `provider/model` do catálogo.
+Overrides via env (`OPENCODE_CONFIG`, `OPENCODE_CONFIG_CONTENT`,
+`OPENCODE_AUTH_CONTENT`) são repassados do login shell para o `serve`,
+igual às chaves de fx e grok.
+
 ## Sobre o projeto
 
 - Exclusivo para Linux: CI, release, docs e empacotamento só para AppImage.
@@ -118,6 +138,22 @@ libwayland do host. Se ainda assim abrir preto numa versão antiga:
 ./MonoCode_*.AppImage --appimage-extract
 ./squashfs-root/AppRun
 ```
+
+## Links não abrem no navegador
+
+O empacotador incluía o `xdg-open` do Ubuntu 22.04, que não conhece os
+desktops Linux atuais: dependendo da sessão (ex. Plasma 6 via
+`KDE_SESSION_VERSION=6`), ele não executa nada e sai com sucesso — o clique
+no link morria em silêncio. Desde a versão com o fix, o
+`scripts/repack-appimage.sh` também remove esse `xdg-open` embutido e o app
+usa o do sistema, que entende o desktop em execução. Se um link mesmo assim
+não abrir, teste no terminal:
+
+```bash
+/usr/bin/xdg-open "https://example.com"
+```
+
+e confira o navegador padrão com `xdg-settings get default-web-browser`.
 
 ## Verificação
 

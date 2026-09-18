@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Links now open in the system browser on current Linux desktops: the
+  bundled Ubuntu 22.04 `xdg-open` (which silently did nothing on sessions
+  it predates) is stripped from the AppImage, so the host handler runs
+  instead.
+
 ## [0.1.61] - 2026-09-18
 
 ### Fixed

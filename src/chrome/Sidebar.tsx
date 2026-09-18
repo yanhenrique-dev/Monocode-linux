@@ -1122,7 +1122,7 @@ function SidebarComponent({
       <div
         key={itemId}
         ref={(el) => sortable.setItemRef(itemId, el)}
-        className="reorder-item workspace-tab relative flex min-w-0 flex-1 touch-none items-stretch"
+        className="reorder-item workspace-tab workspace-tab-item relative flex min-w-0 flex-1 touch-none items-stretch"
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           sortable.onItemPointerDown(itemId, event);
@@ -2424,7 +2424,7 @@ function SessionCard({
       : "py-2";
 
   return (
-    <div className="group relative">
+    <div className="group session-card relative">
       <div
         title={title}
         data-session-card={session.id}
