@@ -1306,6 +1306,17 @@ function UserMessageBlock({
             {displayText}
           </pre>
         ) : null}
+        {block.startedAt != null ? (
+          <div className="flex justify-end px-1 pt-1">
+            <time
+              dateTime={new Date(block.startedAt).toISOString()}
+              title={new Date(block.startedAt).toLocaleString()}
+              className="font-sans text-xs text-content/40"
+            >
+              {formatClockTime(block.startedAt)}
+            </time>
+          </div>
+        ) : null}
       </div>
     </div>
   );
