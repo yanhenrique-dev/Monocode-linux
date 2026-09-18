@@ -53,7 +53,6 @@ export function ContextMeter({
       {onCompact ? (
         <button
           type="button"
-          title="Context usage"
           aria-label={`${headline}, ${detail}. Open context actions`}
           aria-expanded={actionsOpen}
           onClick={() => setOpen((value) => !value)}
