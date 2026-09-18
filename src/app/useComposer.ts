@@ -106,6 +106,7 @@ import {
 import {
   nudgeOpenEditors,
   nudgeWorkspace,
+  scheduleNudge,
   trackSessionEdits,
 } from "./workspaceEvents";
 
@@ -944,8 +945,7 @@ export function useComposer(deps: ComposerDeps) {
           notifyGitChanged();
           notifyUsageStale(usageProviderFor(current.harness));
           nudgeWorkspace(workCwd);
-          nudgeWatchedFiles();
-          window.setTimeout(() => nudgeWatchedFiles(), 150);
+          scheduleNudge(workCwd);
         }
       })()
         .catch((error: unknown) => {

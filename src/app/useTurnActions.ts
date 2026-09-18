@@ -78,8 +78,7 @@ import {
 import { getSession, upsertSession } from "../lib/sessionStore";
 import { notifyGitChanged } from "../lib/fs";
 import { notifyReviewChanged } from "../lib/checkpoint";
-import { nudgeWatchedFiles } from "../lib/fileWatch";
-import { nudgeWorkspace } from "./workspaceEvents";
+import { nudgeWorkspace, scheduleNudge } from "./workspaceEvents";
 import { orchestrator, type OrchestrationRun } from "../lib/orchestration";
 import {
   attachOrchestrationWorkers,
@@ -626,8 +625,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
         notifyReviewChanged(sessionId);
         nudgeWorkspace(sessionWorkCwd(session));
         notifyGitChanged();
-        nudgeWatchedFiles();
-        window.setTimeout(() => nudgeWatchedFiles(), 150);
+        scheduleNudge(sessionWorkCwd(session));
       } else {
         notifyReviewChanged(sessionId);
       }

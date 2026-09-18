@@ -74,6 +74,27 @@ export function nudgeWorkspace(cwd?: string) {
   notifyDirsChanged();
 }
 
+let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingNudgeCwds = new Set<string | undefined>();
+
+function flushNudge() {
+  nudgeTimer = null;
+  const cwds = [...pendingNudgeCwds];
+  pendingNudgeCwds.clear();
+  nudgeWatchedFiles();
+  notifyGitChanged();
+  for (const cwd of cwds) nudgeWorkspace(cwd);
+  // A bare call still invalidates the default project scope.
+  if (cwds.length === 0) nudgeWorkspace(undefined);
+}
+
+/** Trailing-edge coalescing: edit-heavy turns emit several tool events. */
+export function scheduleNudge(cwd?: string) {
+  pendingNudgeCwds.add(cwd);
+  if (nudgeTimer) return;
+  nudgeTimer = setTimeout(flushNudge, 150);
+}
+
 export function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
   if (event.type !== "tool.updated") return;
   const completed = event.status === "completed" || event.status === "success";
@@ -81,11 +102,7 @@ export function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
   const kind = event.kind?.trim().toLowerCase();
   if (kind === "execute" || event.preview?.kind === "shell") {
     if (!completed) return;
-    nudgeWatchedFiles();
-    window.setTimeout(() => nudgeWatchedFiles(), 150);
-    notifyGitChanged();
-    nudgeWorkspace(cwd);
-    window.setTimeout(() => nudgeWorkspace(cwd), 150);
+    scheduleNudge(cwd);
     return;
   }
 
@@ -97,9 +114,5 @@ export function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
   } else if (completed) {
     nudgeWatchedFiles();
   }
-  if (completed) {
-    window.setTimeout(() => nudgeWatchedFiles(), 150);
-    notifyGitChanged();
-    nudgeWorkspace(cwd);
-  }
+  if (completed) scheduleNudge(cwd);
 }
