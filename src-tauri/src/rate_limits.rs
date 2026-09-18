@@ -467,6 +467,8 @@ fn usage_error(status: u16) -> ClaudeUsageFetch {
         "Claude sign-in expired".into()
     } else if status == 403 {
         "Claude usage is unavailable for this account".into()
+    } else if status == 429 {
+        "Claude usage lookup rate limited".into()
     } else {
         format!("Claude usage request failed ({status})")
     };
