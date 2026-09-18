@@ -153,7 +153,7 @@ export function ProjectSearch({
           onClick={onClose}
           title="Back to files"
           aria-label="Back to files"
-          className="grid size-7 shrink-0 place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content"
+          className="grid size-7 shrink-0 place-items-center rounded-md text-content/70 hover:bg-content/10 hover:text-content"
         >
           <ChevronLeft className="size-4" strokeWidth={1.75} />
         </button>

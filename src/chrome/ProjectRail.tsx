@@ -1122,7 +1122,7 @@ function ProjectSectionHeader({
             const rect = event.currentTarget.getBoundingClientRect();
             onAddGroup(rect.left, rect.bottom);
           }}
-          className="grid size-5 shrink-0 place-items-center rounded-md text-content/50 hover:bg-content/8 hover:text-content"
+          className="grid size-5 shrink-0 place-items-center rounded-md text-content/70 hover:bg-content/8 hover:text-content"
         >
           <FolderPlus className="size-3.5" strokeWidth={1.75} />
         </button>
@@ -1133,7 +1133,7 @@ function ProjectSectionHeader({
           title="Open project"
           aria-label="Open project"
           onClick={onAdd}
-          className="grid size-5 shrink-0 place-items-center rounded-md text-content/50 hover:bg-content/8 hover:text-content"
+          className="grid size-5 shrink-0 place-items-center rounded-md text-content/70 hover:bg-content/8 hover:text-content"
         >
           <Plus className="size-3.5" strokeWidth={1.75} />
         </button>
@@ -1273,7 +1273,7 @@ function ProjectGroupSection({
       aria-label={group.name}
     >
       <div
-        className="project-reorder-item group relative flex h-8 items-stretch rounded-md px-2 opacity-65 cursor-default"
+        className="project-reorder-item group relative flex h-8 items-stretch rounded-md px-2 opacity-85 cursor-default"
         onContextMenu={(event) => {
           event.preventDefault();
           event.currentTarget.querySelector<HTMLButtonElement>("button")?.focus();
@@ -1329,7 +1329,7 @@ function ProjectGroupSection({
             event.stopPropagation();
             openMenu(event.currentTarget);
           }}
-          className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-md text-content/55 hover:bg-content/8 hover:text-content group-hover:grid group-has-[:focus-visible]:grid"
+          className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-md text-content/75 hover:bg-content/8 hover:text-content group-hover:grid group-has-[:focus-visible]:grid"
         >
           <MoreHorizontal className="size-4" strokeWidth={1.75} />
         </button>
@@ -1420,7 +1420,7 @@ function ProjectCard({
       className={`reorder-item project-reorder-item group relative flex touch-none items-stretch rounded-md px-2 h-8 ${
         selected
           ? "bg-selection-strong text-content"
-          : "opacity-65"
+          : "opacity-85"
       } cursor-default`}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
@@ -1511,7 +1511,7 @@ function ProjectCard({
             event.detail === 0 ? rect.bottom : event.clientY,
           );
         }}
-        className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-md text-content/55 hover:bg-content/8 hover:text-content group-hover:grid group-has-[:focus-visible]:grid"
+        className="absolute right-1 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-md text-content/75 hover:bg-content/8 hover:text-content group-hover:grid group-has-[:focus-visible]:grid"
       >
         <MoreHorizontal className="size-4" strokeWidth={1.75} />
       </button>
@@ -1525,7 +1525,7 @@ function ProjectCard({
           event.stopPropagation();
           onTogglePin(item.path);
         }}
-        className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-content/55 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
+          className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-content/75 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
       >
         {pinned ? (
           <PinOff className="size-3.5" strokeWidth={1.75} />

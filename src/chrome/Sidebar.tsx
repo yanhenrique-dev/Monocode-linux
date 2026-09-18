@@ -1874,7 +1874,7 @@ function SessionsHeaderButton({
       aria-haspopup={hasPopup ? "menu" : undefined}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={onClick}
-      className={`relative z-50 grid size-6 place-items-center rounded-md text-content/50 hover:bg-content/10 hover:text-content ${
+      className={`relative z-50 grid size-6 place-items-center rounded-md text-content/70 hover:bg-content/10 hover:text-content ${
         open || active ? "bg-selection text-content" : ""
       }`}
     >
@@ -2545,7 +2545,7 @@ function SessionCard({
                   event.stopPropagation();
                   onArchive();
                 }}
-                className="pointer-events-none grid size-5 place-items-center rounded-md text-content/50 opacity-0 hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                className="pointer-events-none grid size-5 place-items-center rounded-md text-content/70 opacity-0 hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
               >
                 <Archive className="size-3 shrink-0" strokeWidth={1.75} />
               </button>
