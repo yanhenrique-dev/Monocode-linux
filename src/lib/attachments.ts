@@ -205,6 +205,22 @@ export function clipboardImageTypes(
   return out;
 }
 
+/**
+ * Whether a paste with zero File objects still deserves an async clipboard
+ * read. True when the transfer advertises an image, or when the webview hid
+ * its type list while carrying no plain text — default insertion would drop
+ * that payload either way, so the last-resort read (or its guidance note)
+ * must run instead of returning silent.
+ */
+export function needsAsyncImageRead(
+  types: ArrayLike<string> | readonly string[] | null | undefined,
+  plainText: string,
+): boolean {
+  if (plainText) return false;
+  if (clipboardImageTypes(types).length > 0) return true;
+  return types == null || types.length === 0;
+}
+
 type AsyncClipboardItem = {
   types: readonly string[];
   getType: (type: string) => Promise<Blob>;
