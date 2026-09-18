@@ -15,6 +15,12 @@
 # This intentionally prunes ONLY libwayland-*. glib/gstreamer stay bundled
 # for old distros, and the GL dispatch (EGL/GL/gbm/drm) already comes from
 # the host in our bundle.
+#
+# usr/bin/xdg-open is pruned for the same vintage reason: the Jammy-era
+# script predates current Linux desktops (e.g. its open_kde() only handles
+# Plasma 4/5, so on newer sessions it can run nothing yet exit 0), which
+# silently broke "open in browser" from the app on some systems. The host
+# xdg-open understands whichever desktop is actually running.
 set -euo pipefail
 
 BUNDLE_DIR="target/release/bundle/appimage"
@@ -60,6 +66,13 @@ if (( ${#to_prune[@]} > 0 )); then
   rm -fv "${to_prune[@]}"
 fi
 
+echo "pruning bundled xdg-open (stale desktop detection silently no-ops links):"
+rm -fv "$work"/squashfs-root/usr/bin/xdg-open || true
+if [ -e "$work/squashfs-root/usr/bin/xdg-open" ]; then
+  echo "xdg-open prune failed" >&2
+  exit 1
+fi
+
 remaining="$(ls "$libdir" | grep -E '^libwayland-.*\.so' || true)"
 if [ -n "$remaining" ]; then
   echo "prune failed, still bundled:" >&2
@@ -84,4 +97,4 @@ fi
 
 mv "$work/$name" "$BUNDLE_DIR/$name"
 chmod +x "$BUNDLE_DIR/$name"
-echo "repacked $BUNDLE_DIR/$name without bundled libwayland"
+echo "repacked $BUNDLE_DIR/$name without bundled libwayland/xdg-open"
