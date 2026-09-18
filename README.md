@@ -13,6 +13,7 @@
   <a href="https://github.com/yanhenrique-dev/Monocode-linux/releases/latest"><img src="https://img.shields.io/github/v/release/yanhenrique-dev/Monocode-linux?label=release" alt="Release" /></a>
   <img src="https://img.shields.io/badge/plataforma-Linux%20x86__64-blue" alt="Linux x86_64" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-green" alt="MIT" /></a>
+  <a href="https://ko-fi.com/yanhenriquedev"><img src="https://img.shields.io/badge/Ko--fi-Apoie-ff5e5b?logo=ko-fi&logoColor=white" alt="Apoie no Ko-fi" /></a>
 </p>
 
 > Aviso de fork: este projeto deriva de [hardbeat920/monocode](https://github.com/hardbeat920/monocode.git) e é mantido com foco total em Linux. O crédito pela base original vai para o autor e os contribuidores do upstream.
