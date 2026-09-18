@@ -285,6 +285,39 @@ describe("mergeCatalog", () => {
       "cursor",
     );
   });
+
+  it("keeps vendored .agents rust skills ahead of provider copies", () => {
+    const catalog = mergeCatalog([
+      {
+        name: "rust-skills",
+        description: "vendored",
+        path: "/p/.agents/skills/rust-skills/SKILL.md",
+        scope: "project",
+        source: "agents",
+      },
+      {
+        name: "rust-skills",
+        description: "provider copy",
+        path: "/p/.opencode/skills/rust-skills/SKILL.md",
+        scope: "project",
+        source: "opencode",
+      },
+      {
+        name: "monocode-rust",
+        description: "repo rules",
+        path: "/p/.agents/skills/monocode-rust/SKILL.md",
+        scope: "project",
+        source: "agents",
+      },
+    ]);
+    expect(catalog.find((s) => s.name === "rust-skills")?.description).toBe(
+      "vendored",
+    );
+    expect(catalog.find((s) => s.name === "monocode-rust")).toMatchObject({
+      scope: "project",
+      source: "agents",
+    });
+  });
 });
 
 describe("rankSkills", () => {

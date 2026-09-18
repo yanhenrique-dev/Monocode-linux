@@ -165,7 +165,9 @@ function pickTextModel(): { providerID: string; modelID: string } {
     const parsed = parseOpenCodeModelSlug(model.nativeId ?? model.id);
     if (parsed) return parsed;
   }
-  return { providerID: "opencode", modelID: "glm-5" };
+  throw new Error(
+    "No OpenCode model available. Wait for the catalog to load, then pick a model.",
+  );
 }
 
 function sameModel(

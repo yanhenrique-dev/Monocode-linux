@@ -1987,6 +1987,9 @@ fn prepare_child(cmd: &mut Command, command: &str) {
     if command_basename(command) == "grok" {
         apply_grok_env(cmd);
     }
+    if command_basename(command) == "opencode" {
+        apply_opencode_env(cmd);
+    }
     isolate_child(cmd);
 }
 
@@ -2021,17 +2024,40 @@ fn apply_grok_env(cmd: &mut Command) {
     }
 }
 
+/// OpenCode resolves `opencode.json[c]` from the cwd upward plus
+/// `~/.config/opencode`, so a spawned `serve` usually needs nothing extra.
+/// Forward explicit config/auth overrides when the user set them in the login
+/// shell, mirroring the fx/grok pattern. Never forward `OPENCODE_*`
+/// credentials beyond this allowlist.
+fn apply_opencode_env(cmd: &mut Command) {
+    for key in [
+        "OPENCODE_CONFIG",
+        "OPENCODE_CONFIG_CONTENT",
+        "OPENCODE_AUTH_CONTENT",
+    ] {
+        if std::env::var_os(key).is_some() {
+            continue;
+        }
+        if let Some(value) = login_shell_env(key) {
+            cmd.env(key, value);
+        }
+    }
+}
+
 static LOGIN_SHELL_ENV: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 
 /// Keys worth keeping out of `printenv`. PATH is the important one: a
 /// Finder-launched app inherits only launchd's bare PATH.
-const LOGIN_SHELL_KEYS: [&str; 6] = [
+const LOGIN_SHELL_KEYS: [&str; 9] = [
     "PATH",
     "AI_GATEWAY_API_KEY",
     "FX_AI_GATEWAY_API_KEY",
     "VERCEL_OIDC_TOKEN",
     "XAI_API_KEY",
     "GROK_CODE_XAI_API_KEY",
+    "OPENCODE_CONFIG",
+    "OPENCODE_CONFIG_CONTENT",
+    "OPENCODE_AUTH_CONTENT",
 ];
 
 fn login_shell_path() -> Option<String> {

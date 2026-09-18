@@ -402,7 +402,7 @@ function TabStripChevron({
       data-tauri-drag-region="false"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={onClick}
-      className={`absolute top-1/2 z-40 grid size-6.5 -translate-y-1/2 place-items-center rounded-md bg-content/10 backdrop-blur-xl text-content/70 hover:bg-content/15 hover:text-content ${
+      className={`absolute top-1/2 z-40 grid size-6.5 -translate-y-1/2 place-items-center rounded-md bg-background-base/90 text-content/70 hover:bg-content/15 hover:text-content ${
         side === "left" ? "left-1" : "right-1"
       }`}
     >

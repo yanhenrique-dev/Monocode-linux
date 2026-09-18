@@ -79,8 +79,21 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
     );
   }
 
-  const modelsOut = await execChild(path, ["models", "--verbose"], cwd);
-  const parsed = parseModelsCliOutput(modelsOut);
+  const modelsOut = await execChild(
+    path,
+    ["models", "--verbose"],
+    cwd,
+  ).catch(() => "");
+  let parsed =
+    modelsOut.trim() && !looksLikePlainSlugList(modelsOut)
+      ? parseModelsCliOutput(modelsOut)
+      : { providers: new Map(), connected: [] as string[] };
+  if (parsed.connected.length === 0) {
+    const plainOut = looksLikePlainSlugList(modelsOut)
+      ? modelsOut
+      : await execChild(path, ["models"], cwd).catch(() => "");
+    if (plainOut.trim()) parsed = parseModelsCliOutput(plainOut);
+  }
   let agents: OpenCodeAgent[] = [];
   try {
     const agentsOut = await execChild(path, ["agent", "list"], cwd);
@@ -92,6 +105,56 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
 }
 
 export function parseModelsCliOutput(stdout: string): {
+  providers: Map<string, ParsedProvider>;
+  connected: string[];
+} {
+  const trimmed = stdout.trim();
+  if (trimmed) {
+    const plain = parsePlainModelSlugs(trimmed);
+    if (plain) return plain;
+  }
+  return parseVerboseModelsCliOutput(stdout);
+}
+
+/**
+ * `opencode models` (no flags) prints one `provider/model` slug per line.
+ * Newer CLIs dropped `--json`, so accept the plain list as a catalog source
+ * with names derived from the slug. Verbose metadata still wins when present.
+ */
+export function parsePlainModelSlugs(stdout: string): {
+  providers: Map<string, ParsedProvider>;
+  connected: string[];
+} | null {
+  const providers = new Map<string, ParsedProvider>();
+  let slugs = 0;
+  for (const raw of stdout.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("{")) return null;
+    const separator = line.indexOf("/");
+    if (separator <= 0 || separator === line.length - 1 || /\s/.test(line)) {
+      return null;
+    }
+    const providerID = line.slice(0, separator);
+    const modelID = line.slice(separator + 1);
+    let provider = providers.get(providerID);
+    if (!provider) {
+      provider = {
+        id: providerID,
+        name: openCodeProviderName(providerID),
+        models: {},
+      };
+      providers.set(providerID, provider);
+    }
+    if (!provider.models[modelID]) {
+      provider.models[modelID] = { id: modelID };
+      slugs += 1;
+    }
+  }
+  if (slugs === 0) return null;
+  return { providers, connected: [...providers.keys()] };
+}
+
+function parseVerboseModelsCliOutput(stdout: string): {
   providers: Map<string, ParsedProvider>;
   connected: string[];
 } {
@@ -214,6 +277,20 @@ export function flattenOpenCodeModels(
 
 export function openCodeProviderName(providerID: string): string {
   return PROVIDER_NAMES[providerID] ?? titleCaseSlug(providerID);
+}
+
+/** True when stdout is the plain `provider/model` list, not verbose JSON. */
+function looksLikePlainSlugList(stdout: string): boolean {
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return false;
+  return lines.every((line) => {
+    if (line.startsWith("{") || /\s/.test(line)) return false;
+    const separator = line.indexOf("/");
+    return separator > 0 && separator < line.length - 1;
+  });
 }
 
 function openCodeModelSettings(
