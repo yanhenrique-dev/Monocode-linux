@@ -11,12 +11,17 @@ type Props = {
   active?: boolean;
 };
 
-/** Pixel mascot standing in for the project's color dot. */
+/** Pixel mascot standing in for the project's color dot.
+ *
+ * The art is an 8×8 grid: only render at integer multiples (8px, 16px…)
+ * so every cell lands on whole device pixels. Fractional boxes (12px,
+ * 14px) make crispEdges snap alternating 1px/2px columns and the sprite
+ * looks lumpy. Prefer `size-4`; never pass a fractional size. */
 export function ProjectMascot({
   project,
   color,
   name,
-  className = "size-3 shrink-0",
+  className = "size-4 shrink-0",
   active = false,
 }: Props) {
   const mascot = projectMascot(project, name);

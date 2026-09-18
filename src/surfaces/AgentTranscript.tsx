@@ -1983,7 +1983,7 @@ function SubagentMascot({
     <ProjectMascot
       project={name}
       active={active}
-      className={`size-3.5 shrink-0 ${
+      className={`size-4 shrink-0 ${
         state === "rejected"
           ? "text-red-400"
           : state === "pending"

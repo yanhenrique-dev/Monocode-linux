@@ -321,7 +321,7 @@ export function TabGroupMenu({
                 <ProjectMascot
                   project={groupId}
                   name={mascot.name}
-                  className="size-3 text-content/75"
+                  className="size-4 text-content/75"
                 />
               </MascotSwatch>
             ))}

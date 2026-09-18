@@ -235,7 +235,7 @@ function InboxProjectMark({
       project={project.name}
       color={project.mascotColor}
       name={project.mascotName}
-      className="size-3 shrink-0"
+      className="size-4 shrink-0"
     />
   );
 }
@@ -1431,7 +1431,7 @@ const InboxCard = memo(function InboxCard({
               project={name}
               color={mascotColor}
               name={mascotName}
-              className="size-3 shrink-0"
+              className="size-4 shrink-0"
             />
           )}
           <span className="min-w-0 truncate">{source}</span>

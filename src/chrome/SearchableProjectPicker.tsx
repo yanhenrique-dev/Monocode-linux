@@ -185,7 +185,7 @@ export function SearchableProjectPicker({
             project={seed}
             color={color}
             name={resolveTabGroupMascot(key, groupMascots)}
-            className="size-3 shrink-0"
+            className="size-4 shrink-0"
             active={busy}
           />
         )}
@@ -272,7 +272,7 @@ export function SearchableProjectPicker({
                           project={itemSeed}
                           color={itemColor}
                           name={resolveTabGroupMascot(itemKey, groupMascots)}
-                          className="size-3.5"
+                          className="size-4"
                         />
                       )}
                     </span>
