@@ -36,7 +36,7 @@ import { HarnessIcon } from "./HarnessIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TerminalSpinner } from "./TerminalSpinner";
 import { WindowControls } from "./WindowControls";
-import { IS_MAC, IS_WIN, MOD } from "../lib/platform";
+import { IS_MAC, MOD } from "../lib/platform";
 import type { RecentProject } from "../lib/recents";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import {
@@ -910,13 +910,10 @@ function TitleBarComponent({
           </div>
         </div>
 
-        {!IS_MAC && !IS_WIN ? (
-          <div className="flex min-w-0 flex-1 items-center justify-center px-4">
-            <span className="pointer-events-none truncate text-[11.5px] font-medium text-content/40 select-none">
-              {systemTitle}
-            </span>
-          </div>
-        ) : null}
+        {/* No centered window title: the tab strip and the sidebar already
+            identify the project and session, and the OS still gets
+            `systemTitle` via setTitle. On borderless Linux this label
+            duplicated "MonoCode" next to the tabs. */}
         {trailingControls}
       </div>
       {tabMenu && contextTab ? (
