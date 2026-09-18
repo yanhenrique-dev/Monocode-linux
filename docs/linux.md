@@ -98,6 +98,27 @@ WEBKIT_INSPECTOR_HTTP_SERVER=127.0.0.1:9222 ./MonoCode_*.AppImage
 Se alguma flag ajudar de forma consistente, vale registrar aqui o hardware
 e o driver onde foi testada.
 
+## Tela preta ao abrir (EGL_BAD_PARAMETER)
+
+Afeta AppImages construídos no Ubuntu 22.04 rodando em distros rolantes
+(CachyOS/Arch + Mesa recente + AMD + Wayland): o empacotador embute o
+`libwayland-client` antigo do Ubuntu, o Mesa do host falha em
+`eglGetDisplay()` e o processo web aborta — a janela abre preta. É o caso
+de [tauri-apps/tauri#15665](https://github.com/tauri-apps/tauri/issues/15665).
+
+Desde a **0.1.61** o workflow de release remove essas bibliotecas e
+reempacota o AppImage (`scripts/repack-appimage.sh`), então o loader usa o
+libwayland do host. Se ainda assim abrir preto numa versão antiga:
+
+```bash
+# Confirma o diagnóstico (esperado: EGL_BAD_PARAMETER)
+./MonoCode_*.AppImage 2>&1 | grep -i EGL
+
+# Contorno imediato: extrair e rodar contra as libs do sistema
+./MonoCode_*.AppImage --appimage-extract
+./squashfs-root/AppRun
+```
+
 ## Verificação
 
 ```bash

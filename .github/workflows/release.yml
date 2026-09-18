@@ -59,6 +59,10 @@ jobs:
       - name: Build Linux AppImage
         run: npm run build:linux
 
+      - name: Repack AppImage without bundled libwayland
+        # See scripts/repack-appimage.sh: stale libwayland breaks host Mesa.
+        run: bash scripts/repack-appimage.sh
+
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
