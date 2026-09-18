@@ -21,6 +21,10 @@ import type { HarnessId } from "./session";
 export type SplitDir = "right" | "down";
 export type FocusDir = "left" | "right" | "up" | "down";
 
+/** Fired on `window` when a sash drag ends, so per-frame observers that
+ * stood down during the drag (see `is-resizing`) can re-sync once. */
+export const PANE_RESIZE_END_EVENT = "monocode:pane-resize-end";
+
 export type LayoutNode =
   | { type: "leaf"; id: string }
   | {

@@ -330,6 +330,14 @@ export function TerminalGridBackground() {
         return;
       }
       raf = requestAnimationFrame(draw);
+      // A sash drag relayouts every frame: skip the canvas repaint (and the
+      // game tick) until the drop so the animation does not fight the resize
+      // for the main thread. lastFrame tracks the skip so the resume step
+      // does not swallow the whole drag as one giant tick.
+      if (document.documentElement.classList.contains("is-resizing")) {
+        lastFrame = time;
+        return;
+      }
       if (time - lastFrame < FRAME_MS) return;
       const dt = lastFrame ? time - lastFrame : FRAME_MS;
       lastFrame = time;

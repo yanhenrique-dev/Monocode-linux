@@ -1153,6 +1153,32 @@ header[data-tauri-drag-region] button {
   animation-play-state: paused;
 }
 
+/* A pane sash drag relayouts the whole window every frame. While it moves
+   (PaneTree sets html.is-resizing, same contract as useDragResize), stand
+   down the most expensive paint: continuous animations, the chat cover
+   image, and backdrop sampling. Everything restores on drop. */
+html.is-resizing .shimmer-text,
+html.is-resizing .zen-thinking-pulse,
+html.is-resizing .zen-tool-spin,
+html.is-resizing .mascot-active,
+html.is-resizing .mascot-rest,
+html.is-resizing .mascot-talk,
+html.is-resizing .composer-coin-face,
+html.is-resizing .composer-coin-edge,
+html.is-resizing .approval-toast,
+html.is-resizing .linked-activity-notice {
+  animation-play-state: paused;
+}
+
+html.is-resizing .chat-pane-background::before {
+  display: none;
+}
+
+html.is-resizing [class*="backdrop-blur"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .monocode-terminal {
   box-sizing: border-box;
   overflow: hidden;

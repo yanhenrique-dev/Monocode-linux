@@ -21,6 +21,7 @@ import {
   type OutlineBand,
 } from "../lib/promptOutline";
 import type { Block } from "../lib/session";
+import { PANE_RESIZE_END_EVENT } from "../lib/layout";
 import { Popover } from "./Popover";
 
 const OPEN_DELAY_MS = 25;
@@ -109,6 +110,9 @@ export function PromptOutline({
   }, [scope]);
 
   const schedule = useCallback(() => {
+    // A sash drag fires this observer every frame with forced layout each
+    // time. Stand down until the drop; the resize-end event re-syncs below.
+    if (document.documentElement.classList.contains("is-resizing")) return;
     if (frame.current != null) return;
     frame.current = window.requestAnimationFrame(() => {
       frame.current = null;
@@ -125,9 +129,12 @@ export function PromptOutline({
     // Content growth moves the anchors without a scroll event.
     if (scroller.firstElementChild)
       observer.observe(scroller.firstElementChild);
+    const onResizeEnd = () => schedule();
+    window.addEventListener(PANE_RESIZE_END_EVENT, onResizeEnd);
     schedule();
     return () => {
       scroller.removeEventListener("scroll", schedule);
+      window.removeEventListener(PANE_RESIZE_END_EVENT, onResizeEnd);
       observer.disconnect();
       if (frame.current != null) {
         window.cancelAnimationFrame(frame.current);
