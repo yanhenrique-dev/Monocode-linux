@@ -16,6 +16,20 @@ import type { HarnessEvent } from "./types";
 export const MINIMUM_OPENCODE_VERSION = "1.14.19";
 export const OPENCODE_SERVER_READY_PREFIX = "opencode server listening";
 export const KNOWN_HIDDEN_AGENTS = new Set(["compaction", "summary", "title"]);
+/**
+ * Newer servers emit `session.idle` alongside `session.status=idle`.
+ * Treat both as turn completion so a server upgrade cannot wedge a turn.
+ */
+export const TURN_DONE_EVENT_TYPES = new Set(["session.status", "session.idle"]);
+
+export function isTurnDoneStatusEvent(
+  type: string,
+  properties: Record<string, unknown>,
+): boolean {
+  if (type === "session.idle") return true;
+  if (type !== "session.status") return false;
+  return stringField(asRecord(properties.status), "type") === "idle";
+}
 
 const OPENCODE_DEFAULT_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -74,15 +88,24 @@ export function parseOpenCodeModelSlug(
 export function parseServerUrlFromOutput(output: string): string | null {
   for (const line of output.split("\n")) {
     const trimmed = line.trim();
-    if (!trimmed.toLowerCase().includes("listening")) continue;
-    const match = trimmed.match(/on\s+(https?:\/\/[^\s]+)/i);
-    if (match?.[1]) return match[1].replace(/[.,;]+$/, "");
-    if (trimmed.startsWith(OPENCODE_SERVER_READY_PREFIX)) {
-      const fallback = trimmed.match(/(https?:\/\/[^\s]+)/i);
-      if (fallback?.[1]) return fallback[1].replace(/[.,;]+$/, "");
-    }
+    const urlMatch = trimmed.match(/(https?:\/\/[^\s]+)/i);
+    if (!urlMatch?.[1]) continue;
+    const url = urlMatch[1].replace(/[.,;]+$/, "");
+    const lowered = trimmed.toLowerCase();
+    if (lowered.includes("listening")) return url;
+    if (trimmed.startsWith(OPENCODE_SERVER_READY_PREFIX)) return url;
+    if (isLoopbackUrl(url)) return url;
   }
   return null;
+}
+
+function isLoopbackUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "127.0.0.1" || host === "localhost" || host === "::1";
+  } catch {
+    return false;
+  }
 }
 
 export function parseOpenCodeVersion(output: string): string | null {

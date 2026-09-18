@@ -25,6 +25,7 @@ import {
   detailFromToolPart,
   eventSessionId,
   isOpenCodeNotFound,
+  isTurnDoneStatusEvent,
   openCodeChildSessionId,
   mergeOpenCodeAssistantText,
   MINIMUM_OPENCODE_VERSION,
@@ -730,7 +731,8 @@ async function handleEvent(
       await pending;
       break;
     }
-    case "session.status": {
+    case "session.status":
+    case "session.idle": {
       const status = asRecord(properties.status);
       const statusType = stringField(status, "type");
       if (statusType === "retry") {
@@ -738,7 +740,7 @@ async function handleEvent(
         if (message) live.onEvent({ type: "status", text: message });
         break;
       }
-      if (statusType === "idle" && live.activeTurn) {
+      if (isTurnDoneStatusEvent(type, properties) && live.activeTurn) {
         finishActiveTurn(live, [
           { type: "message.completed" },
           { type: "reasoning.completed" },
@@ -752,8 +754,10 @@ async function handleEvent(
       finishActiveTurn(live);
       break;
     }
-    default:
+    default: {
+      console.debug(`[monocode] opencode ignored event: ${type || "(missing type)"}`);
       break;
+    }
   }
 }
 
@@ -907,8 +911,14 @@ function emitTool(live: Live, part: OpenCodePart): void {
   if (kind === "agent") trackSubagentRow(live, callId, part);
 }
 
-/** How many parts an unidentified child may bank before its row is known. */
+/**
+ * How many parts an unidentified child may bank before its row is known.
+ * Kept small on purpose: the backlog holds full part payloads in memory and
+ * old servers can emit bursts before the task row names the child session.
+ */
 const MAX_PENDING_SUBAGENT = 64;
+/** Cap on distinct unknown child sessions retained, oldest evicted first. */
+const MAX_PENDING_SUBAGENT_SESSIONS = 32;
 
 /**
  * Task metadata names the child session. Arrival order is not an identity:
@@ -1011,7 +1021,10 @@ function mirrorSubagentPart(
   if (index >= 0) backlog[index] = part;
   else backlog.push(part);
   if (backlog.length > MAX_PENDING_SUBAGENT) backlog.shift();
-  if (!live.pendingSubagent.has(sessionId) && live.pendingSubagent.size >= 32) {
+  if (
+    !live.pendingSubagent.has(sessionId) &&
+    live.pendingSubagent.size >= MAX_PENDING_SUBAGENT_SESSIONS
+  ) {
     live.pendingSubagent.delete(live.pendingSubagent.keys().next().value!);
   }
   live.pendingSubagent.set(sessionId, backlog);
@@ -1251,10 +1264,14 @@ async function repairUnsupportedFileTurn(
 
 function unsupportedFileMediaType(error: unknown): string | undefined {
   const message = sessionErrorMessage(error);
-  if (!/functionality not supported/i.test(message)) return undefined;
-  return message
-    .match(/file part media type\s+([^\s'"`]+)/i)?.[1]
-    ?.toLowerCase();
+  if (!/functionality not supported|not supported|unsupported/i.test(message)) {
+    return undefined;
+  }
+  return (
+    message.match(/file part media type\s+([^\s'"`]+)/i)?.[1]?.toLowerCase() ??
+    message.match(/media type\s+([^\s'"`]+)/i)?.[1]?.toLowerCase() ??
+    message.match(/mime(?:\s+type)?\s+([^\s'"`]+)/i)?.[1]?.toLowerCase()
+  );
 }
 
 async function assertOpenCodeVersion(path: string, cwd: string): Promise<void> {
