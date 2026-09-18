@@ -1,0 +1,13 @@
+language: "pt-BR"
+reviews:
+  profile: "chill"
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src-tauri/**"
+      instructions: "Rust/Tauri: cheque unwrap/expect em input não confiável e comandos que tocam o filesystem."
+    - path: "src/lib/harness/**"
+      instructions: "Adapters de protocolo: valide que todo evento do servidor tem fallback e que approvals/questions sempre emitem evento de UI."
+    - path: "**/*.test.ts"
+      instructions: "Apenas verifique se o teste cobre o comportamento; não exija testes de snapshot."

@@ -85,7 +85,7 @@ import {
 import { inboxAskPrompt } from "../lib/inboxAsk";
 import { loadFollowUpBehavior, type FollowUpBehavior } from "../lib/settings";
 import { notifyGitChanged } from "../lib/fs";
-import { nudgeWatchedFiles } from "../lib/fileWatch";
+import { notifyUsageStale, usageProviderFor } from "../lib/rateLimits";
 import {
   preferredModelSettings,
   resolveModel,
@@ -105,6 +105,7 @@ import {
 import {
   nudgeOpenEditors,
   nudgeWorkspace,
+  scheduleNudge,
   trackSessionEdits,
 } from "./workspaceEvents";
 
@@ -941,9 +942,9 @@ export function useComposer(deps: ComposerDeps) {
           }, 0);
           notifyReviewChanged(sessionId);
           notifyGitChanged();
+          notifyUsageStale(usageProviderFor(current.harness));
           nudgeWorkspace(workCwd);
-          nudgeWatchedFiles();
-          window.setTimeout(() => nudgeWatchedFiles(), 150);
+          scheduleNudge(workCwd);
         }
       })()
         .catch((error: unknown) => {
@@ -974,6 +975,14 @@ export function useComposer(deps: ComposerDeps) {
                     : stopStreaming(session)
                   : session,
               ),
+            );
+            // A failed turn may still have spent quota: nudge the footer off
+            // the failed harness's snapshot, resolved at settle time.
+            const settled = sessionsRef.current.find(
+              (s) => s.id === sessionId,
+            );
+            notifyUsageStale(
+              usageProviderFor(settled?.harness ?? current.harness),
             );
           }
         })

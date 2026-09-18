@@ -193,3 +193,98 @@ describe("Composer question focus", () => {
     portaledPicker.remove();
   });
 });
+
+describe("Composer hidden-types image paste", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { read: vi.fn() },
+      configurable: true,
+    });
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  async function renderComposer() {
+    await act(async () =>
+      root.render(
+        createElement(Composer, {
+          focused: false,
+          harness: "claude",
+          model: "claude-sonnet",
+          runtimeMode: "supervised",
+          executionCwd: "/repo",
+          hideProjectPicker: true,
+          hideBranchPicker: true,
+          onFocus: () => {},
+          onCwdChange: () => {},
+          onModelChange: () => {},
+          onRuntimeModeChange: () => {},
+          onSubmit: () => {},
+        }),
+      ),
+    );
+  }
+
+  function pasteEvent(types: string[] | undefined, text: string) {
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: {
+        types,
+        getData: () => text,
+        files: [],
+        items: [],
+      },
+    });
+    return event;
+  }
+
+  it("reads the image async and prevents default when types are hidden", async () => {
+    vi.mocked(navigator.clipboard.read).mockResolvedValue([
+      {
+        types: ["image/png"],
+        getType: async () => new Blob(["fakepng"], { type: "image/png" }),
+      },
+    ]);
+    await renderComposer();
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+
+    const event = pasteEvent([], "");
+    await act(async () => {
+      textarea.dispatchEvent(event);
+    });
+    await act(async () => {});
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(navigator.clipboard.read).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(
+        container.querySelector('button[aria-label^="Remove"]'),
+      ).not.toBeNull();
+    });
+  });
+
+  it("leaves plain-text pastes to default insertion", async () => {
+    await renderComposer();
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+
+    const event = pasteEvent(undefined, "hello");
+    await act(async () => {
+      textarea.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(navigator.clipboard.read).not.toHaveBeenCalled();
+  });
+});

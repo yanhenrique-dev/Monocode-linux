@@ -11,6 +11,8 @@ type Props = {
   onNewTerminal?: () => void;
   onToggleTerminal?: () => void;
   onGoToFile?: () => void;
+  onOpenCommandPalette?: () => void;
+  onReload?: () => void;
   onToggleSidebar: () => void;
   onShowSourceControl?: () => void;
   onCloseCurrentTab?: () => void;
@@ -31,6 +33,8 @@ export function MenuBar({
   onNewTerminal,
   onToggleTerminal,
   onGoToFile,
+  onOpenCommandPalette,
+  onReload,
   onToggleSidebar,
   onShowSourceControl,
   onCloseCurrentTab,
@@ -134,6 +138,12 @@ export function MenuBar({
         case "go_to_file":
           onGoToFile?.();
           break;
+        case "open_command_palette":
+          onOpenCommandPalette?.();
+          break;
+        case "reload":
+          onReload?.();
+          break;
         case "find_in_project":
           onFindInProject?.();
           break;
@@ -176,6 +186,8 @@ export function MenuBar({
       onCloseAllTabs,
       onFindInProject,
       onGoToFile,
+      onOpenCommandPalette,
+      onReload,
       onNew,
       onNewTerminal,
       onToggleTerminal,
@@ -202,6 +214,7 @@ export function MenuBar({
           { kind: "item", id: "open_project", label: "Open Project…", shortcut: `${MOD}O` },
           { kind: "item", id: "open_search", label: "Search…", shortcut: `${MOD}K` },
           { kind: "item", id: "go_to_file", label: "Go to File…", shortcut: `${MOD}P` },
+          { kind: "item", id: "open_command_palette", label: "Command Palette…", shortcut: `${MOD}${SHIFT}P` },
           { kind: "item", id: "find_in_project", label: "Find in Files…", shortcut: `${MOD}${SHIFT}F` },
           { kind: "sep" },
           { kind: "item", id: "close_tab", label: "Close Pane", shortcut: `${MOD}W` },
@@ -234,6 +247,7 @@ export function MenuBar({
           { kind: "item", id: "zoom_in", label: "Zoom In", shortcut: `${MOD}+` },
           { kind: "item", id: "zoom_out", label: "Zoom Out", shortcut: `${MOD}-` },
           { kind: "item", id: "zoom_reset", label: "Reset Zoom", shortcut: `${MOD}0` },
+          { kind: "item", id: "reload", label: "Reload", shortcut: `${MOD}${SHIFT}R` },
         ];
       case "terminal":
         return [

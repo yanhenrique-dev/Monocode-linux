@@ -4,6 +4,7 @@ import {
   openCodeProviderName,
   parseAgentListCliOutput,
   parseModelsCliOutput,
+  parsePlainModelSlugs,
 } from "./opencodeCatalog";
 import {
   buildOpenCodePermissionRules,
@@ -16,6 +17,7 @@ import {
   inferDefaultVariant,
   isOpenCodeDefaultTitle,
   isOpenCodeNotFound,
+  isTurnDoneStatusEvent,
   mergeOpenCodeAssistantText,
   parseOpenCodeModelSlug,
   parseOpenCodeVersion,
@@ -105,6 +107,19 @@ describe("parseServerUrlFromOutput", () => {
       ),
     ).toBe("http://127.0.0.1:4096");
   });
+
+  it("reads a bare loopback URL without the listening marker", () => {
+    expect(parseServerUrlFromOutput("http://127.0.0.1:4096")).toBe(
+      "http://127.0.0.1:4096",
+    );
+    expect(parseServerUrlFromOutput("Server at http://localhost:4096.")).toBe(
+      "http://localhost:4096",
+    );
+  });
+
+  it("ignores non-loopback URLs without the listening marker", () => {
+    expect(parseServerUrlFromOutput("See https://opencode.ai for docs")).toBeNull();
+  });
 });
 
 describe("parseOpenCodeVersion / compareSemver", () => {
@@ -145,6 +160,30 @@ describe("buildOpenCodePermissionRules", () => {
 });
 
 describe("OpenCode CLI inventory parsers", () => {
+  it("parses the plain provider/model list", () => {
+    const parsed = parseModelsCliOutput(
+      ["opencode/big-pickle", "commandcode/claude-sonnet-5"].join("\n"),
+    );
+    expect(parsed.connected).toEqual(["opencode", "commandcode"]);
+    const models = flattenOpenCodeModels(parsed, []);
+    expect(models.map((model) => model.nativeId)).toEqual([
+      "opencode/big-pickle",
+      "commandcode/claude-sonnet-5",
+    ]);
+    expect(models[1]).toMatchObject({
+      id: "opencode:commandcode/claude-sonnet-5",
+      name: "Claude Sonnet 5",
+    });
+  });
+
+  it("rejects mixed plain and verbose output", () => {
+    expect(
+      parsePlainModelSlugs(
+        ['opencode/big-pickle', '{"id":"big-pickle"}'].join("\n"),
+      ),
+    ).toBeNull();
+  });
+
   it("parses models --verbose output", () => {
     const stdout = [
       "opencode/glm-5",
@@ -189,6 +228,34 @@ describe("OpenCode CLI inventory parsers", () => {
     expect(openCodeProviderName("opencode-go")).toBe("OpenCode Go");
     expect(openCodeProviderName("openai")).toBe("OpenAI");
     expect(openCodeProviderName("acme-cloud")).toBe("Acme Cloud");
+  });
+});
+
+describe("isTurnDoneStatusEvent", () => {
+  it("treats session.status=idle and bare session.idle as done", () => {
+    expect(
+      isTurnDoneStatusEvent("session.status", {
+        status: { type: "idle" },
+      }),
+    ).toBe(true);
+    expect(isTurnDoneStatusEvent("session.idle", {})).toBe(true);
+    expect(isTurnDoneStatusEvent("session.idle", { sessionID: "s" })).toBe(
+      true,
+    );
+  });
+
+  it("ignores busy and retry statuses", () => {
+    expect(
+      isTurnDoneStatusEvent("session.status", {
+        status: { type: "busy" },
+      }),
+    ).toBe(false);
+    expect(
+      isTurnDoneStatusEvent("session.status", {
+        status: { type: "retry" },
+      }),
+    ).toBe(false);
+    expect(isTurnDoneStatusEvent("server.heartbeat", {})).toBe(false);
   });
 });
 

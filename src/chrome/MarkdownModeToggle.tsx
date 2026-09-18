@@ -34,7 +34,7 @@ export function MarkdownModeToggle({ mode, onChange }: ToggleProps) {
     <div
       role="tablist"
       aria-label="Markdown view"
-      className="flex rounded-md border border-content/10 bg-content/10 p-0.5 backdrop-blur-md"
+      className="flex rounded-md border border-content/10 bg-content/10 p-0.5 glass-blur backdrop-blur-md"
     >
       <ModeTab
         label="Preview"
@@ -99,24 +99,11 @@ export function MarkdownViewShell({
           <MarkdownModeToggle mode={mode} onChange={onModeChange} />
         </div>
       </div>
-      <div
-        className={
-          mode === "preview"
-            ? "absolute inset-0"
-            : "pointer-events-none invisible absolute inset-0"
-        }
-      >
-        {preview}
-      </div>
-      <div
-        className={
-          mode === "source"
-            ? "absolute inset-0"
-            : "pointer-events-none invisible absolute inset-0"
-        }
-      >
-        {source}
-      </div>
+      {mode === "preview" ? (
+        <div className="absolute inset-0">{preview}</div>
+      ) : (
+        <div className="absolute inset-0">{source}</div>
+      )}
     </div>
   );
 }

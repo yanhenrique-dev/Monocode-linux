@@ -53,6 +53,8 @@ export interface AppViewsDeps {
   setNotificationProjectPath: Dispatch<SetStateAction<string | null>>;
   setNotificationSettingsRequest: Dispatch<SetStateAction<number>>;
   setFilePickerOpen: Dispatch<SetStateAction<boolean>>;
+  setFilePickerInitialQuery: Dispatch<SetStateAction<string>>;
+  setFilePickerResetToken: Dispatch<SetStateAction<number>>;
   setProjectTerminalFocused: Dispatch<SetStateAction<boolean>>;
   onSelectHistorySession: (sessionId: string) => Promise<void>;
   onVisitBack: () => void;
@@ -85,6 +87,8 @@ export function useAppViews(deps: AppViewsDeps) {
     setNotificationProjectPath,
     setNotificationSettingsRequest,
     setFilePickerOpen,
+    setFilePickerInitialQuery,
+    setFilePickerResetToken,
     setProjectTerminalFocused,
     onSelectHistorySession,
     onVisitBack,
@@ -120,8 +124,21 @@ export function useAppViews(deps: AppViewsDeps) {
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setFilePickerInitialQuery("");
+    setFilePickerResetToken((token) => token + 1);
     setFilePickerOpen(true);
   }, []);
+
+  const onOpenCommandPalette = useCallback(() => {
+    setSearchViewOpen(false);
+    setInboxViewOpen(false);
+    setNotesViewOpen(false);
+    setFilePickerInitialQuery(">");
+    setFilePickerResetToken((token) => token + 1);
+    setFilePickerOpen(true);
+  }, []);
+
+  const onReload = useCallback(() => window.location.reload(), []);
 
   const onFindInProject = useCallback(() => {
     setSearchViewOpen(false);
@@ -297,6 +314,8 @@ export function useAppViews(deps: AppViewsDeps) {
     onToggleSidebar,
     onToggleProjectRail,
     onGoToFile,
+    onOpenCommandPalette,
+    onReload,
     onFindInProject,
     onOpenSearch,
     onLeaveSearch,

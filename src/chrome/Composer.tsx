@@ -31,9 +31,9 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   attachmentsFromFiles,
   attachmentsFromPaths,
-  clipboardImageTypes,
   filesFromClipboard,
   mergeAttachments,
+  needsAsyncImageRead,
   pickAttachments,
   readClipboardImageFile,
   revokeAttachment,
@@ -1272,8 +1272,15 @@ export function Composer({
     // No File objects exposed. Some webviews (notably WebKitGTK on Wayland)
     // hand paste events with zero files even though the OS clipboard holds
     // image data — without this branch the image silently vanishes.
-    const offeredImages = clipboardImageTypes(e.clipboardData?.types);
-    if (offeredImages.length === 0) return;
+    // A hidden type list with no plain text means default insertion would
+    // drop the payload too, so the last-resort read still runs.
+    let plainText = "";
+    try {
+      plainText = e.clipboardData?.getData("text/plain") ?? "";
+    } catch {
+      plainText = "";
+    }
+    if (!needsAsyncImageRead(e.clipboardData?.types, plainText)) return;
     e.preventDefault();
     if (!attachmentsSupported) {
       showAttachNotice(
@@ -1440,7 +1447,7 @@ export function Composer({
         <div
           ref={boxRef}
           data-composer-box
-          className={`relative z-10 rounded-lg border bg-content/3 backdrop-blur-sm ${
+          className={`relative z-10 rounded-lg border bg-background-base/95 ${
             fileDrag
               ? "border-accent/60"
               : "border-content/10 has-focus:border-content/20"

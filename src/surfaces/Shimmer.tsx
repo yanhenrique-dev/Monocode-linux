@@ -1,8 +1,15 @@
-import { memo, useMemo, type CSSProperties, type ElementType } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 export interface ShimmerProps {
   children: string;
-  as?: ElementType;
+  as?: "span";
   className?: string;
   duration?: number;
   spread?: number;
@@ -15,18 +22,34 @@ function ShimmerComponent({
   duration = 2,
   spread = 2,
 }: ShimmerProps) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [visible, setVisible] = useState(true);
   const dynamicSpread = useMemo(
-    () => (children?.length ?? 0) * spread,
+    () => Math.min((children?.length ?? 0) * spread, 480),
     [children, spread],
   );
 
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => setVisible(entries.some((entry) => entry.isIntersecting)),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <Component
+      ref={ref}
+      data-shimmer-visible={visible ? "true" : "false"}
       className={`shimmer-text relative inline-block ${className}`.trim()}
       style={
         {
           "--spread": `${dynamicSpread}px`,
           "--shimmer-duration": `${duration}s`,
+          ...(visible ? null : { animation: "none" }),
         } as CSSProperties
       }
     >
