@@ -69,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native `.deb` and AppImage packaging, Ubuntu/Debian dependency helper (`npm run setup:linux:deb`), and Linux guide in `docs/linux.md`.
 - GPU terminal rendering with a master hardware-acceleration switch in Settings.
 
-[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.61...HEAD
+[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.62...HEAD
+[0.1.62]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.62
 [0.1.61]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.61
 [0.1.60]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.60
 [0.1.50]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.50
