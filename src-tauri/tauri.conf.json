@@ -54,7 +54,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "RWSF4PPUbYGobK4IZPXNAGoBF0wAdTz55lwBtQV/rf7nT3Lhj8Ar8CRK",
       "endpoints": []
     }
   }
