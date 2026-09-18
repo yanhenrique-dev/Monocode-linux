@@ -37,6 +37,8 @@ latest.json
 logs/
 *.log
 monotest/
+# Notas locais de implementação (não versionadas)
+Implemention/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
