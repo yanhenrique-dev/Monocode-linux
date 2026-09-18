@@ -85,7 +85,6 @@ import {
 import { inboxAskPrompt } from "../lib/inboxAsk";
 import { loadFollowUpBehavior, type FollowUpBehavior } from "../lib/settings";
 import { notifyGitChanged } from "../lib/fs";
-import { nudgeWatchedFiles } from "../lib/fileWatch";
 import {
   preferredModelSettings,
   resolveModel,
@@ -105,6 +104,7 @@ import {
 import {
   nudgeOpenEditors,
   nudgeWorkspace,
+  scheduleNudge,
   trackSessionEdits,
 } from "./workspaceEvents";
 
@@ -942,8 +942,7 @@ export function useComposer(deps: ComposerDeps) {
           notifyReviewChanged(sessionId);
           notifyGitChanged();
           nudgeWorkspace(workCwd);
-          nudgeWatchedFiles();
-          window.setTimeout(() => nudgeWatchedFiles(), 150);
+          scheduleNudge(workCwd);
         }
       })()
         .catch((error: unknown) => {
