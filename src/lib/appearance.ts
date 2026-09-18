@@ -401,6 +401,41 @@ export function applySidebarBlur(value: number) {
   return next;
 }
 
+// Drag preview path for the blur slider: the native IPC re-composites the
+// whole window, so it is throttled to ~7Hz while dragging and the exact
+// value is committed on release (see commit via applySidebarBlur).
+const BLUR_PREVIEW_MIN_INTERVAL_MS = 150;
+let blurPreviewAt = 0;
+let blurPreviewTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function previewSidebarBlur(value: number): number {
+  const next = Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
+  if (blurPreviewTimer != null) {
+    clearTimeout(blurPreviewTimer);
+    blurPreviewTimer = null;
+  }
+  const now = Date.now();
+  const wait = BLUR_PREVIEW_MIN_INTERVAL_MS - (now - blurPreviewAt);
+  if (wait <= 0) {
+    blurPreviewAt = now;
+    void invoke("set_window_background_blur", { radius: next });
+  } else {
+    blurPreviewTimer = setTimeout(() => {
+      blurPreviewTimer = null;
+      blurPreviewAt = Date.now();
+      void invoke("set_window_background_blur", { radius: next });
+    }, wait);
+  }
+  return next;
+}
+
+export function cancelSidebarBlurPreview() {
+  if (blurPreviewTimer != null) {
+    clearTimeout(blurPreviewTimer);
+    blurPreviewTimer = null;
+  }
+}
+
 export function loadBodyGlass(): boolean {
   return readFlag(BODY_KEY) ?? BODY_GLASS_DEFAULT;
 }
