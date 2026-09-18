@@ -1440,7 +1440,7 @@ export function Composer({
         <div
           ref={boxRef}
           data-composer-box
-          className={`relative z-10 rounded-lg border bg-content/3 backdrop-blur-sm ${
+          className={`relative z-10 rounded-lg border bg-background-base/95 ${
             fileDrag
               ? "border-accent/60"
               : "border-content/10 has-focus:border-content/20"

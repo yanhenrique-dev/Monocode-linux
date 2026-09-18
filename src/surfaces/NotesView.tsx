@@ -922,7 +922,7 @@ function NoteEditor({
           }}
         >
           {imageDrag || imageBusy ? (
-            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-lg bg-background-base/80 text-[12px] text-content/70 backdrop-blur-sm">
+            <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-lg bg-background-base/90 text-[12px] text-content/70">
               {imageBusy ? "Adding images…" : "Drop images here"}
             </div>
           ) : null}
