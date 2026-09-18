@@ -7,12 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.67] - 2026-09-18
+
+### Added
+
+- Command palette (`>`) with a Reload action.
+- Clock timestamps on user messages, including card-only ones.
+- Interface blur toggle in Appearance (also gates glass blur on
+  WebKitGTK software compositing).
+- Ko-fi donate button (Sponsor + README badge).
+- Usage footer refreshes at turn end without token refresh.
+- Sticky inbox PR header with full-width diffs in the Code tab.
+- New project icon (app, menu, README and favicon).
+
 ### Fixed
 
-- Links now open in the system browser on current Linux desktops: the
-  bundled Ubuntu 22.04 `xdg-open` (which silently did nothing on sessions
-  it predates) is stripped from the AppImage, so the host handler runs
-  instead.
+- Image paste on WebKitGTK/Wayland when the webview hides clipboard
+  types: the async clipboard read is now attempted instead of silently
+  dropping the image.
+- Stale approval requests are settled when turns end, so old Allow/Deny
+  controls stop being actionable.
+- Open editors reconcile on the first mtime sample instead of only
+  establishing a baseline.
+- OpenCode connection: serve env, tolerant catalog, idle ends the turn.
+- Removed the bundled xdg-open: links open in the browser on Plasma 6.
+- Render performance batch: coalesced workspace nudges, frame budget
+  (rAF/memoization), and glass/composite sweep.
 
 ## [0.1.61] - 2026-09-18
 
@@ -60,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native `.deb` and AppImage packaging, Ubuntu/Debian dependency helper (`npm run setup:linux:deb`), and Linux guide in `docs/linux.md`.
 - GPU terminal rendering with a master hardware-acceleration switch in Settings.
 
-[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.61...HEAD
+[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.67...HEAD
+[0.1.67]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.67
 [0.1.61]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.61
 [0.1.60]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.60
 [0.1.50]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.50
