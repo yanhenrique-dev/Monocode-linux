@@ -37,6 +37,8 @@ latest.json
 logs/
 *.log
 monotest/
+# Notas locais de implementação (não versionadas)
+Implemention/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -54,7 +56,6 @@ lerna-debug.log*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-
 # Local agent working dirs (skills, scratch notes) — never commit
 .agents/
 .commandcode/
