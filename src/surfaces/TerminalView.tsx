@@ -163,7 +163,8 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       lineHeight: 1,
       letterSpacing: 0,
       scrollback: 5000,
-      allowTransparency: true,
+      // Opaque canvas avoids a full-window composite on every cell paint.
+      allowTransparency: false,
       smoothScrollDuration: 0,
       theme: terminalTheme(isLightScheme()),
       macOptionIsMeta: IS_MAC,
@@ -242,13 +243,14 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     });
 
     let oscBuffer = "";
+    const decoder = new TextDecoder();
 
     const unsubscribe = subscribePty(
       id,
       (data) => {
         const onMeta = onMetaChangeRef.current;
         if (onMeta) {
-          const text = new TextDecoder().decode(data);
+          const text = decoder.decode(data);
           const scanned = scanOscCwd(text, oscBuffer);
           oscBuffer = scanned.rest;
           if (scanned.cwd) {

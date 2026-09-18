@@ -366,7 +366,7 @@ const FileSection = memo(function FileSection({
     >
       <header
         className={`${
-          fileLayout === "stacked" ? "sticky top-0 z-30 backdrop-blur-xl" : ""
+          fileLayout === "stacked" ? "sticky top-0 z-30 bg-background-base/95" : ""
         } flex items-center gap-2 bg-content/2 px-3 py-1.5 ${
           fileLayout === "stacked" || expanded
             ? "border-b border-stroke"
@@ -544,6 +544,7 @@ function VirtualRows({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const codeRef = useRef<HTMLDivElement | null>(null);
   const mouseYRef = useRef<number | null>(null);
+  const hoverFrame = useRef(0);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [commentTarget, setCommentTarget] = useState<DiffCommentDraft | null>(
     null,
@@ -607,22 +608,26 @@ function VirtualRows({
         setHoverKey((current) => (current == null ? current : null));
         return;
       }
-      let y = clientY - body.getBoundingClientRect().top - range.padTop;
-      if (y < 0) {
-        setHoverKey((current) => (current == null ? current : null));
-        return;
-      }
-      for (let index = range.start; index < range.end; index += 1) {
-        const row = rows[index];
-        if (!row) break;
-        if (y < row.height) {
-          const key = diffRowKey(row, index);
-          setHoverKey((current) => (current === key ? current : key));
+      if (hoverFrame.current) return;
+      hoverFrame.current = window.requestAnimationFrame(() => {
+        hoverFrame.current = 0;
+        let y = clientY - body.getBoundingClientRect().top - range.padTop;
+        if (y < 0) {
+          setHoverKey((current) => (current == null ? current : null));
           return;
         }
-        y -= row.height;
-      }
-      setHoverKey((current) => (current == null ? current : null));
+        for (let index = range.start; index < range.end; index += 1) {
+          const row = rows[index];
+          if (!row) break;
+          if (y < row.height) {
+            const key = diffRowKey(row, index);
+            setHoverKey((current) => (current === key ? current : key));
+            return;
+          }
+          y -= row.height;
+        }
+        setHoverKey((current) => (current == null ? current : null));
+      });
     },
     [range.end, range.padTop, range.start, rows],
   );
@@ -636,6 +641,15 @@ function VirtualRows({
     if (!near) return;
     hoverAtY(mouseYRef.current);
   }, [hoverAtY, near]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverFrame.current) {
+        cancelAnimationFrame(hoverFrame.current);
+        hoverFrame.current = 0;
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!near) return;
@@ -760,6 +774,10 @@ function VirtualRows({
         }}
         onMouseLeave={() => {
           mouseYRef.current = null;
+          if (hoverFrame.current) {
+            cancelAnimationFrame(hoverFrame.current);
+            hoverFrame.current = 0;
+          }
           hoverAtY(null);
         }}
       >

@@ -30,6 +30,8 @@ const SPRITE_SCALE = 0.8;
 /** How hard the bubble chases its speaker; sprites move cell by cell. */
 const BUBBLE_EASE = 0.2;
 const FRAME_MS = 33;
+/** Idle boards repaint slower; a live game keeps the 30fps cadence. */
+const IDLE_FRAME_MS = 100;
 
 const HEADING: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 },
@@ -208,12 +210,14 @@ export function TerminalGridBackground() {
     let rgb = parseContentRgb();
     let surfaceRgb = parseSurfaceRgb();
     let lastFrame = 0;
+    let paintStamp = new Float32Array(0);
+    let offscreen = false;
 
     const layout = () => {
       const { width, height } = root.getBoundingClientRect();
       if (width <= 0 || height <= 0) return;
 
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const nextCols = Math.ceil(width / PITCH);
       const nextRows = Math.ceil(height / PITCH);
 
@@ -228,12 +232,14 @@ export function TerminalGridBackground() {
 
       cols = nextCols;
       rows = nextRows;
+      paintStamp = new Float32Array(Math.max(0, nextCols * nextRows));
     };
 
     const paint = (board: Board, width: number, height: number) => {
       const { ctx, arcade } = board;
       const dim = arcade.controlled() ? 1 : board.game.idleDim;
-      const stamp = new Float32Array(cols * rows);
+      const stamp = paintStamp;
+      stamp.fill(0, 0, cols * rows);
       arcade.stamp(stamp, cols, rows);
 
       const fade = arcade.fade();
@@ -242,6 +248,7 @@ export function TerminalGridBackground() {
       ctx.strokeStyle = `rgba(${rgb}, ${BORDER_OPACITY * fade})`;
 
       const peak = PEAK_OPACITY * dim;
+      const drawBorders = dim >= 0.5 || arcade.controlled();
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           const px = x * PITCH;
@@ -250,8 +257,9 @@ export function TerminalGridBackground() {
           if (fillOpacity > 0.02) {
             ctx.fillStyle = `rgba(${rgb}, ${fillOpacity})`;
             ctx.fillRect(px, py, CELL, CELL);
+          } else if (drawBorders) {
+            ctx.strokeRect(px + 0.5, py + 0.5, CELL - 1, CELL - 1);
           }
-          ctx.strokeRect(px + 0.5, py + 0.5, CELL - 1, CELL - 1);
         }
       }
 
@@ -325,7 +333,7 @@ export function TerminalGridBackground() {
     };
 
     const draw = (time: number) => {
-      if (document.hidden) {
+      if (document.hidden || offscreen) {
         raf = 0;
         return;
       }
@@ -338,7 +346,9 @@ export function TerminalGridBackground() {
         lastFrame = time;
         return;
       }
-      if (time - lastFrame < FRAME_MS) return;
+      const controlled = playingRef.current;
+      const frameMs = controlled ? FRAME_MS : IDLE_FRAME_MS;
+      if (time - lastFrame < frameMs) return;
       const dt = lastFrame ? time - lastFrame : FRAME_MS;
       lastFrame = time;
 
@@ -346,14 +356,14 @@ export function TerminalGridBackground() {
       if (width <= 0 || height <= 0) return;
 
       const current = indexRef.current;
-      const controlled = playingRef.current;
 
       for (let i = 0; i < boards.length; i++) {
         const board = boards[i];
         if (!board) continue;
-        // A live game only ticks the board you're on; idle keeps neighbours
-        // moving so a slide doesn't reveal a frozen frame.
-        if (controlled && i !== current) continue;
+        // A live game only ticks the board you're on; idle paints the visible
+        // board so neighbours don't burn frames offscreen. A slide may reveal
+        // a neighbour stepped up to ~100ms ago; it catches up on its frames.
+        if (i !== current) continue;
         board.arcade.step(dt);
         paint(board, width, height);
       }
@@ -386,6 +396,21 @@ export function TerminalGridBackground() {
     const resizeObserver = new ResizeObserver(layout);
     resizeObserver.observe(root);
 
+    const visibilityObserver =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              offscreen = !entries.some((entry) => entry.isIntersecting);
+              if (!offscreen && !raf && !document.hidden) {
+                lastFrame = 0;
+                raf = requestAnimationFrame(draw);
+              }
+            },
+            { threshold: 0 },
+          )
+        : null;
+    visibilityObserver?.observe(root);
+
     const themeObserver = new MutationObserver(() => {
       rgb = parseContentRgb();
       surfaceRgb = parseSurfaceRgb();
@@ -397,8 +422,10 @@ export function TerminalGridBackground() {
 
     return () => {
       cancelAnimationFrame(raf);
+      raf = 0;
       document.removeEventListener("visibilitychange", onVisible);
       resizeObserver.disconnect();
+      visibilityObserver?.disconnect();
       themeObserver.disconnect();
       boardsRef.current = null;
     };
@@ -448,7 +475,7 @@ export function TerminalGridBackground() {
       );
     }, SLIDE_HOLD_MS);
     return () => window.clearInterval(id);
-  }, [playing, hovered, slide.index]);
+  }, [playing, hovered]);
 
   useEffect(() => {
     if (!playing) return;
@@ -587,7 +614,7 @@ export function TerminalGridBackground() {
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
               onClick={takeControl}
-              className="pointer-events-none flex cursor-pointer items-center gap-2 border border-content/25 bg-background-base/80 px-3 py-1.5 font-mono text-[11px] tracking-[0.16em] text-content/85 shadow-lg backdrop-blur-sm group-hover:pointer-events-auto hover:border-content/45 hover:bg-content/10 hover:text-content"
+              className="pointer-events-none flex cursor-pointer items-center gap-2 border border-content/25 bg-background-base/80 px-3 py-1.5 font-mono text-[11px] tracking-[0.16em] text-content/85 shadow-lg group-hover:pointer-events-auto hover:border-content/45 hover:bg-content/10 hover:text-content"
             >
               <span className="text-content/40">[</span>
               take control
