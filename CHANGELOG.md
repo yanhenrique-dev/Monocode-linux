@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.60] - 2026-09-18
+
+### Added
+
+- Image paste fallback in the composer: when the webview hides clipboard
+  files, the app tries the async clipboard API, and failures now show a
+  hint instead of dying silent.
+
+### Fixed
+
+- Smoother transcript streaming and scrolling: memoized turn grouping,
+  cached viewport sync, stable Mermaid renders, no backdrop blur on the
+  jump-to-latest button, and animations paused while scrolling.
+- Smoother Settings: appearance state moved out of the root, memoized
+  sliders/toggles, preview/commit split (persist and IPC only on release),
+  and throttled blur IPC and color-picker drags.
+- Sash resize no longer freezes the Preview pane: `is-resizing` cutouts,
+  throttled terminal resizes, paused arcade and outline measurements.
+- Build button no longer sticks on Building after a superseded or failed
+  turn: orphaned plan builds reset to ready.
+- Removed the duplicated centered window title on Linux.
+- Pixel mascots render at integer scale (16px) instead of distorted
+  fractional sizes.
+- Higher contrast rail and action icons.
+
+### Changed
+
+- Releases focus on AppImage only: `.deb` builds, docs, and install
+  instructions removed (`npm run build:linux`, `setup:linux`).
+
 ## [0.1.50] - 2026-09-17
 
 ### Added
@@ -15,5 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native `.deb` and AppImage packaging, Ubuntu/Debian dependency helper (`npm run setup:linux:deb`), and Linux guide in `docs/linux.md`.
 - GPU terminal rendering with a master hardware-acceleration switch in Settings.
 
-[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.50...HEAD
+[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.60...HEAD
+[0.1.60]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.60
 [0.1.50]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.50
