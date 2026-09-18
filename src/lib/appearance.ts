@@ -132,7 +132,9 @@ function readFlag(key: string): boolean | null {
   try {
     const raw = localStorage.getItem(key);
     if (raw == null) return null;
-    return raw === "1" || raw === "true";
+    if (raw === "1" || raw === "true") return true;
+    if (raw === "0" || raw === "false") return false;
+    return null;
   } catch {
     return null;
   }

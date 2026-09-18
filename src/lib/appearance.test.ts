@@ -290,6 +290,11 @@ describe("interface blur setting", () => {
     expect(loadUiBlur()).toBe(true);
   });
 
+  it("falls back to default on malformed stored values", () => {
+    localStorage.setItem(UI_BLUR_KEY, "enabled");
+    expect(loadUiBlur()).toBe(UI_BLUR_DEFAULT);
+  });
+
   it("toggles the off class on <html>", () => {
     applyUiBlur(false);
     expect(
