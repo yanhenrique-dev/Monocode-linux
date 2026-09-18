@@ -337,10 +337,19 @@ function AgentTranscriptContent({
   }, [visible, setShowJump]);
 
   useLayoutEffect(() => {
-    if (!visible || !stickToBottom.current) return;
-    const el = scroller.current;
-    syncTranscriptViewport(el);
-    pinToBottom(el);
+    if (!visible) return;
+    if (!stickToBottom.current) return;
+    let raf = 0;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!visible || !stickToBottom.current) return;
+      const el = scroller.current;
+      syncTranscriptViewport(el);
+      pinToBottom(el);
+    });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [blocks, busy, visible]);
 
   useLayoutEffect(() => {
@@ -1224,26 +1233,34 @@ function UserMessageBlock({
     // with the font or the UI scale — never with a resize — so it is resolved
     // once here rather than on every delivery.
     let lineHeight = 0;
+    let raf = 0;
     const measure = () => {
-      if (!expanded) {
-        setOverflows(el.scrollHeight > el.clientHeight + 1);
-      }
-      if (!roundsSingleLine) {
-        setSingleLine(false);
-        return;
-      }
-      if (!lineHeight) {
-        lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight);
-      }
-      setSingleLine(
-        Number.isFinite(lineHeight) && el.scrollHeight <= lineHeight + 1,
-      );
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (!expanded) {
+          setOverflows(el.scrollHeight > el.clientHeight + 1);
+        }
+        if (!roundsSingleLine) {
+          setSingleLine(false);
+          return;
+        }
+        if (!lineHeight) {
+          lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight);
+        }
+        setSingleLine(
+          Number.isFinite(lineHeight) && el.scrollHeight <= lineHeight + 1,
+        );
+      });
     };
 
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
   }, [text, roundsSingleLine, expanded]);
 
   const toggle = () => {

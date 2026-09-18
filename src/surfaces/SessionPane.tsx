@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -246,6 +247,52 @@ const SessionPaneContent = memo(function SessionPaneContent({
     (blockId: string, target?: PlanBuildTarget) =>
       onBuildPlan(session.id, blockId, target),
     [onBuildPlan, session.id],
+  );
+  const onSecondOpinionForTranscript = useCallback(
+    (target: ModelTarget, turn: Block[]) => {
+      if (session.inboxAsk || !onSecondOpinion) return;
+      onSecondOpinion(session.id, target, turn);
+    },
+    [onSecondOpinion, session.id, session.inboxAsk],
+  );
+  const onHandoffForTranscript = useCallback(
+    (target: ModelTarget, turn: Block[]) => {
+      if (session.inboxAsk || !onHandoff) return;
+      onHandoff(session.id, target, turn);
+    },
+    [onHandoff, session.id, session.inboxAsk],
+  );
+  const workCwdForAccessory = sessionWorkCwd(session);
+  const latestTurnAccessory = useMemo(
+    () =>
+      session.inboxAsk ? undefined : (
+        <SessionReview
+          sessionId={session.id}
+          cwd={workCwdForAccessory}
+          enabled={visible}
+          busy={!!session.busy}
+          undoLocked={
+            reviewUndoLocked ||
+            orchestrationRuns.some(
+              (run) =>
+                (run.status === "active" || run.status === "paused") &&
+                (run.leadId === session.id ||
+                  run.tasks.some((task) => task.sessionId === session.id)),
+            )
+          }
+          onOpenDiff={onOpenDiff}
+        />
+      ),
+    [
+      session.inboxAsk,
+      session.id,
+      session.busy,
+      workCwdForAccessory,
+      visible,
+      reviewUndoLocked,
+      orchestrationRuns,
+      onOpenDiff,
+    ],
   );
   const jumpToBottomRef = useRef<(() => void) | null>(null);
   const transcriptScope = useRef<HTMLDivElement>(null);
@@ -544,41 +591,18 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 onBuildPlan={buildPlan}
                 onSecondOpinion={
                   !session.inboxAsk && onSecondOpinion
-                    ? (target, turn) =>
-                        onSecondOpinion(session.id, target, turn)
+                    ? onSecondOpinionForTranscript
                     : undefined
                 }
                 onHandoff={
                   !session.inboxAsk && onHandoff
-                    ? (target, turn) => onHandoff(session.id, target, turn)
+                    ? onHandoffForTranscript
                     : undefined
                 }
                 onJumpToBottomChange={setShowJumpToBottom}
                 onJumpToBottomReady={onJumpToBottomReady}
                 onRevealReady={onRevealReady}
-                latestTurnAccessory={
-                  session.inboxAsk ? undefined : (
-                    <SessionReview
-                      sessionId={session.id}
-                      cwd={workCwd}
-                      enabled={visible}
-                      busy={!!session.busy}
-                      undoLocked={
-                        reviewUndoLocked ||
-                        orchestrationRuns.some(
-                          (run) =>
-                            (run.status === "active" ||
-                              run.status === "paused") &&
-                            (run.leadId === session.id ||
-                              run.tasks.some(
-                                (task) => task.sessionId === session.id,
-                              )),
-                        )
-                      }
-                      onOpenDiff={onOpenDiff}
-                    />
-                  )
-                }
+                latestTurnAccessory={latestTurnAccessory}
               />
               <PromptOutline
                 blocks={session.blocks}
