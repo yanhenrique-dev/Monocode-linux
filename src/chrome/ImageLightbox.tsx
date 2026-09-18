@@ -37,7 +37,7 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label={`Image preview: ${alt}`}
-      className="fixed inset-0 flex items-center justify-center bg-black/85 p-6 backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center bg-black/85 p-6 glass-blur backdrop-blur-sm"
       style={{ zIndex: LAYER.dialog }}
       onMouseDown={(event) => {
         event.stopPropagation();
@@ -57,7 +57,7 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         aria-label="Close image preview"
         title="Close"
         onClick={onClose}
-        className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-white/15 bg-black/45 text-white/80 shadow-lg backdrop-blur-md hover:bg-black/65 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-white/15 bg-black/45 text-white/80 shadow-lg glass-blur backdrop-blur-md hover:bg-black/65 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
       >
         <X className="size-4" strokeWidth={2} />
       </button>
