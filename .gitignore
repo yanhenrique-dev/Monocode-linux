@@ -56,5 +56,7 @@ lerna-debug.log*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-# Agent skills/workspaces locais (não versionar)
+# Local agent working dirs (skills, scratch notes) — never commit
 .agents/
+.commandcode/
+Implemention/
