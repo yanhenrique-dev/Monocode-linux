@@ -1342,6 +1342,9 @@ function LinearSettings() {
   );
 }
 
+/** Minimum spinner time so instant results still paint the busy state. */
+const MIN_BUSY_MS = 500;
+
 function UpdateRow({
   onOpenWhatsNew,
 }: {
@@ -1351,6 +1354,7 @@ function UpdateRow({
     phase: "idle",
     currentVersion: "…",
   });
+  const [holding, setHolding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1364,16 +1368,30 @@ function UpdateRow({
   }, []);
 
   const busy =
-    snapshot.phase === "checking" || snapshot.phase === "downloading";
+    snapshot.phase === "checking" ||
+    snapshot.phase === "downloading" ||
+    holding;
   const hasUpdate = snapshot.phase === "available";
 
   const onClick = async () => {
     if (busy) return;
-    if (hasUpdate) {
-      await installPendingUpdate(setSnapshot);
-      return;
+    // Guarantee a beat of spinner: fast checks (cached "latest version" or
+    // instant errors) would otherwise never paint the busy state.
+    const startedAt = Date.now();
+    setHolding(true);
+    try {
+      if (hasUpdate) {
+        await installPendingUpdate(setSnapshot);
+        return;
+      }
+      await runUpdateFlow(true, setSnapshot);
+    } finally {
+      const remaining = MIN_BUSY_MS - (Date.now() - startedAt);
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+      setHolding(false);
     }
-    await runUpdateFlow(true, setSnapshot);
   };
 
   const status =
