@@ -56,3 +56,5 @@ lerna-debug.log*
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+# Agent skills/workspaces locais (não versionar)
+.agents/
