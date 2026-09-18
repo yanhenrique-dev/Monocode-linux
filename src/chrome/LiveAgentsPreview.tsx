@@ -186,7 +186,7 @@ function LiveAgentCard({
           project={seed}
           color={color}
           name={resolveTabGroupMascot(key, groupMascots)}
-          className="size-2 shrink-0"
+          className="size-4 shrink-0"
           active={live}
         />
         {live ? (

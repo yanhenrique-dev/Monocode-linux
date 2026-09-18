@@ -380,7 +380,7 @@ function NoteProjectMark({
           project={project}
           color={mascotColor}
           name={mascotName}
-          className="size-3 shrink-0"
+          className="size-4 shrink-0"
         />
       )}
       <span className="min-w-0 truncate">{project}</span>
