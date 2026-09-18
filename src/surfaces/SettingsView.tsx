@@ -45,6 +45,7 @@ import {
   applyBodyGlass,
   applySidebarBlur,
   applySidebarOpacity,
+  applyUiBlur,
   applyThemeDarkLightness,
   applyThemePreference,
   applyThemeTint,
@@ -57,6 +58,7 @@ import {
   CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
   THEME_PREFERENCE_DEFAULT,
+  UI_BLUR_DEFAULT,
   chatBackgroundSrc,
   loadBodyGlass,
   loadAccentColor,
@@ -72,6 +74,7 @@ import {
   loadThemeSaturation,
   loadTranscriptLayout,
   loadTranscriptAnchor,
+  loadUiBlur,
   previewSidebarBlur,
   saveBodyGlass,
   saveAccentColor,
@@ -87,6 +90,7 @@ import {
   saveThemeSaturation,
   saveTranscriptLayout,
   saveTranscriptAnchor,
+  saveUiBlur,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
   SIDEBAR_BLUR_DEFAULT,
   SIDEBAR_BLUR_MAX,
@@ -1434,6 +1438,7 @@ function useAppearanceSettings() {
     loadThemeDarkLightness,
   );
   const [bodyGlass, setBodyGlass] = useState(loadBodyGlass);
+  const [uiBlur, setUiBlur] = useState(loadUiBlur);
   const [chatBackgroundPath, setChatBackgroundPath] = useState(
     loadChatBackgroundPath,
   );
@@ -1542,6 +1547,12 @@ function useAppearanceSettings() {
     setBodyGlass(next);
   }, []);
 
+  const onUiBlur = useCallback((next: boolean) => {
+    applyUiBlur(next);
+    saveUiBlur(next);
+    setUiBlur(next);
+  }, []);
+
   const onChooseChatBackground = useCallback(async () => {
     setChatBackgroundBusy(true);
     setChatBackgroundError(null);
@@ -1609,6 +1620,7 @@ function useAppearanceSettings() {
     onTint(THEME_HUE_DEFAULT, THEME_SATURATION_DEFAULT);
     onDarkLightness(THEME_DARK_LIGHTNESS_DEFAULT);
     onBodyGlass(BODY_GLASS_DEFAULT);
+    onUiBlur(UI_BLUR_DEFAULT);
     onChatBackgroundEmptyOpacity(
       Math.round(CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT * 100),
     );
@@ -1622,6 +1634,7 @@ function useAppearanceSettings() {
     chatBackgroundPath,
     onBlur,
     onBodyGlass,
+    onUiBlur,
     onChatBackgroundEmptyOpacity,
     onChatBackgroundSessionOpacity,
     onChatBackgroundScope,
@@ -1643,6 +1656,7 @@ function useAppearanceSettings() {
     themeSaturation,
     themeDarkLightness,
     bodyGlass,
+    uiBlur,
     chatBackgroundPath,
     chatBackgroundEmptyOpacity,
     chatBackgroundSessionOpacity,
@@ -1657,6 +1671,7 @@ function useAppearanceSettings() {
     onTint,
     onDarkLightness,
     onBodyGlass,
+    onUiBlur,
     onChooseChatBackground,
     onClearChatBackground,
     onChatBackgroundEmptyOpacity,
@@ -1836,6 +1851,17 @@ function AppearancePage({
             onPreview={appearance.previewBlur}
             onCommit={appearance.onBlur}
             disabled={glassDisabled}
+          />
+        </Row>
+        <Row
+          id="interface-blur"
+          label="Interface blur"
+          description="Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces keep their tint, just flat."
+        >
+          <Toggle
+            label="Interface blur"
+            on={appearance.uiBlur}
+            onChange={appearance.onUiBlur}
           />
         </Row>
         <Row

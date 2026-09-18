@@ -214,6 +214,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "glass translucent vibrancy backdrop",
   },
   {
+    id: "interface-blur",
+    section: "appearance",
+    label: "Interface blur",
+    keywords: "glass blur backdrop popover toast picker dialog performance",
+  },
+  {
     id: "main-pane-glass",
     section: "appearance",
     label: "Main pane glass",

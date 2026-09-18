@@ -11,6 +11,7 @@ const OPACITY_KEY = "monocode.sidebarOpacity";
 const BLUR_KEY = "monocode.sidebarBlur";
 const PROJECT_RAIL_OPEN_KEY = "monocode.projectRailOpen";
 const BODY_KEY = "monocode.bodyGlass";
+const UI_BLUR_KEY = "monocode.uiBlur";
 const SCHEME_KEY = "monocode.colorScheme";
 const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
@@ -89,6 +90,12 @@ export const PROJECT_RAIL_WIDTH_DEFAULT = 200;
 
 export const BODY_GLASS_DEFAULT = true;
 
+/** In-app CSS blur (popovers, toasts, pickers). Default on, see UI_BLUR_CLASS. */
+export const UI_BLUR_DEFAULT = true;
+
+/** Class applied to <html> while in-app blur is off. */
+export const UI_BLUR_OFF_CLASS = "no-ui-blur";
+
 export const CHAT_BACKGROUND_OPACITY_MIN = 0.05;
 export const CHAT_BACKGROUND_OPACITY_MAX = 0.65;
 export const CHAT_BACKGROUND_OPACITY_DEFAULT = 0.24;
@@ -125,7 +132,9 @@ function readFlag(key: string): boolean | null {
   try {
     const raw = localStorage.getItem(key);
     if (raw == null) return null;
-    return raw === "1" || raw === "true";
+    if (raw === "1" || raw === "true") return true;
+    if (raw === "0" || raw === "false") return false;
+    return null;
   } catch {
     return null;
   }
@@ -282,6 +291,7 @@ export function initAppearance() {
   applySidebarOpacity(loadSidebarOpacity());
   applySidebarBlur(loadSidebarBlur());
   applyBodyGlass(loadBodyGlass());
+  applyUiBlur(loadUiBlur());
   applyChatBackground(loadChatBackgroundPath());
   applyChatBackgroundEmptyOpacity(loadChatBackgroundEmptyOpacity());
   applyChatBackgroundSessionOpacity(loadChatBackgroundSessionOpacity());
@@ -446,6 +456,25 @@ export function saveBodyGlass(value: boolean) {
 
 export function applyBodyGlass(value: boolean) {
   document.documentElement.classList.toggle("glass-body", value);
+  return value;
+}
+
+/**
+ * In-app CSS blur (backdrop-filter on popovers, toasts, pickers, dialogs).
+ * Independent from the native window blur (Blur radius) and from the master
+ * hardware switch: turning it off swaps every .glass-blur node to an opaque
+ * fill, which is the fastest path on software compositing (WebKitGTK).
+ */
+export function loadUiBlur(): boolean {
+  return readFlag(UI_BLUR_KEY) ?? UI_BLUR_DEFAULT;
+}
+
+export function saveUiBlur(value: boolean) {
+  writeFlag(UI_BLUR_KEY, value);
+}
+
+export function applyUiBlur(value: boolean) {
+  document.documentElement.classList.toggle(UI_BLUR_OFF_CLASS, !value);
   return value;
 }
 

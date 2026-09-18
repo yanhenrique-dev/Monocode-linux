@@ -3,16 +3,21 @@ import {
   ACCENT_COLOR_DEFAULT,
   CHAT_BACKGROUND_OPACITY_DEFAULT,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
+  UI_BLUR_DEFAULT,
+  UI_BLUR_OFF_CLASS,
+  applyUiBlur,
   loadChatBackgroundOpacity,
   loadAccentColor,
   loadChatBackgroundPath,
   loadChatBackgroundScope,
   loadTranscriptLayout,
+  loadUiBlur,
   saveChatBackgroundOpacity,
   saveAccentColor,
   saveChatBackgroundPath,
   saveChatBackgroundScope,
   saveTranscriptLayout,
+  saveUiBlur,
   TRANSCRIPT_LAYOUT_DEFAULT,
   loadTranscriptAnchor,
   saveTranscriptAnchor,
@@ -34,6 +39,29 @@ const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
 const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
 const THEME_DARK_LIGHTNESS_KEY = "monocode.themeDarkLightness";
+const UI_BLUR_KEY = "monocode.uiBlur";
+
+function mockDocument() {
+  const classes = new Set<string>();
+  const classList = {
+    toggle: (name: string, force?: boolean) => {
+      const next = force ?? !classes.has(name);
+      if (next) classes.add(name);
+      else classes.delete(name);
+      return next;
+    },
+    contains: (name: string) => classes.has(name),
+  };
+  Object.defineProperty(globalThis, "document", {
+    value: { documentElement: { classList } },
+    configurable: true,
+  });
+}
+
+function unmockDocument() {
+  const scope = globalThis as unknown as { document?: unknown };
+  delete scope.document;
+}
 
 function mockLocalStorage() {
   const data = new Map<string, string>();
@@ -236,5 +264,45 @@ describe("dark theme lightness setting", () => {
     expect(loadThemeDarkLightness()).toBe(0);
     saveThemeDarkLightness(100);
     expect(loadThemeDarkLightness()).toBe(30);
+  });
+});
+
+describe("interface blur setting", () => {
+  beforeEach(() => {
+    mockLocalStorage();
+    mockDocument();
+  });
+  afterEach(() => {
+    localStorage.removeItem(UI_BLUR_KEY);
+    unmockDocument();
+  });
+
+  it("defaults to on", () => {
+    expect(UI_BLUR_DEFAULT).toBe(true);
+    expect(loadUiBlur()).toBe(true);
+  });
+
+  it("persists across loads", () => {
+    saveUiBlur(false);
+    expect(localStorage.getItem(UI_BLUR_KEY)).toBe("0");
+    expect(loadUiBlur()).toBe(false);
+    saveUiBlur(true);
+    expect(loadUiBlur()).toBe(true);
+  });
+
+  it("falls back to default on malformed stored values", () => {
+    localStorage.setItem(UI_BLUR_KEY, "enabled");
+    expect(loadUiBlur()).toBe(UI_BLUR_DEFAULT);
+  });
+
+  it("toggles the off class on <html>", () => {
+    applyUiBlur(false);
+    expect(
+      document.documentElement.classList.contains(UI_BLUR_OFF_CLASS),
+    ).toBe(true);
+    applyUiBlur(true);
+    expect(
+      document.documentElement.classList.contains(UI_BLUR_OFF_CLASS),
+    ).toBe(false);
   });
 });
