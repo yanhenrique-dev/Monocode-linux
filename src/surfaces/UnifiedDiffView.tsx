@@ -359,15 +359,13 @@ const FileSection = memo(function FileSection({
       ref={setSection}
       data-diff-file={file.path}
       className={`${
-        fileLayout === "cards"
-          ? "overflow-hidden rounded-md border border-content/10"
-          : ""
+        fileLayout === "cards" ? "rounded-md border border-content/10" : ""
       } ${focused ? "bg-content/[0.03]" : ""}`}
     >
       <header
-        className={`${
-          fileLayout === "stacked" ? "sticky top-0 z-30 backdrop-blur-xl" : ""
-        } flex items-center gap-2 bg-content/2 px-3 py-1.5 ${
+        className={`sticky top-0 z-30 bg-background-base/95 flex items-center gap-2 bg-content/2 px-3 py-1.5 ${
+          fileLayout === "cards" ? (expanded ? "rounded-t-md" : "rounded-md") : ""
+        } ${
           fileLayout === "stacked" || expanded
             ? "border-b border-stroke"
             : ""
@@ -415,21 +413,27 @@ const FileSection = memo(function FileSection({
         ) : null}
       </header>
       {expanded ? (
-        <FileBody
-          file={file}
-          reveals={reveals}
-          near={near}
-          tokens={tokens}
-          scrollerRef={scrollerRef}
-          onReveal={(foldId, direction) => {
-            const block = file.blocks.find(
-              (entry) => entry.kind === "fold" && entry.id === foldId,
-            );
-            const total = block?.kind === "fold" ? block.lines.length : 0;
-            onReveal(file.id, foldId, total, direction);
-          }}
-          onStageHunk={onStageHunk}
-        />
+        <div
+          className={
+            fileLayout === "cards" ? "overflow-hidden rounded-b-md" : ""
+          }
+        >
+          <FileBody
+            file={file}
+            reveals={reveals}
+            near={near}
+            tokens={tokens}
+            scrollerRef={scrollerRef}
+            onReveal={(foldId, direction) => {
+              const block = file.blocks.find(
+                (entry) => entry.kind === "fold" && entry.id === foldId,
+              );
+              const total = block?.kind === "fold" ? block.lines.length : 0;
+              onReveal(file.id, foldId, total, direction);
+            }}
+            onStageHunk={onStageHunk}
+          />
+        </div>
       ) : null}
     </section>
   );
@@ -544,6 +548,7 @@ function VirtualRows({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const codeRef = useRef<HTMLDivElement | null>(null);
   const mouseYRef = useRef<number | null>(null);
+  const hoverFrame = useRef(0);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [commentTarget, setCommentTarget] = useState<DiffCommentDraft | null>(
     null,
@@ -607,22 +612,26 @@ function VirtualRows({
         setHoverKey((current) => (current == null ? current : null));
         return;
       }
-      let y = clientY - body.getBoundingClientRect().top - range.padTop;
-      if (y < 0) {
-        setHoverKey((current) => (current == null ? current : null));
-        return;
-      }
-      for (let index = range.start; index < range.end; index += 1) {
-        const row = rows[index];
-        if (!row) break;
-        if (y < row.height) {
-          const key = diffRowKey(row, index);
-          setHoverKey((current) => (current === key ? current : key));
+      if (hoverFrame.current) return;
+      hoverFrame.current = window.requestAnimationFrame(() => {
+        hoverFrame.current = 0;
+        let y = clientY - body.getBoundingClientRect().top - range.padTop;
+        if (y < 0) {
+          setHoverKey((current) => (current == null ? current : null));
           return;
         }
-        y -= row.height;
-      }
-      setHoverKey((current) => (current == null ? current : null));
+        for (let index = range.start; index < range.end; index += 1) {
+          const row = rows[index];
+          if (!row) break;
+          if (y < row.height) {
+            const key = diffRowKey(row, index);
+            setHoverKey((current) => (current === key ? current : key));
+            return;
+          }
+          y -= row.height;
+        }
+        setHoverKey((current) => (current == null ? current : null));
+      });
     },
     [range.end, range.padTop, range.start, rows],
   );
@@ -636,6 +645,15 @@ function VirtualRows({
     if (!near) return;
     hoverAtY(mouseYRef.current);
   }, [hoverAtY, near]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverFrame.current) {
+        cancelAnimationFrame(hoverFrame.current);
+        hoverFrame.current = 0;
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!near) return;
@@ -760,6 +778,10 @@ function VirtualRows({
         }}
         onMouseLeave={() => {
           mouseYRef.current = null;
+          if (hoverFrame.current) {
+            cancelAnimationFrame(hoverFrame.current);
+            hoverFrame.current = 0;
+          }
           hoverAtY(null);
         }}
       >

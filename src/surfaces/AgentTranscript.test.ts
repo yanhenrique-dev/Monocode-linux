@@ -106,6 +106,29 @@ describe("AgentTranscript collapsed work", () => {
     expect(markup).not.toContain("text-ellipsis");
   });
 
+  it("stamps user messages with their clock time, even card-only ones", () => {
+    const withText = render([
+      { id: "user", role: "user", text: "Build it", startedAt: 1_000 },
+    ]);
+    expect(withText).toContain("<time");
+    const cardOnly = render([
+      {
+        id: "user",
+        role: "user",
+        text: "",
+        startedAt: 1_000,
+        secondOpinion: {
+          from: "claude",
+          to: "codex",
+          request: "Review this",
+        },
+      } as Block,
+    ]);
+    expect(cardOnly).toContain("<time");
+    const undated = render([{ id: "user", role: "user", text: "Build it" }]);
+    expect(undated).not.toContain("<time");
+  });
+
   it("keeps surrounding prose and previews its first URL", () => {
     const markup = render([
       {

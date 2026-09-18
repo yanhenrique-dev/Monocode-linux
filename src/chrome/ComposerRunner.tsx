@@ -111,6 +111,7 @@ export function ComposerRunner({
     let frozenX = 0;
     let frozenFacing: 1 | -1 = 1;
     let finished = false;
+    let parked = false;
     let stunning = false;
     let stunAt = 0;
     let hitAlong = 0;
@@ -162,6 +163,27 @@ export function ComposerRunner({
 
     const hideStars = () => {
       for (const el of starEls) el.style.opacity = "0";
+    };
+
+    let trackWidth = 0;
+    let trackLeft = 0;
+    let trackTop = 0;
+    const measureTrack = () => {
+      const box = boxRef.current;
+      if (!box) return false;
+      const shell = box.closest("[data-composer]");
+      const review = shell?.querySelector("[data-session-review]");
+      const queue = shell?.querySelector("[data-message-queue-card]");
+      const ledge = review ?? queue;
+      const track = runnerTrack(
+        box.getBoundingClientRect(),
+        ledge?.getBoundingClientRect() ?? null,
+      );
+      if (track.width <= 0) return false;
+      trackWidth = track.width;
+      trackLeft = track.left;
+      trackTop = track.top;
+      return true;
     };
 
     const placeStars = (
@@ -225,19 +247,25 @@ export function ComposerRunner({
         showLayer(false);
         return;
       }
-
-      const shell = box.closest("[data-composer]");
-      const review = shell?.querySelector("[data-session-review]");
-      const queue = shell?.querySelector("[data-message-queue-card]");
-      const ledge = review ?? queue;
-      const track = runnerTrack(
-        box.getBoundingClientRect(),
-        ledge?.getBoundingClientRect() ?? null,
-      );
-      if (track.width <= 0) {
+      // Finished exit: stay parked without layout reads until busy again.
+      if (parked) {
+        if (busyRef.current) {
+          parked = false;
+        } else {
+          showLayer(false);
+          return;
+        }
+      } else if (finished && !busyRef.current && !exiting) {
+        parked = true;
         showLayer(false);
         return;
       }
+
+      if (!measureTrack()) {
+        showLayer(false);
+        return;
+      }
+      const track = { width: trackWidth, left: trackLeft, top: trackTop };
       showLayer(true);
 
       const insetTrack = Math.max(0, track.width - RUNNER_INSET * 2);
@@ -259,6 +287,7 @@ export function ComposerRunner({
           endStun();
         }
         finished = false;
+        parked = false;
         if (!reduced && !stunning) {
           const stepped = stepAlong(along, facing, dt, insetTrack);
           along = stepped.along;
@@ -428,13 +457,34 @@ export function ComposerRunner({
     };
 
     apply(last);
+    let trackObserver: ResizeObserver | null = null;
+    const box = boxRef.current;
+    if (box && typeof ResizeObserver !== "undefined") {
+      trackObserver = new ResizeObserver(() => measureTrack());
+      trackObserver.observe(box);
+      measureTrack();
+    }
     const tick = (now: number) => {
       apply(now);
+      // Parked means the exit finished: stop the loop, don't re-arm. The busy
+      // edge inside apply() clears parked, and the interval below restarts us.
+      if (parked) {
+        raf = 0;
+        return;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
+    const wake = window.setInterval(() => {
+      if (!parked || raf) return;
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    }, 500);
     return () => {
       cancelAnimationFrame(raf);
+      raf = 0;
+      window.clearInterval(wake);
+      trackObserver?.disconnect();
       clearCoins();
       showLayer(false);
     };

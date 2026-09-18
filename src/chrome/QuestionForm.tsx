@@ -25,7 +25,9 @@ export function QuestionForm({ prompt, onReply, onInteraction }: Props) {
   useEffect(() => {
     if (prompt.autoResolveAt == null) return;
     setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => {
+      if (!document.hidden) setNow(Date.now());
+    }, 1000);
     return () => clearInterval(timer);
   }, [prompt.requestId, prompt.autoResolveAt]);
 

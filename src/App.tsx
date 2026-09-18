@@ -306,6 +306,8 @@ const onSelectProviderAccount = useCallback(
     useState<EditorNavigationTarget | null>(null);
   const editorNavigationToken = useRef(0);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
+  const [filePickerInitialQuery, setFilePickerInitialQuery] = useState("");
+  const [filePickerResetToken, setFilePickerResetToken] = useState(0);
   const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(
     () => new Set(windowTransfer?.dirtyFileIds ?? []),
   );
@@ -851,6 +853,8 @@ const onSelectProviderAccount = useCallback(
     onToggleSidebar,
     onToggleProjectRail,
     onGoToFile,
+    onOpenCommandPalette,
+    onReload,
     onFindInProject,
     onOpenSearch,
     onLeaveSearch,
@@ -894,6 +898,8 @@ const onSelectProviderAccount = useCallback(
     setNotificationProjectPath,
     setNotificationSettingsRequest,
     setFilePickerOpen,
+    setFilePickerInitialQuery,
+    setFilePickerResetToken,
     setProjectTerminalFocused,
     onSelectHistorySession,
     onVisitBack,
@@ -950,8 +956,10 @@ const onSelectProviderAccount = useCallback(
         onActivate,
         onSplit,
         onFocusDir,
-        onToggleSidebar,
-        onGoToFile,
+    onToggleSidebar,
+    onGoToFile,
+    onOpenCommandPalette,
+    onReload,
         onFindInProject,
         onOpenSearch,
         onOpenInbox,
@@ -1159,6 +1167,8 @@ const onSelectProviderAccount = useCallback(
                   onNewTerminal={onNewTerminal}
                   onToggleTerminal={onToggleProjectTerminal}
                   onGoToFile={onGoToFile}
+                  onOpenCommandPalette={onOpenCommandPalette}
+                  onReload={onReload}
                   onToggleSidebar={onToggleSidebar}
                   onShowSourceControl={onToggleChanges}
                   onCloseCurrentTab={
@@ -1445,10 +1455,15 @@ const onSelectProviderAccount = useCallback(
 
           {filePickerOpen ? (
             <FilePicker
+              key={filePickerResetToken}
               open
               cwd={gitCwd}
               openPaths={openFilePaths}
+              initialQuery={filePickerInitialQuery}
               onOpenFile={onOpenFile}
+              onRunAction={(id) => {
+                if (id === "reload") onReload();
+              }}
               onClose={() => setFilePickerOpen(false)}
             />
           ) : null}

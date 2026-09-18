@@ -27,7 +27,10 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
     name: "Grok Build CLI",
     install: "curl -fsSL https://x.ai/cli/install.sh | bash",
   },
-  opencode: { name: "OpenCode CLI" },
+  opencode: {
+    name: "OpenCode CLI",
+    install: "https://opencode.ai — then `opencode auth login`; see docs/linux.md",
+  },
   pi: { name: "Pi CLI", install: "npm i -g @earendil-works/pi-coding-agent" },
   omp: { name: "omp CLI", install: "curl -fsSL https://omp.sh/install | sh" },
   fx: { name: "fx CLI", install: "curl -fsSL https://fx.sh/setup.sh | bash" },

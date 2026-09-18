@@ -7,6 +7,7 @@ import {
   memo,
   useCallback,
   useContext,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -481,6 +482,11 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     [cwd],
   );
   const remoteMedia = !!allowRemoteMedia;
+  // Streaming re-parses the whole bubble per frame. Defer the parse one tick
+  // so keystrokes and scroll win over markdown fidelity for a frame.
+  const deferredText = useDeferredValue(text);
+  const renderText = streaming ? deferredText : text;
+  const renderStreaming = streaming && renderText === text;
 
   const onFileMenuPick = (id: string) => {
     if (!fileMenu) return;
@@ -524,14 +530,14 @@ export const AgentMarkdown = memo(function AgentMarkdown({
             components={MARKDOWN_COMPONENTS}
             controls={false}
             dir="auto"
-            isAnimating={!!streaming}
+            isAnimating={!!renderStreaming}
             plugins={MARKDOWN_PLUGINS}
             remarkPlugins={remarkPlugins}
             rehypePlugins={
               remoteMedia ? INBOX_MEDIA_REHYPE_PLUGINS : MARKDOWN_REHYPE_PLUGINS
             }
           >
-            {text}
+            {renderText}
           </Streamdown>
           {fileMenu ? (
             <ExplorerMenu

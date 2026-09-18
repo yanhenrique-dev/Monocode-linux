@@ -2556,9 +2556,9 @@ export function InboxDetail({
           }
         >
           <div
-            className={`mx-auto flex w-full max-w-5xl flex-col ${
-              panel ? "gap-4 px-4 py-4" : "gap-5 px-8 py-5"
-            }`}
+            className={`mx-auto flex w-full flex-col ${
+              tab === "code" ? "max-w-[1600px]" : "max-w-5xl"
+            } ${panel ? "gap-4 px-4 py-4" : "gap-5 px-8 py-5"}`}
           >
             {item.labels.length > 0 ? (
               <div className="flex flex-wrap gap-1">
@@ -2783,7 +2783,7 @@ function InboxProjectPicker({
         <div
           ref={menu}
           role="listbox"
-          className="absolute left-0 top-full z-30 mt-1 max-h-64 min-w-full max-w-64 overflow-y-auto rounded-lg border border-content/10 bg-content/10 p-1 shadow-xl backdrop-blur-xl outline-none"
+          className="absolute left-0 top-full z-30 mt-1 max-h-64 min-w-full max-w-64 overflow-y-auto rounded-lg border border-content/10 bg-content/10 p-1 shadow-xl glass-blur backdrop-blur-xl outline-none"
         >
           {projects.map((project) => {
             const active = selected

@@ -3,6 +3,7 @@ import {
   clipboardImageTypes,
   filesFromClipboard,
   mergeAttachments,
+  needsAsyncImageRead,
   readClipboardImageFile,
 } from "./attachments";
 import type { Attachment } from "./session";
@@ -105,6 +106,28 @@ describe("clipboardImageTypes", () => {
     expect(clipboardImageTypes(null)).toEqual([]);
     expect(clipboardImageTypes(undefined)).toEqual([]);
     expect(clipboardImageTypes(["text/plain", "Files"])).toEqual([]);
+  });
+});
+
+describe("needsAsyncImageRead", () => {
+  it("reads when the transfer advertises an image", () => {
+    expect(needsAsyncImageRead(["text/plain", "image/png"], "")).toBe(true);
+  });
+
+  it("reads when the webview hid types and no text is present", () => {
+    expect(needsAsyncImageRead(null, "")).toBe(true);
+    expect(needsAsyncImageRead(undefined, "")).toBe(true);
+    expect(needsAsyncImageRead([], "")).toBe(true);
+  });
+
+  it("leaves plain-text pastes to default insertion", () => {
+    expect(needsAsyncImageRead(["text/plain"], "hello")).toBe(false);
+    expect(needsAsyncImageRead(null, "hello")).toBe(false);
+    expect(needsAsyncImageRead([], "hello")).toBe(false);
+  });
+
+  it("stays silent for known non-image transfers without text", () => {
+    expect(needsAsyncImageRead(["text/html"], "")).toBe(false);
   });
 });
 
