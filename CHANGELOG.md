@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Black window on recent Mesa/Wayland systems (EGL_BAD_PARAMETER): the
+  release AppImage no longer bundles the stale Ubuntu 22.04
+  `libwayland-client`, so the host EGL stack initializes correctly.
+
 ## [0.1.60] - 2026-09-18
 
 ### Added
