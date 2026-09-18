@@ -569,6 +569,28 @@ describe("task list updates", () => {
     });
   });
 
+  it("resets an orphaned building plan to ready when the turn stops", () => {
+    let session = appendUser(newSession("cursor", "/tmp"), "plan it");
+    session = applyHarnessEvent(session, {
+      type: "message.delta",
+      text: "# Plan\n\nDo it.",
+    });
+    session = applyHarnessEvent(session, { type: "message.completed" });
+    session = promoteLastAssistantToPlan(session, "turn:1");
+    const building = {
+      ...session,
+      blocks: session.blocks.map((block) =>
+        block.role === "plan" && block.plan
+          ? { ...block, plan: { ...block.plan, status: "building" as const } }
+          : block,
+      ),
+    };
+    const stopped = stopStreaming(building);
+    const plan = stopped.blocks.find((block) => block.role === "plan");
+    expect(plan?.plan?.status).toBe("ready");
+    expect(plan?.plan?.originalText).toBe("# Plan\n\nDo it.");
+  });
+
   it("does not replace assistant text when a native plan already exists", () => {
     let session = appendUser(newSession("codex", "/tmp"), "plan it");
     session = applyHarnessEvent(session, {

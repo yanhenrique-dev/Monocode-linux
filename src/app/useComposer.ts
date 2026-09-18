@@ -860,7 +860,21 @@ export function useComposer(deps: ComposerDeps) {
           }
           providerFailureSeen = true;
         } finally {
-          if (turnGen.current.get(sessionId) !== gen) return;
+          if (turnGen.current.get(sessionId) !== gen) {
+            // Superseded: a newer turn took over, so a build this turn
+            // started will never settle. Drop its "building" state instead
+            // of stranding the Build button showing Building… forever.
+            if (approvedPlan && intent === "build") {
+              setSessions((prev) =>
+                prev.map((s) =>
+                  s.id === sessionId
+                    ? withPlanStatus(stopStreaming(s), approvedPlan.id, "ready")
+                    : s,
+                ),
+              );
+            }
+            return;
+          }
           flushHarnessEvents();
           controlOutcome = {
             status:

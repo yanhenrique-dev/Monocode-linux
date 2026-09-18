@@ -545,6 +545,15 @@ function stopBlockProgress(block: Block): Block {
       },
     };
   }
+  // A build turn that throws or gets superseded never reaches the "built"
+  // commit in useComposer: without this, the plan keeps status "building"
+  // forever and the Build button stays stuck and disabled.
+  if (stopped.role === "plan" && stopped.plan?.status === "building") {
+    stopped = {
+      ...stopped,
+      plan: { ...stopped.plan, status: "ready" },
+    };
+  }
   const current = stopped.taskList;
   if (!current?.items.some((item) => item.status === "in_progress")) {
     return stopped;
