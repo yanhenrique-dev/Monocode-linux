@@ -86,7 +86,6 @@ import { inboxAskPrompt } from "../lib/inboxAsk";
 import { loadFollowUpBehavior, type FollowUpBehavior } from "../lib/settings";
 import { notifyGitChanged } from "../lib/fs";
 import { notifyUsageStale, usageProviderFor } from "../lib/rateLimits";
-import { nudgeWatchedFiles } from "../lib/fileWatch";
 import {
   preferredModelSettings,
   resolveModel,
