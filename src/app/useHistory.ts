@@ -39,7 +39,6 @@ import {
   type WorkspaceTabCloseScope,
 } from "../lib/workspaceTabGroups";
 import { markLinkedSessionUpdateSeen } from "../lib/linkedSessionSeen";
-import { restoreSessionCheckout } from "../lib/fs";
 import { runSessionRemoval } from "../lib/sessionRemoval";
 import { sessionChildHarnesses } from "../lib/handoff";
 import { confirmDiscardUnsaved } from "./workspaceEvents";
@@ -384,7 +383,7 @@ export function useHistory(deps: HistoryDeps) {
         };
         const saved = await upsertSession(updated).catch(() => null);
         if (saved) {
-          const cached = restoreSessionCheckout(updated);
+          const cached = updated;
           rememberLoadedSession(loadedSessionCache.current, cached);
           lastPersisted.current.set(sessionId, persistFingerprint(updated));
         }
