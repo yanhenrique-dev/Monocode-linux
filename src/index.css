@@ -240,10 +240,17 @@ html.has-native-glass:not(.theme-light) .sidebar-glass {
 .chat-pane-background::before {
   content: "";
   position: absolute;
-  left: var(--chat-background-left, 0);
-  top: var(--chat-background-top, 0);
-  width: var(--chat-background-width, 100%);
-  height: var(--chat-background-height, 100%);
+  /*
+   * Blur bleed: filter: blur() shrinks the painted edges toward transparent,
+   * so grow the layer by 1.5x the radius on every side. At 0px this reduces
+   * to the plain geometry below.
+   */
+  --chat-background-bleed: calc(var(--chat-background-blur, 0px) * 1.5);
+  left: calc(var(--chat-background-left, 0) - var(--chat-background-bleed));
+  top: calc(var(--chat-background-top, 0) - var(--chat-background-bleed));
+  width: calc(var(--chat-background-width, 100%) + var(--chat-background-bleed) * 2);
+  height: calc(var(--chat-background-height, 100%) + var(--chat-background-bleed) * 2);
+  filter: blur(var(--chat-background-blur, 0px));
   z-index: -1;
   background-image: var(--chat-background-image, none);
   background-position: center;
