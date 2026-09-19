@@ -12,6 +12,11 @@ export function supportsWebGL2(probe?: () => unknown): boolean {
 
 let webgl2Support: boolean | null = null;
 
+/** Test seam: the cached probe result is process-wide. */
+export function resetWebGL2Support(): void {
+  webgl2Support = null;
+}
+
 function probeWebGL2(probe: () => unknown): boolean {
   try {
     const gl = probe();
