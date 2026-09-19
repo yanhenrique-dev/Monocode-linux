@@ -31,6 +31,10 @@ coverage/
 *.deb
 *.rpm
 *.AppImage
+*.pkg.tar.zst
+*.pkg.tar.xz
+packaging/aur/*/src/
+packaging/aur/*/pkg/
 *.tar.gz
 *.zip
 latest.json

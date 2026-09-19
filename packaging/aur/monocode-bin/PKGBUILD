@@ -1,0 +1,53 @@
+# Maintainer: yanhenrique-dev <yanhenrique-dev at users dot noreply dot github dot com>
+# https://github.com/yanhenrique-dev/Monocode-linux
+pkgname=monocode-bin
+pkgver=0.1.67
+pkgrel=1
+pkgdesc="MonoCode Linux — interface desktop para agentes de código (Tauri + React)"
+arch=('x86_64')
+url="https://github.com/yanhenrique-dev/Monocode-linux"
+license=('MIT')
+provides=('monocode')
+conflicts=('monocode')
+depends=('gtk3' 'webkit2gtk-4.1' 'libsoup3' 'libayatana-appindicator' 'openssl' 'librsvg' 'zenity' 'hicolor-icon-theme')
+# Nomes verificados no AUR em 19/09/2026; opencode/codex ainda sem pacote
+# oficial correspondente — reavaliar antes de adicionar optdepends novos.
+optdepends=(
+  'claude-code: provedor Claude Code'
+)
+source=("${pkgname}-${pkgver}.AppImage::${url}/releases/download/v${pkgver}/MonoCode_${pkgver}_amd64.AppImage"
+        "LICENSE::${url}/raw/v${pkgver}/LICENSE")
+sha256sums=('3ebdcb5761a109882df70b0fc5b810494337e8cac64f3175dede617fd75e8add'
+            'f0da354982eb716d0036375be9322e2e77792acd0a782f1655ee75ea36c17640')
+
+prepare() {
+  chmod +x "${pkgname}-${pkgver}.AppImage"
+}
+
+build() {
+  ./"${pkgname}-${pkgver}.AppImage" --appimage-extract
+}
+
+package() {
+  install -dm755 "${pkgdir}/opt/${pkgname}"
+  cp -a "${srcdir}/squashfs-root/." "${pkgdir}/opt/${pkgname}/"
+  chmod 755 "${pkgdir}/opt/${pkgname}/AppRun"
+  rm -f "${pkgdir}/opt/${pkgname}/MonoCode.desktop" "${pkgdir}/opt/${pkgname}/monocode.png"
+
+  install -dm755 "${pkgdir}/usr/bin"
+  ln -s "/opt/${pkgname}/AppRun" "${pkgdir}/usr/bin/monocode"
+
+  install -Dm644 "${srcdir}/squashfs-root/usr/share/applications/MonoCode.desktop" \
+    "${pkgdir}/usr/share/applications/monocode.desktop"
+  sed -i -e 's|^Exec=.*|Exec=monocode %U|' -e 's|^Icon=.*|Icon=monocode|' \
+    "${pkgdir}/usr/share/applications/monocode.desktop"
+
+  # Tamanhos presentes no AppImage (256x256@2 no lugar de 256x256).
+  for size in 32x32 128x128 256x256@2 512x512; do
+    install -Dm644 "${srcdir}/squashfs-root/usr/share/icons/hicolor/${size}/apps/monocode.png" \
+      "${pkgdir}/usr/share/icons/hicolor/${size}/apps/monocode.png" 2>/dev/null || true
+  done
+
+  install -Dm644 "${srcdir}/LICENSE" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
