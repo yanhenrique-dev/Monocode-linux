@@ -68,7 +68,11 @@ type ModelGroup = {
 const MENU_WIDTH = 250;
 const MODEL_MENU_WIDTH = 310;
 const SETTING_MENU_WIDTH = 210;
-const SUBMENU_OVERLAP = -4;
+// Gap positivo: dois cards distintos em vez de sobrepor dois vidros.
+// O overlap negativo (-4) cruzava bordas, duplicava o blur e criava
+// uma faixa escura na junção. Com 8px a sombra separa e o highlight
+// da linha ativa mantém o vínculo visual pai -> flyout.
+const SUBMENU_GAP = 8;
 const SELF = "[data-model-picker]";
 
 const PROVIDER_TAB_SIZE = 32;
@@ -733,7 +737,7 @@ export function ModelPicker({
               key={submenu.setting.id}
               anchor={activeRow}
               side="right"
-              gap={SUBMENU_OVERLAP}
+              gap={SUBMENU_GAP}
               width={SETTING_MENU_WIDTH}
               layer={LAYER.submenu}
               role="menu"
@@ -1065,7 +1069,7 @@ function ModelFlyout({
     <Popover
       anchor={anchor}
       side="right"
-      gap={SUBMENU_OVERLAP}
+      gap={SUBMENU_GAP}
       width={MODEL_MENU_WIDTH}
       minHeight={MODEL_MENU_FRAME_HEIGHT}
       maxHeight={MODEL_MENU_FRAME_HEIGHT}
