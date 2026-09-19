@@ -66,6 +66,22 @@ jobs:
         # See scripts/repack-appimage.sh: stale libwayland breaks host Mesa.
         run: bash scripts/repack-appimage.sh
 
+      - name: Sign repacked AppImage
+        # The repack rewrites the AppImage, so any build-time signature is
+        # stale: re-sign the final artifact the updater will validate.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          appimage=(target/release/bundle/appimage/*.AppImage)
+          if (( ${#appimage[@]} != 1 )); then
+            echo "Expected exactly one AppImage" >&2
+            exit 1
+          fi
+          npx tauri signer sign "${appimage[0]}"
+
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,4 +97,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "MonoCode Linux $VERSION" \
             --notes "See CHANGELOG.md for details." \
-            "${appimage[0]}"
+            "${appimage[0]}" "${appimage[0]}.sig"
