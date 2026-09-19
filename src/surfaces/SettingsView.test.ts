@@ -393,6 +393,29 @@ describe("settings search", () => {
   });
 });
 
+describe("interface blur master guard", () => {
+  function blurToggle() {
+    return container.querySelector<HTMLButtonElement>(
+      '[data-setting-id="interface-blur"] button[role="switch"]',
+    )!;
+  }
+
+  it("enables the toggle while hardware acceleration is on", async () => {
+    localStorage.setItem("monocode.hardwareAcceleration", "1");
+    await render("appearance");
+    expect(blurToggle().disabled).toBe(false);
+  });
+
+  it("disables the toggle with a hint while hardware acceleration is off", async () => {
+    localStorage.setItem("monocode.hardwareAcceleration", "0");
+    await render("appearance");
+    expect(blurToggle().disabled).toBe(true);
+    expect(container.textContent).toContain(
+      "Disabled while Hardware acceleration is off",
+    );
+  });
+});
+
 describe("UpdateRow busy feedback", () => {
   beforeEach(() => {
     vi.useFakeTimers();

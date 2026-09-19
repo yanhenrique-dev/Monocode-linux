@@ -228,6 +228,7 @@ import {
 import {
   loadHardwareAcceleration,
   saveHardwareAcceleration,
+  subscribeHardwareAcceleration,
 } from "../lib/hardwareAcceleration";
 import { loadSoundsEnabled, playCue, saveSoundsEnabled } from "../lib/sounds";
 import {
@@ -1763,6 +1764,13 @@ function AppearancePage({
 }) {
   const appearance = useAppearanceSettings();
   const { restoreDefaults } = appearance;
+  // The master hardware switch overrides every blur control: while it is
+  // off, `html.hw-reduced` kills the sampling the toggle below would flip.
+  const [hardwareOn, setHardwareOn] = useState(loadHardwareAcceleration);
+  useEffect(
+    () => subscribeHardwareAcceleration(setHardwareOn),
+    [],
+  );
   useEffect(() => {
     onRestoreReady?.(restoreDefaults);
   }, [onRestoreReady, restoreDefaults]);
@@ -1922,12 +1930,17 @@ function AppearancePage({
         <Row
           id="interface-blur"
           label="Interface blur"
-          description="Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces go solid instead of translucent."
+          description={
+            hardwareOn
+              ? "Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces go solid instead of translucent."
+              : "Disabled while Hardware acceleration is off: the master switch already suspends every blur."
+          }
         >
           <Toggle
             label="Interface blur"
             on={appearance.uiBlur}
             onChange={appearance.onUiBlur}
+            disabled={!hardwareOn}
           />
         </Row>
         <Row
