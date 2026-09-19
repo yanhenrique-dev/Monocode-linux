@@ -57,11 +57,31 @@ jobs:
           NODE
 
       - name: Build Linux AppImage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: npm run build:linux
 
       - name: Repack AppImage without bundled libwayland
         # See scripts/repack-appimage.sh: stale libwayland breaks host Mesa.
         run: bash scripts/repack-appimage.sh
+
+      - name: Sign repacked AppImage and build updater manifest
+        # The repack rewrites the AppImage, so the build-time signature is
+        # stale: re-sign the final artifact and point latest.json at it.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          appimage=(target/release/bundle/appimage/*.AppImage)
+          if (( ${#appimage[@]} != 1 )); then
+            echo "Expected exactly one AppImage" >&2
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          npx tauri signer sign "${appimage[0]}"
+          node scripts/make-updater-json.mjs \
+            "$VERSION" "${appimage[0]}" "${appimage[0]}.sig" latest.json
 
       - name: GitHub Release
         env:
@@ -78,4 +98,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "MonoCode Linux $VERSION" \
             --notes "See CHANGELOG.md for details." \
-            "${appimage[0]}"
+            "${appimage[0]}" "${appimage[0]}.sig" latest.json

@@ -54,8 +54,10 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
-      "endpoints": []
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFGNDgzQTA4QzA5MjhBRUUKUldUdWlwTEFDRHBJcjlqcDVwT1dBK24xdC96clRSaFMzc09jUEVKa05yY1d1RlBja0V2QWtFSFIK===",
+      "endpoints": [
+        "https://github.com/yanhenrique-dev/Monocode-linux/releases/latest/download/latest.json"
+      ]
     }
   }
 }
