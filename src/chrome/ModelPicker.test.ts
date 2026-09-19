@@ -2,6 +2,12 @@
 import { act, createElement, type CSSProperties, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { HARNESSES } from "../lib/session";
+
+// Grows with the provider rail: one tab per harness. Derived the same way
+// as the component so the next harness registration does not break this.
+const EXPECTED_MENU_HEIGHT =
+  (HARNESSES.length + 1) * 32 + HARNESSES.length * 4 + 12;
 
 vi.mock("../lib/harness/availability", () => ({
   getHarnessAvailabilitySnapshot: () => 0,
@@ -166,9 +172,11 @@ describe("model picker", () => {
     const modelFlyout = container.querySelector<HTMLElement>(
       '[role="dialog"][aria-label="Models"]',
     )!;
-    expect(modelFlyout.style.height).toBe("368px");
-    expect(modelFlyout.dataset.minHeight).toBe("370");
-    expect(modelFlyout.dataset.maxHeight).toBe("370");
+    expect(modelFlyout.style.height).toBe(`${EXPECTED_MENU_HEIGHT}px`);
+    expect(modelFlyout.dataset.minHeight).toBe(`${EXPECTED_MENU_HEIGHT + 2}`);
+    expect(modelFlyout.dataset.maxHeight).toBe(
+      `${EXPECTED_MENU_HEIGHT + 2}`,
+    );
     expect(
       container.querySelector('[role="tablist"][aria-orientation="vertical"]'),
     ).not.toBeNull();
