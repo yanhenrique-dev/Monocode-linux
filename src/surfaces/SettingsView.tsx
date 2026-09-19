@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   ArrowDownCircle,
   Check,
@@ -1067,7 +1067,7 @@ function GithubSettings() {
         {!checking && !status?.installed ? (
           <SecondaryButton
             onClick={() => {
-              void openUrl("https://cli.github.com/").catch(() => {});
+              void openExternalUrl("https://cli.github.com/").catch(() => {});
             }}
           >
             Installation guide
