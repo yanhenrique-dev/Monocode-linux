@@ -128,14 +128,16 @@ body,
   user-select: none;
 }
 
-/* Linux/Windows: explicit sans + thin scrollbars. macOS keeps native overlay
-   scrollbars and default text rendering. */
+/* Linux: explicit sans + thin scrollbars. macOS keeps native overlay
+   scrollbars and default text rendering. Grayscale smoothing is a macOS
+   look: on Linux it kills subpixel antialiasing and thins small text,
+   worse over translucent/blurred surfaces — so leave it on auto. */
 html:not(.is-mac),
 html:not(.is-mac) body,
 html:not(.is-mac) #root {
   font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
   text-rendering: optimizeLegibility;
 }
 
