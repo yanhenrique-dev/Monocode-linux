@@ -77,7 +77,7 @@ export function ModalPanel({
         onMouseDown={(event) => event.stopPropagation()}
         className={`relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
       >
-        <GlassBackdrop className="bg-background-base/55" />
+        <GlassBackdrop className="popover-backdrop bg-background-base/55" />
         <div className="modal-panel relative z-[1] flex min-h-0 flex-1 flex-col">
           <header
             className={
