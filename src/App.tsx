@@ -15,6 +15,8 @@ import { Sidebar } from "./chrome/Sidebar";
 import { ApprovalToasts } from "./chrome/ApprovalToasts";
 import { WhatsNewDialog } from "./chrome/WhatsNewDialog";
 import { ProviderSignInDialog } from "./chrome/ProviderSignInDialog";
+import { DeleteSessionDialog } from "./chrome/DeleteSessionDialog";
+import { useWorktrees, type WorktreeDeletionHooks } from "./app/useWorktrees";
 import { TitleBar } from "./chrome/TitleBar";
 import { MenuBar } from "./chrome/MenuBar";
 import { FilePicker } from "./chrome/FilePicker";
@@ -620,6 +622,8 @@ const onSelectProviderAccount = useCallback(
   const [inspectedWorkerId, setInspectedWorkerId] = useState<string | null>(
     null,
   );
+  // Set by useWorktrees below; useHistory reads it at call time.
+  const worktreeApiRef = useRef<WorktreeDeletionHooks | null>(null);
   const {
     sessionReminders,
     onArchiveFocusedSession,
@@ -628,6 +632,7 @@ const onSelectProviderAccount = useCallback(
     onPlaceSessionOnPane,
     onPlaceTabOnPane,
     onRenameHistorySession,
+    onRemoveHistorySession,
     onArchiveHistorySession,
     onPinHistorySession,
     onArchiveHistorySessions,
@@ -635,6 +640,7 @@ const onSelectProviderAccount = useCallback(
     onDeleteHistorySession,
     onDeleteHistorySessions,
   } = useHistory({
+    worktreeApiRef,
     sessions,
     history,
     activeTabId,
@@ -688,6 +694,30 @@ const onSelectProviderAccount = useCallback(
     persistSession,
     activateTab,
   });
+  const worktree = useWorktrees({
+    sessionsRef,
+    tabsRef,
+    projectTerminalsRef,
+    projectCwdRef,
+    pendingPersist,
+    lastPersisted,
+    removingSessionIds,
+    setSessions,
+    setHistory,
+    setStoredLinkedSessions,
+    setProjectCwd,
+    setRecents,
+    setActiveTabId,
+    setComposerFocused,
+    setSettingsOpen,
+    setSettingsSection,
+    appendTab,
+    stopSessionForRemoval,
+    invalidateLoadedSession,
+    refreshHistory,
+    onRemoveHistorySession,
+  });
+  worktreeApiRef.current = worktree.deletionHooks;
   const {
     onPlaceSessionInFolder,
     onFileDirtyChange,
@@ -1037,6 +1067,8 @@ const onSelectProviderAccount = useCallback(
     onBuildPlan,
     onSecondOpinion,
     onHandoff,
+    onWorktreeChange: worktree.onWorktreeChange,
+    onManageWorktrees: worktree.onManageWorktrees,
     onNewTerminal: onNewTerminalInSession,
   };
 
@@ -1412,6 +1444,10 @@ const onSelectProviderAccount = useCallback(
                 recents={recents}
                 cwd={sidebarCwd}
                 sessions={sidebarHistory}
+                liveSessions={sessions}
+                onRemoveWorktree={worktree.onRemoveWorktree}
+                onCheckWorktreeRemoval={worktree.onCheckWorktreeRemoval}
+                onDeleteWorktreeSessions={worktree.onDeleteWorktreeSessions}
                 besideRail
                 onClose={onCloseSettings}
                 onSelectSection={onSelectSettingsSection}
@@ -1497,6 +1533,16 @@ const onSelectProviderAccount = useCallback(
               key={providerSignInRequest.key}
               harness={providerSignInRequest.harness}
               onClose={() => setProviderSignInRequest(null)}
+            />
+          ) : null}
+          {worktree.sessionDeleteDialog ? (
+            <DeleteSessionDialog
+              title={worktree.sessionDeleteDialog.title}
+              unusedWorktree={worktree.sessionDeleteDialog.unusedWorktree}
+              onClose={(choice) => {
+                worktree.sessionDeleteDialog?.resolve(choice);
+                worktree.setSessionDeleteDialog(undefined);
+              }}
             />
           ) : null}
         </div>

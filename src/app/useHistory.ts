@@ -48,6 +48,7 @@ import { archiveFocusedSession } from "../lib/archiveShortcut";
 import { releaseOrchestrationWorker } from "../lib/orchestrationWorkspace";
 import { rememberLoadedSession } from "../lib/sessionCache";
 import type { SessionSummary } from "../lib/sessionStore";
+import type { WorktreeDeletionHooks } from "./useWorktrees";
 import type { SidebarTabId } from "../lib/appearance";
 import type { LinkedSessionUpdate } from "../lib/linkedSessionUpdates";
 import { useSessionReminders } from "../hooks/useSessionReminders";
@@ -111,6 +112,8 @@ export interface HistoryDeps {
   refreshHistory: (cwd: string) => Promise<void>;
   persistSession: (session: Session | undefined) => void;
   activateTab: (id: string, paneId?: string) => void;
+  /** Set by the worktrees hook after mount; read at call time. */
+  worktreeApiRef?: MutableRefObject<WorktreeDeletionHooks | null>;
 }
 
 export function useHistory(deps: HistoryDeps) {
@@ -165,6 +168,7 @@ export function useHistory(deps: HistoryDeps) {
     refreshHistory,
     persistSession,
     activateTab,
+    worktreeApiRef,
   } = deps;
   const onSelectHistorySession = useCallback(
     async (sessionId: string) => {
@@ -399,7 +403,13 @@ export function useHistory(deps: HistoryDeps) {
       mode: "archive" | "delete",
       skipDeleteConfirm = false,
     ): Promise<boolean> => {
-      if (removingSessionIds.current.has(sessionId)) return false;
+      const worktreeApi = worktreeApiRef?.current;
+      if (
+        removingSessionIds.current.has(sessionId) ||
+        (worktreeApi?.switchingWorktrees.current.has(sessionId) ?? false) ||
+        (worktreeApi?.deleteConfirmationPending.current ?? false)
+      )
+        return false;
       const open = sessionsRef.current.find(
         (session) => session.id === sessionId,
       );
@@ -408,19 +418,32 @@ export function useHistory(deps: HistoryDeps) {
       const label = seed
         ? sessionDisplayTitle(seed.title, seed.harness)
         : "this session";
-      if (
-        mode === "delete" &&
-        !skipDeleteConfirm &&
-        !window.confirm(`Delete “${label}”?`)
-      )
-        return false;
-
       removingSessionIds.current.add(sessionId);
+      let deleteWorktreePath: string | undefined;
+      if (mode === "delete" && !skipDeleteConfirm) {
+        if (!worktreeApi) {
+          if (!window.confirm(`Delete “${label}”?`)) {
+            removingSessionIds.current.delete(sessionId);
+            return false;
+          }
+        } else {
+          const decision = await worktreeApi.requestSessionDelete(
+            label,
+            seed,
+            sessionId,
+          );
+          if (!decision.confirmed) {
+            removingSessionIds.current.delete(sessionId);
+            return false;
+          }
+          deleteWorktreePath = decision.deleteWorktreePath;
+        }
+      }
       invalidateLoadedSession(sessionId);
       pendingPersist.current.delete(sessionId);
       let savedSummary: SessionSummary | undefined;
       try {
-        return await runSessionRemoval({
+        const removed = await runSessionRemoval({
           sessionId,
           scope: tabCloseScope,
           readWorkspace: () => ({
@@ -461,6 +484,21 @@ export function useHistory(deps: HistoryDeps) {
             if (run && (run.status === "active" || run.status === "paused"))
               await orchestrator.stopRun(run.leadId);
             await stopSessionForRemoval(sessionId);
+            if (mode === "delete") {
+              const latest = sessionsRef.current.find(
+                (s) => s.id === sessionId,
+              );
+              const harnesses: HarnessId[] = latest
+                ? sessionChildHarnesses(latest)
+                : [seed?.harness ?? "cursor"];
+              // Release native processes before deleting the record, so a
+              // following worktree removal cannot race fire-and-forget cleanup.
+              await Promise.all(
+                harnesses.map((harness) =>
+                  forgetHarnessSession(harness, sessionId),
+                ),
+              );
+            }
           },
           updateSession: (stopped) => {
             const next = sessionsRef.current.map((session) =>
@@ -563,6 +601,13 @@ export function useHistory(deps: HistoryDeps) {
             }
           },
         });
+        if (removed && deleteWorktreePath && seed) {
+          await worktreeApiRef?.current?.removeWorktreeAfterDelete(
+            seed.cwd,
+            deleteWorktreePath,
+          );
+        }
+        return removed;
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         void message(`Could not ${mode} this conversation.\n\n${detail}`, {
@@ -582,6 +627,7 @@ export function useHistory(deps: HistoryDeps) {
       sidebarCwd,
       stopSessionForRemoval,
       tabCloseScope,
+      worktreeApiRef,
     ],
   );
 
