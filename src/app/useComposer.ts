@@ -10,8 +10,10 @@ import {
   canSteerHarness,
   cancelHarnessTurn,
   forgetHarnessSession,
+  generateHarnessBranchName,
   generateHarnessTitle,
   isLiveHarness,
+  pickTextHarness,
   promoteLastAssistantToPlan,
   sendHarnessTurn,
   steerHarnessTurn,
@@ -94,6 +96,13 @@ import {
 } from "../lib/models";
 import { preparePrompt } from "../lib/promptPreparation";
 import { isNativeCommandPrompt } from "../lib/skills";
+import {
+  createWorktree,
+  namedWorktreeBranch,
+  renameWorktreeBranch,
+  temporaryWorktreeBranchName,
+} from "../lib/worktrees";
+import { pathKey } from "../lib/paths";
 import { resolveLinkedWorkItem } from "../lib/sessionWorkItem";
 import {
   lastAssistantTextInTurn,
@@ -301,7 +310,10 @@ export function useComposer(deps: ComposerDeps) {
       }
       if (isPreparingHandoff(current)) return false;
       saveRecentModelChoice(current.harness, current.model);
-      const workCwd = sessionWorkCwd(current);
+      const initialWorkCwd = sessionWorkCwd(current);
+      const createDraftWorktree =
+        !current.worktreeCwd && current.workspaceMode === "worktree";
+      let workCwd = initialWorkCwd;
       const providerAccountId =
         current.harness === "claude" || current.harness === "codex"
           ? (current.providerAccountId ??
@@ -320,7 +332,9 @@ export function useComposer(deps: ComposerDeps) {
 
       if (current.busy && !pendingSwitch) {
         const followUpBehavior =
-          intent === "plan" || intent === "orchestrate"
+          current.worktreePreparing ||
+          intent === "plan" ||
+          intent === "orchestrate"
             ? "queue"
             : (options?.followUpBehavior ?? loadFollowUpBehavior());
         if (followUpBehavior === "queue") {
@@ -487,6 +501,9 @@ export function useComposer(deps: ComposerDeps) {
           let next: Session = {
             ...selected,
             providerAccountId,
+            worktreePreparing: createDraftWorktree
+              ? true
+              : selected.worktreePreparing,
             inboxCard: rawCommand ? s.inboxCard : undefined,
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
@@ -632,6 +649,56 @@ export function useComposer(deps: ComposerDeps) {
       let nativeProposalText = "";
       let completedProposal: OrchestrationProposal | undefined;
       void (async () => {
+        if (createDraftWorktree) {
+          const tree = await createWorktree(
+            current.cwd,
+            temporaryWorktreeBranchName(),
+            current.worktreeBase || "HEAD",
+            false,
+          );
+          workCwd = tree.path;
+          setSessions((prev) =>
+            prev.map((session) =>
+              session.id === sessionId
+                ? {
+                    ...session,
+                    worktreeCwd: tree.path,
+                    branch: tree.branch ?? undefined,
+                    workspaceMode: undefined,
+                    worktreeBase: undefined,
+                    worktreePreparing: undefined,
+                  }
+                : session,
+            ),
+          );
+          notifyReviewChanged(sessionId);
+
+          const branchMessage =
+            harnessText || attachments.map((file) => file.name).join(", ");
+          void generateHarnessBranchName(
+            pickTextHarness(current.harness),
+            workCwd,
+            branchMessage,
+          )
+            .then(async (fragment) => {
+              const branch = fragment ? namedWorktreeBranch(fragment) : null;
+              if (!branch) return;
+              const renamed = await renameWorktreeBranch(
+                current.cwd,
+                tree.path,
+                branch,
+              );
+              setSessions((prev) =>
+                prev.map((session) =>
+                  session.id === sessionId &&
+                  pathKey(sessionWorkCwd(session)) === pathKey(tree.path)
+                    ? { ...session, branch: renamed.branch ?? undefined }
+                    : session,
+                ),
+              );
+            })
+            .catch(() => undefined);
+        }
         if (proposalDraft && proposalId) {
           const settings = await discoverOrchestrationSettings();
           if (turnGen.current.get(sessionId) !== gen) return;
@@ -899,7 +966,10 @@ export function useComposer(deps: ComposerDeps) {
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id !== sessionId) return s;
-              const stopped = stopStreaming(s);
+              const stopped = {
+                ...stopStreaming(s),
+                worktreePreparing: undefined,
+              };
               const providerFailed =
                 providerFailureSeen ||
                 isProviderFailureText(lastAssistantTextInTurn(stopped));
@@ -964,7 +1034,10 @@ export function useComposer(deps: ComposerDeps) {
                 session.id === sessionId
                   ? proposalId && proposalDraft
                     ? withOrchestrationProposal(
-                        stopStreaming(session),
+                        {
+                          ...stopStreaming(session),
+                          worktreePreparing: undefined,
+                        },
                         proposalId,
                         completeOrchestrationProposal(
                           proposalDraft,
@@ -972,7 +1045,10 @@ export function useComposer(deps: ComposerDeps) {
                           controlOutcome.error,
                         ),
                       )
-                    : stopStreaming(session)
+                    : {
+                        ...stopStreaming(session),
+                        worktreePreparing: undefined,
+                      }
                   : session,
               ),
             );

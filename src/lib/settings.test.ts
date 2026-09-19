@@ -335,6 +335,16 @@ describe("settings navigation", () => {
       expect(sections.has(entry.section), entry.id).toBe(true);
     }
   });
+
+  it("documents the draft workspace toggle", () => {
+    expect(
+      KEYBINDINGS.find((row) => row.command === "Composer: Toggle Workspace"),
+    ).toEqual({
+      command: "Composer: Toggle Workspace",
+      keys: `${MOD}${SHIFT}G`,
+      when: "Draft session composer",
+    });
+  });
 });
 
 describe("settings search", () => {

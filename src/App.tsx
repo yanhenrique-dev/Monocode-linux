@@ -59,9 +59,11 @@ import {
 import {
   newDefaultSession,
   newSession,
+  sessionWorkCwd,
   type HarnessId,
   type Session,
 } from "./lib/session";
+import { useProjectBranches } from "./hooks/useProjectBranches";
 
 import {
   type SessionSummary,
@@ -506,6 +508,14 @@ const onSelectProviderAccount = useCallback(
     projectTerminals,
     projectTerminalsRef,
   });
+  const gitCwdBranches = useProjectBranches(
+    gitCwd,
+    Boolean(gitCwd) && gitCwd !== "~",
+  );
+  const explorerRootLabel =
+    active?.worktreeCwd && sameProjectPath(gitCwd, sessionWorkCwd(active))
+      ? active.branch || gitCwdBranches?.current || undefined
+      : undefined;
   const {
     onOpenWhatsNew,
     onNew,
@@ -1069,6 +1079,8 @@ const onSelectProviderAccount = useCallback(
     onHandoff,
     onWorktreeChange: worktree.onWorktreeChange,
     onManageWorktrees: worktree.onManageWorktrees,
+    onWorkspaceModeChange: worktree.onWorkspaceModeChange,
+    onWorktreeBaseChange: worktree.onWorktreeBaseChange,
     onNewTerminal: onNewTerminalInSession,
   };
 
@@ -1083,6 +1095,7 @@ const onSelectProviderAccount = useCallback(
           <Sidebar
             cwd={sidebarCwd}
             gitCwd={gitCwd}
+            explorerRootLabel={explorerRootLabel}
             open
             tab={sidebarTab}
             onTabChange={setSidebarTab}

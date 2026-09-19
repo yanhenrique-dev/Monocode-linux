@@ -350,6 +350,8 @@ export type Session = {
   workspaceMode?: WorkspaceMode;
   /** Base ref for a worktree that will be created on first send. */
   worktreeBase?: string;
+  /** Internal guard while the first turn creates its selected worktree. */
+  worktreePreparing?: boolean;
   /** One-shot composer text when opening a session from Inbox. */
   composerSeed?: string;
   /** Inbox issue/PR chip shown above the composer. In-memory, one-shot. */

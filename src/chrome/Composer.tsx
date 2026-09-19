@@ -74,6 +74,7 @@ import type {
   QueuedMessage,
   RuntimeMode,
   ComposerTurnOptions,
+  WorkspaceMode,
 } from "../lib/session";
 import { HARNESS_TITLE, harnessSupportsAttachments } from "../lib/session";
 import type {
@@ -97,6 +98,11 @@ import { ComposerRunner } from "./ComposerRunner";
 import { ContextMeter } from "./ContextMeter";
 import { AttachmentChip } from "./AttachmentChip";
 import { BranchPicker } from "./BranchPicker";
+import {
+  isWorkspaceModeShortcut,
+  WorkspaceIdentity,
+  WorkspacePicker,
+} from "./WorkspacePicker";
 import { WorktreePicker } from "./WorktreePicker";
 import type { Worktree } from "../lib/worktrees";
 import { CwdPicker } from "./CwdPicker";
@@ -108,7 +114,8 @@ import { HandoffMiniCard } from "./HandoffMiniCard";
 import { EffortPicker, ModelPicker } from "./ModelPicker";
 import { QuestionForm } from "./QuestionForm";
 import { SkillPicker } from "./SkillPicker";
-import { projectKey } from "../lib/paths";
+import { pathKey, projectKey } from "../lib/paths";
+import { useProjectBranchesState } from "../hooks/useProjectBranches";
 import { consumeQuoteRequest, type QuoteRequest } from "../lib/quoteDraft";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import {
@@ -180,9 +187,13 @@ type Props = {
   onCwdChange: (cwd: string) => void;
   onBranchChange?: () => void;
   onWorktreeChange?: (tree: Worktree) => Promise<void>;
-  worktreeOpensNewSession?: boolean;
   worktreeRemoved?: boolean;
   onManageWorktrees?: () => void;
+  draftWorkspace?: boolean;
+  workspaceMode?: WorkspaceMode;
+  worktreeBase?: string;
+  onWorkspaceModeChange?: (mode: WorkspaceMode, base?: string) => void;
+  onWorktreeBaseChange?: (base: string) => void;
   onNewTerminal?: () => void;
   onModelChange: (harness: HarnessId, model: string) => void;
   onModelSettingsChange?: (settings: Record<string, string>) => void;
@@ -441,9 +452,13 @@ export function Composer({
   onCwdChange,
   onBranchChange,
   onWorktreeChange,
-  worktreeOpensNewSession = false,
   worktreeRemoved = false,
   onManageWorktrees,
+  draftWorkspace = false,
+  workspaceMode,
+  worktreeBase,
+  onWorkspaceModeChange,
+  onWorktreeBaseChange,
   onNewTerminal,
   onModelChange,
   onModelSettingsChange,
@@ -476,6 +491,30 @@ export function Composer({
   const slashRef = useRef<SlashToken | null>(null);
   const mentionRef = useRef<MentionToken | null>(null);
   const [draft, setDraft] = useState(initialDraft ?? "");
+  const { branches: draftBranches } = useProjectBranchesState(
+    executionCwd,
+    draftWorkspace && enabled && !busy,
+  );
+  const resolvedWorktreeBase =
+    worktreeBase && worktreeBase !== "HEAD"
+      ? worktreeBase
+      : branch || draftBranches?.current || worktreeBase || undefined;
+  useEffect(() => {
+    if (
+      draftWorkspace &&
+      workspaceMode === "worktree" &&
+      worktreeBase === "HEAD" &&
+      draftBranches?.current
+    ) {
+      onWorktreeBaseChange?.(draftBranches.current);
+    }
+  }, [
+    draftBranches?.current,
+    draftWorkspace,
+    onWorktreeBaseChange,
+    workspaceMode,
+    worktreeBase,
+  ]);
   const [hasValue, setHasValue] = useState(
     () =>
       (initialDraft ?? "").trim().length > 0 ||
@@ -1141,10 +1180,32 @@ export function Composer({
     syncHasValue("", []);
   };
 
+  const onComposerKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      !draftWorkspace ||
+      !onWorkspaceModeChange ||
+      !enabled ||
+      busy ||
+      isImeComposition(e.nativeEvent) ||
+      !isWorkspaceModeShortcut(e)
+    ) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    const next =
+      (workspaceMode ?? "current") === "current" ? "worktree" : "current";
+    if (next === "worktree" && !resolvedWorktreeBase) return;
+    onWorkspaceModeChange(
+      next,
+      next === "worktree" ? resolvedWorktreeBase : undefined,
+    );
+    ref.current?.focus();
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isImeComposition(e.nativeEvent)) return;
     if (creatingSkill) return;
-
     if (
       e.key === " " &&
       runsSessionFolderCommandOnSpace({
@@ -1341,6 +1402,7 @@ export function Composer({
       data-composer
       className={`relative shrink-0 ${shell ? "" : "p-1.5 pt-0"}`}
       onMouseDown={onFocus}
+      onKeyDownCapture={onComposerKeyDown}
     >
       {question && onQuestionReply ? (
         <QuestionForm
@@ -1489,26 +1551,56 @@ export function Composer({
                   onClose={() => ref.current?.focus()}
                 />
               )}
-              {hideBranchPicker ? null : onWorktreeChange ? (
+              {hideBranchPicker ? null : draftWorkspace &&
+                onWorkspaceModeChange &&
+                onWorktreeBaseChange ? (
+                <>
+                  <WorkspacePicker
+                    cwd={executionCwd}
+                    mode={workspaceMode ?? "current"}
+                    base={resolvedWorktreeBase}
+                    enabled={enabled && !busy}
+                    onModeChange={onWorkspaceModeChange}
+                    onBaseChange={onWorktreeBaseChange}
+                    onOpenSettings={onManageWorktrees}
+                    onClose={() => ref.current?.focus()}
+                  />
+                  {(workspaceMode ?? "current") === "current" ? (
+                    <BranchPicker
+                      cwd={executionCwd}
+                      branch={branch}
+                      enabled={enabled && !busy}
+                      onChange={onBranchChange}
+                      onClose={() => ref.current?.focus()}
+                    />
+                  ) : null}
+                </>
+              ) : worktreeRemoved && onWorktreeChange ? (
                 <WorktreePicker
                   cwd={cwd}
                   executionCwd={executionCwd}
                   enabled={enabled && !busy}
                   onSelect={onWorktreeChange}
-                  opensNewSession={worktreeOpensNewSession}
                   worktreeRemoved={worktreeRemoved}
                   onBranchChange={onBranchChange}
                   onManage={onManageWorktrees}
                   onClose={() => ref.current?.focus()}
                 />
               ) : (
-                <BranchPicker
-                  cwd={executionCwd}
-                  branch={branch}
-                  enabled={enabled && !busy}
-                  onChange={onBranchChange}
-                  onClose={() => ref.current?.focus()}
-                />
+                <>
+                  {onWorktreeChange ? (
+                    <WorkspaceIdentity
+                      worktree={pathKey(cwd) !== pathKey(executionCwd)}
+                    />
+                  ) : null}
+                  <BranchPicker
+                    cwd={executionCwd}
+                    branch={branch}
+                    enabled={enabled && !busy}
+                    onChange={onBranchChange}
+                    onClose={() => ref.current?.focus()}
+                  />
+                </>
               )}
               <div className="ml-auto flex shrink-0 items-center">
                 <ContextMeter

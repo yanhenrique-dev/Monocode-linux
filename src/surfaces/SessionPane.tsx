@@ -12,7 +12,7 @@ import {
 } from "react";
 import { Composer } from "../chrome/Composer";
 import type { Worktree } from "../lib/worktrees";
-import { isBlankSession } from "../lib/projectReturn";
+import type { WorkspaceMode } from "../lib/session";
 import { ErrorBoundary } from "../chrome/ErrorBoundary";
 import { orchestrator, sameCheckout } from "../lib/orchestration";
 import { DiscussionEmpty } from "../chrome/DiscussionEmpty";
@@ -145,6 +145,12 @@ type Props = {
   onHandoff?: (sessionId: string, target: ModelTarget, turn: Block[]) => void;
   onWorktreeChange?: (sessionId: string, tree: Worktree) => Promise<void>;
   onManageWorktrees?: () => void;
+  onWorkspaceModeChange: (
+    sessionId: string,
+    mode: WorkspaceMode,
+    base?: string,
+  ) => void;
+  onWorktreeBaseChange: (sessionId: string, base: string) => void;
   onNewTerminal: (sessionId: string) => void;
   onPaneDragStart?: (event: ReactPointerEvent<HTMLElement>) => void;
 };
@@ -194,6 +200,8 @@ const SessionPaneContent = memo(function SessionPaneContent({
   onHandoff,
   onWorktreeChange,
   onManageWorktrees,
+  onWorkspaceModeChange,
+  onWorktreeBaseChange,
   onNewTerminal,
   onPaneDragStart,
 }: Props) {
@@ -435,9 +443,19 @@ const SessionPaneContent = memo(function SessionPaneContent({
           ? (tree) => onWorktreeChange(session.id, tree)
           : undefined
       }
-      worktreeOpensNewSession={
-        !session.worktreeRemoved && !isBlankSession(session)
+      draftWorkspace={
+        !session.inboxAsk &&
+        !session.worktreeRemoved &&
+        !managed &&
+        ((isEmpty && !session.worktreeCwd) ||
+          (!!session.workspaceMode && !session.worktreeCwd))
       }
+      workspaceMode={session.workspaceMode}
+      worktreeBase={session.worktreeBase}
+      onWorkspaceModeChange={(mode, base) =>
+        onWorkspaceModeChange(session.id, mode, base)
+      }
+      onWorktreeBaseChange={(base) => onWorktreeBaseChange(session.id, base)}
       worktreeRemoved={session.worktreeRemoved}
       onManageWorktrees={onManageWorktrees}
       onNewTerminal={() => onNewTerminal(session.id)}

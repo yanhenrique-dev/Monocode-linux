@@ -417,6 +417,58 @@ export function useWorktrees(deps: WorktreesDeps) {
     setSettingsOpen(true);
   }, [setSettingsOpen, setSettingsSection]);
 
+  const onWorkspaceModeChange = useCallback(
+    (
+      sessionId: string,
+      mode: import("../lib/session").WorkspaceMode,
+      base?: string,
+    ) => {
+      setSessions((prev) =>
+        prev.map((session) => {
+          if (
+            session.id !== sessionId ||
+            (!isBlankSession(session) &&
+              !(session.workspaceMode && !session.worktreeCwd && !session.busy))
+          ) {
+            return session;
+          }
+          return mode === "worktree"
+            ? base || session.worktreeBase
+              ? {
+                  ...session,
+                  workspaceMode: "worktree",
+                  worktreeBase: base || session.worktreeBase,
+                }
+              : session
+            : {
+                ...session,
+                workspaceMode: undefined,
+                worktreeBase: undefined,
+              };
+        }),
+      );
+    },
+    [setSessions],
+  );
+
+  const onWorktreeBaseChange = useCallback(
+    (sessionId: string, base: string) => {
+      setSessions((prev) =>
+        prev.map((session) =>
+          session.id === sessionId &&
+          (isBlankSession(session) ||
+            (!!session.workspaceMode &&
+              !session.worktreeCwd &&
+              !session.busy)) &&
+          session.workspaceMode === "worktree"
+            ? { ...session, worktreeBase: base }
+            : session,
+        ),
+      );
+    },
+    [setSessions],
+  );
+
   const requestSessionDelete = useCallback(
     async (
       label: string,
@@ -499,5 +551,7 @@ export function useWorktrees(deps: WorktreesDeps) {
     onWorktreeChange,
     onDeleteWorktreeSessions,
     onManageWorktrees,
+    onWorkspaceModeChange,
+    onWorktreeBaseChange,
   };
 }
