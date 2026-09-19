@@ -70,6 +70,9 @@ describe("hugeicons imports", () => {
         className: "size-4 shrink-0",
       }),
     );
-    expect(html).toContain("M2%200H10L14.5");
+    // Inline currentColor path (theme-aware), not an <img> data-URI.
+    expect(html).toContain("M2 0H10L14.5");
+    expect(html).toContain('fill="currentColor"');
+    expect(html).not.toContain("<img");
   });
 });
