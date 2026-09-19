@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.70] - 2026-09-19
+
+### Added
+
+- Git worktrees: backend (list/create/rename/remove + session journal)
+  and frontend (pickers, switching, removal, draft auto-create,
+  Worktrees page).
+- Tauri auto-update wiring: signed `latest.json` manifest, updater
+  pubkey, and signing secrets in the release workflow.
+- AUR package `monocode-bin` (AppImage + docs).
+- Interface blur row shows disabled with a hint while Hardware
+  acceleration is off.
+- Chat background blur slider.
+- Confirm before deleting an archived conversation.
+
+### Changed
+
+- Popover blur reduced from xl to md: same frosted feel, less glow.
+- Blur-off states (toggle and hardware-reduced) use opaque fills, so
+  popovers and modals no longer turn transparent.
+
+### Fixed
+
+- External links open in the browser: the launcher now scrubs
+  `LD_LIBRARY_PATH` so host `kde-open` stops crashing on it.
+- Context meter no longer shows a duplicated native tooltip.
+- Spawn/removal race guard between harness processes and worktree
+  deletion, plus worktree frontend fixes (committed hooks, stuck
+  preparing flag, `"~"` project mapping, removed-worktree memo).
+- WebGL probe cache test seam.
+
 ## [0.1.67] - 2026-09-18
 
 ### Added
@@ -80,7 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native `.deb` and AppImage packaging, Ubuntu/Debian dependency helper (`npm run setup:linux:deb`), and Linux guide in `docs/linux.md`.
 - GPU terminal rendering with a master hardware-acceleration switch in Settings.
 
-[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.67...HEAD
+[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.70...HEAD
+[0.1.70]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.70
 [0.1.67]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.67
 [0.1.61]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.61
 [0.1.60]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.60
