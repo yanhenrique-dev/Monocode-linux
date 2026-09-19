@@ -370,6 +370,11 @@ pub fn harness_spawn(
             workdir.display()
         ));
     }
+    // Hold a spawn reservation until the child is registered below: without
+    // it, a worktree removal can pass its preflight while this process is
+    // still between fork and install_spawn, deleting the dir from under it.
+    // Dropped (released) automatically when this command returns.
+    let _spawn_guard = crate::worktree_lifecycle::reserve_spawn(&workdir)?;
 
     let mut cmd = Command::new(&command);
     cmd.args(&args)
