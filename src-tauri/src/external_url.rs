@@ -9,19 +9,22 @@
 /// Only remote web links go through here. Local files keep using the opener
 /// plugin's reveal/open-path flow, which the desktop handles in-process.
 fn is_allowed_url(url: &str) -> bool {
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"));
-    match rest {
-        // No host part, no whitespace/control bytes, no backslashes that some
-        // launchers treat as separators.
-        Some(after) => {
-            !after.is_empty()
-                && !after
-                    .chars()
-                    .any(|ch| ch.is_whitespace() || ch.is_control() || ch == '\\')
+    // Reject control/whitespace/backslash games before parsing: some
+    // launchers trim or split on them differently than the parser does.
+    if url
+        .chars()
+        .any(|ch| ch.is_whitespace() || ch.is_control() || ch == '\\')
+    {
+        return false;
+    }
+    // `Url::parse` lowercases the scheme, so uppercase HTTP(S) works. Note
+    // `has_host` counts `Some("")`, so the emptiness check is explicit.
+    match url::Url::parse(url) {
+        Ok(parsed) => {
+            (parsed.scheme() == "http" || parsed.scheme() == "https")
+                && parsed.host_str().is_some_and(|host| !host.is_empty())
         }
-        None => false,
+        Err(_) => false,
     }
 }
 
@@ -66,6 +69,8 @@ mod tests {
     fn allows_plain_http_urls() {
         assert!(is_allowed_url("http://example.com/docs"));
         assert!(is_allowed_url("https://github.com/acme/web/issues/157"));
+        // Schemes are case-insensitive; the parser normalizes them.
+        assert!(is_allowed_url("HTTPS://example.com/x"));
     }
 
     #[test]
@@ -88,6 +93,7 @@ mod tests {
         for url in [
             "https://",
             "http://",
+            "https://?query-only",
             "https://exa mple.com",
             "https://example.com/a\\b",
             "  https://example.com",
