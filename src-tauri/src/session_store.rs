@@ -1420,9 +1420,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
                 context_window: row.get(12)?,
                 branch: row.get(13)?,
                 worktree_cwd: row.get(14)?,
-                worktree_removed: row
-                    .get::<_, Option<i64>>(17)?
-                    .map(|value| value != 0),
+                worktree_removed: row.get::<_, Option<i64>>(17)?.map(|value| value != 0),
                 linked_work_item: optional_json(row.get(15)?),
                 provider_account_id: row.get(16)?,
                 created_at: row.get(9)?,
@@ -1541,6 +1539,7 @@ mod tests {
             context_window: None,
             branch: None,
             worktree_cwd: None,
+            worktree_removed: None,
             linked_work_item: None,
         }
     }
