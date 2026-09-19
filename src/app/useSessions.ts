@@ -22,7 +22,6 @@ import {
 } from "../lib/sessionStore";
 import { persistFingerprint } from "../lib/sessionStore";
 import { rememberLoadedSession } from "../lib/sessionCache";
-import { restoreSessionCheckout } from "../lib/fs";
 import { sessionChildHarnesses } from "../lib/handoff";
 import type { InboxItem } from "../lib/githubTasks";
 import { githubWorkItemThread } from "../lib/githubTasks";
@@ -129,7 +128,7 @@ export function useSessions(deps: SessionsDeps) {
           ) {
             return null;
           }
-          const restored = restoreSessionCheckout(loaded);
+          const restored = loaded;
           return restored;
         })
         .catch(() => null);

@@ -170,6 +170,8 @@ type Props = {
   cwd: string;
   /** Working copy for Changes / explorer git. Falls back to `cwd`. */
   gitCwd?: string;
+  /** Branch identity shown for a worktree whose folder has a temporary name. */
+  explorerRootLabel?: string;
   open: boolean;
   sessions: SessionSummary[];
   busySessionIds: Set<string>;
@@ -261,6 +263,7 @@ type Props = {
 function SidebarComponent({
   cwd,
   gitCwd,
+  explorerRootLabel,
   open,
   sessions,
   busySessionIds,
@@ -1252,6 +1255,7 @@ function SidebarComponent({
               <FileTree
                 key={gitRoot}
                 cwd={gitRoot}
+                rootLabel={explorerRootLabel}
                 onOpenFile={onOpenFile}
                 onOpenTerminal={onOpenTerminal}
                 onFileMoved={onFileMoved}

@@ -10,7 +10,8 @@ export type SettingsSectionId =
   | "providers"
   | "skills"
   | "inbox"
-  | "archive";
+  | "archive"
+  | "worktrees";
 
 /** Rail buckets. Sections list in order under their group label. */
 export type SettingsGroupId = "app" | "agents" | "workspace";
@@ -93,6 +94,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "Archive",
     description: "Projects and conversations you have archived.",
     keywords: "archived restore delete hidden",
+  },
+  {
+    id: "worktrees",
+    group: "workspace",
+    label: "Worktrees",
+    description: "Manage additional worktrees for each project.",
+    keywords: "git branch worktree working copy project create delete",
   },
 ];
 
@@ -314,6 +322,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     section: "archive",
     label: "Show archived in the sidebar",
     keywords: "hidden conversations list",
+  },
+  {
+    id: "project-worktrees",
+    section: "worktrees",
+    label: "Project worktrees",
+    keywords: "git branch working copy create delete manage",
   },
 ];
 
@@ -773,7 +787,8 @@ export type KeybindingRow = {
 
 /**
  * Mirrors the bindings we actually handle: the native menu accelerators in
- * `src-tauri/src/menu.rs`, `tabCommand`, and the window key handler in App.
+ * `src-tauri/src/menu.rs`, `tabCommand`, the window key handler in App, and
+ * focused surface handlers such as the draft composer workspace toggle.
  */
 export const KEYBINDINGS: KeybindingRow[] = [
   { command: "App: Search", keys: `${MOD}K`, when: "Always" },
@@ -784,6 +799,11 @@ export const KEYBINDINGS: KeybindingRow[] = [
   { command: "App: New Window", keys: `${MOD}${SHIFT}N`, when: "Always" },
   { command: "App: Toggle Sidebar", keys: `${MOD}B`, when: "Always" },
   { command: "App: Switch Model", keys: `${MOD}.`, when: "Always" },
+  {
+    command: "Composer: Toggle Workspace",
+    keys: `${MOD}${SHIFT}G`,
+    when: "Draft session composer",
+  },
   { command: "View: Reload", keys: `${MOD}${SHIFT}R`, when: "Always" },
   { command: "View: Zoom In", keys: `${MOD}+`, when: "Always" },
   { command: "View: Zoom Out", keys: `${MOD}-`, when: "Always" },

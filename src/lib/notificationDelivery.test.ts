@@ -4,6 +4,7 @@ import {
   announceSessionFinished,
   notifySession,
   saveNotificationsEnabled,
+  sessionNotificationSubject,
   setWindowFocused,
 } from "./notifications";
 import { updateNotificationPreferences } from "./notificationPreferences";
@@ -83,4 +84,26 @@ it("does not deliver an input event observed during a mute after expiry", async 
   } finally {
     vi.useRealTimers();
   }
+});
+
+it("builds no subject for inbox-ask threads or non-project paths", () => {
+  expect(
+    sessionNotificationSubject(
+      { ...newSession("claude", "/private"), inboxAsk: true },
+      "agentInput",
+    ),
+  ).toBeNull();
+  expect(
+    sessionNotificationSubject(newSession("claude", "/"), "agentFinished"),
+  ).toBeNull();
+});
+
+it("maps finished and input events to their policy categories", () => {
+  const session = newSession("claude", "/private");
+  expect(
+    sessionNotificationSubject(session, "agentFinished")?.subject,
+  ).toMatchObject({ projectId: "local:/private", category: "agentFinished" });
+  expect(
+    sessionNotificationSubject(session, "agentInput")?.subject,
+  ).toMatchObject({ projectId: "local:/private", category: "agentInput" });
 });
