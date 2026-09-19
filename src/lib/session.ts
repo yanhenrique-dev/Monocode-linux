@@ -342,6 +342,8 @@ export type Session = {
   branch?: string;
   /** Extra git worktree from the old session-branch feature. Unused. */
   worktreeCwd?: string;
+  /** Working copy was deleted; session waits for a replacement checkout. */
+  worktreeRemoved?: boolean;
   /** One-shot composer text when opening a session from Inbox. */
   composerSeed?: string;
   /** Inbox issue/PR chip shown above the composer. In-memory, one-shot. */
