@@ -310,6 +310,8 @@ html.chat-background-empty-only
 html.hw-reduced .glass-blur {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  /* Same reason as the no-ui-blur rule below: translucent fills relied on
+     the blur for legibility (e.g. modal backdrops at 55%), so go solid. */
   background-color: var(--color-background-base);
 }
 
