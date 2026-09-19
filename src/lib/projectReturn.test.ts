@@ -331,4 +331,20 @@ describe("project selection", () => {
       }),
     ).toEqual({ action: "keep" });
   });
+
+  it("ignores the unset project sentinel when the file has a real cwd", () => {
+    const state = workspace();
+    const file = newFileTab("/delta/notes.md", "/delta", false, undefined, "~");
+    const tab = {
+      ...newTab("editor"),
+      id: "files",
+      editorPanes: [{ id: "editor", files: [file], activeFileId: file.id }],
+    };
+    const tabs = [...state.tabs, tab];
+    const memory = reconcileProjectReturn({ ...state, tabs });
+    expect(memory.has("~")).toBe(false);
+    expect(
+      planProjectReturn({ ...state, tabs, memory, projectPath: "/delta" }),
+    ).toEqual({ action: "activate", tabId: "files", paneId: "editor" });
+  });
 });

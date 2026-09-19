@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   fetchLinkPreviewMetadata,
   type LinkPreviewMetadata,
@@ -37,7 +37,7 @@ export function UserLinkPreview({ link }: { link: UserLink }) {
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        void openUrl(link.url).catch((error) => {
+        void openExternalUrl(link.url).catch((error) => {
           console.error("Failed to open web link:", error);
         });
       }}

@@ -76,6 +76,7 @@ const GIT_STATUS_COLOR: Record<string, string> = {
 
 type Props = {
   cwd: string;
+  rootLabel?: string;
   onOpenFile: OpenFileFn;
   onOpenTerminal?: (cwd: string) => void;
   onFileMoved?: (from: string, to: string) => void;
@@ -232,6 +233,7 @@ function explorerItems(
 // intact unless file-tree props, local state, or subscriptions actually change.
 export const FileTree = memo(function FileTree({
   cwd,
+  rootLabel,
   onOpenFile,
   onOpenTerminal,
   onFileMoved,
@@ -260,7 +262,7 @@ export const FileTree = memo(function FileTree({
   const suppressFileClickUntil = useRef(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
-  const name = basename(cwd);
+  const name = rootLabel?.trim() || basename(cwd);
   const rootOpen = expanded.has(cwd);
 
   const toggle = (path: string) => {

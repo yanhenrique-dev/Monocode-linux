@@ -1,17 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ACCENT_COLOR_DEFAULT,
+  CHAT_BACKGROUND_BLUR_DEFAULT,
+  CHAT_BACKGROUND_BLUR_MAX,
+  CHAT_BACKGROUND_BLUR_MIN,
   CHAT_BACKGROUND_OPACITY_DEFAULT,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
   UI_BLUR_DEFAULT,
   UI_BLUR_OFF_CLASS,
   applyUiBlur,
+  loadChatBackgroundBlur,
   loadChatBackgroundOpacity,
   loadAccentColor,
   loadChatBackgroundPath,
   loadChatBackgroundScope,
   loadTranscriptLayout,
   loadUiBlur,
+  saveChatBackgroundBlur,
   saveChatBackgroundOpacity,
   saveAccentColor,
   saveChatBackgroundPath,
@@ -37,6 +42,7 @@ const SCHEME_KEY = "monocode.colorScheme";
 const ANCHOR_KEY = "monocode.transcriptAnchor";
 const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
+const CHAT_BACKGROUND_BLUR_KEY = "monocode.chatBackgroundBlur";
 const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
 const THEME_DARK_LIGHTNESS_KEY = "monocode.themeDarkLightness";
 const UI_BLUR_KEY = "monocode.uiBlur";
@@ -161,6 +167,7 @@ describe("chat background setting", () => {
   afterEach(() => {
     localStorage.removeItem(CHAT_BACKGROUND_PATH_KEY);
     localStorage.removeItem(CHAT_BACKGROUND_OPACITY_KEY);
+    localStorage.removeItem(CHAT_BACKGROUND_BLUR_KEY);
     localStorage.removeItem(CHAT_BACKGROUND_SCOPE_KEY);
   });
 
@@ -190,6 +197,18 @@ describe("chat background setting", () => {
     expect(loadChatBackgroundScope()).toBe("all");
     localStorage.setItem(CHAT_BACKGROUND_SCOPE_KEY, "transcript");
     expect(loadChatBackgroundScope()).toBe(CHAT_BACKGROUND_SCOPE_DEFAULT);
+  });
+
+  it("defaults, rounds, and clamps background blur", () => {
+    expect(loadChatBackgroundBlur()).toBe(CHAT_BACKGROUND_BLUR_DEFAULT);
+    saveChatBackgroundBlur(12.6);
+    expect(loadChatBackgroundBlur()).toBe(13);
+    saveChatBackgroundBlur(99);
+    expect(loadChatBackgroundBlur()).toBe(CHAT_BACKGROUND_BLUR_MAX);
+    saveChatBackgroundBlur(-4);
+    expect(loadChatBackgroundBlur()).toBe(CHAT_BACKGROUND_BLUR_MIN);
+    localStorage.setItem(CHAT_BACKGROUND_BLUR_KEY, "strong");
+    expect(loadChatBackgroundBlur()).toBe(CHAT_BACKGROUND_BLUR_DEFAULT);
   });
 });
 

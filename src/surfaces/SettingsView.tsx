@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   ArrowDownCircle,
   Check,
@@ -29,6 +29,7 @@ import {
   ColorPickerPopover,
   ColorSwatchRow,
 } from "../chrome/ColorPickerPopover";
+import { ConfirmDialog } from "../chrome/ConfirmDialog";
 import { Popover } from "../chrome/Popover";
 import { SecondaryButton } from "../chrome/SecondaryButton";
 import { InboxProviderMark } from "../chrome/InboxProviderMark";
@@ -38,6 +39,7 @@ import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useColorScheme } from "../hooks/useColorScheme";
 import {
   applyChatBackground,
+  applyChatBackgroundBlur,
   applyChatBackgroundEmptyOpacity,
   applyChatBackgroundSessionOpacity,
   applyChatBackgroundScope,
@@ -52,6 +54,9 @@ import {
   cancelSidebarBlurPreview,
   BODY_GLASS_DEFAULT,
   ACCENT_COLOR_DEFAULT,
+  CHAT_BACKGROUND_BLUR_DEFAULT,
+  CHAT_BACKGROUND_BLUR_MAX,
+  CHAT_BACKGROUND_BLUR_MIN,
   CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT,
   CHAT_BACKGROUND_OPACITY_MAX,
   CHAT_BACKGROUND_OPACITY_MIN,
@@ -62,6 +67,7 @@ import {
   chatBackgroundSrc,
   loadBodyGlass,
   loadAccentColor,
+  loadChatBackgroundBlur,
   loadChatBackgroundEmptyOpacity,
   loadChatBackgroundPath,
   loadChatBackgroundSessionOpacity,
@@ -78,6 +84,7 @@ import {
   previewSidebarBlur,
   saveBodyGlass,
   saveAccentColor,
+  saveChatBackgroundBlur,
   saveChatBackgroundEmptyOpacity,
   saveChatBackgroundPath,
   saveChatBackgroundSessionOpacity,
@@ -242,6 +249,9 @@ import {
 
 import { SkillsPage } from "./SkillsPage";
 import { ProjectNotificationSettings } from "./ProjectNotificationSettings";
+import { WorktreesPage } from "./WorktreesPage";
+import { removeWorktree, type RemoveWorktree } from "../lib/worktrees";
+import type { Session } from "../lib/session";
 
 /**
  * The `data-setting-id` Settings should reveal when it opens: one of the ids in
@@ -265,6 +275,12 @@ type Props = {
   recents?: RecentProject[];
   cwd: string;
   sessions: SessionSummary[];
+  liveSessions?: Session[];
+  onRemoveWorktree?: RemoveWorktree;
+  onCheckWorktreeRemoval?: RemoveWorktree;
+  onDeleteWorktreeSessions?: (
+    sessionIds: readonly string[],
+  ) => Promise<boolean>;
   besideRail?: boolean;
   onClose: () => void;
   /** Lets search jump to a setting that lives on another page. */
@@ -285,6 +301,10 @@ export function SettingsView({
   recents,
   cwd,
   sessions,
+  liveSessions,
+  onRemoveWorktree = removeWorktree,
+  onCheckWorktreeRemoval,
+  onDeleteWorktreeSessions,
   besideRail = false,
   onClose,
   onSelectSection,
@@ -413,6 +433,16 @@ export function SettingsView({
               {section === "chat" ? <ChatPage /> : null}
               {section === "keybindings" ? <KeybindingsPage /> : null}
               {section === "providers" ? <ProvidersPage /> : null}
+              {section === "worktrees" ? (
+                <WorktreesPage
+                  cwd={cwd}
+                  recents={recents}
+                  liveSessions={liveSessions}
+                  onRemove={onRemoveWorktree}
+                  onCheckRemove={onCheckWorktreeRemoval}
+                  onDeleteSessions={onDeleteWorktreeSessions}
+                />
+              ) : null}
               {section === "inbox" ? (
                 <InboxPage
                   cwd={cwd}
@@ -1039,7 +1069,7 @@ function GithubSettings() {
         {!checking && !status?.installed ? (
           <SecondaryButton
             onClick={() => {
-              void openUrl("https://cli.github.com/").catch(() => {});
+              void openExternalUrl("https://cli.github.com/").catch(() => {});
             }}
           >
             Installation guide
@@ -1343,6 +1373,9 @@ function LinearSettings() {
   );
 }
 
+/** Minimum spinner time so instant results still paint the busy state. */
+const MIN_BUSY_MS = 500;
+
 function UpdateRow({
   onOpenWhatsNew,
 }: {
@@ -1352,6 +1385,7 @@ function UpdateRow({
     phase: "idle",
     currentVersion: "…",
   });
+  const [holding, setHolding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1365,16 +1399,30 @@ function UpdateRow({
   }, []);
 
   const busy =
-    snapshot.phase === "checking" || snapshot.phase === "downloading";
+    snapshot.phase === "checking" ||
+    snapshot.phase === "downloading" ||
+    holding;
   const hasUpdate = snapshot.phase === "available";
 
   const onClick = async () => {
     if (busy) return;
-    if (hasUpdate) {
-      await installPendingUpdate(setSnapshot);
-      return;
+    // Guarantee a beat of spinner: fast checks (cached "latest version" or
+    // instant errors) would otherwise never paint the busy state.
+    const startedAt = Date.now();
+    setHolding(true);
+    try {
+      if (hasUpdate) {
+        await installPendingUpdate(setSnapshot);
+        return;
+      }
+      await runUpdateFlow(true, setSnapshot);
+    } finally {
+      const remaining = MIN_BUSY_MS - (Date.now() - startedAt);
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+      setHolding(false);
     }
-    await runUpdateFlow(true, setSnapshot);
   };
 
   const status =
@@ -1448,6 +1496,9 @@ function useAppearanceSettings() {
   );
   const [chatBackgroundSessionOpacity, setChatBackgroundSessionOpacity] =
     useState(loadChatBackgroundSessionOpacity);
+  const [chatBackgroundBlur, setChatBackgroundBlur] = useState(
+    loadChatBackgroundBlur,
+  );
   const [chatBackgroundScope, setChatBackgroundScope] =
     useState<ChatBackgroundScope>(loadChatBackgroundScope);
   const [chatBackgroundBusy, setChatBackgroundBusy] = useState(false);
@@ -1601,6 +1652,16 @@ function useAppearanceSettings() {
     setChatBackgroundSessionOpacity(next);
   }, []);
 
+  const previewChatBackgroundBlur = useCallback((radius: number) => {
+    setChatBackgroundBlur(applyChatBackgroundBlur(radius));
+  }, []);
+
+  const onChatBackgroundBlur = useCallback((radius: number) => {
+    const next = applyChatBackgroundBlur(radius);
+    saveChatBackgroundBlur(next);
+    setChatBackgroundBlur(next);
+  }, []);
+
   const onChatBackgroundScope = useCallback((next: ChatBackgroundScope) => {
     applyChatBackgroundScope(next);
     saveChatBackgroundScope(next);
@@ -1628,6 +1689,7 @@ function useAppearanceSettings() {
     onChatBackgroundSessionOpacity(
       Math.round(CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT * 100),
     );
+    onChatBackgroundBlur(CHAT_BACKGROUND_BLUR_DEFAULT);
     onChatBackgroundScope(CHAT_BACKGROUND_SCOPE_DEFAULT);
     if (chatBackgroundPath) void onClearChatBackground();
     onUiScale(Math.round(UI_SCALE_DEFAULT * 100));
@@ -1638,6 +1700,7 @@ function useAppearanceSettings() {
     onUiBlur,
     onChatBackgroundEmptyOpacity,
     onChatBackgroundSessionOpacity,
+    onChatBackgroundBlur,
     onChatBackgroundScope,
     onClearChatBackground,
     onAccentColor,
@@ -1661,6 +1724,7 @@ function useAppearanceSettings() {
     chatBackgroundPath,
     chatBackgroundEmptyOpacity,
     chatBackgroundSessionOpacity,
+    chatBackgroundBlur,
     chatBackgroundScope,
     chatBackgroundBusy,
     chatBackgroundError,
@@ -1677,6 +1741,7 @@ function useAppearanceSettings() {
     onClearChatBackground,
     onChatBackgroundEmptyOpacity,
     onChatBackgroundSessionOpacity,
+    onChatBackgroundBlur,
     onChatBackgroundScope,
     onUiScale,
     restoreDefaults,
@@ -1687,6 +1752,7 @@ function useAppearanceSettings() {
     previewBlur,
     previewChatBackgroundEmptyOpacity,
     previewChatBackgroundSessionOpacity,
+    previewChatBackgroundBlur,
     previewUiScale,
   };
 }
@@ -1866,7 +1932,7 @@ function AppearancePage({
           label="Interface blur"
           description={
             hardwareOn
-              ? "Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces keep their tint, just flat."
+              ? "Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces go solid instead of translucent."
               : "Disabled while Hardware acceleration is off: the master switch already suspends every blur."
           }
         >
@@ -1945,7 +2011,10 @@ function ChatBackgroundCard({
                 alt=""
                 draggable={false}
                 className="size-full object-cover"
-                style={{ opacity: appearance.chatBackgroundEmptyOpacity }}
+                style={{
+                  opacity: appearance.chatBackgroundEmptyOpacity,
+                  filter: `blur(${appearance.chatBackgroundBlur}px)`,
+                }}
               />
               <span className="pointer-events-none absolute bottom-2 left-2 text-[11px] text-content/40">
                 Empty chat preview at {emptyVisibility}%
@@ -2035,6 +2104,24 @@ function ChatBackgroundCard({
               max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
               onPreview={appearance.previewChatBackgroundSessionOpacity}
               onCommit={appearance.onChatBackgroundSessionOpacity}
+            />
+          </Row>
+          <Row
+            label="Background blur"
+            description="Soften the wallpaper so text stays readable. Zero disables it."
+          >
+            <Slider
+              label="Chat background blur"
+              value={appearance.chatBackgroundBlur}
+              display={
+                appearance.chatBackgroundBlur === 0
+                  ? "Off"
+                  : `${appearance.chatBackgroundBlur}px`
+              }
+              min={CHAT_BACKGROUND_BLUR_MIN}
+              max={CHAT_BACKGROUND_BLUR_MAX}
+              onPreview={appearance.previewChatBackgroundBlur}
+              onCommit={appearance.onChatBackgroundBlur}
             />
           </Row>
         </>
@@ -2291,7 +2378,10 @@ function ArchivePage({
   onDeleteProject?: (path: string) => void;
 }) {
   const [filters, setFilters] = useState(loadSessionSidebarFilters);
-  const [deleting, setDeleting] = useState<ArchivedProject | null>(null);
+  const [deletingProject, setDeletingProject] =
+    useState<ArchivedProject | null>(null);
+  const [deletingSession, setDeletingSession] =
+    useState<SessionSummary | null>(null);
   const archivedProjects = useArchivedProjects();
   const archived = useMemo(
     () =>
@@ -2337,7 +2427,7 @@ function ArchivePage({
                 </SecondaryButton>
               ) : null}
               {onDeleteProject ? (
-                <SecondaryButton danger onClick={() => setDeleting(project)}>
+                <SecondaryButton danger onClick={() => setDeletingProject(project)}>
                   Delete
                 </SecondaryButton>
               ) : null}
@@ -2399,7 +2489,7 @@ function ArchivePage({
               </SecondaryButton>
               <SecondaryButton
                 danger
-                onClick={() => onDeleteSession(session.id)}
+                onClick={() => setDeletingSession(session)}
               >
                 Delete
               </SecondaryButton>
@@ -2408,14 +2498,30 @@ function ArchivePage({
         )}
       </Group>
 
-      {deleting ? (
+      {deletingProject ? (
         <RemoveProjectDialog
-          name={archivedProjectLabel(deleting.path)}
-          path={deleting.path}
-          onCancel={() => setDeleting(null)}
+          name={archivedProjectLabel(deletingProject.path)}
+          path={deletingProject.path}
+          onCancel={() => setDeletingProject(null)}
           onConfirm={() => {
-            onDeleteProject?.(deleting.path);
-            setDeleting(null);
+            onDeleteProject?.(deletingProject.path);
+            setDeletingProject(null);
+          }}
+        />
+      ) : null}
+
+      {deletingSession ? (
+        <ConfirmDialog
+          title={`Delete “${sessionDisplayTitle(
+            deletingSession.title,
+            deletingSession.harness,
+          )}”?`}
+          description="The conversation and its transcript are removed for good."
+          danger
+          onCancel={() => setDeletingSession(null)}
+          onConfirm={() => {
+            onDeleteSession(deletingSession.id);
+            setDeletingSession(null);
           }}
         />
       ) : null}
