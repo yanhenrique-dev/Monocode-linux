@@ -321,6 +321,7 @@ describe("settings navigation", () => {
       "skills",
       "inbox",
       "archive",
+      "worktrees",
     ]);
   });
 
@@ -333,6 +334,16 @@ describe("settings navigation", () => {
     for (const entry of SETTINGS_INDEX) {
       expect(sections.has(entry.section), entry.id).toBe(true);
     }
+  });
+
+  it("documents the draft workspace toggle", () => {
+    expect(
+      KEYBINDINGS.find((row) => row.command === "Composer: Toggle Workspace"),
+    ).toEqual({
+      command: "Composer: Toggle Workspace",
+      keys: `${MOD}${SHIFT}G`,
+      when: "Draft session composer",
+    });
   });
 });
 

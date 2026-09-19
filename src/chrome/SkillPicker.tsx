@@ -47,7 +47,7 @@ export function SkillPicker({
   return (
     <div
       data-skill-picker
-      className="overflow-hidden rounded-lg border border-content/10 bg-content/5 glass-blur backdrop-blur-xl"
+      className="overflow-hidden rounded-lg border border-content/10 bg-content/5 glass-blur backdrop-blur-md"
     >
       {creating ? (
         <CreateSkillForm

@@ -13,7 +13,10 @@ const actions = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openPath: actions.openPath,
-  openUrl: actions.openUrl,
+}));
+
+vi.mock("../lib/openExternal", () => ({
+  openExternalUrl: actions.openUrl,
 }));
 
 vi.mock("../lib/clipboard", () => ({

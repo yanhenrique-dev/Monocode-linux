@@ -39,6 +39,7 @@ impl SessionStore {
         conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
             .map_err(|e| e.to_string())?;
         migrate(&conn).map_err(|e| e.to_string())?;
+        crate::worktrees::reconcile_removals(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -93,6 +94,8 @@ pub struct SessionUpsert {
     pub branch: Option<String>,
     #[serde(default)]
     pub worktree_cwd: Option<String>,
+    #[serde(default)]
+    pub worktree_removed: Option<bool>,
     #[serde(default)]
     pub linked_work_item: Option<Value>,
 }
@@ -153,6 +156,8 @@ pub struct SessionRecord {
     pub branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub worktree_cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worktree_removed: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub linked_work_item: Option<Value>,
     pub created_at: i64,
@@ -601,6 +606,13 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
             params![now_millis()],
         )?;
     }
+    if current < 15 {
+        ensure_session_column(conn, "worktree_removed", "INTEGER NOT NULL DEFAULT 0")?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (15, ?1)",
+            params![now_millis()],
+        )?;
+    }
     // Create even when a version row already exists (another build may have
     // used the same numbers, or a previous run recorded the version without
     // the table). Restore writes into these; missing tables look like a
@@ -615,6 +627,10 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
            id INTEGER PRIMARY KEY CHECK (id = 1),
            snapshot_json TEXT NOT NULL,
            updated_at INTEGER NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS worktree_removals (
+           path TEXT PRIMARY KEY,
+           sessions_json TEXT NOT NULL
          );",
     )?;
     // Compatibility only: earlier Inbox Ask builds saved temporary chats here.
@@ -816,8 +832,8 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
            id, cwd, harness, model, model_settings, runtime_mode, title,
            provider_session_id, blocks_json, created_at, updated_at, branch,
            context_used, context_window, worktree_cwd, has_user_message,
-           linked_work_item_json, provider_account_id
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+           linked_work_item_json, provider_account_id, worktree_removed
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
          ON CONFLICT(id) DO UPDATE SET
            cwd = excluded.cwd,
            harness = excluded.harness,
@@ -834,7 +850,8 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
            worktree_cwd = excluded.worktree_cwd,
            has_user_message = excluded.has_user_message,
            linked_work_item_json = excluded.linked_work_item_json,
-           provider_account_id = excluded.provider_account_id",
+           provider_account_id = excluded.provider_account_id,
+           worktree_removed = excluded.worktree_removed",
         params![
             session.id,
             session.cwd,
@@ -854,6 +871,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
             i64::from(has_user_message),
             linked_work_item_json,
             provider_account_id,
+            i64::from(session.worktree_removed.unwrap_or(false)),
         ],
     )?;
 
@@ -1366,7 +1384,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
         "SELECT id, cwd, harness, model, model_settings, runtime_mode, title,
                 provider_session_id, blocks_json, created_at, updated_at,
                 context_used, context_window, branch, worktree_cwd,
-                linked_work_item_json, provider_account_id
+                linked_work_item_json, provider_account_id, worktree_removed
          FROM sessions
          WHERE id = ?1 AND inbox_ask IS NULL",
         params![session_id],
@@ -1402,6 +1420,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
                 context_window: row.get(12)?,
                 branch: row.get(13)?,
                 worktree_cwd: row.get(14)?,
+                worktree_removed: row.get::<_, Option<i64>>(17)?.map(|value| value != 0),
                 linked_work_item: optional_json(row.get(15)?),
                 provider_account_id: row.get(16)?,
                 created_at: row.get(9)?,
@@ -1520,6 +1539,7 @@ mod tests {
             context_window: None,
             branch: None,
             worktree_cwd: None,
+            worktree_removed: None,
             linked_work_item: None,
         }
     }

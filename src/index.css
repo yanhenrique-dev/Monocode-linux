@@ -240,10 +240,17 @@ html.has-native-glass:not(.theme-light) .sidebar-glass {
 .chat-pane-background::before {
   content: "";
   position: absolute;
-  left: var(--chat-background-left, 0);
-  top: var(--chat-background-top, 0);
-  width: var(--chat-background-width, 100%);
-  height: var(--chat-background-height, 100%);
+  /*
+   * Blur bleed: filter: blur() shrinks the painted edges toward transparent,
+   * so grow the layer by 1.5x the radius on every side. At 0px this reduces
+   * to the plain geometry below.
+   */
+  --chat-background-bleed: calc(var(--chat-background-blur, 0px) * 1.5);
+  left: calc(var(--chat-background-left, 0) - var(--chat-background-bleed));
+  top: calc(var(--chat-background-top, 0) - var(--chat-background-bleed));
+  width: calc(var(--chat-background-width, 100%) + var(--chat-background-bleed) * 2);
+  height: calc(var(--chat-background-height, 100%) + var(--chat-background-bleed) * 2);
+  filter: blur(var(--chat-background-blur, 0px));
   z-index: -1;
   background-image: var(--chat-background-image, none);
   background-position: center;
@@ -295,8 +302,8 @@ html.chat-background-empty-only
 /*
  * Master hardware switch off: drop glass blurs in one place instead of
  * touching ~20 components. Specificity (0,2,1) beats the Tailwind
- * backdrop-blur utilities (0,1,0). Surfaces already carry opaque-ish
- * bg-content/* fills, so nothing turns invisible — just flat.
+ * backdrop-blur utilities (0,1,0). Translucent fills relied on the blur
+ * for legibility, so go solid instead of staying translucent.
  * Only .glass-blur is suspended: chrome that lost its blur in favor of an
  * opaque fill keeps no backdrop-filter to match against.
  */
@@ -316,6 +323,18 @@ html.hw-reduced .glass-blur {
 html.no-ui-blur .glass-blur {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  /* Translucent fills relied on the blur for legibility; go solid instead. */
+  background-color: var(--color-background-base);
+}
+
+/*
+ * Popover/modal/toast backdrops are ~transparent by design (2% content):
+ * without sampled blur they vanish entirely, so pin them solid while any
+ * blur switch is off — same fill the light theme already uses.
+ */
+html.no-ui-blur .popover-backdrop,
+html.hw-reduced .popover-backdrop {
+  background: var(--color-background-base);
 }
 
 /* Same switch also freezes the always-on animations: with compositing off,

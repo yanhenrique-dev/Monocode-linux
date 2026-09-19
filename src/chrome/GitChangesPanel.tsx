@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   Check,
   ChevronDown,
@@ -465,7 +465,7 @@ function ChangedFiles({
     );
     const number = Number(/\/pull\/(\d+)(?:[/?#]|$)/.exec(url)?.[1]);
     if (Number.isInteger(number) && number > 0) recordPrActivity(number);
-    await openUrl(url.trim());
+    await openExternalUrl(url.trim());
   };
 
   const createPr = async () => {
@@ -582,7 +582,7 @@ function ChangedFiles({
             onSync={() => void sync()}
             onCreatePr={() => void createPr()}
             onViewPr={() => {
-              if (pr?.url) void openUrl(pr.url);
+              if (pr?.url) void openExternalUrl(pr.url);
             }}
           />
         ) : null}

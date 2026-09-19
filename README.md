@@ -80,6 +80,8 @@ chmod +x MonoCode_*.AppImage
 
 Funciona em qualquer distro x86_64, sem instalar nada.
 
+No Arch Linux, há também o pacote AUR [`monocode-bin`](https://aur.archlinux.org/packages/monocode-bin) (ver [docs/aur.md](docs/aur.md)).
+
 Dependências e solução de problemas em detalhe: [docs/linux.md](docs/linux.md).
 
 ## Compilando do código-fonte
@@ -143,6 +145,7 @@ npm run check:rust   # cargo fmt, clippy e testes
 │   └── install-linux-deps.sh  # dependências Ubuntu/Debian
 ├── docs/
 │   ├── linux.md            # guia Linux completo
+│   ├── aur.md              # pacote AUR monocode-bin
 │   ├── CONTRIBUTING.md     # como contribuir
 │   ├── CODE_OF_CONDUCT.md  # código de conduta
 │   └── SECURITY.md         # política de segurança

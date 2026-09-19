@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   useEffect,
   useRef,
@@ -289,7 +289,7 @@ function InboxComment({
                       ? "Open on GitLab"
                       : "Open on GitHub"
                 }
-                onClick={() => void openUrl(comment.url)}
+                onClick={() => void openExternalUrl(comment.url)}
                 className="hover:text-content"
               >
                 {part}

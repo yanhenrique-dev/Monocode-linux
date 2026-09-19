@@ -220,6 +220,7 @@ export function useProjects(deps: ProjectsDeps) {
                 cwd: normalized,
                 branch: undefined,
                 worktreeCwd: undefined,
+                worktreeRemoved: undefined,
               }
             : s,
         ),
@@ -251,15 +252,13 @@ export function useProjects(deps: ProjectsDeps) {
     (sessionId: string) => {
       notifyGitChanged();
       const current = sessionsRef.current.find((s) => s.id === sessionId);
-      if (!current || (!current.branch && !current.worktreeCwd)) return;
-      if (current.worktreeCwd && current.providerSessionId) {
-        void forgetHarnessSession(current.harness, sessionId);
-      }
+      if (!current) return;
+      void forgetHarnessSession(current.harness, sessionId);
       const next = {
         ...current,
         branch: undefined,
-        worktreeCwd: undefined,
-        ...(current.worktreeCwd ? { providerSessionId: undefined } : {}),
+        providerSessionId: undefined,
+        context: undefined,
       };
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? next : s)));
       persistSession(next);
