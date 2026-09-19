@@ -1,3 +1,4 @@
+import type { AgentModel, ModelSetting } from "../models";
 import type { ApprovalDecision } from "./types";
 
 export type McodePermissionRequest = {
@@ -121,4 +122,136 @@ export function mcodePermissionOptionId(
       "reject",
     ]) ?? "reject-once"
   );
+}
+
+export type SessionConfigOption = {
+  id: string;
+  category?: string;
+  currentValue?: string | boolean;
+};
+
+/**
+ * Flatten the raw `configOptions` array from a session/new or
+ * session/set_config_option response into the {id, category,
+ * currentValue} records the harness expects.
+ */
+export function mcodeReadConfigOptions(raw: unknown): SessionConfigOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const rec = asRecord(item);
+    const id = String(rec?.id ?? rec?.configId ?? "").trim();
+    if (!id) return [];
+    return [
+      {
+        id,
+        category: typeof rec?.category === "string" ? rec.category : undefined,
+        currentValue:
+          typeof rec?.currentValue === "string" ||
+          typeof rec?.currentValue === "boolean"
+            ? rec.currentValue
+            : undefined,
+      },
+    ];
+  });
+}
+
+/**
+ * Pick the config option id that selects the model. Prefers the literal
+ * "model" id; falls back to the first category=model option that isn't the
+ * provider picker, then to "model".
+ */
+export function mcodeExtractModelConfigId(
+  options: SessionConfigOption[],
+): string {
+  const exact = options.find((option) => option.id === "model");
+  if (exact) return exact.id;
+  const model = options.find(
+    (option) => option.category === "model" && option.id !== "provider",
+  );
+  return model?.id ?? "model";
+}
+
+/**
+ * Resolve a user-visible setting id (e.g. "effort") to the corresponding
+ * mcode config option id. Falls back to aliases like "reasoning" or
+ * category "thought_level" when the exact id isn't present.
+ */
+export function mcodeResolveSettingConfigId(
+  options: SessionConfigOption[],
+  settingId: string,
+): string | undefined {
+  const needle = settingId.trim().toLowerCase();
+  const exact = options.find((option) => option.id.toLowerCase() === needle);
+  if (exact) return exact.id;
+  if (needle === "effort" || needle === "reasoning") {
+    return options.find(
+      (option) =>
+        option.id === "effort" ||
+        option.id === "reasoning" ||
+        option.category === "thought_level",
+    )?.id;
+  }
+  return undefined;
+}
+
+/**
+ * Extract the ACP session id from a session/new or session/resume response.
+ * Returns undefined if the response doesn't carry an id; the caller is
+ * responsible for treating that as a hard failure (mcode is required to
+ * return a session id on session/new).
+ */
+export function mcodeSessionIdFromResult(result: unknown): string | undefined {
+  const rec = asRecord(result);
+  if (!rec) return undefined;
+  const direct = stringField(rec, "sessionId", "session_id", "id");
+  return direct;
+}
+
+/**
+ * Map mcode's structured config options into the app's ModelSetting
+ * shape so the picker can render toggles and select controls. Skips
+ * the model and provider options — the app already has dedicated UI
+ * for those.
+ */
+export function mcodeConfigToModelSettings(
+  options: SessionConfigOption[],
+): ModelSetting[] {
+  const out: ModelSetting[] = [];
+  for (const option of options) {
+    if (!option.category) continue;
+    if (option.id === "model" || option.id === "provider") continue;
+    if (typeof option.currentValue === "boolean") {
+      out.push({
+        id: option.id,
+        label: option.id,
+        kind: "toggle",
+        value: option.currentValue ? "true" : "false",
+        options: [
+          { value: "true", label: "On" },
+          { value: "false", label: "Off" },
+        ],
+      });
+    } else if (typeof option.currentValue === "string") {
+      out.push({
+        id: option.id,
+        label: option.id,
+        kind: "select",
+        value: option.currentValue,
+        options: [{ value: option.currentValue, label: option.currentValue }],
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Filter a MODELS list down to those the mcode runtime actually exposes.
+ * Currently a no-op because mcode reports its active model through
+ * session config; this hook exists so the picker can drop unsupported
+ * entries once a runtime query is added.
+ */
+export function mcodeFilterModels(models: AgentModel[]): AgentModel[] {
+  // mcode reports its current model through session config; we still let the
+  // user pick from the catalog and forward the choice to the runtime.
+  return models;
 }

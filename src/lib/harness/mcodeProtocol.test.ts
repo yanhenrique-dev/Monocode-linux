@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   mcodeAutoPermissionOption,
+  mcodeConfigToModelSettings,
+  mcodeExtractModelConfigId,
   mcodePermissionOptionId,
   mcodePermissionRequestFromAcp,
+  mcodeReadConfigOptions,
+  mcodeResolveSettingConfigId,
+  mcodeSessionIdFromResult,
 } from "./mcodeProtocol";
 
 describe("mcode permission requests", () => {
@@ -47,5 +52,46 @@ describe("mcode permission requests", () => {
       mcodeAutoPermissionOption("auto", ["allow-once", "allow-always"]),
     ).toBe("allow-always");
     expect(mcodeAutoPermissionOption("auto", [])).toBeNull();
+  });
+});
+
+describe("mcode session config", () => {
+  const options = mcodeReadConfigOptions([
+    { id: "provider", category: "provider", currentValue: "minimax" },
+    { id: "model", category: "model", currentValue: "MiniMax-M2" },
+    { id: "effort", category: "thought_level", currentValue: "high" },
+    { id: "verbose", category: "display", currentValue: true },
+    { noId: true },
+  ]);
+
+  it("flattens config options, skipping id-less entries", () => {
+    expect(options).toHaveLength(4);
+    expect(options[1]).toMatchObject({ id: "model", category: "model" });
+  });
+
+  it("prefers the literal model id for the model selector", () => {
+    expect(mcodeExtractModelConfigId(options)).toBe("model");
+    expect(mcodeExtractModelConfigId([])).toBe("model");
+  });
+
+  it("resolves effort through aliases", () => {
+    expect(mcodeResolveSettingConfigId(options, "effort")).toBe("effort");
+    expect(mcodeResolveSettingConfigId(options, "reasoning")).toBe("effort");
+    expect(mcodeResolveSettingConfigId(options, "unknown")).toBeUndefined();
+  });
+
+  it("maps toggles and selects to model settings, skipping model/provider", () => {
+    const settings = mcodeConfigToModelSettings(options);
+    expect(settings.map((s) => s.id).sort()).toEqual(["effort", "verbose"]);
+    expect(settings.find((s) => s.id === "verbose")).toMatchObject({
+      kind: "toggle",
+      value: "true",
+    });
+  });
+
+  it("reads the session id from new/resume responses", () => {
+    expect(mcodeSessionIdFromResult({ sessionId: "abc" })).toBe("abc");
+    expect(mcodeSessionIdFromResult({ session_id: "def" })).toBe("def");
+    expect(mcodeSessionIdFromResult({})).toBeUndefined();
   });
 });
