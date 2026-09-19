@@ -33,28 +33,33 @@ pub async fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(),
     if !is_allowed_url(&url) {
         return Err("refusing to open non-http(s) URL".into());
     }
-    open_url(&app, &url)
+    open_url(&app, &url).await
 }
 
 #[cfg(target_os = "linux")]
-fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
-    std::process::Command::new("xdg-open")
-        .arg(url)
-        // See the module docs: host helpers must not see our bundled libs.
-        .env_remove("LD_LIBRARY_PATH")
-        .status()
-        .map_err(|err| format!("failed to launch xdg-open: {err}"))
-        .and_then(|status| {
-            if status.success() {
-                Ok(())
-            } else {
-                Err(format!("xdg-open exited with {status}"))
-            }
-        })
+async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+    let url = url.to_string();
+    // Never block the async executor on a child process: run the launch on
+    // the blocking pool like the other spawn sites in this codebase.
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            // See the module docs: host helpers must not see our bundled libs.
+            .env_remove("LD_LIBRARY_PATH")
+            .status()
+    })
+    .await
+    .map_err(|err| format!("xdg-open task failed: {err}"))?
+    .map_err(|err| format!("failed to launch xdg-open: {err}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("xdg-open exited with {status}"))
+    }
 }
 
 #[cfg(not(target_os = "linux"))]
-fn open_url(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+async fn open_url(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_url(url, None::<&str>)
