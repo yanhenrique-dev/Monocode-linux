@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { supportsWebGL2 } from "./webgl";
+import { beforeEach, describe, expect, it } from "vitest";
+import { resetWebGL2Support, supportsWebGL2 } from "./webgl";
 
 describe("supportsWebGL2", () => {
+  beforeEach(resetWebGL2Support);
   it("reports true when the probe returns a context", () => {
     expect(supportsWebGL2(() => ({}))).toBe(true);
   });
