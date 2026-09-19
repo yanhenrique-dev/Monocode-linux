@@ -302,6 +302,8 @@ export const RUNTIME_MODE_HINT: Record<RuntimeMode, string> = {
   "full-access": "Allow commands and edits without prompts.",
 };
 
+export type WorkspaceMode = "current" | "worktree";
+
 export type Session = {
   /** Internal worker: displayed in its lead's panel rather than a workspace tab. */
   orchestrationLeadId?: string;
@@ -344,6 +346,10 @@ export type Session = {
   worktreeCwd?: string;
   /** Working copy was deleted; session waits for a replacement checkout. */
   worktreeRemoved?: boolean;
+  /** Blank-composer choice; consumed when the first turn starts. */
+  workspaceMode?: WorkspaceMode;
+  /** Base ref for a worktree that will be created on first send. */
+  worktreeBase?: string;
   /** One-shot composer text when opening a session from Inbox. */
   composerSeed?: string;
   /** Inbox issue/PR chip shown above the composer. In-memory, one-shot. */
