@@ -300,6 +300,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       ),
     [
       session.inboxAsk,
+      session.worktreeRemoved,
       session.id,
       session.busy,
       workCwdForAccessory,

@@ -727,7 +727,12 @@ const onSelectProviderAccount = useCallback(
     refreshHistory,
     onRemoveHistorySession,
   });
-  worktreeApiRef.current = worktree.deletionHooks;
+  // Committed renders only: assigning during render can leave hooks from an
+  // abandoned concurrent render in the ref, and a later deletion would call
+  // callbacks that never belonged to the confirmed UI.
+  useLayoutEffect(() => {
+    worktreeApiRef.current = worktree.deletionHooks;
+  }, [worktree.deletionHooks]);
   const {
     onPlaceSessionInFolder,
     onFileDirtyChange,

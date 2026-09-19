@@ -501,9 +501,13 @@ export function useComposer(deps: ComposerDeps) {
           let next: Session = {
             ...selected,
             providerAccountId,
-            worktreePreparing: createDraftWorktree
-              ? true
-              : selected.worktreePreparing,
+            // Only flag preparing when the async flow below can actually run:
+            // the !live branch returns early and its finally/catch never
+            // clears the flag, leaving a stuck "preparing" state.
+            worktreePreparing:
+              live && createDraftWorktree
+                ? true
+                : selected.worktreePreparing,
             inboxCard: rawCommand ? s.inboxCard : undefined,
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,

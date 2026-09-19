@@ -44,15 +44,26 @@ function paneProjects(
 
     for (const pane of tab.editorPanes) {
       const active = pane.files.find((file) => file.id === pane.activeFileId);
+      // projectCwd "~" is the unset sentinel, not a project: ?? keeps it,
+      // so filter it explicitly or the map remembers "~" and the return
+      // flow reuses the wrong session instead of the existing pane.
       if (active && active.cwd !== "~") {
-        result.set(pane.id, pathKey(active.projectCwd ?? active.cwd));
+        const project =
+          active.projectCwd && active.projectCwd !== "~"
+            ? active.projectCwd
+            : active.cwd;
+        result.set(pane.id, pathKey(project));
       }
     }
 
     for (const pane of tab.terminalPanes ?? []) {
       const active = pane.files.find((file) => file.id === pane.activeFileId);
       if (active && active.cwd !== "~") {
-        result.set(pane.id, pathKey(active.projectCwd ?? active.cwd));
+        const project =
+          active.projectCwd && active.projectCwd !== "~"
+            ? active.projectCwd
+            : active.cwd;
+        result.set(pane.id, pathKey(project));
       }
     }
   }
