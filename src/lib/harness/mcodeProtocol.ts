@@ -1,6 +1,6 @@
 import type { PromptContentBlock } from "../attachments";
 import type { AgentModel, ModelSetting } from "../models";
-import type { RuntimeMode, TaskListItem } from "../session";
+import type { RuntimeMode, TaskListItem, ToolPreview } from "../session";
 import { normalizeTaskListStatus } from "../taskList";
 import type { ApprovalDecision, HarnessEvent } from "./types";
 
@@ -10,6 +10,7 @@ export type McodePermissionRequest = {
   title: string;
   kind?: string;
   callId?: string;
+  preview?: ToolPreview;
   optionIds: string[];
 };
 
@@ -247,6 +248,63 @@ export function mcodeConfigToModelSettings(
     }
   }
   return out;
+}
+
+/**
+ * Read the ACP SessionModelState that `session/new` returns.
+ *
+ * mcode answers with the whole catalog up front, so the model picker is
+ * populated by the same response that opens the session — no separate probe
+ * request is needed beyond creating the session.
+ */
+export function modelsFromMcodeSession(result: unknown): AgentModel[] {
+  const rec = asRecord(result);
+  const state = asRecord(rec?.models);
+  const raw = state?.availableModels ?? state?.available_models;
+  if (!Array.isArray(raw)) return [];
+
+  const current = mcodeCurrentModelId(result);
+  const seen = new Set<string>();
+  const models: AgentModel[] = [];
+  for (const item of raw) {
+    const model = asRecord(item);
+    if (!model) continue;
+    const nativeId = String(
+      model.modelId ?? model.model_id ?? model.value ?? model.id ?? "",
+    ).trim();
+    if (!nativeId || seen.has(nativeId)) continue;
+    seen.add(nativeId);
+    const name = String(model.name ?? model.title ?? nativeId).trim();
+    models.push({
+      id: `mcode:${nativeId}`,
+      harness: "mcode",
+      name: name || displayName(nativeId),
+      nativeId,
+    });
+  }
+
+  // The active model is the right default for a freshly selected provider.
+  if (current) {
+    const index = models.findIndex((model) => model.nativeId === current);
+    if (index > 0) models.unshift(...models.splice(index, 1));
+  }
+  return models;
+}
+
+export function mcodeCurrentModelId(result: unknown): string | undefined {
+  const rec = asRecord(result);
+  const models = asRecord(rec?.models);
+  const value = models?.currentModelId ?? models?.current_model_id;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function displayName(nativeId: string): string {
+  const slug = nativeId.includes("/")
+    ? nativeId.slice(nativeId.lastIndexOf("/") + 1)
+    : nativeId;
+  return slug
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 /**
