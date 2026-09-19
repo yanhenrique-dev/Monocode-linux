@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   Check,
   CheckCheck,
@@ -1224,7 +1224,7 @@ export function LinkedWorkItemPanel({
             </p>
             <button
               type="button"
-              onClick={() => void openUrl(target.url)}
+              onClick={() => void openExternalUrl(target.url)}
               className={ACTION_OUTLINE}
             >
               <ExternalLink className="size-3.5" strokeWidth={1.75} />
@@ -2261,7 +2261,7 @@ export function InboxDetail({
           type="button"
           title={externalActionLabel}
           aria-label={externalActionLabel}
-          onClick={() => void openUrl(item.url)}
+          onClick={() => void openExternalUrl(item.url)}
           className={`${ACTION_PANEL_HEADER} ml-auto shrink-0`}
         >
           <ExternalLink className="size-3.5" strokeWidth={1.75} />
@@ -2478,7 +2478,7 @@ export function InboxDetail({
                 {panel ? null : (
                   <button
                     type="button"
-                    onClick={() => void openUrl(item.url)}
+                    onClick={() => void openExternalUrl(item.url)}
                     className={ACTION_GHOST}
                   >
                     <ExternalLink className="size-3.5" strokeWidth={1.75} />

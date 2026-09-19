@@ -1,5 +1,5 @@
 import { CircleDot, GitPullRequest, X } from "./icons";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import type { GithubLabel, InboxComposerCard } from "../lib/githubTasks";
 import { InboxProviderMark } from "./InboxProviderMark";
 
@@ -32,7 +32,7 @@ export function InboxMiniCard({ card, onDismiss }: Props) {
           aria-label={`Open ${kindLabel} ${card.identifier} in ${providerLabel}`}
           disabled={!card.url}
           onClick={() => {
-            if (card.url) void openUrl(card.url);
+            if (card.url) void openExternalUrl(card.url);
           }}
           className="flex w-full flex-col text-left disabled:cursor-default"
         >
