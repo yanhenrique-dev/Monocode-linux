@@ -11,7 +11,7 @@
 //
 // The asset URL targets the GitHub Release that will host these files, so
 // this must run before `gh release create` uploads them.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const REPO = "yanhenrique-dev/Monocode-linux";
 
@@ -26,6 +26,10 @@ if (!version || !appimagePath || !sigPath || !outPath) {
 const signature = readFileSync(sigPath, "utf8").trim();
 if (!signature) {
   console.error(`empty signature in ${sigPath}`);
+  process.exit(1);
+}
+if (!existsSync(appimagePath)) {
+  console.error(`missing AppImage: ${appimagePath}`);
   process.exit(1);
 }
 const asset = appimagePath.split("/").pop();
