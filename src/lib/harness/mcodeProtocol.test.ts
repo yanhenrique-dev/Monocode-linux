@@ -48,6 +48,15 @@ describe("mcode permission requests", () => {
     );
   });
 
+  it("matches option ids case-insensitively and ignores non-strings", () => {
+    expect(mcodePermissionOptionId("allow", ["ALLOW-ONCE"])).toBe(
+      "ALLOW-ONCE",
+    );
+    expect(
+      mcodePermissionOptionId("deny", [null, 42, "reject-once"] as never[]),
+    ).toBe("reject-once");
+  });
+
   it("auto-approves with the most permissive option", () => {
     expect(
       mcodeAutoPermissionOption("auto", ["allow-once", "allow-always"]),

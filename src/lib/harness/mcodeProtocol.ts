@@ -45,7 +45,8 @@ function stringField(
 function pickOption(optionIds: string[], preferred: string[]): string | null {
   for (const candidate of preferred) {
     const hit = optionIds.find(
-      (id) => id.toLowerCase() === candidate.toLowerCase(),
+      (id) =>
+        typeof id === "string" && id.toLowerCase() === candidate.toLowerCase(),
     );
     if (hit) return hit;
   }
