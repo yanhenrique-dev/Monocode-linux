@@ -1,5 +1,5 @@
 import { ask } from "@tauri-apps/plugin-dialog";
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort, openExternalUrl } from "../lib/openExternal";
 import {
   Check,
   ChevronDown,
@@ -464,8 +464,20 @@ function ChangedFiles({
       content.head,
     );
     const number = Number(/\/pull\/(\d+)(?:[/?#]|$)/.exec(url)?.[1]);
-    if (Number.isInteger(number) && number > 0) recordPrActivity(number);
-    await openExternalUrl(url.trim());
+    const createdPr = Number.isInteger(number) && number > 0 ? number : null;
+    if (createdPr !== null) recordPrActivity(createdPr);
+    try {
+      await openExternalUrl(url.trim());
+    } catch (error) {
+      // The PR already exists at this point: a browser failure must not
+      // read as a creation failure.
+      const reason = error instanceof Error ? error.message : String(error);
+      fail(
+        createdPr !== null
+          ? `Pull request #${createdPr} created, but the browser did not open (${reason}).`
+          : `Pull request created, but the browser did not open (${reason}).`,
+      );
+    }
   };
 
   const createPr = async () => {
@@ -582,7 +594,7 @@ function ChangedFiles({
             onSync={() => void sync()}
             onCreatePr={() => void createPr()}
             onViewPr={() => {
-              if (pr?.url) void openExternalUrl(pr.url);
+              if (pr?.url) openExternalBestEffort(pr.url);
             }}
           />
         ) : null}

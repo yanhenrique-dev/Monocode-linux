@@ -6,11 +6,11 @@ import type { LinkedWorkItemUpdateCard } from "../lib/linkedWorkItemActivity";
 import { resetSoundCues } from "../lib/sounds";
 import { LinkedWorkItemUpdateNotice } from "./LinkedWorkItemUpdateNotice";
 
-const { openExternalUrl, play } = vi.hoisted(() => ({
-  openExternalUrl: vi.fn(),
+const { openExternalBestEffort, play } = vi.hoisted(() => ({
+  openExternalBestEffort: vi.fn(),
   play: vi.fn(),
 }));
-vi.mock("../lib/openExternal", () => ({ openExternalUrl }));
+vi.mock("../lib/openExternal", () => ({ openExternalBestEffort }));
 vi.mock("cuelume", () => ({
   play,
   setEnabled: vi.fn(),
@@ -53,7 +53,7 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  openExternalUrl.mockReset();
+  openExternalBestEffort.mockReset();
   play.mockReset();
   resetSoundCues();
   localStorage.clear();
@@ -265,7 +265,7 @@ describe("linked work item update notice", () => {
 
     act(() => button("Open commit").click());
     expect(onAcknowledge).toHaveBeenCalledTimes(1);
-    expect(openExternalUrl).toHaveBeenCalledWith(
+    expect(openExternalBestEffort).toHaveBeenCalledWith(
       "https://github.com/acme/app/commit/abcdef123456",
     );
   });

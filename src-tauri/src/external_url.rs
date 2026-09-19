@@ -40,21 +40,43 @@ pub async fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(),
 async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     let url = url.to_string();
     // Never block the async executor on a child process: run the launch on
-    // the blocking pool like the other spawn sites in this codebase.
+    // the blocking pool like the other spawn sites in this codebase. The
+    // wait itself is bounded: a wedged session bus can keep `xdg-open`
+    // from exiting, and the click must not hang forever without feedback.
     let status = tauri::async_runtime::spawn_blocking(move || {
-        std::process::Command::new("xdg-open")
+        let child = std::process::Command::new("xdg-open")
             .arg(&url)
             // See the module docs: host helpers must not see our bundled libs.
             .env_remove("LD_LIBRARY_PATH")
-            .status()
+            .spawn()
+            .map_err(|err| format!("failed to launch xdg-open: {err}"))?;
+        wait_with_timeout(child, std::time::Duration::from_secs(15))
     })
     .await
-    .map_err(|err| format!("xdg-open task failed: {err}"))?
-    .map_err(|err| format!("failed to launch xdg-open: {err}"))?;
+    .map_err(|err| format!("xdg-open task failed: {err}"))??;
     if status.success() {
         Ok(())
     } else {
         Err(format!("xdg-open exited with {status}"))
+    }
+}
+
+/// Waits for a spawned helper, giving up after `timeout`. A timed-out child
+/// is left running: `xdg-open` delegates and exits on its own in the common
+/// case, and killing by pid from here would race its own reparenting.
+#[cfg(target_os = "linux")]
+fn wait_with_timeout(
+    mut child: std::process::Child,
+    timeout: std::time::Duration,
+) -> Result<std::process::ExitStatus, String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait());
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(status)) => Ok(status),
+        Ok(Err(err)) => Err(format!("failed waiting for xdg-open: {err}")),
+        Err(_) => Err(format!("xdg-open timed out after {}s", timeout.as_secs())),
     }
 }
 
@@ -105,5 +127,37 @@ mod tests {
         ] {
             assert!(!is_allowed_url(url), "{url}");
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn wait_returns_exit_status() {
+        use super::wait_with_timeout;
+        let child = std::process::Command::new("true")
+            .spawn()
+            .expect("spawns true");
+        let status =
+            wait_with_timeout(child, std::time::Duration::from_secs(5)).expect("true exits");
+        assert!(status.success());
+
+        let child = std::process::Command::new("false")
+            .spawn()
+            .expect("spawns false");
+        let status =
+            wait_with_timeout(child, std::time::Duration::from_secs(5)).expect("false exits");
+        assert!(!status.success());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn wait_gives_up_on_hung_helpers() {
+        use super::wait_with_timeout;
+        let child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .expect("spawns sleep");
+        let err = wait_with_timeout(child, std::time::Duration::from_millis(100))
+            .expect_err("sleep outlives the timeout");
+        assert!(err.contains("timed out"), "{err}");
     }
 }

@@ -1,4 +1,4 @@
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   useEffect,
   useRef,
@@ -289,7 +289,7 @@ function InboxComment({
                       ? "Open on GitLab"
                       : "Open on GitHub"
                 }
-                onClick={() => void openExternalUrl(comment.url)}
+                onClick={() => openExternalBestEffort(comment.url)}
                 className="hover:text-content"
               >
                 {part}

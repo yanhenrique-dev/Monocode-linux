@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   fetchInboxMedia,
   sniffInboxMedia,
@@ -86,7 +86,7 @@ export function InboxMedia({ src, alt }: Props) {
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        void openExternalUrl(src);
+        openExternalBestEffort(src);
       }}
     />
   );
@@ -100,7 +100,7 @@ function MediaFallback({ src, alt }: { src: string; alt?: string }) {
       className="text-sky-400/90 hover:text-sky-300 hover:underline"
       onClick={(event) => {
         event.preventDefault();
-        void openExternalUrl(src);
+        openExternalBestEffort(src);
       }}
     >
       {label}

@@ -1,5 +1,5 @@
 import { OrchestrationSidebarAgents } from "./OrchestrationSidebarAgents";
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   Archive,
   Check,
@@ -2239,17 +2239,17 @@ function SessionCard({
         event.preventDefault();
         event.stopPropagation();
         if (event.metaKey || event.ctrlKey) {
-          void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
+          openExternalBestEffort(linkedWorkItem.url);
           return;
         }
         if (onOpenWorkItem) onOpenWorkItem(linkedWorkItem, session.id);
-        else void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
+        else openExternalBestEffort(linkedWorkItem.url);
       }}
       onAuxClick={(event) => {
         if (event.button !== 1) return;
         event.preventDefault();
         event.stopPropagation();
-        void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
+        openExternalBestEffort(linkedWorkItem.url);
       }}
       className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-0.5 text-[11px] tabular-nums text-accent hover:underline"
     >
