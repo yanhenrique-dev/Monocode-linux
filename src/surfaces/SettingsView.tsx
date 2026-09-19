@@ -29,6 +29,7 @@ import {
   ColorPickerPopover,
   ColorSwatchRow,
 } from "../chrome/ColorPickerPopover";
+import { ConfirmDialog } from "../chrome/ConfirmDialog";
 import { Popover } from "../chrome/Popover";
 import { SecondaryButton } from "../chrome/SecondaryButton";
 import { InboxProviderMark } from "../chrome/InboxProviderMark";
@@ -2364,7 +2365,10 @@ function ArchivePage({
   onDeleteProject?: (path: string) => void;
 }) {
   const [filters, setFilters] = useState(loadSessionSidebarFilters);
-  const [deleting, setDeleting] = useState<ArchivedProject | null>(null);
+  const [deletingProject, setDeletingProject] =
+    useState<ArchivedProject | null>(null);
+  const [deletingSession, setDeletingSession] =
+    useState<SessionSummary | null>(null);
   const archivedProjects = useArchivedProjects();
   const archived = useMemo(
     () =>
@@ -2410,7 +2414,7 @@ function ArchivePage({
                 </SecondaryButton>
               ) : null}
               {onDeleteProject ? (
-                <SecondaryButton danger onClick={() => setDeleting(project)}>
+                <SecondaryButton danger onClick={() => setDeletingProject(project)}>
                   Delete
                 </SecondaryButton>
               ) : null}
@@ -2472,7 +2476,7 @@ function ArchivePage({
               </SecondaryButton>
               <SecondaryButton
                 danger
-                onClick={() => onDeleteSession(session.id)}
+                onClick={() => setDeletingSession(session)}
               >
                 Delete
               </SecondaryButton>
@@ -2481,14 +2485,30 @@ function ArchivePage({
         )}
       </Group>
 
-      {deleting ? (
+      {deletingProject ? (
         <RemoveProjectDialog
-          name={archivedProjectLabel(deleting.path)}
-          path={deleting.path}
-          onCancel={() => setDeleting(null)}
+          name={archivedProjectLabel(deletingProject.path)}
+          path={deletingProject.path}
+          onCancel={() => setDeletingProject(null)}
           onConfirm={() => {
-            onDeleteProject?.(deleting.path);
-            setDeleting(null);
+            onDeleteProject?.(deletingProject.path);
+            setDeletingProject(null);
+          }}
+        />
+      ) : null}
+
+      {deletingSession ? (
+        <ConfirmDialog
+          title={`Delete “${sessionDisplayTitle(
+            deletingSession.title,
+            deletingSession.harness,
+          )}”?`}
+          description="The conversation and its transcript are removed for good."
+          danger
+          onCancel={() => setDeletingSession(null)}
+          onConfirm={() => {
+            onDeleteSession(deletingSession.id);
+            setDeletingSession(null);
           }}
         />
       ) : null}
