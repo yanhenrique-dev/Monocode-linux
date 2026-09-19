@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsView } from "./SettingsView";
 import { rememberNotificationProjects } from "../lib/notificationProjects";
+import type { SessionSummary } from "../lib/sessionStore";
 import {
   SETTINGS_INDEX,
   SETTINGS_SECTIONS,
@@ -196,6 +197,92 @@ describe("settings pages", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe("archived conversations", () => {
+  function archivedSession(id: string, title: string): SessionSummary {
+    return {
+      id,
+      cwd: "/repo",
+      harness: "codex",
+      model: "codex:gpt-5.4",
+      runtimeMode: "supervised",
+      title,
+      createdAt: 1,
+      updatedAt: 2,
+      archived: true,
+    };
+  }
+
+  function rowDeleteButton(title: string): HTMLButtonElement {
+    const open = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((button) => button.textContent?.trim() === title)!;
+    const row = open.parentElement!;
+    return [...row.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent?.trim() === "Delete",
+    )!;
+  }
+
+  function dialog(): HTMLElement | null {
+    return document.querySelector<HTMLElement>('[role="dialog"]');
+  }
+
+  function dialogButton(label: string): HTMLButtonElement {
+    return [...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent?.trim() === label,
+    )!;
+  }
+
+  // Delete destroys a transcript for good and sits beside Unarchive, so a
+  // stray click must not be the last word.
+  it("asks before deleting one", async () => {
+    const onDeleteSession = vi.fn();
+    await render("archive", {
+      sessions: [archivedSession("s1", "Fix login")],
+      onDeleteSession,
+    });
+
+    await act(async () => rowDeleteButton("Fix login").click());
+    expect(onDeleteSession).not.toHaveBeenCalled();
+    expect(dialog()?.textContent).toContain("Delete “Fix login”?");
+    await act(async () => {});
+    expect(document.activeElement).toBe(dialogButton("Cancel"));
+
+    await act(async () => dialogButton("Delete").click());
+    expect(onDeleteSession).toHaveBeenCalledWith("s1");
+    expect(dialog()).toBeNull();
+  });
+
+  it("leaves the conversation alone when the prompt is dismissed", async () => {
+    const onDeleteSession = vi.fn();
+    await render("archive", {
+      sessions: [archivedSession("s1", "Fix login")],
+      onDeleteSession,
+    });
+
+    await act(async () => rowDeleteButton("Fix login").click());
+    await act(async () => dialogButton("Cancel").click());
+    expect(onDeleteSession).not.toHaveBeenCalled();
+    expect(dialog()).toBeNull();
+  });
+
+  it("names only the conversation whose Delete was clicked", async () => {
+    const onDeleteSession = vi.fn();
+    await render("archive", {
+      sessions: [
+        archivedSession("s1", "Fix login"),
+        archivedSession("s2", "Ship release"),
+      ],
+      onDeleteSession,
+    });
+
+    await act(async () => rowDeleteButton("Ship release").click());
+    expect(dialog()?.textContent).toContain("Ship release");
+    expect(dialog()?.textContent).not.toContain("Fix login");
+    await act(async () => dialogButton("Delete").click());
+    expect(onDeleteSession).toHaveBeenCalledWith("s2");
   });
 });
 
