@@ -77,6 +77,7 @@ pub struct CursorBinary {
 struct LiveChild {
     stdin: Mutex<ChildStdin>,
     pid: u32,
+    cwd: PathBuf,
 }
 
 struct LiveSse {
@@ -109,6 +110,13 @@ impl HarnessHost {
 
     fn lock_inner(&self) -> std::sync::MutexGuard<'_, HarnessInner> {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub(crate) fn has_working_dir(&self, path: &Path) -> bool {
+        self.lock_inner()
+            .children
+            .values()
+            .any(|child| crate::worktrees::contains_working_dir(path, &child.cwd))
     }
 
     fn get(&self, session_id: &str) -> Option<Arc<LiveChild>> {
@@ -362,6 +370,11 @@ pub fn harness_spawn(
             workdir.display()
         ));
     }
+    // Hold a spawn reservation until the child is registered below: without
+    // it, a worktree removal can pass its preflight while this process is
+    // still between fork and install_spawn, deleting the dir from under it.
+    // Dropped (released) automatically when this command returns.
+    let _spawn_guard = crate::worktree_lifecycle::reserve_spawn(&workdir)?;
 
     let mut cmd = Command::new(&command);
     cmd.args(&args)
@@ -394,6 +407,7 @@ pub fn harness_spawn(
     let live = Arc::new(LiveChild {
         stdin: Mutex::new(stdin),
         pid,
+        cwd: workdir.clone(),
     });
     if let Some(rejected) = host.install_spawn(session_id.clone(), epoch, kill_all, live) {
         // A kill, or a newer spawn, won the race while this one was forking.
@@ -2191,6 +2205,7 @@ mod tests {
             Arc::new(LiveChild {
                 stdin: Mutex::new(stdin),
                 pid,
+                cwd: PathBuf::from("/test"),
             }),
             child,
         )
@@ -2320,6 +2335,7 @@ mod tests {
             Arc::new(LiveChild {
                 stdin: Mutex::new(stdin),
                 pid,
+                cwd: PathBuf::from("/test"),
             }),
             child,
         )

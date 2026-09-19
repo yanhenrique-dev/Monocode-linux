@@ -616,9 +616,10 @@ export function useTurnActions(deps: TurnActionsDeps) {
           const completed = isPreparingHandoff(stopped)
             ? completeHandoff(stopped, buildDeterministicHandoff(stopped))
             : stopped;
-          return completed.queuedMessages?.length
-            ? { ...completed, queueStatus: "paused" }
-            : completed;
+          const ready = { ...completed, worktreePreparing: undefined };
+          return ready.queuedMessages?.length
+            ? { ...ready, queueStatus: "paused" }
+            : ready;
         }),
       );
       if (session) {
