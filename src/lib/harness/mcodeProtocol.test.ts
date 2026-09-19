@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   mcodeAutoPermissionOption,
   mcodeConfigToModelSettings,
+  mcodeEventsFromAcpUpdate,
   mcodeExtractModelConfigId,
   mcodePermissionOptionId,
   mcodePermissionRequestFromAcp,
@@ -93,5 +94,53 @@ describe("mcode session config", () => {
     expect(mcodeSessionIdFromResult({ sessionId: "abc" })).toBe("abc");
     expect(mcodeSessionIdFromResult({ session_id: "def" })).toBe("def");
     expect(mcodeSessionIdFromResult({})).toBeUndefined();
+  });
+});
+
+describe("mcode session updates", () => {
+  it("maps message and thought chunks to deltas", () => {
+    expect(
+      mcodeEventsFromAcpUpdate({
+        update: { sessionUpdate: "agent_message_chunk", content: "hi" },
+      }),
+    ).toEqual([{ type: "message.delta", text: "hi" }]);
+    expect(
+      mcodeEventsFromAcpUpdate({
+        update: { sessionUpdate: "agent_thought_chunk", content: "hmm" },
+      }),
+    ).toEqual([{ type: "reasoning.delta", text: "hmm" }]);
+  });
+
+  it("maps tool calls with call ids", () => {
+    expect(
+      mcodeEventsFromAcpUpdate({
+        update: {
+          sessionUpdate: "tool_call",
+          toolCall: { toolCallId: "c1", kind: "write", title: "W" },
+          status: "running",
+        },
+      }),
+    ).toEqual([
+      { type: "tool.updated", callId: "c1", title: "W", kind: "write", status: "running" },
+    ]);
+    expect(
+      mcodeEventsFromAcpUpdate({ update: { sessionUpdate: "tool_call" } }),
+    ).toEqual([]);
+  });
+
+  it("maps plan entries to tasks and falls back to text", () => {
+    const [event] = mcodeEventsFromAcpUpdate({
+      update: {
+        sessionUpdate: "plan",
+        entries: [{ content: "step one", status: "done" }],
+      },
+    }) as Array<{ type: string; items: Array<{ text: string }> }>;
+    expect(event.type).toBe("tasks.updated");
+    expect(event.items[0]?.text).toBe("step one");
+    expect(
+      mcodeEventsFromAcpUpdate({
+        update: { sessionUpdate: "plan", text: "loose plan" },
+      }),
+    ).toEqual([{ type: "plan", text: "loose plan", append: true }]);
   });
 });

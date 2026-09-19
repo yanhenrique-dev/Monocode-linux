@@ -1,5 +1,10 @@
+import type { PromptContentBlock } from "../attachments";
 import type { AgentModel, ModelSetting } from "../models";
-import type { ApprovalDecision } from "./types";
+import type { RuntimeMode, TaskListItem } from "../session";
+import { normalizeTaskListStatus } from "../taskList";
+import type { ApprovalDecision, HarnessEvent } from "./types";
+
+export type McodeModeId = "ask" | "code" | "plan" | "build";
 
 export type McodePermissionRequest = {
   title: string;
@@ -254,4 +259,128 @@ export function mcodeFilterModels(models: AgentModel[]): AgentModel[] {
   // mcode reports its current model through session config; we still let the
   // user pick from the catalog and forward the choice to the runtime.
   return models;
+}
+
+function textFromContent(content: unknown, fallback = ""): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => {
+        const rec = asRecord(block);
+        if (!rec) return "";
+        if (typeof rec.text === "string") return rec.text;
+        if (typeof rec.content === "string") return rec.content;
+        return "";
+      })
+      .filter(Boolean)
+      .join("");
+  }
+  if (content && typeof content === "object") {
+    const rec = asRecord(content);
+    if (rec && typeof rec.text === "string") return rec.text;
+  }
+  return fallback;
+}
+
+/** mcode accepts text prompt blocks (mirrors the standard ACP shape). */
+export function mcodePromptBlocks(text: string): PromptContentBlock[] {
+  const trimmed = text.trim();
+  return trimmed ? [{ type: "text", text: trimmed }] : [];
+}
+
+/** Map the runtime mode to mcode's ACP mode id. */
+export function mcodeModeId(runtimeMode: RuntimeMode): McodeModeId {
+  switch (runtimeMode) {
+    case "supervised":
+      return "ask";
+    case "auto-accept-edits":
+    case "auto":
+    case "full-access":
+      return "code";
+    default:
+      return "code";
+  }
+}
+
+/**
+ * Convert an ACP `session/update` notification into the app's
+ * `HarnessEvent` stream: agent message / thought chunks become
+ * `message.delta` / `reasoning.delta`; tool calls and plan entries
+ * become `tool.updated` / `plan` rows.
+ */
+export function mcodeEventsFromAcpUpdate(params: unknown): HarnessEvent[] {
+  const rec = asRecord(params);
+  const update = asRecord(rec?.update) ?? rec;
+  if (!update) return [];
+  const kind = String(
+    update.sessionUpdate ?? update.session_update ?? update.type ?? "",
+  );
+
+  if (kind === "agent_message_chunk" || kind === "agent_message") {
+    const text = textFromContent(
+      update.content ?? update.text,
+      kind === "agent_message" ? "\n" : "",
+    );
+    return text ? [{ type: "message.delta", text }] : [];
+  }
+
+  if (kind === "agent_thought_chunk" || kind === "agent_thought") {
+    const text = textFromContent(
+      update.content ?? update.text,
+      kind === "agent_thought" ? "\n" : "",
+    );
+    return text ? [{ type: "reasoning.delta", text }] : [];
+  }
+
+  if (kind === "tool_call" || kind === "tool_call_update") {
+    const tool =
+      asRecord(update.toolCall) ?? asRecord(update.tool_call) ?? update;
+    const callId = stringField(tool, update, "toolCallId", "tool_call_id");
+    if (!callId) return [];
+    const title = stringField(tool, update, "title", "name") ?? "Tool call";
+    const toolKind = stringField(tool, update, "kind");
+    const status = stringField(update, "status") ?? stringField(tool, "status");
+    return [
+      {
+        type: "tool.updated",
+        callId,
+        title,
+        kind: toolKind,
+        status,
+      },
+    ];
+  }
+
+  if (kind === "plan") {
+    // ACP `plan` notifications carry an `entries: [{content, priority,
+    // status}]` array — read the entries directly instead of via the loose
+    // `stringField` helper. Each entry becomes a task in a `tasks.updated`
+    // event so the UI can render the plan as a todo list.
+    const entriesRaw = update.entries;
+    if (Array.isArray(entriesRaw)) {
+      const items = entriesRaw.flatMap((entry): TaskListItem[] => {
+        const rec = asRecord(entry);
+        if (!rec) return [];
+        const content =
+          (typeof rec.content === "string" ? rec.content : undefined) ??
+          stringField(rec, "text");
+        if (!content) return [];
+        return [
+          {
+            text: content,
+            status: normalizeTaskListStatus(rec.status),
+          } as TaskListItem,
+        ];
+      });
+      if (items.length > 0) {
+        return [{ type: "tasks.updated", items }];
+      }
+    }
+    // Some providers emit plan as a single text blob — fall back to that
+    // shape rather than dropping the update.
+    const fallback = stringField(update, "plan") ?? stringField(update, "text");
+    return fallback ? [{ type: "plan", text: fallback, append: true }] : [];
+  }
+
+  return [];
 }
