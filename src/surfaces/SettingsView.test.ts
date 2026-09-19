@@ -14,6 +14,9 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async () => undefined),
   convertFileSrc: (path: string) => path,
 }));
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: vi.fn(async () => "0.1.67"),
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     isMaximized: async () => false,
@@ -21,6 +24,12 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  ask: vi.fn(async () => false),
+  message: vi.fn(async () => undefined),
+}));
+vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: vi.fn() }));
+vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn() }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -294,5 +303,46 @@ describe("settings search", () => {
     expect(onSelectSection).not.toHaveBeenCalled();
     const row = container.querySelector('[data-setting-id="sounds"]')!;
     expect(row.className).toContain("bg-accent/10");
+  });
+});
+
+describe("UpdateRow busy feedback", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  async function clickCheckForUpdates() {
+    await render("general");
+    const button = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((node) => node.textContent === "Check for updates")!;
+    await act(async () => {
+      button.click();
+    });
+    return button;
+  }
+
+  it("holds the spinner visible for instant checks", async () => {
+    const { check } = await import("@tauri-apps/plugin-updater");
+    const { message } = await import("@tauri-apps/plugin-dialog");
+    vi.mocked(check).mockResolvedValue(null);
+    await clickCheckForUpdates();
+
+    // The check already resolved, but the hold keeps the spinner painted.
+    expect(container.querySelector(".animate-spin")).not.toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(499);
+    });
+    expect(container.querySelector(".animate-spin")).not.toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(container.querySelector(".animate-spin")).toBeNull();
+    expect(message).toHaveBeenCalled();
   });
 });
