@@ -937,7 +937,7 @@ fn git_remote_names(root: &Path) -> Vec<String> {
 
 fn git_peel_commit(root: &Path, spec: &str) -> Result<String, String> {
     let spec = spec.trim();
-    if spec.len() < 4 || spec.len() > 40 || !spec.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if spec.len() < 4 || spec.len() > 64 || !spec.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("Invalid commit".into());
     }
     let peeled = format!("{spec}^{{commit}}");

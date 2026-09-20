@@ -245,6 +245,29 @@ fn inspect_paths_reports_files_and_directories() {
 }
 
 #[test]
+fn preview_truncates_on_char_boundaries() {
+    let dir = tmp("preview-truncate");
+    // Byte 199 lands inside the 2-byte 'é' (bytes 198..200): truncating by
+    // byte index would panic, so the preview must cut on a char boundary.
+    let line = format!("{}é{}", "a".repeat(198), "b".repeat(50));
+    let file = dir.0.join("notes.txt");
+    std::fs::write(&file, format!("{line}\nshort\n")).unwrap();
+
+    let preview = read_file_preview(file.to_string_lossy().into_owned(), 12, None).unwrap();
+    assert_eq!(preview.len(), 2);
+    assert_eq!(preview[0].chars().count(), 200);
+    assert!(preview[0].ends_with('…'));
+    assert_eq!(preview[1], "short");
+
+    // Pure-ASCII behavior is unchanged: 199 chars + ellipsis.
+    let ascii = "x".repeat(250);
+    let file = dir.0.join("ascii.txt");
+    std::fs::write(&file, format!("{ascii}\n")).unwrap();
+    let preview = read_file_preview(file.to_string_lossy().into_owned(), 12, None).unwrap();
+    assert_eq!(preview[0], format!("{}…", "x".repeat(199)));
+}
+
+#[test]
 fn attachment_bytes_round_trip_through_temp_dir() {
     let encoded =
         read_file_base64_sync(&write_attachment_sync("shot.png", "aGVsbG8=").unwrap()).unwrap();

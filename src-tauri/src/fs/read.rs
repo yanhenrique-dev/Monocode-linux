@@ -340,8 +340,13 @@ pub fn read_file_preview(
         if line.contains('\0') {
             return Err("Binary file".into());
         }
-        if line.len() > 200 {
-            line.truncate(199);
+        if line.chars().count() > 200 {
+            let cut = line
+                .char_indices()
+                .nth(199)
+                .map(|(index, _)| index)
+                .unwrap_or(line.len());
+            line.truncate(cut);
             line.push('…');
         }
         lines.push(line);
