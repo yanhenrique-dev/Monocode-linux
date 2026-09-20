@@ -1620,10 +1620,10 @@ function UpdateRow({
     setHolding(true);
     try {
       if (hasUpdate) {
-        await installPendingUpdate(setSnapshot);
+        await installPendingUpdate(setSnapshot, { showDialog: false });
         return;
       }
-      await runUpdateFlow(true, setSnapshot);
+      await runUpdateFlow(true, setSnapshot, { showDialog: false });
     } finally {
       const remaining = MIN_BUSY_MS - (Date.now() - startedAt);
       if (remaining > 0) {
@@ -2881,7 +2881,7 @@ function Group({
     <section
       id={id ? settingDomId(id) : undefined}
       data-setting-id={id}
-      className="pt-8 first:pt-0"
+      className="pt-8"
     >
       <div className="flex items-end gap-4 pb-2.5">
         <div className="min-w-0 flex-1">

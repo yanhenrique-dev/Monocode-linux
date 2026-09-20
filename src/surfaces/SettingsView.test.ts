@@ -462,6 +462,8 @@ describe("UpdateRow busy feedback", () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(container.querySelector(".animate-spin")).toBeNull();
-    expect(message).toHaveBeenCalled();
+    // Settings renders the result inline: no native dialog for this surface.
+    expect(message).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("You're on the latest version.");
   });
 });

@@ -5,6 +5,16 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { announceUpdateAvailable } from "./sounds";
 import { rememberInstalledUpdate } from "./updateNotice";
+import { loadLocale, t } from "./locale";
+
+export type UpdateFlowOptions = {
+  /**
+   * Show the native dialog for manual checks. Defaults to false when an
+   * `onProgress` listener renders the result inline (Settings), true
+   * otherwise (menu / shortcut with no inline surface).
+   */
+  showDialog?: boolean;
+};
 
 export type UpdaterPhase =
   | "idle"
@@ -65,19 +75,30 @@ export async function probeForUpdate(): Promise<Update | null> {
   return update;
 }
 
+/**
+ * Check the release feed and optionally drive the install.
+ * Progress is reported through `onProgress` for inline surfaces (Settings);
+ * the native dialog only pops when `opts.showDialog` resolves true (menu /
+ * shortcut have no inline surface, so they default to showing it).
+ */
 export async function runUpdateFlow(
   manual: boolean,
   onProgress?: (snapshot: UpdaterSnapshot) => void,
+  opts?: UpdateFlowOptions,
 ): Promise<UpdaterSnapshot> {
+  const locale = loadLocale();
+  const dialogTitle = t(locale, "updater.dialog.title");
+  // Inline listeners (Settings) already render the result: only pop the
+  // native dialog when there is no inline surface, unless forced.
+  const showDialog = opts?.showDialog ?? !onProgress;
   const currentVersion = await readAppVersion();
   if (await isFlatpakSandbox()) {
     const idle = flatpakIdle(currentVersion);
     onProgress?.(idle);
-    if (manual) {
-      await message(
-        "Updates are managed by Flatpak. Update MonoCode from your software center or with `flatpak update`.",
-        { title: "MonoCode" },
-      );
+    if (manual && showDialog) {
+      await message(t(locale, "updater.dialog.flatpak"), {
+        title: dialogTitle,
+      });
     }
     return idle;
   }
@@ -90,8 +111,10 @@ export async function runUpdateFlow(
       pendingUpdate = null;
       const current: UpdaterSnapshot = { phase: "current", currentVersion };
       onProgress?.(current);
-      if (manual) {
-        await message("You're on the latest version.", { title: "MonoCode" });
+      if (manual && showDialog) {
+        await message(t(locale, "updater.dialog.latest"), {
+          title: dialogTitle,
+        });
       }
       return current;
     }
@@ -105,27 +128,30 @@ export async function runUpdateFlow(
     };
     onProgress?.(available);
 
-    if (!manual) return available;
+    if (!manual || !showDialog) return available;
 
     const notes = update.body?.trim();
     const detail = notes ? `\n\n${notes}` : "";
     const yes = await ask(
-      `MonoCode ${update.version} is available (you have ${currentVersion}).${detail}\n\nInstall now?`,
-      { title: "Update available", kind: "info" },
+      t(locale, "updater.dialog.available_body", {
+        availableVersion: update.version,
+        currentVersion,
+        detail,
+      }),
+      { title: t(locale, "updater.dialog.available_title"), kind: "info" },
     );
     if (!yes) return available;
 
-    return installPendingUpdate(onProgress);
+    return installPendingUpdate(onProgress, opts);
   } catch (err) {
     if (isUpdaterNotConfiguredError(err)) {
       pendingUpdate = null;
       const idle: UpdaterSnapshot = { phase: "idle", currentVersion };
       onProgress?.(idle);
-      if (manual) {
-        await message(
-          "Automatic updates aren't configured for this build.\n\nDownload releases at https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
-          { title: "MonoCode" },
-        );
+      if (manual && showDialog) {
+        await message(t(locale, "updater.dialog.not_configured"), {
+          title: dialogTitle,
+        });
       }
       return idle;
     }
@@ -133,18 +159,26 @@ export async function runUpdateFlow(
     const error = err instanceof Error ? err.message : String(err);
     const failed: UpdaterSnapshot = { phase: "error", currentVersion, error };
     onProgress?.(failed);
-    if (manual) {
-      await message(`Couldn't check for updates.\n\n${error}`, {
-        title: "MonoCode",
+    if (manual && showDialog) {
+      await message(t(locale, "updater.dialog.check_failed", { error }), {
+        title: dialogTitle,
       });
     }
     return failed;
   }
 }
 
+/**
+ * Download and install a previously detected update, then relaunch.
+ * Failure is reported through `onProgress`; the native dialog follows the
+ * same `showDialog` rule as `runUpdateFlow`.
+ */
 export async function installPendingUpdate(
   onProgress?: (snapshot: UpdaterSnapshot) => void,
+  opts?: UpdateFlowOptions,
 ): Promise<UpdaterSnapshot> {
+  const locale = loadLocale();
+  const showDialog = opts?.showDialog ?? !onProgress;
   const currentVersion = await readAppVersion();
   const update = pendingUpdate;
   if (!update) {
@@ -202,7 +236,11 @@ export async function installPendingUpdate(
       error,
     };
     onProgress?.(failed);
-    await message(`Couldn't install the update.\n\n${error}`, { title: "MonoCode" });
+    if (showDialog) {
+      await message(t(locale, "updater.dialog.install_failed", { error }), {
+        title: t(locale, "updater.dialog.title"),
+      });
+    }
     return failed;
   }
 }
