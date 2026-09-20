@@ -197,25 +197,41 @@ impl CheckpointStore {
         };
         let mut dirty = false;
         for file in git_diff_files_for(&root).files {
-            if manifest.touched.len() >= MAX_SNAPSHOT_FILES {
-                break;
-            }
             let Ok(relative) = resolve_repo_path(&root, &file.relative) else {
                 continue;
             };
-            if manifest.touched.contains(&relative) || manifest.prepared.contains(&relative) {
+            if manifest.prepared.contains(&relative) {
                 continue;
             }
-            manifest.touched.insert(relative.clone());
-            if in_head(&root, &relative) {
-                manifest.tracked.insert(relative.clone());
+            let already_adopted = manifest.adopted.contains(&relative);
+            if manifest.touched.contains(&relative) && !already_adopted {
+                continue;
             }
+            if !already_adopted {
+                // The file cap gates new claims only, not refreshes of paths
+                // this session already adopted.
+                if manifest.touched.len() >= MAX_SNAPSHOT_FILES {
+                    break;
+                }
+                manifest.touched.insert(relative.clone());
+                if in_head(&root, &relative) {
+                    manifest.tracked.insert(relative.clone());
+                }
+                manifest.adopted.insert(relative.clone());
+            }
+            // A re-adopted path changed again through the shell: refresh the
+            // result snapshot and counts. Adopted paths stay review-visible
+            // but never exact nor undoable (no tool-start baseline).
             let after = snapshot_after_file(&dir, &root, &relative)?;
             manifest.after.insert(relative.clone(), after);
-            if let Some(stats) = calculate_session_stats(&dir, &manifest, &relative) {
-                manifest.stats.insert(relative.clone(), stats);
+            match calculate_session_stats(&dir, &manifest, &relative) {
+                Some(stats) => {
+                    manifest.stats.insert(relative.clone(), stats);
+                }
+                None => {
+                    manifest.stats.remove(&relative);
+                }
             }
-            manifest.adopted.insert(relative);
             dirty = true;
         }
         if dirty {
@@ -423,7 +439,9 @@ impl CheckpointStore {
             if !same_cwd(&manifest.cwd, cwd) {
                 continue;
             }
-            for relative in manifest.touched.intersection(&manifest.prepared) {
+            for relative in manifest.touched.iter().filter(|relative| {
+                manifest.prepared.contains(*relative) || manifest.adopted.contains(*relative)
+            }) {
                 claimants
                     .entry(relative.clone())
                     .or_default()
@@ -1673,6 +1691,18 @@ mod tests {
         let again = store.adopt("s1", &cwd).unwrap();
         assert_eq!(again.files.len(), 1);
 
+        // A further shell change refreshes the adopted snapshot and counts.
+        std::fs::write(repo.0.join("app.ts"), "shell\nextra\n").unwrap();
+        let refreshed = store.adopt("s1", &cwd).unwrap();
+        let app_refreshed = refreshed
+            .files
+            .iter()
+            .find(|file| file.relative == "app.ts")
+            .unwrap();
+        assert!(!app_refreshed.exact);
+        assert_eq!(app_refreshed.additions, 2);
+        assert_eq!(app_refreshed.deletions, 1);
+
         // A later structured edit upgrades the adopted claim to a real one.
         store.prepare("s1", &cwd, &["app.ts".into()]).unwrap();
         std::fs::write(repo.0.join("app.ts"), "shell\ntool\n").unwrap();
@@ -1924,20 +1954,20 @@ mod tests {
         // No snapshot stats and no git row (e.g. legacy manifests): a
         // worktree file unknown to HEAD still reports its new lines instead
         // of 0/0, which the file list would hide entirely.
-        let added = describe_change(&repo.0, "new.txt", None, true, true, None);
+        let added = describe_change(&repo.0, "new.txt", None, true, true, Vec::new(), None);
         assert_eq!(added.status, "modified");
         assert_eq!((added.additions, added.deletions), (3, 0));
 
-        let empty = describe_change(&repo.0, "empty.txt", None, true, true, None);
+        let empty = describe_change(&repo.0, "empty.txt", None, true, true, Vec::new(), None);
         assert_eq!((empty.additions, empty.deletions), (0, 0));
 
-        let binary = describe_change(&repo.0, "blob.bin", None, true, true, None);
+        let binary = describe_change(&repo.0, "blob.bin", None, true, true, Vec::new(), None);
         assert_eq!((binary.additions, binary.deletions), (0, 0));
 
-        let tracked = describe_change(&repo.0, "a.txt", None, true, true, None);
+        let tracked = describe_change(&repo.0, "a.txt", None, true, true, Vec::new(), None);
         assert_eq!((tracked.additions, tracked.deletions), (0, 0));
 
-        let missing = describe_change(&repo.0, "gone.txt", None, true, true, None);
+        let missing = describe_change(&repo.0, "gone.txt", None, true, true, Vec::new(), None);
         assert_eq!(missing.status, "deleted");
         assert_eq!((missing.additions, missing.deletions), (0, 0));
     }
