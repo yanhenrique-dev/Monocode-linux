@@ -75,6 +75,9 @@ export function quitWhileBusyMessage(count: number): string {
  */
 export function markTurnInterrupted(session: Session): Session {
   const sealed = { ...sealOpenWork(stopStreaming(session)), busy: false };
+  // Only skip when an interrupt note is already last: canAutoContinue keys
+  // off INTERRUPT_MESSAGE as the final block, so a model-swap notice must
+  // still be followed by a fresh interrupt.
   if (lastBlockIsInterrupt(sealed)) return sealed;
   return {
     ...sealed,

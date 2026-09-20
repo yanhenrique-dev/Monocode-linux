@@ -1,5 +1,6 @@
 import {
   closeLeaf,
+  firstLeafId,
   focusedFileTab,
   leaf,
   leafIds,
@@ -7,6 +8,7 @@ import {
   placePane,
   replacePaneWithLayout,
   replaceLeafId,
+  splitPane,
   type PaneEdge,
   type WorkspaceTab,
 } from "./layout";
@@ -68,6 +70,34 @@ export function findOpenSessionTab(
 ): WorkspaceTab | undefined {
   if (!sessions.some((session) => session.id === sessionId)) return undefined;
   return tabs.find((tab) => leafIds(tab.layout).includes(sessionId));
+}
+
+/**
+ * Add a chat beside a file-only tab so an add-to-chat request has a target.
+ * (porte #325: cobre tab com leaves não-mapeados + tab fantasma)
+ */
+export function openAddToChatSessionPane({
+  tab,
+  sessions,
+  sessionId,
+}: {
+  tab: WorkspaceTab;
+  sessions: readonly Pick<Session, "id">[];
+  sessionId: string;
+}): WorkspaceTab | null {
+  const paneIds = leafIds(tab.layout);
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  if (paneIds.some((id) => sessionIds.has(id))) return null;
+
+  const sourceId = paneIds.includes(tab.focusedId)
+    ? tab.focusedId
+    : firstLeafId(tab.layout);
+  return {
+    ...tab,
+    layout: splitPane(tab.layout, sourceId, "right", sessionId),
+    focusedId: sessionId,
+    diffFocused: false,
+  };
 }
 
 export function filterTabsForProject(

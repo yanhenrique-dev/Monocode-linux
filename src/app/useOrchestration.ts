@@ -62,6 +62,7 @@ export interface OrchestrationDeps {
   focusOpenSession: (sessionId: string) => boolean;
   onOpenApprovalSession: (sessionId: string) => void;
   onSubmit: ReturnType<typeof import("./useComposer").useComposer>["onSubmit"];
+  onStopSession: (sessionId: string) => Promise<void>;
   confirmingOrchestration: MutableRefObject<Set<string>>;
   onSelectHistorySession: (sessionId: string) => Promise<void>;
   ensureOpenSession: (sessionId: string) => Promise<Session | null>;
@@ -96,6 +97,7 @@ export function useOrchestration(deps: OrchestrationDeps) {
     focusOpenSession,
     onOpenApprovalSession,
     onSubmit,
+    onStopSession,
     confirmingOrchestration,
     onSelectHistorySession,
     ensureOpenSession,
@@ -199,6 +201,7 @@ export function useOrchestration(deps: OrchestrationDeps) {
     () => ({
       open: onOpenApprovalSession,
       openAgents: queueWorkerPanes,
+      stop: (sessionId: string) => onStopSession(sessionId),
       update: (
         leadId: string,
         blockId: string,
@@ -287,7 +290,13 @@ export function useOrchestration(deps: OrchestrationDeps) {
         });
       },
     }),
-    [onOpenApprovalSession, queueWorkerPanes, onSubmit, updateOrchestrationCard],
+    [
+      onOpenApprovalSession,
+      queueWorkerPanes,
+      onSubmit,
+      onStopSession,
+      updateOrchestrationCard,
+    ],
   );
 
   const onSelectLiveAgent = useCallback(

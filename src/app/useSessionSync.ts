@@ -34,6 +34,7 @@ import {
   setQuitWorkspace,
   type ResumedWorkspace,
 } from "../lib/appLifecycle";
+import { flushSessionDraft } from "../lib/composerDraft";
 import {
   focusedFileTab,
   isolateTerminalPanes,
@@ -104,7 +105,7 @@ import { warmNativeSkills } from "../lib/skills";
 import { IS_MAC } from "../lib/platform";
 import { loadCloseToTray } from "../lib/settings";
 import { DEFAULT_PROVIDER_ACCOUNT_ID } from "../lib/providerAccounts";
-import { mergeModelSettings, resolveModel } from "../lib/models";
+import { reconcileRestoredModel } from "../lib/restoredModel";
 import { rememberLoadedSession } from "../lib/sessionCache";
 import { prefetchProjectFiles } from "../lib/fileIndex";
 import { nativeSkillContextForSession } from "../lib/sessionSkills";
@@ -118,7 +119,6 @@ import {
 } from "./tabHelpers";
 import {
   cancelScheduledFlush,
-  sameSettings,
   scheduleHarnessFlush,
   type ScheduledFlush,
 } from "./workspaceEvents";
@@ -426,18 +426,10 @@ export function useSessionSync(deps: SessionSyncDeps) {
       setSessions((prev) =>
         prev.map((session) => {
           if (!isLiveHarness(session.harness)) return session;
-          const resolved = resolveModel(session.harness, session.model);
-          const modelSettings = mergeModelSettings(
-            resolved,
-            session.modelSettings,
-          );
-          if (
-            resolved.id === session.model &&
-            sameSettings(modelSettings, session.modelSettings)
-          ) {
-            return session;
-          }
-          return { ...session, model: resolved.id, modelSettings };
+          // Restored sessions keep their persisted model verbatim whenever it
+          // still exists in the catalog; a genuinely removed id falls back
+          // with a visible transcript note instead of a silent rewrite.
+          return reconcileRestoredModel(session).session;
         }),
       );
     });
@@ -702,28 +694,40 @@ export function useSessionSync(deps: SessionSyncDeps) {
         // calls JS `window.destroy`, which Tauri denies without a permission.
         event.preventDefault();
         const toTray = loadCloseToTray();
-        if (hasInFlightSessions(sessionsRef.current)) {
-          flushHarnessEvents();
-          if (!toTray && !IS_MAC) {
-            void closeBusyWindow();
+        void (async () => {
+          // Hide/destroy end the JS context before the draft debounce timer
+          // would fire, so push any pending composer drafts out first.
+          // A failed write cannot block window teardown; it stays pending
+          // in memory and is simply lost with the context.
+          // (porte #321)
+          try {
+            await flushSessionDraft();
+          } catch (reason) {
+            console.error(reason);
+          }
+          if (hasInFlightSessions(sessionsRef.current)) {
+            flushHarnessEvents();
+            if (!toTray && !IS_MAC) {
+              void closeBusyWindow();
+              return;
+            }
+            // Not `persistQuitState`: that marks the live turns interrupted.
+            void persistLiveTranscripts(sessionsRef.current);
+            void hideCurrentWindow();
             return;
           }
-          // Not `persistQuitState`: that marks the live turns interrupted.
-          void persistLiveTranscripts(sessionsRef.current);
-          void hideCurrentWindow();
-          return;
-        }
-        void persistQuitState(
-          sessionsRef.current,
-          tabsRef.current,
-          activeTabIdRef.current,
-          projectCwdRef.current,
-          readProjectReturnMemory(),
-          "unload",
-          projectTerminalsRef.current,
-        ).finally(() => {
-          void (toTray ? hideCurrentWindow() : closeCurrentWindow());
-        });
+          await persistQuitState(
+            sessionsRef.current,
+            tabsRef.current,
+            activeTabIdRef.current,
+            projectCwdRef.current,
+            readProjectReturnMemory(),
+            "unload",
+            projectTerminalsRef.current,
+          ).finally(() => {
+            void (toTray ? hideCurrentWindow() : closeCurrentWindow());
+          });
+        })();
       })
       .then((fn) => {
         unlistenClose = fn;

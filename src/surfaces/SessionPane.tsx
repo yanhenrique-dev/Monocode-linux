@@ -52,6 +52,11 @@ import {
   type AddToChatRequest,
   type QuoteRequest,
 } from "../lib/quoteDraft";
+import {
+  flushSessionDraft,
+  loadSessionDraft,
+  saveSessionDraft,
+} from "../lib/composerDraft";
 import { createNote, noteTitle } from "../lib/notes";
 import { canEditLastTurn, lastTurnRecall } from "../lib/editLastTurn";
 import { loadNotesEnabled, subscribeNotesEnabled } from "../lib/settings";
@@ -99,7 +104,7 @@ type Props = {
     attachments: Attachment[],
     options?: ComposerTurnOptions,
   ) => boolean | void;
-  onStop: (sessionId: string) => void;
+  onStop: (sessionId: string) => Promise<void>;
   onCompactContext: (sessionId: string) => boolean;
   onPlaceSessionInFolder: (
     sessionId: string,
@@ -418,6 +423,27 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
   const draftRef = useRef<string | undefined>(undefined);
+  // Persisted draft for this session, loaded once per pane mount. The Composer
+  // picks up late loads through its `initialDraft` sync effect. (porte #321)
+  const [restoredDraft, setRestoredDraft] = useState<string | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    draftRef.current = undefined;
+    setRestoredDraft(undefined);
+    void loadSessionDraft(session.id).then((text) => {
+      if (!cancelled && text) setRestoredDraft(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [session.id]);
+  useEffect(() => {
+    return () => {
+      void flushSessionDraft().catch(console.error);
+    };
+  }, [session.id]);
   const composer = (
     <Composer
       enabled={visible}
@@ -444,12 +470,14 @@ const SessionPaneContent = memo(function SessionPaneContent({
       quoteRequest={quoteRequest}
       initialDraft={
         draftRef.current ??
+        restoredDraft ??
         (session.inboxCard || session.noteCard || session.handoffCard
           ? undefined
           : session.composerSeed)
       }
       onDraftChange={(text) => {
         draftRef.current = text;
+        saveSessionDraft(session.id, text);
       }}
       inboxCard={session.inboxCard}
       noteCard={session.noteCard}
@@ -500,7 +528,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onSubmit={(text, attachments, options) =>
         onSubmit(session.id, text, attachments, options)
       }
-      onStop={() => onStop(session.id)}
+      onStop={() => void onStop(session.id).catch(console.error)}
       onCompactContext={() => onCompactContext(session.id)}
       onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
       queuedMessages={session.queuedMessages}

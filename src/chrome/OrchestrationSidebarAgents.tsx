@@ -265,6 +265,17 @@ export function OrchestrationSidebarAgents({
                 Open blocker
               </button>
             )}
+            {resumeBlocker && actions?.stop && (
+              <button
+                type="button"
+                className={action}
+                disabled={pending}
+                title={`Stop ${resumeBlocker.title || "the other conversation"} so this run can resume`}
+                onClick={() => void perform(() => actions.stop!(resumeBlocker.id))}
+              >
+                Stop blocker
+              </button>
+            )}
             <button
               type="button"
               className={action}

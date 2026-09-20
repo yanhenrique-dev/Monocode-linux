@@ -19,6 +19,7 @@ import type { SettingsAnchor } from "../surfaces/SettingsView";
 import type { ConnectableInboxSource } from "../lib/inboxFilters";
 import type { LinkedWorkItem, Session } from "../lib/session";
 import type { SessionSummary } from "../lib/sessionStore";
+import { flushSessionDraft } from "../lib/composerDraft";
 
 export interface LinkedWorkItemPanelState {
   item: LinkedWorkItem;
@@ -138,7 +139,19 @@ export function useAppViews(deps: AppViewsDeps) {
     setFilePickerOpen(true);
   }, []);
 
-  const onReload = useCallback(() => window.location.reload(), []);
+  const onReload = useCallback(() => {
+    // The reload tears down JS before the draft debounce timer fires.
+    // A failed write still reloads (the pending entry survives in memory
+    // only, so there is nothing more to do) — but surface the error first.
+    // (porte #321)
+    void flushSessionDraft().then(
+      () => window.location.reload(),
+      (reason) => {
+        console.error(reason);
+        window.location.reload();
+      },
+    );
+  }, []);
 
   const onFindInProject = useCallback(() => {
     setSearchViewOpen(false);

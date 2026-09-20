@@ -99,6 +99,7 @@ import {
   isIncompleteTool,
   isSubagentBlock,
   isThinkingBlock,
+  liveTitleThought,
   lastActivityIndex,
   isProseBlock,
   needsApproval,
@@ -1704,8 +1705,16 @@ function ActivityPhaseGroup({
   const waiting = phase.steps.some(needsApproval);
   const open = waiting || (override ?? active);
   const [liveScroller, setLiveScroller] = useState<HTMLDivElement | null>(null);
-  useLivePhaseScroll(liveScroller, active && open, phase.steps);
-  const title = activityPhaseTitle(phase, active);
+  const title = activityPhaseTitle(phase, active, open);
+  // What the header is holding while the group runs, so the trail under it
+  // starts one step back: a header repeating the row beneath it says the same
+  // thing twice, and the thought drops into the trail as the agent moves on.
+  // (porte #318)
+  const titling = active && open ? liveTitleThought(phase) : undefined;
+  const steps = titling
+    ? phase.steps.filter((block) => block !== titling)
+    : phase.steps;
+  useLivePhaseScroll(liveScroller, active && open, steps);
   // Opening a group on purpose is also how you read the line that titled it,
   // whole. The auto-open while it runs is a live view, not a reading one, and
   // a one-line note the header already shows in full has nothing to add.
@@ -1807,7 +1816,7 @@ function ActivityPhaseGroup({
                   />
                 </div>
               ) : null}
-              {phase.steps.map((block) => (
+              {steps.map((block) => (
                 <div
                   key={block.id}
                   className={`zen-phase-step${active ? " zen-step-in" : ""}`}
@@ -2459,12 +2468,15 @@ function ActivityToolRow({
   onOpenFile?: (path: string) => void;
   onOpenDiff?: (path: string) => void;
 }) {
-  const [errorOpen, setErrorOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const label = toolCallLabel(block, cwd);
   const state = toolCallState(block);
   const pending = needsApproval(block);
-  const errorDetail =
-    !pending && state === "rejected" ? block.tool?.detail?.trim() : undefined;
+  const failed = !pending && state === "rejected";
+  // #328: success rows carry output too — expandable, closed by default.
+  const detail =
+    state !== "pending" ? block.tool?.detail?.trim() : undefined;
+  const truncated = detail?.endsWith("\n…") ?? false;
   const summary = (
     <ToolCallSummary
       label={label}
@@ -2480,28 +2492,30 @@ function ActivityToolRow({
 
   return (
     <div className="flex min-w-0 flex-col">
-      {errorDetail ? (
+      {detail ? (
         <div
-          aria-label={`Failed tool call: ${label}`}
+          aria-label={`${failed ? "Failed tool call" : "Tool call"}: ${label}`}
           className="group flex min-w-0 items-center gap-1.5 py-1"
         >
           {bare ? null : <ActivityToolIcon state={state} live={live} />}
           <div
             className="flex min-w-0 flex-1 cursor-pointer"
-            onClick={() => setErrorOpen((value) => !value)}
+            onClick={() => setDetailOpen((value) => !value)}
           >
             {summary}
           </div>
           <ToolCallStatusIcon state={state} />
           <button
             type="button"
-            aria-expanded={errorOpen}
-            aria-label={`${errorOpen ? "Hide" : "Show"} error details for ${label}`}
-            onClick={() => setErrorOpen((value) => !value)}
+            aria-expanded={detailOpen}
+            aria-label={`${detailOpen ? "Hide" : "Show"} ${failed ? "error details" : "output"} for ${label}`}
+            onClick={() => setDetailOpen((value) => !value)}
             className="-m-1 shrink-0 rounded p-1"
           >
             <ChevronRight
-              className={`size-3.5 text-red-400/60 transition-transform ${errorOpen ? "rotate-90" : ""}`}
+              className={`size-3.5 transition-transform ${detailOpen ? "rotate-90" : ""} ${
+                failed ? "text-red-400/60" : "text-content/40"
+              }`}
               strokeWidth={1.75}
             />
           </button>
@@ -2519,12 +2533,22 @@ function ActivityToolRow({
       {pending ? (
         <ApprovalControls block={block} onApproval={onApproval} />
       ) : null}
-      {errorOpen && errorDetail ? (
-        <pre
-          className={`min-w-0 whitespace-pre-wrap break-words py-1 font-mono text-[12px] leading-5 text-red-400/80 ${bare ? "" : "pl-5"}`}
-        >
-          {errorDetail}
-        </pre>
+      {(detailOpen) && detail ? (
+        <div className={`min-w-0 py-1 ${bare ? "" : "pl-5"}`}>
+          <pre
+            className={`min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 ${
+              failed ? "text-red-400/80" : "text-content/70"
+            }`}
+          >
+            {detail}
+          </pre>
+          {truncated ? (
+            <div className="pt-0.5 font-sans text-[11px] text-content/40">
+              Truncated at 8,000 chars — open the full log from the session
+              transcript.
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
