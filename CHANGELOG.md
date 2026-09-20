@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.75] - 2026-09-20
+
+### Added
+
+- MiniMax Code (mcode) harness over ACP: binary resolve, session
+  lifecycle, ACP events, catalog, picker height and models.
+- Amend last commit in the Changes panel, with HEAD message prefill
+  and a pushed-commit guard.
+- Uniform model controls: Menu/Beside pills (effort, variant, fast,
+  thinking, service tier, context), `Extra High` variant labels with
+  low-to-high ordering, favorites provenance, and direct model list
+  in beside mode.
+- Custom pets management in Settings (add, remove, hide).
+- Font-smoothing auto on Linux.
+- Brazilian Portuguese translation for Settings (language selector,
+  dates/numbers follow the locale).
+- Dual-protocol OpenCode harness (V1/V2 auto-detect, durable prompt,
+  nested permissions/questions).
+
+### Fixed
+
+- Model submenu overlapping the parent glass (positive gap) and
+  provider icon consistency (unique SVG ids, optical padding).
+- HarnessIcon compiles with the mcode branch on every lineage.
+
 ## [0.1.70] - 2026-09-19
 
 ### Added
@@ -111,7 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native `.deb` and AppImage packaging, Ubuntu/Debian dependency helper (`npm run setup:linux:deb`), and Linux guide in `docs/linux.md`.
 - GPU terminal rendering with a master hardware-acceleration switch in Settings.
 
-[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.70...HEAD
+[Unreleased]: https://github.com/yanhenrique-dev/Monocode-linux/compare/v0.1.75...HEAD
+[0.1.75]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.75
 [0.1.70]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.70
 [0.1.67]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.67
 [0.1.61]: https://github.com/yanhenrique-dev/Monocode-linux/releases/tag/v0.1.61
