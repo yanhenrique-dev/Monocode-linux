@@ -1,4 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getIntlLocale } from "../lib/locale";
 import {
   Check,
   CheckCheck,
@@ -2346,7 +2347,7 @@ export function InboxDetail({
                     <span aria-hidden>·</span>
                     <time
                       dateTime={item.createdAt}
-                      title={new Date(item.createdAt).toLocaleString()}
+                      title={new Date(item.createdAt).toLocaleString(getIntlLocale())}
                     >
                       Created {formatRelativeTime(item.createdAt)}
                     </time>

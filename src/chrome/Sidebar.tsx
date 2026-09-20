@@ -38,6 +38,7 @@ import {
 } from "../lib/appearance";
 import { type GitFileDiffKind, type GitHistoryCommit } from "../lib/fs";
 import { IS_MAC, MOD } from "../lib/platform";
+import { getIntlLocale } from "../lib/locale";
 import { resolveModel } from "../lib/models";
 import type { OpenFileFn } from "../lib/search";
 import { sessionDisplayTitle } from "../lib/session";
@@ -2771,7 +2772,7 @@ function formatRelative(value: number, now: number): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(getIntlLocale(), {
       month: "short",
       day: "numeric",
     }).format(new Date(value));

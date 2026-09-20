@@ -1,10 +1,12 @@
+import type { LocaleKey } from "./locale";
+
 export const NOTIFICATION_CATEGORIES = [
-  { id: "pullRequests", label: "Pull requests / Merge requests" },
-  { id: "issues", label: "Issues and Linear tasks" },
-  { id: "agentFinished", label: "Agent finished" },
-  { id: "agentInput", label: "Agent approvals and questions" },
-  { id: "reminders", label: "Reminders" },
-] as const;
+  { id: "pullRequests", label: "settings.inbox.category.pull_requests" },
+  { id: "issues", label: "settings.inbox.category.issues" },
+  { id: "agentFinished", label: "settings.inbox.category.agent_finished" },
+  { id: "agentInput", label: "settings.inbox.category.agent_input" },
+  { id: "reminders", label: "settings.inbox.category.reminders" },
+] as const satisfies readonly { id: string; label: LocaleKey }[];
 
 export type NotificationCategory =
   (typeof NOTIFICATION_CATEGORIES)[number]["id"];

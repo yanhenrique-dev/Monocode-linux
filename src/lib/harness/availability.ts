@@ -12,6 +12,7 @@ import {
   resolvePiBinary,
 } from "./child";
 import { isLiveHarness } from "./registry";
+import { loadLocale, t, type Locale } from "../locale";
 
 export type HarnessAvailability = Record<HarnessId, boolean>;
 
@@ -89,10 +90,13 @@ export function isHarnessAvailable(id: HarnessId): boolean {
   return availability[id];
 }
 
-export function harnessUnavailableHint(id: HarnessId): string {
+export function harnessUnavailableHint(
+  id: HarnessId,
+  locale: Locale = loadLocale(),
+): string {
   const { name, install } = CLI[id];
   const how = install ? ` (\`${install}\`)` : "";
-  return `${name} not found${how}. Install it, or restart MonoCode if it is already installed.`;
+  return t(locale, "settings.providers.row.unavailable", { name, how });
 }
 
 export function probeHarnessAvailability(
