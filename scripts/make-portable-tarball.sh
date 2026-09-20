@@ -67,6 +67,7 @@ Dependências do sistema (Arch/CachyOS e derivadas):
     openssl librsvg zenity hicolor-icon-theme xdg-utils
 
 Instalar para o seu usuário (sem root):
+  mkdir -p ~/.local
   tar -xzf MonoCode_${VERSION}_amd64.tar.gz -C ~/.local --strip-components=1
   (binário em ~/.local/bin, launcher e ícones em ~/.local/share)
 
