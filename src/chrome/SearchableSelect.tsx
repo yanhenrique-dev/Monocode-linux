@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Check, ChevronDown, Search } from "./icons";
 import { Popover } from "./Popover";
+import { useLocale } from "../lib/locale";
 
 export type SearchableSelectOption = {
   value: string;
@@ -20,9 +21,9 @@ export function SearchableSelect({
   value,
   options,
   onChange,
-  placeholder = "Choose an option…",
-  searchPlaceholder = "Search options…",
-  emptyLabel = "No matching options",
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
   disabled = false,
   layer,
 }: {
@@ -36,6 +37,13 @@ export function SearchableSelect({
   disabled?: boolean;
   layer?: number;
 }) {
+  const { t } = useLocale();
+  const resolvedPlaceholder =
+    placeholder ?? t("settings.searchable_select.choose");
+  const resolvedSearchPlaceholder =
+    searchPlaceholder ?? t("settings.searchable_select.search");
+  const resolvedEmptyLabel =
+    emptyLabel ?? t("settings.searchable_select.empty");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -148,7 +156,7 @@ export function SearchableSelect({
         ref={trigger}
         type="button"
         disabled={disabled}
-        aria-label={`${label}: ${selected?.label ?? placeholder}`}
+        aria-label={`${label}: ${selected?.label ?? resolvedPlaceholder}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => (open ? close() : openMenu())}
@@ -163,7 +171,7 @@ export function SearchableSelect({
         <span
           className={`min-w-0 flex-1 truncate ${selected ? "text-content" : "text-content/40"}`}
         >
-          {selected?.label ?? placeholder}
+          {selected?.label ?? resolvedPlaceholder}
         </span>
         <ChevronDown
           className={`size-3.5 shrink-0 text-content/45 transition-transform ${open ? "rotate-180" : ""}`}
@@ -187,17 +195,17 @@ export function SearchableSelect({
         >
           <label className="flex h-11 shrink-0 items-center gap-2.5 border-b border-stroke px-3 text-content/45 focus-within:text-content/70">
             <Search className="size-4 shrink-0" strokeWidth={1.75} />
-            <span className="sr-only">{searchPlaceholder}</span>
+            <span className="sr-only">{resolvedSearchPlaceholder}</span>
             <input
               ref={search}
               role="combobox"
-              aria-label={searchPlaceholder}
+              aria-label={resolvedSearchPlaceholder}
               aria-expanded="true"
               aria-autocomplete="list"
               aria-controls={listId}
               aria-activedescendant={activeId}
               value={query}
-              placeholder={searchPlaceholder}
+              placeholder={resolvedSearchPlaceholder}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => {
@@ -249,7 +257,7 @@ export function SearchableSelect({
               })
             ) : (
               <p className="px-2.5 py-5 text-center text-[12px] text-content/45">
-                {emptyLabel}
+                {resolvedEmptyLabel}
               </p>
             )}
           </div>

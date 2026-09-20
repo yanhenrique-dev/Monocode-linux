@@ -9,6 +9,7 @@ import {
 import { prettyCwd, projectName } from "../lib/paths";
 import { type Worktree } from "../lib/worktrees";
 import { Modal } from "./Modal";
+import { useLocale } from "../lib/locale";
 import {
   CircleAlert,
   CloudUpload,
@@ -67,6 +68,7 @@ export function DeleteWorktreeDialog({
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
+  const { t } = useLocale();
   // The modal focuses its close button on mount, so claim focus on the next frame.
   useEffect(() => {
     const frame = requestAnimationFrame(() => input.current?.focus());
@@ -93,7 +95,7 @@ export function DeleteWorktreeDialog({
   };
   return (
     <Modal
-      title="Delete worktree?"
+      title={t("settings.worktrees.delete_title_confirm")}
       size="sm"
       onClose={() => {
         if (!busy) onClose();
@@ -104,7 +106,7 @@ export function DeleteWorktreeDialog({
         onSubmit={(e) => void submit(e)}
       >
         <p className="text-content/75">
-          This permanently deletes the working copy and everything inside it.
+          {t("settings.worktrees.delete_body")}
         </p>
         <div className="rounded-lg border border-content/10 bg-content/5 p-3">
           <p className="flex items-start gap-2.5 text-[12px] text-content/55">
@@ -119,41 +121,49 @@ export function DeleteWorktreeDialog({
                 icon={MessageSquare}
                 tone={deleteSessions ? "danger" : "muted"}
               >
-                {sessionCount} session{sessionCount === 1 ? "" : "s"} using this
-                worktree {sessionCount === 1 ? "is" : "are"}{" "}
+                {t(
+                  sessionCount === 1
+                    ? "settings.worktrees.sessions_using_one"
+                    : "settings.worktrees.sessions_using_other",
+                  { count: sessionCount },
+                )}{" "}
                 {deleteSessions
-                  ? "permanently deleted."
-                  : "kept. Select a branch or worktree to continue them."}
+                  ? t("settings.worktrees.sessions_deleted")
+                  : t("settings.worktrees.sessions_kept")}
               </Consequence>
             )}
             {tree.dirty && (
               <Consequence icon={FileDiff} tone="warn">
-                All uncommitted and untracked changes here are discarded.
+                {t("settings.worktrees.dirty_discarded")}
               </Consequence>
             )}
             {tree.dirty == null && (
               <Consequence icon={CircleAlert} tone="warn">
-                Changes could not be checked. Anything uncommitted here is
-                discarded.
+                {t("settings.worktrees.unchecked_discarded")}
               </Consequence>
             )}
             <Consequence icon={GitBranch}>
               {tree.branch ? (
                 <>
-                  The{" "}
+                  {t("settings.worktrees.branch_kept_prefix")}{" "}
                   <span className="font-medium text-content">
                     {tree.branch}
                   </span>{" "}
-                  branch and its commits are kept.
+                  {t("settings.worktrees.branch_kept")}
                 </>
               ) : (
-                "The branch is kept."
+                t("settings.worktrees.branch_kept_bare")
               )}
             </Consequence>
             {!!tree.unpushed && (
               <Consequence icon={CloudUpload}>
-                {tree.unpushed} commit{tree.unpushed === 1 ? " is" : "s are"}{" "}
-                not on a remote. They stay on the branch.
+                {t(
+                  tree.unpushed === 1
+                    ? "settings.worktrees.unpushed_one_short"
+                    : "settings.worktrees.unpushed_other_short",
+                  { count: tree.unpushed },
+                )}{" "}
+                {t("settings.worktrees.unpushed_kept")}
               </Consequence>
             )}
           </ul>
@@ -164,7 +174,7 @@ export function DeleteWorktreeDialog({
               id="delete-worktree-sessions-label"
               className="text-[12.5px] text-content/75"
             >
-              Also delete associated sessions
+              {t("settings.worktrees.delete_sessions_label")}
             </span>
             <button
               type="button"
@@ -183,12 +193,15 @@ export function DeleteWorktreeDialog({
         )}
         <label className="flex flex-col gap-1.5">
           <span className="text-[12.5px] text-content/70">
-            Type <span className="font-mono text-content">{folder}</span> to
-            confirm
+            {t("settings.worktrees.type_to_confirm_prefix")}{" "}
+            <span className="font-mono text-content">{folder}</span>{" "}
+            {t("settings.worktrees.type_to_confirm_suffix")}
           </span>
           <input
             ref={input}
-            aria-label={`Type ${folder} to confirm`}
+            aria-label={t("settings.worktrees.type_to_confirm_aria", {
+              name: folder,
+            })}
             className="h-9 rounded-md border border-content/10 bg-background-base px-2.5 font-mono text-[13px] outline-none placeholder:text-content/25 focus:border-content/25 disabled:opacity-50"
             value={confirmation}
             disabled={busy}
@@ -211,7 +224,7 @@ export function DeleteWorktreeDialog({
             onClick={onClose}
             className="rounded-md px-3 py-1.5 hover:bg-content/8 active:scale-[0.97]"
           >
-            Cancel
+            {t("settings.worktrees.cancel")}
           </button>
           <button
             type="submit"
@@ -220,8 +233,13 @@ export function DeleteWorktreeDialog({
           >
             {busy && <Loader className="size-3.5 animate-spin" />}
             {sessionCount && deleteSessions
-              ? `Delete worktree and session${sessionCount === 1 ? "" : "s"}`
-              : "Delete worktree"}
+              ? t(
+                  sessionCount === 1
+                    ? "settings.worktrees.delete_confirm_one"
+                    : "settings.worktrees.delete_confirm_other",
+                  { count: sessionCount },
+                )
+              : t("settings.worktrees.delete_title")}
           </button>
         </div>
       </form>

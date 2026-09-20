@@ -2092,8 +2092,8 @@ function AppearancePage({
 
       <Group
         id="pets"
-        title="Pets"
-        description="Draw your own project pets, hide the built-ins you never pick, and bring them back any time."
+        title={t("settings.appearance.pets.label")}
+        description={t("settings.appearance.pets.description")}
       >
         <PetsSettings />
       </Group>
@@ -2273,15 +2273,15 @@ function ChatBackgroundCard({
             />
           </Row>
           <Row
-            label="Background blur"
-            description="Soften the wallpaper so text stays readable. Zero disables it."
+            label={t("settings.appearance.background_blur.label")}
+            description={t("settings.appearance.background_blur.description")}
           >
             <Slider
-              label="Chat background blur"
+              label={t("settings.appearance.background_blur.slider")}
               value={appearance.chatBackgroundBlur}
               display={
                 appearance.chatBackgroundBlur === 0
-                  ? "Off"
+                  ? t("settings.appearance.background_blur.off")
                   : `${appearance.chatBackgroundBlur}px`
               }
               min={CHAT_BACKGROUND_BLUR_MIN}
@@ -2706,11 +2706,15 @@ function ArchivePage({
 
       {deletingSession ? (
         <ConfirmDialog
-          title={`Delete “${sessionDisplayTitle(
-            deletingSession.title,
-            deletingSession.harness,
-          )}”?`}
-          description="The conversation and its transcript are removed for good."
+          title={t("settings.archive.sessions.delete_title", {
+            name: sessionDisplayTitle(
+              deletingSession.title,
+              deletingSession.harness,
+            ),
+          })}
+          description={t("settings.archive.sessions.delete_description")}
+          confirmLabel={t("settings.archive.dialog.confirm")}
+          cancelLabel={t("settings.archive.dialog.cancel")}
           danger
           onCancel={() => setDeletingSession(null)}
           onConfirm={() => {
