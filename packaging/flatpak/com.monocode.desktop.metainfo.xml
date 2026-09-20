@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.monocode.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>MonoCode</name>
+  <summary>Desktop interface for your coding agents</summary>
+  <description>
+    <p>
+      MonoCode Linux is a desktop app (Tauri + React) that puts coding
+      agents — Claude Code, Codex, OpenCode, Cursor CLI, Grok Build, Pi,
+      omp, fx, Hermes Agent and MiniMax Code — in one interface. Tabs are
+      sessions, the composer is the input, and each provider runs on its
+      own subscription.
+    </p>
+    <p>
+      The Flatpak build runs the interface sandboxed and executes your
+      shells, provider CLIs and git on the host, so install at least one
+      provider CLI on the host before opening the app.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.monocode.desktop.desktop</launchable>
+  <developer id="com.monocode.desktop">
+    <name>yanhenrique-dev</name>
+  </developer>
+  <url type="homepage">https://github.com/yanhenrique-dev/Monocode-linux</url>
+  <url type="bugtracker">https://github.com/yanhenrique-dev/Monocode-linux/issues</url>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.70" date="2026-09-20">
+      <description>
+        <p>Linux distribution packaging: .deb artifact and Flatpak support.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,4 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
@@ -23,6 +24,26 @@ export type UpdaterSnapshot = {
 
 let pendingUpdate: Update | null = null;
 
+let flatpakCache: boolean | null = null;
+
+/// True inside the Flatpak sandbox, where the in-app updater is disabled
+/// (Flathub updates the whole package; the backend doesn't even register
+/// the updater plugin there). Cached after the first probe; falls back to
+/// false outside Tauri (web preview, unit tests).
+export async function isFlatpakSandbox(): Promise<boolean> {
+  if (flatpakCache !== null) return flatpakCache;
+  try {
+    flatpakCache = await invoke<boolean>("flatpak_sandboxed");
+  } catch {
+    flatpakCache = false;
+  }
+  return flatpakCache;
+}
+
+function flatpakIdle(currentVersion: string): UpdaterSnapshot {
+  return { phase: "idle", currentVersion };
+}
+
 function isUpdaterNotConfiguredError(error: unknown): boolean {
   const text = error instanceof Error ? error.message : String(error);
   return /updater does not have any endpoints set/i.test(text);
@@ -37,6 +58,7 @@ export async function readAppVersion(): Promise<string> {
 }
 
 export async function probeForUpdate(): Promise<Update | null> {
+  if (await isFlatpakSandbox()) return null;
   const update = await check();
   pendingUpdate = update;
   if (update) announceUpdateAvailable(update.version);
@@ -48,6 +70,17 @@ export async function runUpdateFlow(
   onProgress?: (snapshot: UpdaterSnapshot) => void,
 ): Promise<UpdaterSnapshot> {
   const currentVersion = await readAppVersion();
+  if (await isFlatpakSandbox()) {
+    const idle = flatpakIdle(currentVersion);
+    onProgress?.(idle);
+    if (manual) {
+      await message(
+        "Updates are managed by Flatpak. Update MonoCode from your software center or with `flatpak update`.",
+        { title: "MonoCode" },
+      );
+    }
+    return idle;
+  }
   const base: UpdaterSnapshot = { phase: "checking", currentVersion };
   onProgress?.(base);
 

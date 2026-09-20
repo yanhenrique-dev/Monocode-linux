@@ -388,7 +388,8 @@ pub fn harness_spawn(
     // Dropped (released) automatically when this command returns.
     let _spawn_guard = crate::worktree_lifecycle::reserve_spawn(&workdir)?;
 
-    let mut cmd = Command::new(&command);
+    // Inside Flatpak the CLI lives on the host: route through flatpak-spawn.
+    let mut cmd = crate::host::command(&command);
     cmd.args(&args)
         .current_dir(&workdir)
         .stdin(Stdio::piped())
@@ -803,7 +804,7 @@ pub async fn harness_exec(
 }
 
 fn exec_capture(command: &str, args: &[String], cwd: Option<&str>) -> Result<String, String> {
-    let mut cmd = Command::new(command);
+    let mut cmd = crate::host::command(command);
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -976,6 +977,17 @@ fn signal_tree(pid: u32, signal: TreeSignal) {
             TreeSignal::Term => libc::SIGTERM,
             TreeSignal::Kill => libc::SIGKILL,
         };
+        // Sandboxed children run on the host via flatpak-spawn: libc::kill
+        // cannot reach across the sandbox boundary.
+        if crate::host::in_flatpak() {
+            let name = match signal {
+                TreeSignal::Term => "TERM",
+                TreeSignal::Kill => "KILL",
+            };
+            crate::host::signal_host(pid, true, name);
+            crate::host::signal_host(pid, false, name);
+            return;
+        }
         let ipid = pid as i32;
         unsafe {
             // Every child is isolated with process_group(0), so its pid is the
@@ -1007,6 +1019,9 @@ fn signal_tree(pid: u32, signal: TreeSignal) {
 fn tree_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
+        if crate::host::in_flatpak() {
+            return crate::host::host_alive(pid);
+        }
         let ipid = pid as i32;
         unsafe { libc::kill(ipid, 0) == 0 || libc::kill(-ipid, 0) == 0 }
     }
@@ -1024,6 +1039,9 @@ fn process_alive(pid: u32) -> bool {
     }
     #[cfg(unix)]
     {
+        if crate::host::in_flatpak() {
+            return crate::host::host_alive(pid);
+        }
         unsafe { libc::kill(pid as i32, 0) == 0 }
     }
     #[cfg(not(unix))]
@@ -1169,6 +1187,23 @@ fn harness_parent_from_bytes(buf: &[u8]) -> Option<u32> {
 fn snapshot_processes() -> Vec<ProcessSnapshot> {
     #[cfg(target_os = "linux")]
     {
+        // The sandbox /proc cannot see host processes (where our sandboxed
+        // children actually run), so list them through the host instead.
+        if crate::host::in_flatpak() {
+            let mut rows: Vec<ProcessSnapshot> = crate::host::host_process_snapshot()
+                .into_iter()
+                .map(|(pid, ppid, args)| ProcessSnapshot {
+                    pid,
+                    ppid,
+                    args,
+                    harness_parent: None,
+                })
+                .collect();
+            // Same marker attach as the /proc path, resolved through the
+            // host: without it only legacy orphans would be reaped.
+            attach_markers_from_env(&mut rows);
+            return rows;
+        }
         snapshot_from_proc()
     }
     #[cfg(not(target_os = "linux"))]
@@ -1297,9 +1332,14 @@ fn parse_ps_pid_command(line: &str) -> Option<(u32, String)> {
 
 #[cfg(target_os = "linux")]
 fn read_harness_parents(pids: &[u32]) -> HashMap<u32, u32> {
+    let sandboxed = crate::host::in_flatpak();
     pids.iter()
         .filter_map(|pid| {
-            let buf = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
+            let buf = if sandboxed {
+                crate::host::read_host_environ(*pid)?
+            } else {
+                std::fs::read(format!("/proc/{pid}/environ")).ok()?
+            };
             Some((*pid, harness_parent_from_bytes(&buf)?))
         })
         .collect()
@@ -1595,7 +1635,7 @@ fn file_mentions_pi_coding_agent(path: &Path) -> bool {
 }
 
 fn help_mentions_rpc_mode(path: &Path) -> bool {
-    let mut cmd = Command::new(path);
+    let mut cmd = crate::host::command(path);
     cmd.arg("--help")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -1727,7 +1767,7 @@ fn file_mentions_mcode_agent(path: &Path) -> bool {
 /// as a secondary confirmation that this binary supports the Agent Client
 /// Protocol. Times out after 2 s and kills the child if it's still running.
 fn mcode_help_mentions_acp(path: &Path) -> bool {
-    let mut cmd = Command::new(path);
+    let mut cmd = crate::host::command(path);
     cmd.arg("acp")
         .arg("--help")
         .stdin(Stdio::null())
@@ -1793,7 +1833,7 @@ fn file_mentions_fx_agent(path: &Path) -> bool {
 }
 
 fn fx_help_mentions_acp(path: &Path) -> bool {
-    let mut cmd = Command::new(path);
+    let mut cmd = crate::host::command(path);
     cmd.arg("--help")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -1856,7 +1896,7 @@ fn file_mentions_grok_agent(path: &Path) -> bool {
 }
 
 fn grok_help_mentions_agent(path: &Path) -> bool {
-    let mut cmd = Command::new(path);
+    let mut cmd = crate::host::command(path);
     cmd.arg("--help")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -2238,7 +2278,8 @@ fn load_unix_login_shell_env() -> HashMap<String, String> {
             "/bin/bash".into()
         }
     });
-    let mut cmd = Command::new(&shell);
+    // The login shell (and its PATH) lives on the host when sandboxed.
+    let mut cmd = crate::host::command(&shell);
     cmd.args(["-lic", "printenv"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

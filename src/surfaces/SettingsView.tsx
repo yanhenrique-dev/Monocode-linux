@@ -255,6 +255,7 @@ import {
 } from "../lib/notifications";
 import {
   installPendingUpdate,
+  isFlatpakSandbox,
   readAppVersion,
   runUpdateFlow,
   type UpdaterSnapshot,
@@ -1542,12 +1543,17 @@ function UpdateRow({
   });
   const { t } = useLocale();
   const [holding, setHolding] = useState(false);
+  const [isFlatpak, setIsFlatpak] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void readAppVersion().then((currentVersion) => {
       if (cancelled) return;
       setSnapshot((current) => ({ ...current, currentVersion }));
+    });
+    void isFlatpakSandbox().then((sandboxed) => {
+      if (cancelled) return;
+      setIsFlatpak(sandboxed);
     });
     return () => {
       cancelled = true;
@@ -1581,8 +1587,10 @@ function UpdateRow({
     }
   };
 
-  const status =
-    snapshot.phase === "available"
+  // Sandboxed (Flatpak) builds have no self-updater: Flathub owns updates.
+  const status = isFlatpak
+    ? t("settings.general.update.flatpak")
+    : snapshot.phase === "available"
       ? t("settings.general.update.available", {
           availableVersion: snapshot.availableVersion ?? "",
         })
@@ -1620,18 +1628,20 @@ function UpdateRow({
         >
           {t("settings.general.update.whats_new")}
         </SecondaryButton>
-        <SecondaryButton onClick={() => void onClick()} disabled={busy}>
-          {busy ? (
-            <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
-          ) : hasUpdate ? (
-            <ArrowDownCircle className="size-3.5 text-accent" aria-hidden />
-          ) : (
-            <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
-          )}
-          {hasUpdate
-            ? t("settings.general.update.download")
-            : t("settings.general.update.check")}
-        </SecondaryButton>
+        {!isFlatpak && (
+          <SecondaryButton onClick={() => void onClick()} disabled={busy}>
+            {busy ? (
+              <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+            ) : hasUpdate ? (
+              <ArrowDownCircle className="size-3.5 text-accent" aria-hidden />
+            ) : (
+              <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
+            )}
+            {hasUpdate
+              ? t("settings.general.update.download")
+              : t("settings.general.update.check")}
+          </SecondaryButton>
+        )}
       </div>
     </Row>
   );

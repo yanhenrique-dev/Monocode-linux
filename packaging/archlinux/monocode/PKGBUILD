@@ -1,0 +1,79 @@
+# Maintainer: yanhenrique-dev <yanhenrique-dev at users dot noreply dot github dot com>
+# https://github.com/yanhenrique-dev/Monocode-linux
+#
+# Native build (compiles from source). For the prebuilt AppImage repack,
+# see packaging/aur/monocode-bin instead. The two packages conflict:
+# install one or the other.
+pkgname=monocode
+pkgver=0.1.70
+pkgrel=1
+pkgdesc="MonoCode Linux — interface desktop para agentes de código (Tauri + React)"
+arch=('x86_64')
+url="https://github.com/yanhenrique-dev/Monocode-linux"
+license=('MIT')
+provides=('monocode')
+conflicts=('monocode-bin')
+depends=('gtk3' 'webkit2gtk-4.1' 'libsoup3' 'libayatana-appindicator' 'openssl' 'librsvg' 'zenity' 'hicolor-icon-theme' 'xdg-utils')
+makedepends=('git' 'nodejs' 'npm' 'rust')
+# Nomes verificados no AUR em 19/09/2026; opencode/codex ainda sem pacote
+# oficial correspondente — reavaliar antes de adicionar optdepends novos.
+optdepends=(
+  'claude-code: provedor Claude Code'
+)
+source=("${pkgname}-${pkgver}::git+${url}.git#tag=v${pkgver}"
+        "monocode.desktop"
+        "LICENSE::${url}/raw/v${pkgver}/LICENSE")
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP')
+# A fonte VCS e os arquivos locais usam SKIP: o tarball da tag é resolvido
+# pelo makepkg no build. Troque para sums reais com `updpkgsums` se migrar
+# para tarballs de release.
+
+prepare() {
+  cd "${pkgname}-${pkgver}"
+  # Cargo/Rust honram o target dir do workspace (./target).
+  export CARGO_HOME="${srcdir}/cargo-home"
+  export CARGO_TARGET_DIR="${srcdir}/${pkgname}-${pkgver}/target"
+  # npm ci exige lockfile íntegro — falha cedo se package-lock.json e
+  # package.json divergirem.
+  npm ci
+}
+
+build() {
+  cd "${pkgname}-${pkgver}"
+  export CARGO_HOME="${srcdir}/cargo-home"
+  export CARGO_TARGET_DIR="${srcdir}/${pkgname}-${pkgver}/target"
+  # Frontend primeiro: o tauri-build embute ../dist no binário. O bundler
+  # do Tauri (.deb/AppImage) NÃO roda aqui — o empacotamento é o PKGBUILD.
+  npm run build
+  cargo build --release --locked --manifest-path src-tauri/Cargo.toml
+}
+
+check() {
+  cd "${pkgname}-${pkgver}"
+  export CARGO_HOME="${srcdir}/cargo-home"
+  export CARGO_TARGET_DIR="${srcdir}/${pkgname}-${pkgver}/target"
+  # Testes web não precisam de display; testes Rust ligam contra o
+  # webkit2gtk do sistema (já em depends/makedepends via webkit2gtk-4.1).
+  npm test
+  cargo test --release --locked
+}
+
+package() {
+  cd "${pkgname}-${pkgver}"
+  install -Dm755 "target/release/monocode" "${pkgdir}/usr/bin/monocode"
+
+  install -Dm644 "${srcdir}/monocode.desktop" \
+    "${pkgdir}/usr/share/applications/monocode.desktop"
+
+  install -Dm644 "src-tauri/icons/32x32.png" \
+    "${pkgdir}/usr/share/icons/hicolor/32x32/apps/monocode.png"
+  install -Dm644 "src-tauri/icons/128x128.png" \
+    "${pkgdir}/usr/share/icons/hicolor/128x128/apps/monocode.png"
+  install -Dm644 "src-tauri/icons/128x128@2x.png" \
+    "${pkgdir}/usr/share/icons/hicolor/256x256/apps/monocode.png"
+
+  install -Dm644 "${srcdir}/LICENSE" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

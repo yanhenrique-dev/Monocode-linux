@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => ({
   check: vi.fn(),
   downloadAndInstall: vi.fn(),
   getVersion: vi.fn(),
+  invoke: vi.fn(),
   message: vi.fn(),
   relaunch: vi.fn(),
   remember: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/app", () => ({ getVersion: mocks.getVersion }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   ask: vi.fn(),
   message: mocks.message,
@@ -26,6 +28,8 @@ beforeEach(() => {
   mocks.getVersion.mockResolvedValue("0.1.22");
   mocks.relaunch.mockResolvedValue(undefined);
   mocks.message.mockResolvedValue(undefined);
+  // Outside Tauri there is no backend: sandbox probe falls back to false.
+  mocks.invoke.mockRejectedValue(new Error("no tauri"));
 });
 
 async function updaterWithPendingUpdate() {
@@ -70,5 +74,30 @@ describe("installPendingUpdate", () => {
     expect((await updater.installPendingUpdate()).phase).toBe("idle");
     expect(mocks.remember).not.toHaveBeenCalled();
     expect(mocks.relaunch).not.toHaveBeenCalled();
+  });
+});
+
+describe("flatpak sandbox", () => {
+  it("skips the update check and reports idle", async () => {
+    mocks.invoke.mockResolvedValue(true);
+    const updater = await import("./updater");
+
+    expect(await updater.isFlatpakSandbox()).toBe(true);
+    expect(await updater.probeForUpdate()).toBeNull();
+
+    const result = await updater.runUpdateFlow(true);
+    expect(result.phase).toBe("idle");
+    expect(mocks.check).not.toHaveBeenCalled();
+    expect(mocks.message).toHaveBeenCalledOnce();
+  });
+
+  it("checks normally outside the sandbox", async () => {
+    mocks.invoke.mockResolvedValue(false);
+    mocks.check.mockResolvedValue(null);
+    const updater = await import("./updater");
+
+    expect(await updater.isFlatpakSandbox()).toBe(false);
+    expect(await updater.probeForUpdate()).toBeNull();
+    expect(mocks.check).toHaveBeenCalledOnce();
   });
 });

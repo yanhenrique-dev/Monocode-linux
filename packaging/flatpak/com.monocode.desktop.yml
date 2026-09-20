@@ -1,0 +1,97 @@
+# MonoCode Flatpak manifest (Flathub-ready).
+#
+# Local validation build (needs flatpak + flatpak-builder):
+#   flatpak-builder --install-deps-from=flathub --force-clean \
+#     builddir packaging/flatpak/com.monocode.desktop.yml
+#   flatpak-builder --run builddir \
+#     packaging/flatpak/com.monocode.desktop.yml monocode
+#
+# Flathub submission: copy this file (with the `monocode` module source
+# switched to the release tag, see below) to a new
+# `flathub/com.monocode.desktop` repository and open a PR. Flathub builds
+# and publishes from its own repo; this in-tree copy is the source of truth.
+#
+# NOTE: bump `tag` below together with every release (same step as the AUR
+# `pkgver` bump in packaging/aur).
+# Runtime pin: re-check at submission time — Flathub bounces EOL runtimes
+# (one-line bump here). GNOME 49 SDK still ships webkit2gtk-4.1, which the
+# Tauri backend links against.
+app-id: com.monocode.desktop
+runtime: org.gnome.Platform
+runtime-version: "49"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  # cargo + rustc for the Tauri backend (deterministic per runtime).
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: monocode
+
+finish-args:
+  # Standard display/audio/network access for an Electron-class desktop app.
+  - --share=ipc
+  - --share=network
+  # Wayland first, X11 only as fallback (per Flathub linter guidance —
+  # never ship both plain sockets).
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # MonoCode is an IDE/agent workspace: it opens, edits and runs the user's
+  # own projects, so it needs the whole home (narrower per-folder portals
+  # cannot work — the user picks arbitrary project directories at runtime).
+  - --filesystem=home
+  # Provider CLIs (claude, codex, opencode, …), the login shell, git and
+  # xdg-open all live on the host. The backend re-execs them via
+  # `flatpak-spawn --host` (see src-tauri/src/host.rs).
+  - --talk-name=org.freedesktop.Flatpak
+  # Session/reminder notifications via org.freedesktop.Notifications.
+  - --talk-name=org.freedesktop.Notifications
+
+build-options:
+  append-path: /app/node/bin:/usr/lib/sdk/rust-stable/bin
+  env:
+    # Keep build caches inside the sandbox build dir.
+    CARGO_HOME: /run/build/monocode/cargo-home
+    NPM_CONFIG_CACHE: /run/build/monocode/npm-cache
+
+modules:
+  # Node 20 only builds the web frontend (vite). Pinned tarball from nodejs.org.
+  - name: node
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/node
+      - tar -xJf node-v20.18.0-linux-x64.tar.xz -C /app/node --strip-components=1
+    sources:
+      - type: archive
+        url: https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.xz
+        sha256: 4543670b589593f8fa5f106111fd5139081da42bb165a9239f05195e405f240a
+
+  - name: monocode
+    buildsystem: simple
+    build-commands:
+      # Frontend first: tauri-build embeds ../dist into the binary at
+      # compile time, and the tauri CLI bundler is intentionally NOT run
+      # here (no .deb/AppImage inside a Flatpak).
+      - npm ci
+      - npm run build
+      - cargo build --release --locked --manifest-path src-tauri/Cargo.toml
+      - install -Dm755 target/release/monocode /app/bin/monocode
+      - install -Dm644 packaging/flatpak/com.monocode.desktop.desktop
+        /app/share/applications/com.monocode.desktop.desktop
+      - install -Dm644 packaging/flatpak/com.monocode.desktop.metainfo.xml
+        /app/share/metainfo/com.monocode.desktop.metainfo.xml
+      - install -Dm644 src-tauri/icons/32x32.png
+        /app/share/icons/hicolor/32x32/apps/com.monocode.desktop.png
+      - install -Dm644 src-tauri/icons/128x128.png
+        /app/share/icons/hicolor/128x128/apps/com.monocode.desktop.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png
+        /app/share/icons/hicolor/256x256/apps/com.monocode.desktop.png
+    sources:
+      # Flathub form (release tag). For local iteration builds, temporarily
+      # switch to: `type: dir, path: ../..`
+      - type: git
+        url: https://github.com/yanhenrique-dev/Monocode-linux.git
+        tag: v0.1.70
+        # Pinned commit for the tag above (clears the linter's
+        # no-commit-with-tag warning; bump together with `tag:`).
+        commit: 14267ddf1ab48bb419e19f75ec9f5259b89ed0d5
+        disable-shallow-clone: true

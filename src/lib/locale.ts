@@ -205,6 +205,8 @@ const en = {
   "settings.general.update.failed": "Update check failed.",
   "settings.general.update.idle":
     "MonoCode updates itself from the release feed.",
+  "settings.general.update.flatpak":
+    "Updates are managed by Flatpak.",
   "settings.general.update.whats_new": "What's new",
   "settings.general.update.download": "Download",
   "settings.general.update.check": "Check for updates",
@@ -815,6 +817,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.update.failed": "Falha ao verificar atualizações.",
   "settings.general.update.idle":
     "O MonoCode se atualiza pelo feed de lançamentos.",
+  "settings.general.update.flatpak":
+    "Atualizações gerenciadas pelo Flatpak.",
   "settings.general.update.whats_new": "Novidades",
   "settings.general.update.download": "Baixar",
   "settings.general.update.check": "Verificar atualizações",

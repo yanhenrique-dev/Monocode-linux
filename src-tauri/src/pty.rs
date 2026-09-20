@@ -251,13 +251,14 @@ fn spawn_unix(
     use std::fs::File;
     use std::os::unix::io::FromRawFd;
     use std::os::unix::process::CommandExt;
-    use std::process::Command;
 
     let workdir = working_dir(&cwd);
     let (shell, args) = default_shell();
     let (master, slave) = open_pty(cols, rows)?;
 
-    let mut cmd = Command::new(&shell);
+    // Inside Flatpak the user's shell lives on the host: fork flatpak-spawn
+    // and let it exec the host shell with our piped stdio.
+    let mut cmd = crate::host::command(&shell);
     cmd.args(&args)
         .current_dir(&workdir)
         .stdin(dup_stdio(slave)?)
@@ -517,6 +518,14 @@ fn hangup(pid: u32) {
     if pid == 0 || pid == 1 {
         return;
     }
+    // Sandboxed shells run on the host; a local kill cannot reach them.
+    // flatpak-spawn forwards the signal to the host child while the proxy
+    // is alive, and closing our stdio pipes delivers EOF to the shell.
+    if crate::host::in_flatpak() {
+        crate::host::signal_host(pid, false, "HUP");
+        crate::host::signal_host(pid, true, "HUP");
+        return;
+    }
     let ipid = pid as i32;
     unsafe {
         libc::kill(ipid, libc::SIGHUP);
@@ -530,6 +539,20 @@ fn terminate(pid: u32) {
     }
     #[cfg(unix)]
     {
+        // See hangup(): sandboxed shells live on the host.
+        if crate::host::in_flatpak() {
+            crate::host::signal_host(pid, false, "HUP");
+            crate::host::signal_host(pid, true, "HUP");
+            crate::host::signal_host(pid, false, "TERM");
+            crate::host::signal_host(pid, true, "TERM");
+            let escalate_pid = pid;
+            thread::spawn(move || {
+                thread::sleep(KILL_ESCALATE);
+                crate::host::signal_host(escalate_pid, false, "KILL");
+                crate::host::signal_host(escalate_pid, true, "KILL");
+            });
+            return;
+        }
         let ipid = pid as i32;
         unsafe {
             libc::kill(ipid, libc::SIGHUP);
@@ -700,6 +723,13 @@ fn wait_readable(fd: i32, timeout: Duration) -> bool {
 
 #[cfg(unix)]
 fn foreground_label(master_fd: i32, shell_pid: u32) -> Option<String> {
+    // The sandbox pty only ever sees the flatpak-spawn proxy: the real
+    // foreground process runs on the host in another pid namespace, so
+    // there is nothing meaningful to label. Degraded, documented in
+    // docs/flathub.md.
+    if crate::host::in_flatpak() {
+        return None;
+    }
     let mut pgrp: libc::pid_t = 0;
     if unsafe { libc::ioctl(master_fd, libc::TIOCGPGRP, &mut pgrp) } != 0 {
         return None;

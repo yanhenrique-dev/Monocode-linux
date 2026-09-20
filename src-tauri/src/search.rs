@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +68,7 @@ fn search_project_sync(options: &SearchOptions) -> Result<SearchResult, String> 
 }
 
 fn git_grep(root: &Path, options: &SearchOptions, query: &str) -> Option<SearchResult> {
-    let mut cmd = Command::new("git");
+    let mut cmd = crate::host::command("git");
     crate::hide_window_console(&mut cmd);
     cmd.arg("-C").arg(root).arg("grep").arg("-z").arg("-n");
     if !options.case_sensitive {
@@ -330,6 +329,7 @@ fn pathspecs(include: &Option<String>, exclude: &Option<String>) -> Vec<String> 
 mod tests {
     use super::*;
     use std::io::ErrorKind;
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 

@@ -24,7 +24,10 @@
     "tauri": "tauri",
     "tauri:stable": "tauri dev --no-watch --config src-tauri/tauri.stable.conf.json",
     "setup:linux": "bash scripts/install-linux-deps.sh",
-    "build:linux": "tauri build --bundles appimage"
+    "build:linux": "tauri build --bundles appimage",
+    "install:linux:desktop": "npm run build && cargo build --release && bash scripts/install-linux-desktop.sh",
+    "uninstall:linux:desktop": "bash scripts/install-linux-desktop.sh --uninstall",
+    "test:linux:installer": "bash scripts/test-linux-desktop-installer.sh"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

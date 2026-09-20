@@ -893,7 +893,7 @@ fn git_github_status_for() -> GitHubStatus {
             authenticated: false,
         };
     };
-    let mut cmd = Command::new(program);
+    let mut cmd = crate::host::command(program);
     cmd.args(["auth", "status", "--active", "--hostname", "github.com"])
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GH_PROMPT_DISABLED", "1")
@@ -3338,7 +3338,7 @@ fn gh_checked(root: &Path, args: &[&str]) -> Result<String, String> {
 fn gh_run(root: &Path, args: &[&str], allow_empty: bool) -> Result<String, String> {
     let program = crate::harness::resolve_gui_binary("gh")
         .ok_or_else(|| "GitHub CLI (`gh`) is not installed.".to_string())?;
-    let mut cmd = Command::new(&program);
+    let mut cmd = crate::host::command(&program);
     cmd.current_dir(root)
         .args(args)
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -3394,7 +3394,9 @@ pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, S
 }
 
 fn git_cmd() -> Command {
-    let mut cmd = Command::new("git");
+    // Central git constructor: sandboxed repos live under the shared home,
+    // git itself runs on the host so hooks, ssh and user config keep working.
+    let mut cmd = crate::host::command("git");
     crate::hide_window_console(&mut cmd);
     cmd
 }
