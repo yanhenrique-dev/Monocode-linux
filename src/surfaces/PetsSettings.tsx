@@ -13,6 +13,7 @@ import {
 } from "../lib/customPets";
 import { MASCOT_GRID, mascotPath } from "../lib/projectMascots";
 import { ProjectMascot } from "../chrome/ProjectMascot";
+import { useLocale } from "../lib/locale";
 
 const EMPTY_FRAME = [
   "........",
@@ -46,6 +47,7 @@ function PixelEditor({
   frame: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useLocale();
   const toggle = (y: number, x: number) => {
     const next = frame.map((row, rowIndex) =>
       rowIndex !== y
@@ -62,7 +64,7 @@ function PixelEditor({
   return (
     <div
       role="group"
-      aria-label="Pixel editor"
+      aria-label={t("settings.appearance.pets.pixel_editor")}
       className="grid shrink-0 grid-cols-8 gap-px rounded-md border border-content/10 bg-content/5 p-1"
     >
       {frame.map((row, y) =>
@@ -70,7 +72,15 @@ function PixelEditor({
           <button
             key={`${y}-${x}`}
             type="button"
-            aria-label={`Pixel row ${y + 1} column ${x + 1} ${cell === "#" ? "filled" : "empty"}`}
+            aria-label={t("settings.appearance.pets.pixel_aria", {
+              row: y + 1,
+              column: x + 1,
+              state: t(
+                cell === "#"
+                  ? "settings.appearance.pets.pixel_filled"
+                  : "settings.appearance.pets.pixel_empty",
+              ),
+            })}
             aria-pressed={cell === "#"}
             onClick={() => toggle(y, x)}
             className={`size-6 rounded-[2px] ${
@@ -92,13 +102,12 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
   const [frame, setFrame] = useState<"rest" | "talk">("rest");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const { t } = useLocale();
 
   const onSave = () => {
     const pet = validateCustomPet({ name, rest, talk }, taken);
     if (!pet) {
-      setError(
-        "Give it a unique name (letters, numbers, dashes) and keep both frames on the grid.",
-      );
+      setError(t("settings.appearance.pets.error_invalid"));
       setSaved(false);
       return;
     }
@@ -112,10 +121,9 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
 
   return (
     <div className="border-b border-content/5 px-4 py-3.5 last:border-b-0">
-      <div className="text-[13px] font-medium text-content">Add a pet</div>
+      <div className="text-[13px] font-medium text-content">{t("settings.appearance.pets.add_title")}</div>
       <p className="mt-1 text-[12px] leading-relaxed text-content/45">
-        Draw two 8×8 frames — resting and talking. Filled cells pick up the
-        project color everywhere the pet appears.
+        {t("settings.appearance.pets.add_description")}
       </p>
       <div className="mt-3 flex flex-wrap items-start gap-4">
         <PixelEditor
@@ -123,7 +131,7 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
           onChange={frame === "rest" ? setRest : setTalk}
         />
         <div className="flex min-w-44 flex-1 flex-col gap-2">
-          <div className="flex gap-1" role="group" aria-label="Frame">
+          <div className="flex gap-1" role="group" aria-label={t("settings.appearance.pets.frame_group")}>
             {(["rest", "talk"] as const).map((value) => (
               <button
                 key={value}
@@ -136,7 +144,11 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
                     : "text-content/50 hover:text-content"
                 }`}
               >
-                {value}
+                {t(
+                  value === "rest"
+                    ? "settings.appearance.pets.frame_rest"
+                    : "settings.appearance.pets.frame_talk",
+                )}
               </button>
             ))}
           </div>
@@ -148,18 +160,18 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Name your pet"
-              aria-label="Pet name"
+                placeholder={t("settings.appearance.pets.name_placeholder")}
+                aria-label={t("settings.appearance.pets.name_aria")}
               spellCheck={false}
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
             />
           </label>
           <div className="flex items-center gap-2">
-            <SecondaryButton onClick={onSave}>Save pet</SecondaryButton>
+            <SecondaryButton onClick={onSave}>{t("settings.appearance.pets.save")}</SecondaryButton>
             {saved ? (
               <span role="status" className="text-[12px] text-content/50">
-                Saved — pick it from any project menu.
+                {t("settings.appearance.pets.saved")}
               </span>
             ) : null}
           </div>
@@ -177,6 +189,7 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
 export function PetsSettings() {
   const [revision, setRevision] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const { t } = useLocale();
   useEffect(() => subscribePets(() => setRevision((value) => value + 1)), []);
 
   const pets = useMemo(() => effectivePets(), [revision]);
@@ -231,7 +244,7 @@ export function PetsSettings() {
                       : "text-content/40 hover:bg-content/10 hover:text-content"
                   }`}
                 >
-                  {confirming ? "Confirm?" : "Delete"}
+                  {confirming ? t("settings.appearance.pets.confirm") : t("settings.appearance.pets.delete")}
                 </button>
               ) : (
                 <button
@@ -239,7 +252,7 @@ export function PetsSettings() {
                   onClick={() => setPetHidden(pet.name, true)}
                   className="rounded px-1.5 py-0.5 text-[11px] text-content/40 hover:bg-content/10 hover:text-content"
                 >
-                  Hide
+                  {t("settings.appearance.pets.hide")}
                 </button>
               )}
             </div>
@@ -250,10 +263,12 @@ export function PetsSettings() {
         <div className="border-b border-content/5 px-4 py-3.5 last:border-b-0">
           <div className="flex items-center justify-between gap-2">
             <div className="text-[13px] font-medium text-content">
-              Hidden ({hidden.length})
+              {t("settings.appearance.pets.hidden_title", {
+                count: hidden.length,
+              })}
             </div>
             <SecondaryButton onClick={() => restoreHiddenPets()}>
-              Restore all
+              {t("settings.appearance.pets.restore_all")}
             </SecondaryButton>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -262,7 +277,7 @@ export function PetsSettings() {
                 key={name}
                 type="button"
                 onClick={() => setPetHidden(name, false)}
-                title={`Show ${name}`}
+                title={t("settings.appearance.pets.show_title", { name })}
                 className="flex items-center gap-1.5 rounded-md border border-content/10 px-2 py-1 text-[11px] text-content/50 opacity-60 hover:opacity-100"
               >
                 <ProjectMascot

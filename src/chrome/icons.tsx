@@ -78,6 +78,7 @@ import MessageMultiple01Icon from "@hugeicons/core-free-icons/MessageMultiple01I
 import MinusSignIcon from "@hugeicons/core-free-icons/MinusSignIcon";
 import MoreHorizontalIcon from "@hugeicons/core-free-icons/MoreHorizontalIcon";
 import Note01Icon from "@hugeicons/core-free-icons/Note01Icon";
+import Notification01Icon from "@hugeicons/core-free-icons/Notification01Icon";
 import PaintBoardIcon from "@hugeicons/core-free-icons/PaintBoardIcon";
 import PauseIcon from "@hugeicons/core-free-icons/PauseIcon";
 import PencilEdit01Icon from "@hugeicons/core-free-icons/PencilEdit01Icon";
@@ -214,6 +215,7 @@ export const GripVertical = wrap(DragDropVerticalIcon, "GripVertical");
 export const ImagePlus = wrap(ImageAdd01Icon, "ImagePlus");
 export const Inbox = wrap(InboxIcon, "Inbox");
 export const BellOff = wrap(NotificationOff01Icon, "BellOff");
+export const Bell = wrap(Notification01Icon, "Bell");
 export const Keyboard = wrap(KeyboardIcon, "Keyboard");
 export const ListBullet = wrap(LeftToRightListBulletIcon, "ListBullet");
 export const ListEnd = wrap(ListEndIcon, "ListEnd");

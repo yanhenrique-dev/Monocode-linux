@@ -442,6 +442,15 @@ export function SettingsView({
               {section === "general" ? (
                 <GeneralPage onOpenWhatsNew={onOpenWhatsNew} />
               ) : null}
+              {section === "notifications" ? (
+                <NotificationsPage
+                  cwd={cwd}
+                  recents={recents}
+                  notificationProjectPath={notificationProjectPath}
+                  notificationSettingsRequest={notificationSettingsRequest}
+                />
+              ) : null}
+              {section === "performance" ? <PerformancePage /> : null}
               {section === "appearance" ? (
                 <AppearancePage onRestoreReady={onRestoreAppearanceReady} />
               ) : null}
@@ -458,14 +467,7 @@ export function SettingsView({
                   onDeleteSessions={onDeleteWorktreeSessions}
                 />
               ) : null}
-              {section === "inbox" ? (
-                <InboxPage
-                  cwd={cwd}
-                  recents={recents}
-                  notificationProjectPath={notificationProjectPath}
-                  notificationSettingsRequest={notificationSettingsRequest}
-                />
-              ) : null}
+              {section === "inbox" ? <InboxPage /> : null}
               {section === "archive" ? (
                 <ArchivePage
                   cwd={cwd}
@@ -618,12 +620,6 @@ function GeneralPage({
 }: {
   onOpenWhatsNew: (version: string) => void;
 }) {
-  const [soundsEnabled, setSoundsEnabled] = useState(loadSoundsEnabled);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    loadNotificationsEnabled,
-  );
-  const [notificationPermission, setNotificationPermission] =
-    useState<NotificationPermission>(cachedNotificationPermission);
   const [notesEnabled, setNotesEnabled] = useState(loadNotesEnabled);
   const [reviewAdoptShell, setReviewAdoptShell] = useState(
     loadReviewAdoptShell,
@@ -632,35 +628,7 @@ function GeneralPage({
     loadLiveAgentsEnabled,
   );
   const [closeToTray, setCloseToTray] = useState(loadCloseToTray);
-  const [hardwareAcceleration, setHardwareAcceleration] = useState(
-    loadHardwareAcceleration,
-  );
-  const [terminalGpu, setTerminalGpu] = useState(loadTerminalGpu);
   const { locale, t } = useLocale();
-
-  // The user may flip the switch in System Settings and come back: re-read
-  // the OS state whenever the window regains focus while the toggle is on.
-  useEffect(() => {
-    if (!notificationsEnabled) return;
-    const refresh = () => {
-      void probeNotificationPermission().then(setNotificationPermission);
-    };
-    refresh();
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [notificationsEnabled]);
-
-  const onSoundsEnabled = (next: boolean) => {
-    saveSoundsEnabled(next);
-    setSoundsEnabled(next);
-  };
-
-  const onNotificationsEnabled = (next: boolean) => {
-    saveNotificationsEnabled(next);
-    setNotificationsEnabled(next);
-    if (!next) return;
-    void requestNotificationPermission().then(setNotificationPermission);
-  };
 
   const onNotesEnabled = (next: boolean) => {
     saveNotesEnabled(next);
@@ -682,16 +650,6 @@ function GeneralPage({
     setCloseToTray(next);
   };
 
-  const onHardwareAcceleration = (next: boolean) => {
-    saveHardwareAcceleration(next);
-    setHardwareAcceleration(next);
-  };
-
-  const onTerminalGpu = (next: boolean) => {
-    saveTerminalGpu(next);
-    setTerminalGpu(next);
-  };
-
   const onLanguage = (value: string) => {
     const next: Locale = value === "pt-BR" ? "pt-BR" : "en";
     saveLocale(next);
@@ -700,63 +658,6 @@ function GeneralPage({
 
   return (
     <>
-      <Group
-        title={t("settings.general.alerts.title")}
-        description={t("settings.general.alerts.description")}
-      >
-        <Row
-          id="sounds"
-          label={t("settings.general.sounds.label")}
-          description={t("settings.general.sounds.description")}
-        >
-          <Toggle
-            label={t("settings.general.sounds.toggle")}
-            on={soundsEnabled}
-            onChange={onSoundsEnabled}
-          />
-        </Row>
-        <Row
-          id="notifications"
-          label={t("settings.general.notifications.label")}
-          description={t("settings.general.notifications.description")}
-        >
-          {notificationsEnabled && notificationPermission === "denied" ? (
-            <NotificationsBlocked />
-          ) : null}
-          {notificationsEnabled && notificationPermission === "unsupported" ? (
-            <span className="text-[12px] text-content/45">
-              {t("settings.general.notifications.unsupported")}
-            </span>
-          ) : null}
-          <Toggle
-            label={t("settings.general.notifications.toggle")}
-            on={notificationsEnabled}
-            onChange={onNotificationsEnabled}
-          />
-        </Row>
-        <Row
-          id="language"
-          label={t("settings.general.language.label")}
-          description={t("settings.general.language.description")}
-        >
-          <Select
-            label={t("settings.general.language.label")}
-            value={locale}
-            options={[
-              {
-                value: "en",
-                label: t("settings.general.language.option.english"),
-              },
-              {
-                value: "pt-BR",
-                label: t("settings.general.language.option.portuguese"),
-              },
-            ]}
-            onChange={onLanguage}
-          />
-        </Row>
-      </Group>
-
       <Group
         title={t("settings.general.workspace.title")}
         description={t("settings.general.workspace.description")}
@@ -809,6 +710,151 @@ function GeneralPage({
         )}
       </Group>
 
+      <Group title={t("settings.general.about.title")}>
+        <UpdateRow onOpenWhatsNew={onOpenWhatsNew} />
+        <Row
+          id="language"
+          label={t("settings.general.language.label")}
+          description={t("settings.general.language.description")}
+        >
+          <Select
+            label={t("settings.general.language.label")}
+            value={locale}
+            options={[
+              {
+                value: "en",
+                label: t("settings.general.language.option.english"),
+              },
+              {
+                value: "pt-BR",
+                label: t("settings.general.language.option.portuguese"),
+              },
+            ]}
+            onChange={onLanguage}
+          />
+        </Row>
+      </Group>
+    </>
+  );
+}
+
+function NotificationsPage({
+  cwd,
+  recents,
+  notificationProjectPath,
+  notificationSettingsRequest,
+}: {
+  cwd: string;
+  recents?: RecentProject[];
+  notificationProjectPath?: string | null;
+  notificationSettingsRequest?: number;
+}) {
+  const [soundsEnabled, setSoundsEnabled] = useState(loadSoundsEnabled);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    loadNotificationsEnabled,
+  );
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission>(cachedNotificationPermission);
+  const revealed = useContext(RevealedSetting);
+  const { t } = useLocale();
+
+  // The user may flip the switch in System Settings and come back: re-read
+  // the OS state whenever the window regains focus while the toggle is on.
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    const refresh = () => {
+      void probeNotificationPermission().then(setNotificationPermission);
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [notificationsEnabled]);
+
+  const onSoundsEnabled = (next: boolean) => {
+    saveSoundsEnabled(next);
+    setSoundsEnabled(next);
+  };
+
+  const onNotificationsEnabled = (next: boolean) => {
+    saveNotificationsEnabled(next);
+    setNotificationsEnabled(next);
+    if (!next) return;
+    void requestNotificationPermission().then(setNotificationPermission);
+  };
+
+  return (
+    <>
+      <Group
+        title={t("settings.general.alerts.title")}
+        description={t("settings.general.alerts.description")}
+      >
+        <Row
+          id="sounds"
+          label={t("settings.general.sounds.label")}
+          description={t("settings.general.sounds.description")}
+        >
+          <Toggle
+            label={t("settings.general.sounds.toggle")}
+            on={soundsEnabled}
+            onChange={onSoundsEnabled}
+          />
+        </Row>
+        <Row
+          id="notifications"
+          label={t("settings.general.notifications.label")}
+          description={t("settings.general.notifications.description")}
+        >
+          {notificationsEnabled && notificationPermission === "denied" ? (
+            <NotificationsBlocked />
+          ) : null}
+          {notificationsEnabled && notificationPermission === "unsupported" ? (
+            <span className="text-[12px] text-content/45">
+              {t("settings.general.notifications.unsupported")}
+            </span>
+          ) : null}
+          <Toggle
+            label={t("settings.general.notifications.toggle")}
+            on={notificationsEnabled}
+            onChange={onNotificationsEnabled}
+          />
+        </Row>
+      </Group>
+
+      <div
+        id={settingDomId("project-notifications")}
+        data-setting-id="project-notifications"
+      >
+        <ProjectNotificationSettings
+          cwd={cwd}
+          recents={recents}
+          notificationProjectPath={notificationProjectPath}
+          notificationSettingsRequest={notificationSettingsRequest}
+          highlighted={revealed === "project-notifications"}
+        />
+      </div>
+    </>
+  );
+}
+
+function PerformancePage() {
+  const [hardwareAcceleration, setHardwareAcceleration] = useState(
+    loadHardwareAcceleration,
+  );
+  const [terminalGpu, setTerminalGpu] = useState(loadTerminalGpu);
+  const { t } = useLocale();
+
+  const onHardwareAcceleration = (next: boolean) => {
+    saveHardwareAcceleration(next);
+    setHardwareAcceleration(next);
+  };
+
+  const onTerminalGpu = (next: boolean) => {
+    saveTerminalGpu(next);
+    setTerminalGpu(next);
+  };
+
+  return (
+    <>
       <Group
         title={t("settings.general.performance.title")}
         description={t("settings.general.performance.description")}
@@ -836,10 +882,6 @@ function GeneralPage({
             disabled={!hardwareAcceleration}
           />
         </Row>
-      </Group>
-
-      <Group title={t("settings.general.about.title")}>
-        <UpdateRow onOpenWhatsNew={onOpenWhatsNew} />
       </Group>
     </>
   );
@@ -1069,33 +1111,10 @@ function ChatPage() {
   );
 }
 
-function InboxPage({
-  cwd,
-  recents,
-  notificationProjectPath,
-  notificationSettingsRequest,
-}: {
-  cwd: string;
-  recents?: RecentProject[];
-  notificationProjectPath?: string | null;
-  notificationSettingsRequest?: number;
-}) {
-  const revealed = useContext(RevealedSetting);
+function InboxPage() {
   const { t } = useLocale();
   return (
     <>
-      <div
-        id={settingDomId("project-notifications")}
-        data-setting-id="project-notifications"
-      >
-        <ProjectNotificationSettings
-          cwd={cwd}
-          recents={recents}
-          notificationProjectPath={notificationProjectPath}
-          notificationSettingsRequest={notificationSettingsRequest}
-          highlighted={revealed === "project-notifications"}
-        />
-      </div>
       <Group
         id="github"
         title={
@@ -2113,8 +2132,8 @@ function AppearancePage({
 
       <Group
         id="pets"
-        title="Pets"
-        description="Draw your own project pets, hide the built-ins you never pick, and bring them back any time."
+        title={t("settings.appearance.pets.label")}
+        description={t("settings.appearance.pets.description")}
       >
         <PetsSettings />
       </Group>
@@ -2294,15 +2313,15 @@ function ChatBackgroundCard({
             />
           </Row>
           <Row
-            label="Background blur"
-            description="Soften the wallpaper so text stays readable. Zero disables it."
+            label={t("settings.appearance.background_blur.label")}
+            description={t("settings.appearance.background_blur.description")}
           >
             <Slider
-              label="Chat background blur"
+              label={t("settings.appearance.background_blur.slider")}
               value={appearance.chatBackgroundBlur}
               display={
                 appearance.chatBackgroundBlur === 0
-                  ? "Off"
+                  ? t("settings.appearance.background_blur.off")
                   : `${appearance.chatBackgroundBlur}px`
               }
               min={CHAT_BACKGROUND_BLUR_MIN}
@@ -2727,11 +2746,15 @@ function ArchivePage({
 
       {deletingSession ? (
         <ConfirmDialog
-          title={`Delete “${sessionDisplayTitle(
-            deletingSession.title,
-            deletingSession.harness,
-          )}”?`}
-          description="The conversation and its transcript are removed for good."
+          title={t("settings.archive.sessions.delete_title", {
+            name: sessionDisplayTitle(
+              deletingSession.title,
+              deletingSession.harness,
+            ),
+          })}
+          description={t("settings.archive.sessions.delete_description")}
+          confirmLabel={t("settings.archive.dialog.confirm")}
+          cancelLabel={t("settings.archive.dialog.cancel")}
           danger
           onCancel={() => setDeletingSession(null)}
           onConfirm={() => {

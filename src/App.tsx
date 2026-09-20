@@ -1537,7 +1537,7 @@ const onSelectProviderAccount = useCallback(
             onSnooze={sessionReminders.schedule}
             onDismiss={sessionReminders.cancel}
             onRetry={sessionReminders.refresh}
-            onOpenSettings={() => openSettings("general", "notifications")}
+            onOpenSettings={() => openSettings("notifications", "notifications")}
             onHeightChange={setReminderNoticesHeight}
           />
           {whatsNewVersion ? (

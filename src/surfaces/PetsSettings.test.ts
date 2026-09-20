@@ -50,6 +50,9 @@ function click(label: string) {
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   localStorage.clear();
+  // These tests assert the English UI: pin the locale so a pt-BR OS does
+  // not translate the surface under test.
+  localStorage.setItem("monocode.locale", "en");
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

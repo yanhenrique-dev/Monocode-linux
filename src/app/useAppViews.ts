@@ -247,7 +247,7 @@ export function useAppViews(deps: AppViewsDeps) {
   const onOpenSettings = useCallback(() => openSettings(), [openSettings]);
 
   const onOpenNotificationSettings = useCallback((path?: string) => {
-    openSettings("inbox", "project-notifications");
+    openSettings("notifications", "project-notifications");
     setNotificationProjectPath(path ?? null);
     setNotificationSettingsRequest((request) => request + 1);
   }, [openSettings]);

@@ -102,7 +102,7 @@ describe("settings pages", () => {
       notificationProjectPath: "/repo",
       notificationSettingsRequest: 1,
     };
-    await render("inbox", shortcut);
+    await render("notifications", shortcut);
     const project = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Notification categories for work/app"]',
     )!;
@@ -126,7 +126,7 @@ describe("settings pages", () => {
     expect(document.activeElement).toBe(search);
     scroll.mockClear();
 
-    await render("inbox", { ...shortcut, notificationSettingsRequest: 2 });
+    await render("notifications", { ...shortcut, notificationSettingsRequest: 2 });
 
     expect.soft(project.getAttribute("aria-expanded")).toBe("true");
     expect.soft(scroll).toHaveBeenCalledWith({ block: "nearest" });
@@ -151,7 +151,7 @@ describe("settings pages", () => {
         paths: ["/repo"],
       },
     ]);
-    await render("inbox", {
+    await render("notifications", {
       anchor: "project-notifications",
       notificationProjectPath: "/repo",
     });
@@ -334,12 +334,12 @@ describe("settings search", () => {
     await render("general");
     await type("project notifications");
     expect(options().map((item) => item.textContent)).toEqual([
-      "Project notificationsInbox",
+      "Project notificationsNotifications",
     ]);
 
     await act(async () => options()[0]!.click());
-    expect(onSelectSection).toHaveBeenCalledWith("inbox");
-    await render("inbox");
+    expect(onSelectSection).toHaveBeenCalledWith("notifications");
+    await render("notifications");
     const section = container.querySelector(
       '[data-setting-id="project-notifications"]',
     );
@@ -363,10 +363,9 @@ describe("settings search", () => {
       options().map((item) => item.querySelector("span")!.textContent),
     ).toEqual([
       "Notifications",
+      "Notifications",
       "Project notifications",
       "Claude Code hooks",
-      "General",
-      "Inbox",
     ]);
   });
 
@@ -388,11 +387,18 @@ describe("settings search", () => {
 
   it("reveals a setting on the current page", async () => {
     await render("general");
-    await type("sounds");
+    await type("notes");
     await act(async () => options()[0]!.click());
     expect(onSelectSection).not.toHaveBeenCalled();
-    const row = container.querySelector('[data-setting-id="sounds"]')!;
+    const row = container.querySelector('[data-setting-id="notes"]')!;
     expect(row.className).toContain("bg-accent/10");
+  });
+
+  it("navigates to another page for a moved setting", async () => {
+    await render("general");
+    await type("sounds");
+    await act(async () => options()[0]!.click());
+    expect(onSelectSection).toHaveBeenCalledWith("notifications");
   });
 });
 

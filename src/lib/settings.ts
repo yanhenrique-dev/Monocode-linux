@@ -5,6 +5,8 @@ const SECTION_KEY = "monocode.settingsSection";
 
 export type SettingsSectionId =
   | "general"
+  | "notifications"
+  | "performance"
   | "appearance"
   | "keybindings"
   | "chat"
@@ -39,7 +41,23 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "settings.section.general.label",
     description: "settings.section.general.description",
     keywords:
-      "version update sounds notifications notes rail gpu hardware acceleration performance terminal language idioma portugues locale traducao translation",
+      "version update notes rail language idioma portugues locale traducao translation",
+  },
+  {
+    id: "notifications",
+    group: "app",
+    label: "settings.section.notifications.label",
+    description: "settings.section.notifications.description",
+    keywords:
+      "sounds notifications notify alert toast permission reminder background mute audio cue chime volume sons notificacoes notificar aviso permissao silenciar",
+  },
+  {
+    id: "performance",
+    group: "app",
+    label: "settings.section.performance.label",
+    description: "settings.section.performance.description",
+    keywords:
+      "gpu webgl terminal performance render slow lag desempenho aceleracao hardware",
   },
   {
     id: "appearance",
@@ -134,13 +152,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "sounds",
-    section: "general",
+    section: "notifications",
     label: "settings.general.sounds.label",
     keywords: "audio cue chime mute volume som mudo",
   },
   {
     id: "notifications",
-    section: "general",
+    section: "notifications",
     label: "settings.general.notifications.label",
     keywords: "notify alert toast permission reminder background notificar aviso permissao",
   },
@@ -171,13 +189,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "hardware-acceleration",
-    section: "general",
+    section: "performance",
     label: "settings.general.hardware_acceleration.label",
     keywords: "gpu webgl terminal performance render aceleracao hardware desempenho",
   },
   {
     id: "terminal-gpu",
-    section: "general",
+    section: "performance",
     label: "settings.general.terminal_gpu.label",
     keywords: "gpu webgl terminal performance render xterm",
   },
@@ -321,7 +339,7 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "project-notifications",
-    section: "inbox",
+    section: "notifications",
     label: "settings.inbox.project_notifications.title",
     keywords: "mute resume sounds banners reminders categories silenciar notificacoes",
   },
