@@ -949,6 +949,8 @@ export function useComposer(deps: ComposerDeps) {
             // The provider revert succeeded: now swap the local transcript to
             // the edited turn. It was left intact until now so a rejection
             // above leaves the old turn (and no duplicate prompt) in place.
+            // Pass the truncated state through untouched: generateHarnessTitle
+            // may have updated the title while the revert was in flight.
             setSessions((prev) =>
               prev.map((s) => {
                 if (s.id !== sessionId) return s;
@@ -956,12 +958,7 @@ export function useComposer(deps: ComposerDeps) {
                   ...s,
                   blocks: truncateBeforeLastUserTurn(s.blocks),
                 };
-                return appendUser(
-                  { ...truncated, title: isFirstTurn ? titleSeed : s.title },
-                  visibleText,
-                  visible,
-                  cards,
-                );
+                return appendUser(truncated, visibleText, visible, cards);
               }),
             );
           }
