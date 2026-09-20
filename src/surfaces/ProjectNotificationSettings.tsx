@@ -289,7 +289,7 @@ export function ProjectNotificationSettings({
                                   seed,
                                 )}
                                 name={resolveTabGroupMascot(key, groupMascots)}
-                                className="size-3"
+                                className="size-4 shrink-0"
                               />
                             ) : (
                               <Folder

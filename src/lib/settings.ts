@@ -157,6 +157,30 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "audio cue chime mute volume som mudo",
   },
   {
+    id: "sounds-turnFinished",
+    section: "notifications",
+    label: "settings.general.sounds.cue.turnFinished",
+    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo turno finished done flac m4a opus",
+  },
+  {
+    id: "sounds-inboxUnseen",
+    section: "notifications",
+    label: "settings.general.sounds.cue.inboxUnseen",
+    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo inbox activity atividade caixa entrada flac m4a opus",
+  },
+  {
+    id: "sounds-linkedActivity",
+    section: "notifications",
+    label: "settings.general.sounds.cue.linkedActivity",
+    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo linked pr issue atividade vinculada flac m4a opus",
+  },
+  {
+    id: "sounds-updateAvailable",
+    section: "notifications",
+    label: "settings.general.sounds.cue.updateAvailable",
+    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo update available atualizacao flac m4a opus",
+  },
+  {
     id: "notifications",
     section: "notifications",
     label: "settings.general.notifications.label",
