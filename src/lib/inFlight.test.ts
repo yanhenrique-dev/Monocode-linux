@@ -264,3 +264,22 @@ describe("shouldWriteInFlightSnapshot", () => {
     ).toBe(false);
   });
 });
+
+describe("markTurnInterrupted with a model-swap note", () => {
+  it("does not stack another interrupt note after the swap note", () => {
+    const swapped = chat("/tmp/a", {
+      busy: true,
+      blocks: [
+        { id: "u1", role: "user", text: "hello" },
+        {
+          id: "n1",
+          role: "system",
+          text: "Modelo x não está mais no catálogo; continuando com y.",
+        },
+      ],
+    });
+    const result = markTurnInterrupted(swapped);
+    expect(result.blocks).toHaveLength(2);
+    expect(result.busy).toBe(false);
+  });
+});

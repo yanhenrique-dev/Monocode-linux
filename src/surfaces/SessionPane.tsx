@@ -52,6 +52,11 @@ import {
   type AddToChatRequest,
   type QuoteRequest,
 } from "../lib/quoteDraft";
+import {
+  flushSessionDraft,
+  loadSessionDraft,
+  saveSessionDraft,
+} from "../lib/composerDraft";
 import { createNote, noteTitle } from "../lib/notes";
 import { loadNotesEnabled, subscribeNotesEnabled } from "../lib/settings";
 import { resolveModel } from "../lib/models";
@@ -410,6 +415,27 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
   const draftRef = useRef<string | undefined>(undefined);
+  // Persisted draft for this session, loaded once per pane mount. The Composer
+  // picks up late loads through its `initialDraft` sync effect. (porte #321)
+  const [restoredDraft, setRestoredDraft] = useState<string | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    draftRef.current = undefined;
+    setRestoredDraft(undefined);
+    void loadSessionDraft(session.id).then((text) => {
+      if (!cancelled && text) setRestoredDraft(text);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [session.id]);
+  useEffect(() => {
+    return () => {
+      void flushSessionDraft();
+    };
+  }, [session.id]);
   const composer = (
     <Composer
       enabled={visible}
@@ -436,12 +462,14 @@ const SessionPaneContent = memo(function SessionPaneContent({
       quoteRequest={quoteRequest}
       initialDraft={
         draftRef.current ??
+        restoredDraft ??
         (session.inboxCard || session.noteCard || session.handoffCard
           ? undefined
           : session.composerSeed)
       }
       onDraftChange={(text) => {
         draftRef.current = text;
+        saveSessionDraft(session.id, text);
       }}
       inboxCard={session.inboxCard}
       noteCard={session.noteCard}

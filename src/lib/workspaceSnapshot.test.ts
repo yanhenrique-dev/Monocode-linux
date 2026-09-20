@@ -19,6 +19,7 @@ import {
   collectWorkspaceSnapshot,
   hydrateWorkspaceSnapshot,
   parseWorkspaceSnapshot,
+  sessionFromStub,
 } from "./workspaceSnapshot";
 
 function chat(id: string, cwd: string): Session {
@@ -544,5 +545,25 @@ describe("hydrateWorkspaceSnapshot", () => {
     expect(
       workspace?.projectTerminals?.[0]?.pane.files[0]?.foreground,
     ).toBeUndefined();
+  });
+});
+
+describe("sessionFromStub", () => {
+  it("preserves an unknown model id and settings verbatim", () => {
+    const session = sessionFromStub({
+      id: "s-stub",
+      cwd: "/tmp/a",
+      harness: "opencode",
+      model: "opencode:removed-model-xyz",
+      modelSettings: { variant: "xhigh", custom: "keep" },
+      runtimeMode: "supervised",
+      title: "t",
+    });
+    // The old path routed through newSession/resolveModel and silently fell
+    // back to the harness default; the boot reconciliation owns that decision now.
+    expect(session.model).toBe("opencode:removed-model-xyz");
+    expect(session.modelSettings).toEqual({ variant: "xhigh", custom: "keep" });
+    expect(session.harness).toBe("opencode");
+    expect(session.blocks).toEqual([]);
   });
 });

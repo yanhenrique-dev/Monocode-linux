@@ -1,5 +1,6 @@
 import { leafIds, newTab, type WorkspaceTab } from "./layout";
 import type { ProjectTerminalDock } from "./projectTerminal";
+import { isModelSwapNotice } from "./restoredModel";
 import { sessionNeedsInput, type Session } from "./session";
 import { stopStreaming } from "./harness/apply";
 import type { ProjectReturnMemory } from "./projectReturn";
@@ -75,7 +76,10 @@ export function quitWhileBusyMessage(count: number): string {
  */
 export function markTurnInterrupted(session: Session): Session {
   const sealed = { ...sealOpenWork(stopStreaming(session)), busy: false };
-  if (lastBlockIsInterrupt(sealed)) return sealed;
+  const last = sealed.blocks[sealed.blocks.length - 1];
+  // A model-swap note appended after the interrupt already explains the
+  // state; stacking another interrupt note on the next quit would bury it.
+  if (lastBlockIsInterrupt(sealed) || isModelSwapNotice(last)) return sealed;
   return {
     ...sealed,
     blocks: [

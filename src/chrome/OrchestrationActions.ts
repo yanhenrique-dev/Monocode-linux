@@ -35,4 +35,6 @@ export const OrchestrationActions = createContext<{
   open(sessionId: string): void;
   /** Open every worker of a run as tabs beside the lead, not sidebar rows. */
   openAgents?(workers: OrchestrationWorkerDetail[]): void;
+  /** Stop a stuck turn (e.g. the session blocking a paused run's resume). */
+  stop?(sessionId: string): void;
 } | null>(null);

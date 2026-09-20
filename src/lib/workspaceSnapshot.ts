@@ -26,7 +26,6 @@ import type { InboxAskContext } from "./inboxAsk";
 import {
   HARNESSES,
   RUNTIME_MODES,
-  newSession,
   type HarnessId,
   type RuntimeMode,
   type Session,
@@ -323,18 +322,23 @@ function sessionStub(session: Session): WorkspaceSessionStub | null {
   };
 }
 
-function sessionFromStub(stub: WorkspaceSessionStub): Session {
-  const session = newSession(
-    stub.harness,
-    stub.cwd,
-    stub.model,
-    stub.runtimeMode,
-    stub.modelSettings,
-  );
+export function sessionFromStub(stub: WorkspaceSessionStub): Session {
+  // Stubs snapshot user state: keep the persisted model id and settings
+  // verbatim. Routing through newSession/resolveModel here would silently
+  // rewrite them (catalog fallback + global last-used settings) before the
+  // boot reconciliation in reconcileRestoredModel ever sees the originals.
+  const session: Session = {
+    id: stub.id,
+    harness: stub.harness,
+    model: stub.model,
+    modelSettings: { ...stub.modelSettings },
+    runtimeMode: stub.runtimeMode,
+    title: stub.title,
+    cwd: stub.cwd,
+    blocks: [],
+  };
   return {
     ...session,
-    id: stub.id,
-    title: stub.title,
     ...(stub.inboxAsk ? { inboxAsk: stub.inboxAsk } : {}),
     ...(stub.providerSessionId
       ? { providerSessionId: stub.providerSessionId }

@@ -123,6 +123,12 @@ import { latestTurnNeedsHarnessLogin } from "./lib/harness/authSupport";
 import { useAppShortcuts } from "./app/useAppShortcuts";
 import { useSessionSync } from "./app/useSessionSync";
 import { useOrchestration } from "./app/useOrchestration";
+import {
+  ADD_TO_CHAT_EVENT,
+  appendComposerInsert,
+  appendSelectionQuote,
+  type AddToChatRequest,
+} from "./lib/quoteDraft";
 
 // Register capabilities before composer hooks choose their discovery strategy.
 registerBuiltinHarnesses();
@@ -355,6 +361,41 @@ const onSelectProviderAccount = useCallback(
   projectCwdRef.current = projectCwd;
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
+  // Porte #325 (Fixes #311): com zero tabs nenhum SessionPane está montado e o
+  // evento add-to-chat seria descartado. O fallback cria tab+sessão seed
+  // (espelhando onCloseAllTabs) com o texto como composerSeed.
+  useEffect(() => {
+    const onAddToChatFallback = (event: Event) => {
+      if (tabsRef.current.length > 0) return;
+      const detail = (event as CustomEvent<AddToChatRequest>).detail;
+      if (!detail?.text) return;
+      const seedSession = sessionsRef.current[0] ?? sessionDefaults;
+      const seedText =
+        detail.mode === "plain"
+          ? appendComposerInsert("", detail.text)
+          : appendSelectionQuote("", detail.text);
+      const fallbackSession: Session = {
+        ...newSession(
+          seedSession?.harness ?? "claude",
+          sessionDefaults?.cwd ?? projectCwdRef.current,
+          seedSession?.model,
+          sessionDefaults?.runtimeMode,
+          seedSession?.modelSettings,
+        ),
+        composerSeed: seedText,
+      };
+      const fallbackTab = newTab(fallbackSession.id);
+      sessionsRef.current = [...sessionsRef.current, fallbackSession];
+      tabsRef.current = [...tabsRef.current, fallbackTab];
+      setSessions(sessionsRef.current);
+      setTabs(tabsRef.current);
+      setActiveTabId(fallbackTab.id);
+      setComposerFocused(true);
+    };
+    window.addEventListener(ADD_TO_CHAT_EVENT, onAddToChatFallback);
+    return () =>
+      window.removeEventListener(ADD_TO_CHAT_EVENT, onAddToChatFallback);
+  }, [sessionDefaults]);
   const searchViewOpenRef = useRef(searchViewOpen);
   searchViewOpenRef.current = searchViewOpen;
   const inboxViewOpenRef = useRef(inboxViewOpen);
@@ -892,6 +933,7 @@ const onSelectProviderAccount = useCallback(
     onSubmit,
     confirmingOrchestration,
     storedLinkedSessions,
+    onStopSession: onStop,
   });
   const {
     closeLinkedWorkItemPanel,
