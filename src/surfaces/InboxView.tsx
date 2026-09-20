@@ -1,5 +1,5 @@
+import { openExternalBestEffort } from "../lib/openExternal";
 import { getIntlLocale } from "../lib/locale";
-import { openExternalUrl } from "../lib/openExternal";
 import {
   Check,
   CheckCheck,
@@ -1225,7 +1225,7 @@ export function LinkedWorkItemPanel({
             </p>
             <button
               type="button"
-              onClick={() => void openExternalUrl(target.url)}
+              onClick={() => openExternalBestEffort(target.url)}
               className={ACTION_OUTLINE}
             >
               <ExternalLink className="size-3.5" strokeWidth={1.75} />
@@ -2262,7 +2262,7 @@ export function InboxDetail({
           type="button"
           title={externalActionLabel}
           aria-label={externalActionLabel}
-          onClick={() => void openExternalUrl(item.url)}
+          onClick={() => openExternalBestEffort(item.url)}
           className={`${ACTION_PANEL_HEADER} ml-auto shrink-0`}
         >
           <ExternalLink className="size-3.5" strokeWidth={1.75} />
@@ -2479,7 +2479,7 @@ export function InboxDetail({
                 {panel ? null : (
                   <button
                     type="button"
-                    onClick={() => void openExternalUrl(item.url)}
+                    onClick={() => openExternalBestEffort(item.url)}
                     className={ACTION_GHOST}
                   >
                     <ExternalLink className="size-3.5" strokeWidth={1.75} />

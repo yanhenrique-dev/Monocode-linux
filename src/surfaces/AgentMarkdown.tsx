@@ -1,7 +1,7 @@
 import { code } from "@streamdown/code";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   createContext,
   isValidElement,
@@ -233,9 +233,7 @@ function MarkdownLink({
         }
         event.preventDefault();
         if (href && /^https?:\/\//i.test(href)) {
-          void openExternalUrl(href).catch((error) => {
-            console.error("Failed to open web link:", error);
-          });
+          openExternalBestEffort(href);
         }
       }}
       onContextMenu={(event) => {

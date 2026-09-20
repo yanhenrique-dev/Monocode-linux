@@ -7,7 +7,7 @@ import { AgentMarkdown } from "./AgentMarkdown";
 const actions = vi.hoisted(() => ({
   copyText: vi.fn(async () => {}),
   openPath: vi.fn(async () => {}),
-  openUrl: vi.fn(async () => {}),
+  openExternalBestEffort: vi.fn(),
   revealPath: vi.fn(async () => {}),
 }));
 
@@ -16,7 +16,7 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 }));
 
 vi.mock("../lib/openExternal", () => ({
-  openExternalUrl: actions.openUrl,
+  openExternalBestEffort: actions.openExternalBestEffort,
 }));
 
 vi.mock("../lib/clipboard", () => ({
@@ -138,7 +138,7 @@ describe("AgentMarkdown file link context menu", () => {
     await act(async () => link.dispatchEvent(event));
 
     expect(event.defaultPrevented).toBe(true);
-    expect(actions.openUrl).toHaveBeenCalledWith("https://example.com/docs");
+    expect(actions.openExternalBestEffort).toHaveBeenCalledWith("https://example.com/docs");
     expect(props.onOpenFile).not.toHaveBeenCalled();
   });
 

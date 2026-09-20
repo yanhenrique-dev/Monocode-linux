@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   fetchLinkPreviewMetadata,
   type LinkPreviewMetadata,
@@ -37,9 +37,7 @@ export function UserLinkPreview({ link }: { link: UserLink }) {
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        void openExternalUrl(link.url).catch((error) => {
-          console.error("Failed to open web link:", error);
-        });
+        openExternalBestEffort(link.url);
       }}
     >
       <span className="mr-1 inline-flex size-4 items-center justify-center overflow-hidden rounded bg-background-base/50 align-[-0.125em] text-[9px] font-semibold uppercase text-content/55">

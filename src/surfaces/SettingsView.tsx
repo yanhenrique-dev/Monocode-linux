@@ -1,4 +1,4 @@
-import { openExternalUrl } from "../lib/openExternal";
+import { openExternalBestEffort } from "../lib/openExternal";
 import {
   ArrowDownCircle,
   Check,
@@ -1210,7 +1210,7 @@ function GithubSettings() {
         {!checking && !status?.installed ? (
           <SecondaryButton
             onClick={() => {
-              void openExternalUrl("https://cli.github.com/").catch(() => {});
+              openExternalBestEffort("https://cli.github.com/");
             }}
           >
             {t("settings.inbox.github.connection.installation_guide")}

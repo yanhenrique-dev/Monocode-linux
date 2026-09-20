@@ -228,14 +228,16 @@ function clip(text: string): string {
  * preamble shared by banners, finish announcements, and their sound
  * fallbacks.
  */
+export type SessionNotificationEntry = {
+  project: NotificationProject;
+  subject: NotificationSubject;
+};
+
 export function sessionNotificationSubject(
   session: Session,
   category: NotificationSubject["category"],
   occurredAt = Date.now(),
-): {
-  project: NotificationProject;
-  subject: NotificationSubject;
-} | null {
+): SessionNotificationEntry | null {
   if (session.inboxAsk) return null;
   const project = knownNotificationProject(session.cwd);
   if (!project) return null;
