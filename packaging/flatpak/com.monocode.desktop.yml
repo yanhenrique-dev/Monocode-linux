@@ -54,16 +54,24 @@ build-options:
     NPM_CONFIG_CACHE: /run/build/monocode/npm-cache
 
 modules:
-  # Node 20 only builds the web frontend (vite). Pinned tarball from nodejs.org.
+  # Node 20 only builds the web frontend (vite). Pinned tarballs from
+  # nodejs.org, one per Flatpak arch (Flathub builds x86_64 and aarch64).
   - name: node
     buildsystem: simple
     build-commands:
       - mkdir -p /app/node
-      - tar -xJf node-v20.18.0-linux-x64.tar.xz -C /app/node --strip-components=1
+      - tar -xJf node-$FLATPAK_ARCH.tar.xz -C /app/node --strip-components=1
     sources:
       - type: archive
+        only-arches: [x86_64]
         url: https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.xz
         sha256: 4543670b589593f8fa5f106111fd5139081da42bb165a9239f05195e405f240a
+        dest-filename: node-x86_64.tar.xz
+      - type: archive
+        only-arches: [aarch64]
+        url: https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-arm64.tar.xz
+        sha256: a9ce85675ba33f00527f6234d90000946c0936fb4fca605f1891bb5f4fe6fb0a
+        dest-filename: node-aarch64.tar.xz
 
   - name: monocode
     buildsystem: simple

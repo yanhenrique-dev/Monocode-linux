@@ -44,6 +44,22 @@ autentique antes de abrir o app (a mesma tabela de
   `flatpak-spawn --host kill`; órfãos de crash são varridos via `ps` do
   host com os mesmos markers (`MONOCODE_HARNESS_PARENT`).
 
+## Limitações conhecidas (antes da submissão ao Flathub)
+
+- **Dependências offline.** O sandbox de build do Flathub não tem rede:
+  a submissão exige manifestos de fontes npm/Cargo gerados
+  (`flatpak-node-generator`, `flatpak-cargo-generator`) e build 100%
+  offline. O manifesto atual baixa o repo + toolchain Node — suficiente
+  para iteração local, insuficiente para o Flathub.
+- **PID do proxy vs. PID do host.** `harness_spawn`/`spawn_unix`
+  guardam o `Child::id()` do proxy `flatpak-spawn`, mas `signal_host` e
+  `host_alive` usam esse número em `kill` no host — namespaces `/proc`
+  distintos, então o número pode não identificar o processo real (ou
+  identificar outro). Antes da submissão: protocolo explícito de PID
+  real (ex. wrapper que imprime o PID do host antes do `exec`) ou ciclo
+  de vida gerenciado pelo próprio proxy, e remover a dependência de
+  `MONOCODE_HARNESS_PARENT` quando ele carregar o PID do proxy.
+
 ## Validar localmente
 
 Pré-requisitos: `flatpak`, `flatpak-builder`, `appstreamcli`.

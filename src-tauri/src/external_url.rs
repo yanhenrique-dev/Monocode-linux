@@ -33,29 +33,55 @@ pub async fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(),
     if !is_allowed_url(&url) {
         return Err("refusing to open non-http(s) URL".into());
     }
-    open_url(&app, &url)
+    open_url(&app, &url).await
 }
 
 #[cfg(target_os = "linux")]
-fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
-    // Sandboxed: the host xdg-open dispatches to the host browser.
-    crate::host::command("xdg-open")
-        .arg(url)
-        // See the module docs: host helpers must not see our bundled libs.
-        .env_remove("LD_LIBRARY_PATH")
-        .status()
-        .map_err(|err| format!("failed to launch xdg-open: {err}"))
-        .and_then(|status| {
-            if status.success() {
-                Ok(())
-            } else {
-                Err(format!("xdg-open exited with {status}"))
+async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+    // Sandboxed: the host xdg-open dispatches to the host browser. The wait
+    // stays off the async runtime (spawn_blocking) and is bounded: a stuck
+    // helper is killed and reaped instead of leaking a thread per click.
+    let url = url.to_owned();
+    tauri::async_runtime::spawn_blocking(move || {
+        let child = crate::host::command("xdg-open")
+            .arg(&url)
+            // See the module docs: host helpers must not see our bundled libs.
+            .env_remove("LD_LIBRARY_PATH")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|err| format!("failed to launch xdg-open: {err}"))?;
+        wait_with_timeout(child, std::time::Duration::from_secs(15))
+    })
+    .await
+    .map_err(|err| format!("failed waiting for xdg-open: {err}"))?
+}
+
+#[cfg(target_os = "linux")]
+fn wait_with_timeout(
+    mut child: std::process::Child,
+    timeout: std::time::Duration,
+) -> Result<std::process::ExitStatus, String> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(25));
             }
-        })
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("xdg-open timed out after {}s", timeout.as_secs()));
+            }
+            Err(err) => return Err(format!("failed waiting for xdg-open: {err}")),
+        }
+    }
 }
 
 #[cfg(not(target_os = "linux"))]
-fn open_url(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
+async fn open_url(app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_url(url, None::<&str>)

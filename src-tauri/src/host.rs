@@ -131,6 +131,29 @@ fn parse_host_ps_row(line: &str) -> Option<(u32, u32, String)> {
     Some((pid, ppid, args))
 }
 
+/// Resolve `name` to an absolute path **on the host**, for use with
+/// `command()` inside the sandbox. A path resolved in the sandbox (e.g. via
+/// the login-shell-enriched GUI search path) may not exist on the host, so
+/// sandbox-side resolution must never feed host-side spawns. Off Linux (or
+/// without flatpak-spawn) the lookup simply fails and callers fall back.
+pub(crate) fn resolve_host_binary(name: &str) -> Option<String> {
+    let output = Command::new("flatpak-spawn")
+        .args(["--host", "sh", "-c", "command -v \"$1\"", "--", name])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let resolved = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if resolved.is_empty() {
+        return None;
+    }
+    Some(resolved)
+}
+
 /// Frontend probe: lets the web UI hide the in-app updater inside the
 /// sandbox (Flathub updates the whole package; a self-updater is forbidden).
 #[tauri::command]

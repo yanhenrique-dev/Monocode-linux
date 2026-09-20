@@ -29,7 +29,7 @@
   <releases>
     <release version="0.1.89" date="2026-09-20">
       <description>
-        <p>Linux distribution packaging: .deb artifact and Flatpak support.</p>
+        <p>Linux packaging and Flatpak support.</p>
       </description>
     </release>
   </releases>

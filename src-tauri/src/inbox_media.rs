@@ -261,10 +261,15 @@ fn path_has_dotdot(path: &str) -> bool {
 }
 
 fn github_auth_token() -> Option<String> {
-    let program = crate::harness::resolve_gui_binary("gh")?;
     let home = dirs_home()?;
-    // Sandboxed: `gh` runs on the host where the user's auth lives.
-    let mut cmd = crate::host::command(program);
+    // Sandboxed: `gh` runs on the host where the user's auth lives. Resolve
+    // on the host side — a sandbox-resolved absolute path may not exist
+    // there, and then the spawn would fail silently below.
+    let mut cmd = if crate::host::in_flatpak() {
+        crate::host::command(crate::host::resolve_host_binary("gh")?)
+    } else {
+        crate::host::command(crate::harness::resolve_gui_binary("gh")?)
+    };
     cmd.current_dir(&home)
         .args(["auth", "token"])
         .env("GIT_TERMINAL_PROMPT", "0")
