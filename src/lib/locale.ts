@@ -109,7 +109,13 @@ const en = {
   "settings.group.workspace": "Workspace",
   "settings.section.general.label": "General",
   "settings.section.general.description":
-    "The build you are running, how MonoCode reaches you, and the panels it shows.",
+    "The build you are running, and the panels it shows.",
+  "settings.section.notifications.label": "Notifications",
+  "settings.section.notifications.description":
+    "How MonoCode reaches you while you are looking somewhere else.",
+  "settings.section.performance.label": "Performance",
+  "settings.section.performance.description":
+    "How MonoCode uses your hardware: GPU fast paths and terminal rendering.",
   "settings.section.appearance.label": "Appearance",
   "settings.section.appearance.description":
     "Theme, tint, translucency, and the image behind your conversations.",
@@ -127,7 +133,7 @@ const en = {
     "Discover and manage file skills from project, personal, and harness folders.",
   "settings.section.inbox.label": "Inbox",
   "settings.section.inbox.description":
-    "Manage Inbox services and notification preferences for each project.",
+    "Connect the Inbox services that surface work alongside your sessions.",
   "settings.section.archive.label": "Archive",
   "settings.section.archive.description":
     "Projects and conversations you have archived.",
@@ -552,7 +558,13 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.group.workspace": "Espaço de trabalho",
   "settings.section.general.label": "Geral",
   "settings.section.general.description":
-    "A versão em execução, como o MonoCode avisa você e os painéis exibidos.",
+    "A versão em execução e os painéis exibidos.",
+  "settings.section.notifications.label": "Notificações",
+  "settings.section.notifications.description":
+    "Como o MonoCode avisa você quando você está olhando para outro lugar.",
+  "settings.section.performance.label": "Desempenho",
+  "settings.section.performance.description":
+    "Como o MonoCode usa seu hardware: recursos rápidos de GPU e renderização do terminal.",
   "settings.section.appearance.label": "Aparência",
   "settings.section.appearance.description":
     "Tema, matiz, translucidez e a imagem atrás das suas conversas.",
@@ -570,7 +582,7 @@ const ptBR: Record<LocaleKey, string> = {
     "Descubra e gerencie skills de arquivo das pastas do projeto, pessoais e do harness.",
   "settings.section.inbox.label": "Caixa de entrada",
   "settings.section.inbox.description":
-    "Gerencie serviços da Caixa de entrada e preferências de notificação por projeto.",
+    "Conecte os serviços da Caixa de entrada que mostram trabalho ao lado das suas sessões.",
   "settings.section.archive.label": "Arquivo",
   "settings.section.archive.description":
     "Projetos e conversas que você arquivou.",

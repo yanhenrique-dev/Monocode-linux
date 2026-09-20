@@ -1,8 +1,10 @@
 import {
   Archive,
   ArrowLeft,
+  Bell,
   Bot,
   FolderTree,
+  Gauge,
   Inbox,
   Keyboard,
   MessageSquare,
@@ -20,6 +22,8 @@ import { useLocale } from "../lib/locale";
 
 const SECTION_ICONS: Record<SettingsSectionId, IconComponent> = {
   general: SlidersHorizontal,
+  notifications: Bell,
+  performance: Gauge,
   appearance: Palette,
   keybindings: Keyboard,
   chat: MessageSquare,
