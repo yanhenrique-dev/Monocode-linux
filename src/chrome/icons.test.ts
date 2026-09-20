@@ -63,4 +63,13 @@ describe("hugeicons imports", () => {
     expect(html).toContain("size-[72%]");
   });
 
+  it("renders the MiniMax mark for the mcode harness", () => {
+    const html = renderToStaticMarkup(
+      createElement(HarnessIcon, {
+        harness: "mcode",
+        className: "size-4 shrink-0",
+      }),
+    );
+    expect(html).toContain("M2%200H10L14.5");
+  });
 });
