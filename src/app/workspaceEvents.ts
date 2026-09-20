@@ -2,6 +2,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import type { HarnessEvent } from "../lib/harness";
 import { isEditTool } from "../lib/harness/preview";
 import {
+  adoptSessionCheckpoint,
   captureSessionCheckpoint,
   notifyReviewChanged,
   prepareSessionCheckpoint,
@@ -11,6 +12,7 @@ import { notifyDirsChanged } from "../lib/fileTree";
 import { nudgeWatchedFiles } from "../lib/fileWatch";
 import { notifyGitChanged } from "../lib/fs";
 import { resolveWorkspacePath } from "../lib/paths";
+import { loadReviewAdoptShell } from "../lib/settings";
 
 export type ScheduledFlush = { kind: "raf" | "timeout"; id: number };
 
@@ -95,7 +97,11 @@ export function scheduleNudge(cwd?: string) {
   nudgeTimer = setTimeout(flushNudge, 150);
 }
 
-export function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
+export function nudgeOpenEditors(
+  event: HarnessEvent,
+  cwd: string,
+  sessionId?: string,
+) {
   if (event.type !== "tool.updated") return;
   const completed = event.status === "completed" || event.status === "success";
 
@@ -103,6 +109,13 @@ export function nudgeOpenEditors(event: HarnessEvent, cwd: string) {
   if (kind === "execute" || event.preview?.kind === "shell") {
     if (!completed) return;
     scheduleNudge(cwd);
+    // Opt-in heuristic: pull shell-made file changes into this session's
+    // review card. Adopted entries are never exact nor undoable.
+    if (sessionId && loadReviewAdoptShell()) {
+      void adoptSessionCheckpoint(sessionId, cwd)
+        .catch(() => undefined)
+        .then(() => notifyReviewChanged(sessionId));
+    }
     return;
   }
 

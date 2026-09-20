@@ -216,6 +216,7 @@ import {
   loadLiveAgentsEnabled,
   loadModelControls,
   loadNotesEnabled,
+  loadReviewAdoptShell,
   loadTerminalGpu,
   saveClaudeHooks,
   saveCloseToTray,
@@ -226,6 +227,7 @@ import {
   saveLiveAgentsEnabled,
   saveModelControls,
   saveNotesEnabled,
+  saveReviewAdoptShell,
   saveTerminalGpu,
   searchSettings,
   settingsSectionDescription,
@@ -623,6 +625,9 @@ function GeneralPage({
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>(cachedNotificationPermission);
   const [notesEnabled, setNotesEnabled] = useState(loadNotesEnabled);
+  const [reviewAdoptShell, setReviewAdoptShell] = useState(
+    loadReviewAdoptShell,
+  );
   const [liveAgentsEnabled, setLiveAgentsEnabled] = useState(
     loadLiveAgentsEnabled,
   );
@@ -660,6 +665,11 @@ function GeneralPage({
   const onNotesEnabled = (next: boolean) => {
     saveNotesEnabled(next);
     setNotesEnabled(next);
+  };
+
+  const onReviewAdoptShell = (next: boolean) => {
+    saveReviewAdoptShell(next);
+    setReviewAdoptShell(next);
   };
 
   const onLiveAgentsEnabled = (next: boolean) => {
@@ -771,6 +781,17 @@ function GeneralPage({
             label={t("settings.general.working_agents.toggle")}
             on={liveAgentsEnabled}
             onChange={onLiveAgentsEnabled}
+          />
+        </Row>
+        <Row
+          id="session-review-shell"
+          label={t("settings.general.session_review_shell.label")}
+          description={t("settings.general.session_review_shell.description")}
+        >
+          <Toggle
+            label={t("settings.general.session_review_shell.toggle")}
+            on={reviewAdoptShell}
+            onChange={onReviewAdoptShell}
           />
         </Row>
         {IS_WIN && (

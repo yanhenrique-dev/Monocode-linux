@@ -392,6 +392,7 @@ pub fn run() {
             checkpoint::session_checkpoint_ensure,
             checkpoint::session_checkpoint_prepare,
             checkpoint::session_checkpoint_capture,
+            checkpoint::session_checkpoint_adopt,
             checkpoint::session_checkpoint_status,
             checkpoint::session_checkpoint_file_diff,
             checkpoint::session_checkpoint_undo,

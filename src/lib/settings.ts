@@ -163,6 +163,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "live running sessions rail card agentes ativos",
   },
   {
+    id: "session-review-shell",
+    section: "general",
+    label: "settings.general.session_review_shell.label",
+    keywords:
+      "session review changes shell terminal command adopt review diff sessao revisao alteracoes shell terminal comando",
+  },
+  {
     id: "hardware-acceleration",
     section: "general",
     label: "settings.general.hardware_acceleration.label",
@@ -640,6 +647,48 @@ export function subscribeLiveAgentsEnabled(onStoreChange: () => void) {
 }
 
 const CLOSE_TO_TRAY_KEY = "monocode.closeToTray";
+
+const REVIEW_ADOPT_SHELL_KEY = "monocode.reviewAdoptShell";
+
+/** Adopt shell-made file changes into session review. Off by default: in a
+ * shared project the shell delta may contain bytes written by another
+ * session, so adopted entries are never exact nor undoable. */
+export const REVIEW_ADOPT_SHELL_DEFAULT = false;
+
+/** Fired on `window` when the shell-adopt review setting flips. */
+export const REVIEW_ADOPT_SHELL_CHANGE_EVENT =
+  "monocode:review-adopt-shell-change";
+
+export function loadReviewAdoptShell(): boolean {
+  try {
+    const raw = localStorage.getItem(REVIEW_ADOPT_SHELL_KEY);
+    if (raw == null) return REVIEW_ADOPT_SHELL_DEFAULT;
+    return raw === "1" || raw === "true";
+  } catch {
+    return REVIEW_ADOPT_SHELL_DEFAULT;
+  }
+}
+
+export function saveReviewAdoptShell(value: boolean) {
+  try {
+    localStorage.setItem(REVIEW_ADOPT_SHELL_KEY, value ? "1" : "0");
+  } catch {
+    // private mode / quota
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<boolean>(REVIEW_ADOPT_SHELL_CHANGE_EVENT, {
+      detail: value,
+    }),
+  );
+}
+
+export function subscribeReviewAdoptShell(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
+}
 
 export const CLOSE_TO_TRAY_DEFAULT = true;
 
