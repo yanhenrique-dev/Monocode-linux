@@ -240,6 +240,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "zoom font size bigger smaller ui",
   },
   {
+    id: "pets",
+    section: "appearance",
+    label: "Pets",
+    keywords: "mascot pets pixel sprite hide custom draw",
+  },
+  {
     id: "chat-background",
     section: "appearance",
     label: "Chat background",
