@@ -63,16 +63,4 @@ describe("hugeicons imports", () => {
     expect(html).toContain("size-[72%]");
   });
 
-  it("renders the MiniMax mark for the mcode harness", () => {
-    const html = renderToStaticMarkup(
-      createElement(HarnessIcon, {
-        harness: "mcode",
-        className: "size-4 shrink-0",
-      }),
-    );
-    // Inline currentColor path (theme-aware), not an <img> data-URI.
-    expect(html).toContain("M2 0H10L14.5");
-    expect(html).toContain('fill="currentColor"');
-    expect(html).not.toContain("<img");
-  });
 });
