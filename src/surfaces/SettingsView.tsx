@@ -241,6 +241,7 @@ import {
 } from "../lib/updater";
 
 import { SkillsPage } from "./SkillsPage";
+import { PetsSettings } from "./PetsSettings";
 import { ProjectNotificationSettings } from "./ProjectNotificationSettings";
 
 /**
@@ -1883,6 +1884,14 @@ function AppearancePage({
       </Group>
 
       <ChatBackgroundCard appearance={appearance} />
+
+      <Group
+        id="pets"
+        title="Pets"
+        description="Draw your own project pets, hide the built-ins you never pick, and bring them back any time."
+      >
+        <PetsSettings />
+      </Group>
 
       <Group title="Layout">
         <Row
