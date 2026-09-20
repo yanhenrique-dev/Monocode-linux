@@ -42,7 +42,7 @@ async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     // stays off the async runtime (spawn_blocking) and is bounded: a stuck
     // helper is killed and reaped instead of leaking a thread per click.
     let url = url.to_owned();
-    tauri::async_runtime::spawn_blocking(move || {
+    let status = tauri::async_runtime::spawn_blocking(move || {
         let child = crate::host::command("xdg-open")
             .arg(&url)
             // See the module docs: host helpers must not see our bundled libs.
@@ -55,7 +55,12 @@ async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
         wait_with_timeout(child, std::time::Duration::from_secs(15))
     })
     .await
-    .map_err(|err| format!("failed waiting for xdg-open: {err}"))?
+    .map_err(|err| format!("failed waiting for xdg-open: {err}"))??;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("xdg-open exited with {status}"))
+    }
 }
 
 #[cfg(target_os = "linux")]
