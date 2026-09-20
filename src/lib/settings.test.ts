@@ -346,6 +346,8 @@ describe("settings navigation", () => {
     ]);
     expect(groups.flatMap((group) => group.sections.map((s) => s.id))).toEqual([
       "general",
+      "notifications",
+      "performance",
       "appearance",
       "keybindings",
       "chat",
