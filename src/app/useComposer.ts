@@ -127,7 +127,60 @@ export interface ComposerDeps {
   setSessions: Dispatch<SetStateAction<Session[]>>;
   enqueueHarnessEvent: (sessionId: string, event: HarnessEvent) => void;
   flushHarnessEvents: () => void;
-  dismissNoticesForContinuedSession: (sessionId: string) => void;
+    dismissNoticesForContinuedSession: (sessionId: string) => void;
+}
+
+/** Extract Method: the empty-submit guard reads as one named predicate. */
+function isEmptySubmit(
+    text: string,
+    attachments: Attachment[],
+    noteCard: NoteComposerCard | undefined,
+    handoffCard: HandoffComposerCard | undefined,
+): boolean {
+    return (
+        !text.trim() &&
+        attachments.length === 0 &&
+        !noteCard &&
+        !handoffCard
+    );
+}
+
+/** Extract Method: approved-plan lookup for the build intent. */
+function findApprovedPlanBlock(
+    session: Session,
+    planBlockId: string | undefined,
+) {
+    if (!planBlockId) return undefined;
+    return session.blocks.find(
+        (block) => block.id === planBlockId && block.role === "plan",
+    );
+}
+
+/** Extract Method: pure availability predicate; event emission stays at the call site. */
+function isManagedSubmitBlocked(
+    target: Session | undefined,
+    removing: Set<string>,
+    sessionId: string,
+): boolean {
+    return (
+        !target ||
+        !!target.busy ||
+        !!target.pendingSwitch ||
+        (!!target && isPreparingHandoff(target)) ||
+        removing.has(sessionId)
+    );
+}
+
+/** Extract Method: orchestration-run check; emission stays at the call site. */
+function activeOrchestrationError(sessionId: string): string | null {
+    try {
+        const run = orchestrator.forSession(sessionId);
+        if (run && ["active", "paused"].includes(run.status))
+            return "Stop the current orchestration run before preparing another proposal.";
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    }
+    return null;
 }
 
 export function useComposer(deps: ComposerDeps) {
@@ -243,11 +296,11 @@ export function useComposer(deps: ComposerDeps) {
       if (options?.managed) {
         const target = sessionsRef.current.find((s) => s.id === sessionId);
         if (
-          !target ||
-          target.busy ||
-          target.pendingSwitch ||
-          isPreparingHandoff(target) ||
-          removingSessionIds.current.has(sessionId)
+          isManagedSubmitBlocked(
+            target,
+            removingSessionIds.current,
+            sessionId,
+          )
         ) {
           options.onSettled?.({
             status: "failed",
@@ -265,27 +318,20 @@ export function useComposer(deps: ComposerDeps) {
         : storedCurrent;
       const intent = options?.intent ?? "default";
       if (intent === "orchestrate") {
-        try {
-          const run = orchestrator.forSession(sessionId);
-          if (run && ["active", "paused"].includes(run.status))
-            throw new Error(
-              "Stop the current orchestration run before preparing another proposal.",
-            );
-        } catch (error) {
+        const orchestrationError = activeOrchestrationError(sessionId);
+        if (orchestrationError) {
           enqueueHarnessEvent(sessionId, {
             type: "status",
-            text: error instanceof Error ? error.message : String(error),
+            text: orchestrationError,
           });
           flushHarnessEvents();
           return false;
         }
       }
-      const approvedPlan = options?.planBlockId
-        ? current.blocks.find(
-            (block) =>
-              block.id === options.planBlockId && block.role === "plan",
-          )
-        : undefined;
+      const approvedPlan = findApprovedPlanBlock(
+        current,
+        options?.planBlockId,
+      );
       if (intent === "build" && !approvedPlan?.text.trim()) return false;
       if (options?.queuedMessageId) {
         const mode =
@@ -300,12 +346,7 @@ export function useComposer(deps: ComposerDeps) {
         options && "handoffCard" in options
           ? options.handoffCard
           : current.handoffCard;
-      if (
-        !text.trim() &&
-        attachments.length === 0 &&
-        !noteCard &&
-        !handoffCard
-      ) {
+      if (isEmptySubmit(text, attachments, noteCard, handoffCard)) {
         return false;
       }
       if (isPreparingHandoff(current)) return false;
