@@ -130,6 +130,13 @@ export interface ComposerDeps {
     dismissNoticesForContinuedSession: (sessionId: string) => void;
 }
 
+/** Phase 3 (clean-code): names the deliberate fire-and-forget swallows below.
+ * Policy: only non-fatal side effects may ignore rejections, and only through
+ * this helper — everything else propagates into ControlOutcome. */
+function ignoreRejection(): undefined {
+    return undefined;
+}
+
 /** Extract Method: the empty-submit guard reads as one named predicate. */
 function isEmptySubmit(
     text: string,
@@ -655,7 +662,7 @@ export function useComposer(deps: ComposerDeps) {
               }),
             );
           })
-          .catch(() => undefined);
+            .catch(ignoreRejection);
       }
 
       if (!live) {
@@ -742,7 +749,7 @@ export function useComposer(deps: ComposerDeps) {
                 ),
               );
             })
-            .catch(() => undefined);
+          .catch(ignoreRejection);
         }
         if (proposalDraft && proposalId) {
           const settings = await discoverOrchestrationSettings();
@@ -781,6 +788,8 @@ export function useComposer(deps: ComposerDeps) {
                 userRequest: text,
               });
             } catch {
+              // Deliberate: a handoff-brief failure must not fail the turn;
+              // the brief is advisory. Pinned, not fixed (see TECH-DEBT.md).
               agentText = "";
             }
           }
@@ -837,7 +846,7 @@ export function useComposer(deps: ComposerDeps) {
         };
 
         if (!current.inboxAsk && !orchestrator.forSession(sessionId)) {
-          await beginSessionTurn(sessionId, workCwd).catch(() => undefined);
+          await beginSessionTurn(sessionId, workCwd).catch(ignoreRejection);
         }
         if (turnGen.current.get(sessionId) !== gen) return;
         let buildSucceeded = false;
