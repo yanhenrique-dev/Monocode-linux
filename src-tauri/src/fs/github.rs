@@ -370,8 +370,39 @@ pub(crate) fn github_pr_head_filter(repo: &str, branch: &str) -> Option<String> 
     Some(format!("{owner}:{branch}"))
 }
 
+/// Owner/repo slug pinned to the fetch remote (origin first), so `gh` never
+/// resolves some other remote (e.g. `upstream`) on its own. Returns `None`
+/// when no remote points at github.com.
+pub(crate) fn slug_from_github_remote_url(url: &str) -> Option<String> {
+    let rest = normalize_github_remote_url(url)
+        .strip_prefix("github.com/")?
+        .to_string();
+    let (owner, name) = rest.split_once('/')?;
+    if owner.is_empty() || name.is_empty() || name.contains('/') {
+        return None;
+    }
+    Some(format!("{owner}/{name}"))
+}
+
+fn origin_github_slug(root: &Path) -> Option<String> {
+    let remote = github_fetch_remote(root)?;
+    let url = git_stdout(root, &["remote", "get-url", &remote])?;
+    slug_from_github_remote_url(&url)
+}
+
+/// `gh repo view` arguments pinned to the origin repo when it is known.
+/// Without `--repo`, `gh` picks its own base repo, which can be `upstream`
+/// instead of the user's fork.
+pub(crate) fn repo_view_args<'a>(slug: &'a Option<String>, fields: &'a str) -> Vec<&'a str> {
+    match slug {
+        Some(slug) => vec!["repo", "view", slug, "--json", fields],
+        None => vec!["repo", "view", "--json", fields],
+    }
+}
+
 fn git_github_repo_for(root: &Path) -> Result<String, String> {
-    let json = gh_checked(root, &["repo", "view", "--json", "nameWithOwner"])?;
+    let slug = origin_github_slug(root);
+    let json = gh_checked(root, &repo_view_args(&slug, "nameWithOwner"))?;
     #[derive(Deserialize)]
     struct View {
         #[serde(rename = "nameWithOwner")]
@@ -386,7 +417,8 @@ fn git_github_repo_for(root: &Path) -> Result<String, String> {
 }
 
 fn git_github_repositories_for(root: &Path) -> Result<Vec<String>, String> {
-    let json = gh_checked(root, &["repo", "view", "--json", "nameWithOwner,parent"])?;
+    let slug = origin_github_slug(root);
+    let json = gh_checked(root, &repo_view_args(&slug, "nameWithOwner,parent"))?;
     parse_github_repositories(&json)
 }
 
