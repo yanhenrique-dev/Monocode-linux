@@ -18,7 +18,7 @@ import {
   GitMerge,
   GitPullRequest,
   GitPullRequestClosed,
-  Loader,
+  LoaderCircle,
   MessageSquare,
   Trash2,
   X,
@@ -247,7 +247,7 @@ export function LinkedWorkItemUpdateNotice({
                 className="inline-flex min-w-0 items-center gap-1.5 overflow-hidden rounded-md bg-content/10 px-2 py-1 text-[11px] font-medium hover:bg-content/15 disabled:opacity-40"
               >
                 {cleanupAction === "archive" ? (
-                  <Loader className="size-3 shrink-0 animate-spin" />
+                  <LoaderCircle className="size-3 shrink-0 animate-spin" />
                 ) : (
                   <Archive className="size-3 shrink-0" strokeWidth={1.75} />
                 )}
@@ -263,7 +263,7 @@ export function LinkedWorkItemUpdateNotice({
                 className="inline-flex min-w-0 items-center gap-1.5 overflow-hidden rounded-md px-2 py-1 text-[11px] text-red-300/90 hover:bg-red-500/15 disabled:opacity-40"
               >
                 {cleanupAction === "delete" ? (
-                  <Loader className="size-3 shrink-0 animate-spin" />
+                  <LoaderCircle className="size-3 shrink-0 animate-spin" />
                 ) : (
                   <Trash2 className="size-3 shrink-0" strokeWidth={1.75} />
                 )}

@@ -6,7 +6,7 @@ import {
   FolderOpen,
   FolderTree,
   GitBranch,
-  Loader,
+  LoaderCircle,
   Plus,
   RefreshCw,
   Trash2,
@@ -129,7 +129,7 @@ export function WorktreesPage({
         </p>
       ) : !data ? (
         <p className="flex items-center gap-2 text-[12px] text-content/50">
-          <Loader className="size-4 animate-spin" />
+          <LoaderCircle className="size-4 animate-spin" />
           Loading worktrees…
         </p>
       ) : !worktrees.length ? (

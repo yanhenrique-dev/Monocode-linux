@@ -4,7 +4,7 @@ import {
   Check,
   ChevronDown,
   ImagePlus,
-  Loader,
+  LoaderCircle,
   RefreshCw,
   RotateCcw,
   Search,
@@ -1563,7 +1563,7 @@ function UpdateRow({
         </SecondaryButton>
         <SecondaryButton onClick={() => void onClick()} disabled={busy}>
           {busy ? (
-            <Loader className="size-3.5 animate-spin" aria-hidden />
+            <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
           ) : hasUpdate ? (
             <ArrowDownCircle className="size-3.5 text-accent" aria-hidden />
           ) : (
@@ -2151,7 +2151,7 @@ function ChatBackgroundCard({
               className="flex h-36 w-full flex-col items-center justify-center gap-2 text-content/40 hover:bg-content/5 hover:text-content/70 disabled:cursor-default disabled:opacity-40"
             >
               {busy ? (
-                <Loader className="size-5 animate-spin" aria-hidden />
+                <LoaderCircle className="size-5 animate-spin" aria-hidden />
               ) : (
                 <ImagePlus className="size-5" aria-hidden />
               )}
@@ -2168,7 +2168,7 @@ function ChatBackgroundCard({
               disabled={busy}
             >
               {busy ? (
-                <Loader className="size-3.5 animate-spin" aria-hidden />
+                <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
               ) : null}
               {t("settings.appearance.chat_background.change")}
             </SecondaryButton>

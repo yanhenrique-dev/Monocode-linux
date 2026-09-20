@@ -1,4 +1,4 @@
-import { Check, ListEnd, Loader, Minus } from "./icons";
+import { Check, ListEnd, LoaderCircle, Minus } from "./icons";
 import type { TaskListItem, TaskListItemStatus } from "../lib/session";
 import { taskListProgressLabel } from "../lib/taskList";
 
@@ -78,7 +78,7 @@ function TaskState({ status }: { status: TaskListItemStatus }) {
         aria-label="In progress"
         className="mt-px grid size-4 shrink-0 place-items-center text-sky-300"
       >
-        <Loader
+        <LoaderCircle
           className="size-4 motion-safe:animate-spin"
           strokeWidth={2}
         />

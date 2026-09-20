@@ -64,7 +64,7 @@ import ImageAdd01Icon from "@hugeicons/core-free-icons/ImageAdd01Icon";
 import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import NotificationOff01Icon from "@hugeicons/core-free-icons/NotificationOff01Icon";
 import KeyboardIcon from "@hugeicons/core-free-icons/KeyboardIcon";
-import LayoutAlignRightIcon from "@hugeicons/core-free-icons/LayoutAlignRightIcon";
+import SidebarLeft01Icon from "@hugeicons/core-free-icons/SidebarLeft01Icon";
 import LayoutBottomIcon from "@hugeicons/core-free-icons/LayoutBottomIcon";
 import LayoutTopIcon from "@hugeicons/core-free-icons/LayoutTopIcon";
 import LeftToRightListBulletIcon from "@hugeicons/core-free-icons/LeftToRightListBulletIcon";
@@ -156,7 +156,6 @@ const UnfoldVerticalIcon: IconSvgElement = [
   ["path", { d: "M7 17L12 22L17 17", ...stroke, key: "5" }],
 ];
 
-export const AlertCircle = wrap(AlertCircleIcon, "AlertCircle");
 export const AppWindow = wrap(AppWindowIcon, "AppWindow");
 export const Archive = wrap(Archive02Icon, "Archive");
 export const ArrowDownCircle = wrap(CircleArrowDown01Icon, "ArrowDownCircle");
@@ -217,7 +216,6 @@ export const Keyboard = wrap(KeyboardIcon, "Keyboard");
 export const ListBullet = wrap(LeftToRightListBulletIcon, "ListBullet");
 export const ListEnd = wrap(ListEndIcon, "ListEnd");
 export const ListFilter = wrap(FilterIcon, "ListFilter");
-export const Loader = wrap(Loading03Icon, "Loader");
 export const LoaderCircle = wrap(Loading03Icon, "LoaderCircle");
 export const Lock = wrap(SquareLock02Icon, "Lock");
 export const LockOpen = wrap(SquareUnlock01Icon, "LockOpen");
@@ -230,7 +228,7 @@ export const MoreHorizontal = wrap(MoreHorizontalIcon, "MoreHorizontal");
 export const Palette = wrap(PaintBoardIcon, "Palette");
 export const Pause = wrap(PauseIcon, "Pause");
 export const PanelBottom = wrap(LayoutBottomIcon, "PanelBottom");
-export const PanelLeft = wrap(LayoutAlignRightIcon, "PanelLeft");
+export const PanelLeft = wrap(SidebarLeft01Icon, "PanelLeft");
 export const PanelRight = wrap(SidebarRight01Icon, "PanelRight");
 export const PanelTop = wrap(LayoutTopIcon, "PanelTop");
 export const PenLine = wrap(PencilEdit01Icon, "PenLine");
