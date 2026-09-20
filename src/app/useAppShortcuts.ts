@@ -233,6 +233,9 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
   });
 
   const debounce = useRef({ name: "", at: 0 });
+  // Serializes F11 toggles: two quick presses must read/set in order,
+  // otherwise both read the same state and only one toggle lands.
+  const fullscreenQueue = useRef(Promise.resolve());
   const run = useCallback((name: string, fn: () => void) => {
     const now = performance.now();
     if (name === debounce.current.name && now - debounce.current.at < 80)
@@ -262,6 +265,26 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
           }
           return;
         }
+      }
+      // Browser-standard fullscreen. Runs before tabCommand and always
+      // applies — even in inputs and the terminal — so F11 behaves like a
+      // browser. Tauri webviews have no built-in F11 handling.
+      if (
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.isComposing &&
+        e.key === "F11"
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const win = getCurrentWindow();
+        fullscreenQueue.current = fullscreenQueue.current
+          .then(() => win.isFullscreen())
+          .then((fullscreen) => win.setFullscreen(!fullscreen))
+          .catch(() => {});
+        return;
       }
       const cmd = tabCommand(e);
       if (cmd) {

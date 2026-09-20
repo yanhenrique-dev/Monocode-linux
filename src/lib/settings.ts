@@ -841,6 +841,7 @@ export const KEYBINDINGS: KeybindingRow[] = [
   { command: "settings.keybindings.cmd.view_zoom_in", keys: `${MOD}+`, when: "Always" },
   { command: "settings.keybindings.cmd.view_zoom_out", keys: `${MOD}-`, when: "Always" },
   { command: "settings.keybindings.cmd.view_reset_zoom", keys: `${MOD}0`, when: "Always" },
+  { command: "settings.keybindings.cmd.view_toggle_fullscreen", keys: "F11", when: "Always" },
   { command: "settings.keybindings.cmd.tab_new", keys: `${MOD}T`, when: "Always" },
   { command: "settings.keybindings.cmd.tab_close_others", keys: `${MOD}${ALT}T`, when: "Always" },
   { command: "settings.keybindings.cmd.tab_close_all", keys: `${MOD}${SHIFT}W`, when: "Always" },
