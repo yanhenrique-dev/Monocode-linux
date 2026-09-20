@@ -75,6 +75,12 @@ export async function probeForUpdate(): Promise<Update | null> {
   return update;
 }
 
+/**
+ * Check the release feed and optionally drive the install.
+ * Progress is reported through `onProgress` for inline surfaces (Settings);
+ * the native dialog only pops when `opts.showDialog` resolves true (menu /
+ * shortcut have no inline surface, so they default to showing it).
+ */
 export async function runUpdateFlow(
   manual: boolean,
   onProgress?: (snapshot: UpdaterSnapshot) => void,
@@ -162,6 +168,11 @@ export async function runUpdateFlow(
   }
 }
 
+/**
+ * Download and install a previously detected update, then relaunch.
+ * Failure is reported through `onProgress`; the native dialog follows the
+ * same `showDialog` rule as `runUpdateFlow`.
+ */
 export async function installPendingUpdate(
   onProgress?: (snapshot: UpdaterSnapshot) => void,
   opts?: UpdateFlowOptions,
