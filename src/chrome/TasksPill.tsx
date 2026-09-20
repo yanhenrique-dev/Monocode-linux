@@ -38,7 +38,14 @@ export function TasksPill({
     const anchor = scroller?.querySelector<HTMLElement>(
       `[data-task-anchor="${last.id}"]`,
     );
-    if (!scroller || !anchor) return;
+    if (!scroller) return;
+    // Paginated-out turn: the block exists but its anchor is not mounted.
+    // Treat as offscreen; this re-runs when blocks change (e.g. after
+    // revealBlock loads the turn), so the pill hides once visible.
+    if (!anchor) {
+      setOffscreen(true);
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => setOffscreen(!entry.isIntersecting),
       { root: scroller },

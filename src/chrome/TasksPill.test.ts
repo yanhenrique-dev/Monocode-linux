@@ -109,6 +109,21 @@ describe("TasksPill", () => {
     }
   });
 
+  it("shows when the task turn is paginated out (no anchor mounted)", () => {
+    container.innerHTML = '<div class="agent-transcript"></div>';
+    const { root, revealBlock } = renderPill();
+    try {
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      expect(pill.textContent).toContain("1 of 3");
+      act(() => pill.click());
+      expect(revealBlock).toHaveBeenCalledWith("t1");
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
   it("stays hidden when disabled or without tasks", () => {
     const first = renderPill({ enabled: false });
     try {
