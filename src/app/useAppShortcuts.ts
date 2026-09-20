@@ -275,7 +275,7 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
         !e.altKey &&
         !e.shiftKey &&
         !e.isComposing &&
-        e.key === "F11"
+        (e.key === "F11" || e.code === "F11")
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -283,7 +283,9 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
         fullscreenQueue.current = fullscreenQueue.current
           .then(() => win.isFullscreen())
           .then((fullscreen) => win.setFullscreen(!fullscreen))
-          .catch(() => {});
+          .catch((error) => {
+            console.error("F11 fullscreen toggle failed", error);
+          });
         return;
       }
       const cmd = tabCommand(e);

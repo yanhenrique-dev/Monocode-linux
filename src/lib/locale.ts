@@ -227,6 +227,17 @@ const en = {
   "settings.general.update.whats_new": "What's new",
   "settings.general.update.download": "Download",
   "settings.general.update.check": "Check for updates",
+  "updater.dialog.title": "MonoCode",
+  "updater.dialog.latest": "You're on the latest version.",
+  "updater.dialog.flatpak":
+    "Updates are managed by Flatpak. Update MonoCode from your software center or with `flatpak update`.",
+  "updater.dialog.available_title": "Update available",
+  "updater.dialog.available_body":
+    "MonoCode {availableVersion} is available (you have {currentVersion}).{detail}\n\nInstall now?",
+  "updater.dialog.not_configured":
+    "Automatic updates aren't configured for this build.\n\nDownload releases at https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
+  "updater.dialog.check_failed": "Couldn't check for updates.\n\n{error}",
+  "updater.dialog.install_failed": "Couldn't install the update.\n\n{error}",
   "settings.chat.transcript.title": "Transcript",
   "settings.chat.transcript.description":
     "How a conversation reads as it grows.",
@@ -856,6 +867,17 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.update.whats_new": "Novidades",
   "settings.general.update.download": "Baixar",
   "settings.general.update.check": "Verificar atualizações",
+  "updater.dialog.title": "MonoCode",
+  "updater.dialog.latest": "Você está na versão mais recente.",
+  "updater.dialog.flatpak":
+    "Atualizações gerenciadas pelo Flatpak. Atualize o MonoCode pela central de programas ou com `flatpak update`.",
+  "updater.dialog.available_title": "Atualização disponível",
+  "updater.dialog.available_body":
+    "MonoCode {availableVersion} disponível (você tem {currentVersion}).{detail}\n\nInstalar agora?",
+  "updater.dialog.not_configured":
+    "Atualizações automáticas não configuradas nesta build.\n\nBaixe lançamentos em https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
+  "updater.dialog.check_failed": "Não foi possível verificar atualizações.\n\n{error}",
+  "updater.dialog.install_failed": "Não foi possível instalar a atualização.\n\n{error}",
   "settings.chat.transcript.title": "Transcrição",
   "settings.chat.transcript.description":
     "Como a conversa é exibida à medida que cresce.",
