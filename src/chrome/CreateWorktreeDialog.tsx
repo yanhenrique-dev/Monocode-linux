@@ -183,8 +183,13 @@ export function CreateWorktreeDialog({
             disabled={busy || !name.trim()}
             className="inline-flex items-center gap-1.5 rounded-md bg-content px-3 py-1.5 text-[12px] font-medium text-background-base disabled:opacity-40 active:scale-[0.97]"
           >
-            {busy && <LoaderCircle className="size-3.5 animate-spin" />}
+            {busy && <LoaderCircle aria-hidden className="size-3.5 animate-spin" />}
             {t("settings.worktrees.create_confirm")}
+            {busy && (
+              <span role="status" className="sr-only">
+                {t("settings.worktrees.creating")}
+              </span>
+            )}
           </button>
         </div>
       </form>

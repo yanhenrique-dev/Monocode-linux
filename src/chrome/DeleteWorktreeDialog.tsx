@@ -231,7 +231,7 @@ export function DeleteWorktreeDialog({
             disabled={busy || !confirmed}
             className="inline-flex items-center gap-1.5 rounded-md bg-red-500/20 px-3 py-1.5 font-medium text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:hover:bg-red-500/20 active:scale-[0.97]"
           >
-            {busy && <LoaderCircle className="size-3.5 animate-spin" />}
+            {busy && <LoaderCircle aria-hidden className="size-3.5 animate-spin" />}
             {sessionCount && deleteSessions
               ? t(
                   sessionCount === 1
@@ -240,6 +240,11 @@ export function DeleteWorktreeDialog({
                   { count: sessionCount },
                 )
               : t("settings.worktrees.delete_title")}
+            {busy && (
+              <span role="status" className="sr-only">
+                {t("settings.worktrees.deleting")}
+              </span>
+            )}
           </button>
         </div>
       </form>

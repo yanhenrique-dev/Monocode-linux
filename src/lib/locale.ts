@@ -299,6 +299,8 @@ const en = {
   "settings.worktrees.created_in_root": "Created in {path}",
   "settings.worktrees.cancel": "Cancel",
   "settings.worktrees.create_confirm": "Create worktree",
+  "settings.worktrees.creating": "Creating worktree…",
+  "settings.worktrees.deleting": "Deleting worktree…",
   "settings.worktrees.delete_title_confirm": "Delete worktree?",
   "settings.worktrees.delete_body":
     "This permanently deletes the working copy and everything inside it.",
@@ -901,6 +903,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.worktrees.created_in_root": "Criado em {path}",
   "settings.worktrees.cancel": "Cancelar",
   "settings.worktrees.create_confirm": "Criar worktree",
+  "settings.worktrees.creating": "Criando worktree…",
+  "settings.worktrees.deleting": "Excluindo worktree…",
   "settings.worktrees.delete_title_confirm": "Excluir worktree?",
   "settings.worktrees.delete_body":
     "Isso exclui permanentemente a cópia de trabalho e tudo dentro dela.",
