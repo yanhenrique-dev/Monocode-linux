@@ -263,6 +263,26 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
           return;
         }
       }
+      // Browser-standard fullscreen. Runs before tabCommand and always
+      // applies — even in inputs and the terminal — so F11 behaves like a
+      // browser. Tauri webviews have no built-in F11 handling.
+      if (
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.isComposing &&
+        e.key === "F11"
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        const win = getCurrentWindow();
+        void win
+          .isFullscreen()
+          .then((fullscreen) => win.setFullscreen(!fullscreen))
+          .catch(() => {});
+        return;
+      }
       const cmd = tabCommand(e);
       if (cmd) {
         if (cmd === "archive-session") {
