@@ -203,6 +203,27 @@ describe("TasksPill", () => {
     }
   });
 
+  it("hides once every task settled, even when scrolled out", () => {
+    const done: Block = {
+      id: "t1",
+      role: "tasks",
+      text: "",
+      taskList: {
+        items: [
+          { text: "Done", status: "completed" },
+          { text: "Skipped", status: "cancelled" },
+        ],
+      },
+    } as Block;
+    const { root } = renderPill({ blocks: [done] });
+    try {
+      setIntersecting(false);
+      expect(container.querySelector("[data-tasks-pill]")).toBeNull();
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
   it("stays hidden when disabled or without tasks", () => {
     const first = renderPill({ enabled: false });
     try {

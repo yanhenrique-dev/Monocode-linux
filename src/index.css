@@ -587,6 +587,22 @@ html.is-resizing * {
   border-top-right-radius: 0;
 }
 
+/*
+ * Same fusion for the queued-message card when it sits between the strip
+ * and the box: drop its top border/radius and its horizontal inset so the
+ * strip, queue and input read as one continuous surface instead of three
+ * stacked bubbles.
+ */
+[data-tasks-strip] + [data-composer] [data-message-queue] {
+  padding-left: 0;
+  padding-right: 0;
+}
+[data-tasks-strip] + [data-composer] [data-message-queue-card] {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 html.theme-light [data-composer-box] {
   background: var(--color-background-base);
   box-shadow:
