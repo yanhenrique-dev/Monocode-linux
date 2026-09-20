@@ -259,7 +259,10 @@ export async function notifySession(
     session,
     event === "finished" ? "agentFinished" : "agentInput",
   );
-  if (!entry) return false;
+  if (!entry) {
+    console.debug("[notifications] skip: no notifiable subject", session.id);
+    return false;
+  }
   return notifyProjectSession(session, event, sessionVisible, entry.subject);
 }
 
@@ -269,7 +272,10 @@ export async function announceSessionFinished(
   sessionVisible: boolean,
 ): Promise<void> {
   const entry = sessionNotificationSubject(session, "agentFinished");
-  if (!entry) return;
+  if (!entry) {
+    console.debug("[notifications] skip: no notifiable subject", session.id);
+    return;
+  }
   const sent = await notifyProjectSession(
     session,
     "finished",
@@ -285,14 +291,29 @@ async function notifyProjectSession(
   sessionVisible: boolean,
   subject: NotificationSubject,
 ): Promise<boolean> {
-  if (!allowsProjectNotification(subject)) return false;
+  if (!allowsProjectNotification(subject)) {
+    console.debug(
+      "[notifications] skip: project policy blocks",
+      subject.projectId,
+      subject.category,
+    );
+    return false;
+  }
   const decision = shouldNotify({
     enabled: loadNotificationsEnabled(),
     permission,
     windowFocused,
     sessionVisible,
   });
-  if (!decision) return false;
+  if (!decision) {
+    console.debug("[notifications] skip: not eligible", {
+      enabled: loadNotificationsEnabled(),
+      permission,
+      windowFocused,
+      sessionVisible,
+    });
+    return false;
+  }
   const { title, subtitle, body } = notificationText(session, event);
   try {
     await invoke("show_notification", {
