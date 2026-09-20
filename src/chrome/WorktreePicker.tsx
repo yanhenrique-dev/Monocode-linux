@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useProjectBranchesState } from "../hooks/useProjectBranches";
 import { useProjectWorktrees } from "../hooks/useProjectWorktrees";
 import { pathKey, prettyCwd } from "../lib/paths";
-import { NO_BRANCH_LABEL, type Worktree } from "../lib/worktrees";
+import { type Worktree } from "../lib/worktrees";
+import { useLocale } from "../lib/locale";
 import { BranchPicker } from "./BranchPicker";
 import { CreateWorktreeDialog } from "./CreateWorktreeDialog";
 import { GitPickerTrigger } from "./GitPickerTrigger";
@@ -48,6 +49,7 @@ export function WorktreePicker({
   const anchor = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const activeOption = useRef<HTMLButtonElement>(null);
+  const { t } = useLocale();
   const { branches, settled } = useProjectBranchesState(
     worktreeRemoved ? cwd : executionCwd,
     !!cwd && cwd !== "~",
@@ -133,10 +135,12 @@ export function WorktreePicker({
         }
         title={
           worktreeRemoved
-            ? "Select a branch or worktree to continue this session"
-            : `Working copy: ${prettyCwd(executionCwd)}`
+            ? t("settings.worktrees.picker_continue")
+            : t("settings.worktrees.picker_working_copy", {
+                path: prettyCwd(executionCwd),
+              })
         }
-        aria-label="Choose working copy"
+        aria-label={t("settings.worktrees.picker_choose")}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
@@ -148,16 +152,18 @@ export function WorktreePicker({
         }}
         label={
           worktreeRemoved
-            ? NO_BRANCH_LABEL
+            ? t("settings.worktrees.picker_no_branch")
             : branches?.current
               ? branches.detached
-                ? `detached ${branches.current}`
+                ? t("settings.worktrees.picker_detached", {
+                    ref: branches.current,
+                  })
                 : branches.current
               : settled
                 ? inWorktree
-                  ? "Worktree unavailable"
-                  : "No repo"
-                : "Loading…"
+                  ? t("settings.worktrees.picker_unavailable")
+                  : t("settings.worktrees.picker_no_repo")
+                : t("settings.worktrees.picker_loading_short")
         }
         worktree={!worktreeRemoved && inWorktree}
       />
@@ -171,7 +177,7 @@ export function WorktreePicker({
             if (!busy) dismiss();
           }}
           role="dialog"
-          aria-label="Working copies"
+          aria-label={t("settings.worktrees.picker_title")}
           data-branch-picker
           className="flex flex-col overflow-hidden"
         >
@@ -179,8 +185,8 @@ export function WorktreePicker({
             <Search className="size-3.5 text-content/40" />
             <input
               ref={search}
-              aria-label="Search working copies"
-              placeholder="Search working copies…"
+              aria-label={t("settings.worktrees.picker_search_aria")}
+              placeholder={t("settings.worktrees.picker_search")}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -208,24 +214,23 @@ export function WorktreePicker({
           </label>
           {worktreeRemoved && (
             <p className="shrink-0 px-3 pt-2 pb-1 text-[11px] text-content/50">
-              This session’s worktree was deleted. Select a working copy to
-              continue.
+              {t("settings.worktrees.picker_removed")}
             </p>
           )}
           {opensNewSession && !worktreeRemoved && (
             <p className="shrink-0 px-3 pt-2 pb-1 text-[11px] text-content/50">
-              Another working copy opens a new session.
+              {t("settings.worktrees.picker_new_session")}
             </p>
           )}
           <div
             className="min-h-0 overflow-y-auto p-1"
             role="listbox"
-            aria-label="Working copies"
+            aria-label={t("settings.worktrees.picker_title")}
           >
             {!data && !loadError && (
               <div className="flex items-center gap-2 p-2 text-[12px] text-content/50">
                 <Loader className="size-3.5 animate-spin" />
-                Loading working copies…
+                {t("settings.worktrees.picker_loading")}
               </div>
             )}
             {rows.map((tree, index) => (
@@ -251,11 +256,18 @@ export function WorktreePicker({
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px]">
-                    {tree.branch ?? `Detached ${tree.head.slice(0, 7)}`}
+                    {tree.branch ??
+                      t("settings.worktrees.picker_detached_row", {
+                        hash: tree.head.slice(0, 7),
+                      })}
                   </span>
                   <span className="block truncate text-[10px] text-content/40">
-                    {tree.isMain ? "Project folder" : prettyCwd(tree.path)}
-                    {tree.missing ? " · Missing" : ""}
+                    {tree.isMain
+                      ? t("settings.worktrees.picker_project_folder")
+                      : prettyCwd(tree.path)}
+                    {tree.missing
+                      ? ` · ${t("settings.worktrees.picker_missing")}`
+                      : ""}
                   </span>
                 </span>
                 {!worktreeRemoved &&
@@ -266,7 +278,7 @@ export function WorktreePicker({
             ))}
             {data && !rows.length && (
               <p className="p-2 text-[12px] text-content/45">
-                No matching working copies
+                {t("settings.worktrees.picker_no_match")}
               </p>
             )}
             {(error || loadError) && (
@@ -286,7 +298,7 @@ export function WorktreePicker({
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-content/8"
             >
               <Plus className="size-3.5" />
-              Create worktree…
+              {t("settings.worktrees.picker_create")}
             </button>
             <button
               type="button"
@@ -298,7 +310,7 @@ export function WorktreePicker({
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-content/55 hover:bg-content/8 disabled:opacity-40"
             >
               <GitBranch className="size-3.5" />
-              Switch branch in this working copy…
+              {t("settings.worktrees.picker_switch")}
             </button>
             {onManage && (
               <button
@@ -311,7 +323,7 @@ export function WorktreePicker({
                 className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-content/55 hover:bg-content/8"
               >
                 <Settings className="size-3.5" />
-                Manage worktrees…
+                {t("settings.worktrees.picker_manage")}
               </button>
             )}
           </div>

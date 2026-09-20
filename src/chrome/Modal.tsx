@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { LAYER } from "../lib/layers";
+import { useLocale } from "../lib/locale";
 import { GlassBackdrop } from "./GlassBackdrop";
 
 export type ModalSize = "sm" | "md";
@@ -40,6 +41,7 @@ export function ModalPanel({
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
+  const { t } = useLocale();
   const uid = useId();
   const titleId = `${uid}-title`;
   const descriptionId = description ? `${uid}-desc` : undefined;
@@ -107,7 +109,7 @@ export function ModalPanel({
             <button
               ref={closeRef}
               type="button"
-              aria-label="Close"
+              aria-label={t("settings.common.close")}
               onClick={onClose}
               className="grid size-7 shrink-0 place-items-center rounded-md text-content/45 hover:bg-content/8 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
