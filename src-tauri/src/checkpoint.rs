@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 #[cfg(test)]
-use crate::fs::GitDiffStats;
+use crate::fs::git::GitDiffStats;
 use crate::fs::{
     expand_home, git_checked, git_diff_files_for, path_to_js, resolve_repo_path, GitChangedFile,
     GitDiffIndex, MAX_TEXT_FILE_BYTES,
