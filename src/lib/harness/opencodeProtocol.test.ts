@@ -358,6 +358,43 @@ describe("OpenCode CLI inventory parsers", () => {
     ]);
     expect(variant?.value).toBe("medium");
   });
+
+  it("parses indented slug lines instead of falling back to plain slugs", () => {
+    // Some CLI generations indent the inventory. Without trimming, no slug
+    // matches, zero models parse, and the caller falls back to the plain
+    // list — silently dropping every model's variants (and the thinking
+    // control with them).
+    const parsed = parseModelsCliOutput(
+      [
+        "  some-cloud/spark-1",
+        '  {"id":"spark-1","name":"Spark 1","variants":{"xhigh":{}}}',
+        "",
+      ].join("\n"),
+    );
+    expect(parsed.connected).toEqual(["some-cloud"]);
+    const [model] = flattenOpenCodeModels(parsed, []);
+    expect(
+      model?.settings?.find((setting) => setting.id === "variant")?.options.map(
+        (option) => option.value,
+      ),
+    ).toEqual(["xhigh"]);
+  });
+
+  it("accepts V2 variant entries keyed by name", () => {
+    const parsed = parseModelsCliOutput(
+      [
+        "some-cloud/spark-1",
+        '{"id":"spark-1","variants":[{"name":"high"},{"id":"low"}]}',
+        "",
+      ].join("\n"),
+    );
+    const [model] = flattenOpenCodeModels(parsed, []);
+    expect(
+      model?.settings?.find((setting) => setting.id === "variant")?.options.map(
+        (option) => option.value,
+      ),
+    ).toEqual(["low", "high"]);
+  });
 });
 
 describe("isTurnDoneStatusEvent", () => {

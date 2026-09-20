@@ -193,6 +193,21 @@ describe("AgentTranscript collapsed work", () => {
     expect(markup).not.toContain("Claude Opus 5 worked for 9s");
   });
 
+  it("marks the edited message with a quiet visual state instead of a text banner", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AgentTranscript, {
+        blocks: [{ id: "user", role: "user", text: "Edit this prompt" }],
+        onEditLastTurn: () => {},
+        editingLastTurn: true,
+      }),
+    );
+
+    expect(markup).toContain('data-editing-last-turn="true"');
+    expect(markup).toContain("edit-last-turn-bubble");
+    expect(markup).toContain("pr-10");
+    expect(markup).not.toContain("Editing this message");
+  });
+
   it("renders the summary and answer without mounting a large completed tool trail", () => {
     const blocks: Block[] = [
       { id: "user", role: "user", text: "Check the project" },

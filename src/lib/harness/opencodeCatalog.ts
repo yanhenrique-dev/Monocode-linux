@@ -24,8 +24,8 @@ type OpenCodeModelJson = {
   /** V2 native name for `id`. */
   modelID?: string;
   name?: string;
-  /** V1 object map; V2 uses an array with an `id` per entry. */
-  variants?: Record<string, unknown> | { id?: unknown }[];
+  /** V1 object map; V2 uses an array with an `id` (or `name`) per entry. */
+  variants?: Record<string, unknown> | { id?: unknown; name?: unknown }[];
   /** V1 `"deprecated"` status / V2 `disabled` both mean skip. */
   status?: string;
   disabled?: boolean;
@@ -48,9 +48,14 @@ function normalizeOpenCodeModelJson(model: OpenCodeModelJson): void {
   if (Array.isArray(model.variants)) {
     const record: Record<string, unknown> = {};
     for (const entry of model.variants) {
-      if (entry && typeof entry === "object" && typeof entry.id === "string") {
-        record[entry.id] = entry;
-      }
+      if (!entry || typeof entry !== "object") continue;
+      const key =
+        typeof entry.id === "string"
+          ? entry.id
+          : typeof entry.name === "string"
+            ? entry.name
+            : undefined;
+      if (key) record[key] = entry;
     }
     model.variants = record;
   }
@@ -126,7 +131,19 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   } catch (error) {
     console.debug("[monocode] opencode agents", error);
   }
-  return flattenOpenCodeModels(parsed, agents);
+  const models = flattenOpenCodeModels(parsed, agents);
+  if (import.meta.env.DEV) {
+    // The thinking-level control only exists for models with variants; when
+    // this logs zero variants the provider simply advertises none (not a bug
+    // in the picker). Distinguishes that from a verbose-parse failure, which
+    // falls back to the plain slug list and drops every model's variants.
+    console.debug(
+      `[monocode] opencode catalog: ${models.length} models, ` +
+        `${models.filter((model) => model.settings?.some((setting) => setting.id === "variant")).length} with variants ` +
+        `(verbose ${modelsOut.trim() ? "ok" : "empty"})`,
+    );
+  }
+  return models;
 }
 
 export function parseModelsCliOutput(stdout: string): {
@@ -236,9 +253,16 @@ function parseVerboseModelsCliOutput(stdout: string): {
   };
 
   for (const line of lines) {
-    const slugMatch = line.trimStart().startsWith("{")
-      ? null
-      : SLUG_LINE_RE.exec(line);
+    // Match slug lines on the trimmed text: some CLI generations indent the
+    // inventory, and an indented slug must still start a new model — otherwise
+    // the whole verbose output parses to zero models and the caller falls back
+    // to the plain slug list, silently dropping every model's variants (and
+    // with them the thinking-level control).
+    const trimmed = line.trim();
+    const slugMatch =
+      trimmed.startsWith("{") || trimmed === ""
+        ? null
+        : SLUG_LINE_RE.exec(trimmed);
     if (slugMatch) {
       flushModel();
       currentSlug = slugMatch[1]!;

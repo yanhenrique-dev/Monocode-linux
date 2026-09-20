@@ -452,6 +452,12 @@ function sanitizeBlock(block: Block): Block | null {
   if (block.role === "user" && turnModel) next.turnModel = turnModel;
   if (
     block.role === "user" &&
+    typeof block.providerTurnId === "string" &&
+    isPersistableId(block.providerTurnId)
+  )
+    next.providerTurnId = block.providerTurnId;
+  if (
+    block.role === "user" &&
     typeof block.orchestrationLeadId === "string" &&
     isPersistableId(block.orchestrationLeadId)
   )

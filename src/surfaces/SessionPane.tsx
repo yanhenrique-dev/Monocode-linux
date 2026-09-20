@@ -53,6 +53,7 @@ import {
   type QuoteRequest,
 } from "../lib/quoteDraft";
 import { createNote, noteTitle } from "../lib/notes";
+import { canEditLastTurn, lastTurnRecall } from "../lib/editLastTurn";
 import { loadNotesEnabled, subscribeNotesEnabled } from "../lib/settings";
 import { resolveModel } from "../lib/models";
 import { isAstraModel } from "../lib/astraWelcome";
@@ -222,6 +223,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
   );
   const title = sessionDisplayTitle(session.title, session.harness);
   const isEmpty = session.blocks.length === 0;
+  const recallLastTurnRef = useRef<(() => void) | null>(null);
+  const editLastTurnSupported = canEditLastTurn(session);
+  const turnRecall = editLastTurnSupported ? lastTurnRecall(session) : null;
   const backgroundRevision = useSyncExternalStore(
     subscribeProjectChatBackground,
     projectChatBackgroundRevision,
@@ -343,6 +347,10 @@ const SessionPaneContent = memo(function SessionPaneContent({
       void orchestrator.hydrate(session.id).catch(console.error);
   }, [session.id, session.inboxAsk, session.worktreeRemoved]);
   const [quoteRequest, setQuoteRequest] = useState<QuoteRequest>();
+  const [editingLastTurn, setEditingLastTurn] = useState(false);
+  useEffect(() => {
+    setEditingLastTurn(false);
+  }, [session.id, editLastTurnSupported]);
   const onJumpToBottomReady = useCallback((jump: () => void) => {
     jumpToBottomRef.current = jump;
   }, []);
@@ -512,6 +520,12 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onResumeQueue={() => onResumeQueue(session.id)}
       onOpenFile={onOpenFile}
       busy={!!session.busy}
+      editLastTurnSupported={editLastTurnSupported}
+      lastTurnRecall={turnRecall}
+      onRecallLastTurnReady={(recall) => {
+        recallLastTurnRef.current = recall;
+      }}
+      onEditingLastTurnChange={setEditingLastTurn}
     />
   );
 
@@ -659,6 +673,15 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 onJumpToBottomChange={setShowJumpToBottom}
                 onJumpToBottomReady={onJumpToBottomReady}
                 onRevealReady={onRevealReady}
+                editingLastTurn={editingLastTurn}
+                onEditLastTurn={
+                  editLastTurnSupported
+                    ? () => {
+                        onFocus(session.id);
+                        recallLastTurnRef.current?.();
+                      }
+                    : undefined
+                }
                 latestTurnAccessory={latestTurnAccessory}
               />
               <PromptOutline

@@ -24,6 +24,7 @@ export {
 export {
   sendCodexTurn,
   compactCodexContext,
+  rewindCodexLastTurn,
   cancelCodexTurn,
   respondCodexApproval,
   stopCodexSession,
@@ -33,6 +34,7 @@ export {
 export {
   sendOpenCodeTurn,
   compactOpenCodeContext,
+  rewindOpenCodeLastTurn,
   cancelOpenCodeTurn,
   respondOpenCodeApproval,
   stopOpenCodeSession,
@@ -51,6 +53,7 @@ export {
 export {
   sendPiTurn,
   compactPiContext,
+  rewindPiLastTurn,
   cancelPiTurn,
   respondPiApproval,
   stopPiSession,
@@ -60,6 +63,7 @@ export {
 export {
   sendOmpTurn,
   compactOmpContext,
+  rewindOmpLastTurn,
   cancelOmpTurn,
   respondOmpApproval,
   stopOmpSession,
@@ -149,6 +153,8 @@ export {
   canCompactHarnessContext,
   steerHarnessTurn,
   canSteerHarness,
+  canRewindHarnessLastTurn,
+  rewindHarnessLastTurn,
   cancelHarnessTurn,
   respondHarnessApproval,
   respondHarnessQuestion,
@@ -166,6 +172,8 @@ export type {
   ApprovalDecision,
   CompactContextInput,
   HarnessEvent,
+  RewindLastTurnInput,
+  RewindLastTurnResult,
   SteerTurnInput,
 } from "./types";
 export type {

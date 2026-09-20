@@ -77,6 +77,7 @@ import type {
   WorkspaceMode,
 } from "../lib/session";
 import { HARNESS_TITLE, harnessSupportsAttachments } from "../lib/session";
+import type { LastTurnRecall } from "../lib/editLastTurn";
 import type {
   UserQuestionPrompt,
   UserQuestionReply,
@@ -180,6 +181,8 @@ type Props = {
   handoffCard?: HandoffComposerCard;
   question?: UserQuestionPrompt;
   busy?: boolean;
+  editLastTurnSupported?: boolean;
+  lastTurnRecall?: LastTurnRecall | null;
   queuedMessages?: QueuedMessage[];
   queueStatus?: MessageQueueStatus;
   hotkeys?: boolean;
@@ -219,6 +222,8 @@ type Props = {
   onResumeQueue?: () => void;
   onOpenFile?: (path: string) => void;
   onDraftChange?: (text: string) => void;
+  onRecallLastTurnReady?: (recall: () => void) => void;
+  onEditingLastTurnChange?: (editing: boolean) => void;
   children?: ReactNode;
 };
 
@@ -446,6 +451,8 @@ export function Composer({
   handoffCard,
   question,
   busy = false,
+  editLastTurnSupported = false,
+  lastTurnRecall = null,
   queuedMessages = [],
   queueStatus,
   onFocus,
@@ -480,6 +487,8 @@ export function Composer({
   onResumeQueue,
   onOpenFile,
   onDraftChange,
+  onRecallLastTurnReady,
+  onEditingLastTurnChange,
   children,
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -487,6 +496,8 @@ export function Composer({
   const plusRef = useRef<HTMLDivElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
+  const borrowedAttachmentIdsRef = useRef(new Set<string>());
+  const attachmentLifecycleRef = useRef(0);
   const consumedQuoteId = useRef<number | null>(null);
   const slashRef = useRef<SlashToken | null>(null);
   const mentionRef = useRef<MentionToken | null>(null);
@@ -552,6 +563,7 @@ export function Composer({
   const [notes, setNotes] = useState<Note[]>(() => peekNotes() ?? []);
   const [mention, setMention] = useState<MentionToken | null>(null);
   const [mentionActive, setMentionActive] = useState(0);
+  const [resendEdited, setResendEdited] = useState(false);
   const [runnerEnabled, setRunnerEnabled] = useState(loadComposerRunner);
   const [runnerLive, setRunnerLive] = useState(
     () => busy && loadComposerRunner(),
@@ -697,32 +709,48 @@ export function Composer({
 
   const removeAttachment = useCallback(
     (id: string) => {
-      setAttachments((prev) => {
-        const removed = prev.find((file) => file.id === id);
-        if (removed) revokeAttachment(removed);
-        const next = prev.filter((file) => file.id !== id);
-        syncHasValue(ref.current?.value ?? "", next);
-        return next;
-      });
+      const previous = attachmentsRef.current;
+      const removed = previous.find((file) => file.id === id);
+      if (removed && !borrowedAttachmentIdsRef.current.delete(removed.id)) {
+        revokeAttachment(removed);
+      }
+      const next = previous.filter((file) => file.id !== id);
+      attachmentsRef.current = next;
+      setAttachments(next);
+      syncHasValue(ref.current?.value ?? "", next);
       ref.current?.focus();
     },
     [syncHasValue],
   );
 
   useEffect(() => {
+    const lifecycle = ++attachmentLifecycleRef.current;
     return () => {
-      for (const file of attachmentsRef.current) revokeAttachment(file);
+      queueMicrotask(() => {
+        if (attachmentLifecycleRef.current !== lifecycle) return;
+        for (const file of attachmentsRef.current) {
+          if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+            revokeAttachment(file);
+          }
+        }
+        attachmentsRef.current = [];
+        borrowedAttachmentIdsRef.current.clear();
+      });
     };
   }, []);
 
   useEffect(() => {
     if (harnessSupportsAttachments(harness)) return;
-    setAttachments((prev) => {
-      if (prev.length === 0) return prev;
-      for (const file of prev) revokeAttachment(file);
-      syncHasValue(ref.current?.value ?? "", []);
-      return [];
-    });
+    const previous = attachmentsRef.current;
+    if (previous.length === 0) return;
+    for (const file of previous) {
+      if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+        revokeAttachment(file);
+      }
+    }
+    attachmentsRef.current = [];
+    setAttachments([]);
+    syncHasValue(ref.current?.value ?? "", []);
   }, [harness, syncHasValue]);
 
   useEffect(() => {
@@ -1117,6 +1145,90 @@ export function Composer({
     };
   }, [addAttachments, attachmentsSupported, enabled]);
 
+  const restoreDraft = useCallback(
+    (text: string, nextAttachments: Attachment[]) => {
+      setDraft(text);
+      onDraftChange?.(text);
+      if (ref.current) {
+        ref.current.value = text;
+        ref.current.style.height = "auto";
+        ref.current.style.height = `${Math.min(ref.current.scrollHeight, 240)}px`;
+      }
+
+      const nextIds = new Set(nextAttachments.map((file) => file.id));
+      for (const file of attachmentsRef.current) {
+        if (
+          nextIds.has(file.id) ||
+          borrowedAttachmentIdsRef.current.delete(file.id)
+        ) {
+          continue;
+        }
+        revokeAttachment(file);
+      }
+      borrowedAttachmentIdsRef.current.clear();
+      for (const file of nextAttachments) {
+        borrowedAttachmentIdsRef.current.add(file.id);
+      }
+      attachmentsRef.current = nextAttachments;
+      setAttachments(nextAttachments);
+      syncHasValue(text, nextAttachments);
+      ref.current?.focus();
+    },
+    [onDraftChange, syncHasValue],
+  );
+
+  const recallLastTurn = useCallback(() => {
+    if (!editLastTurnSupported || !lastTurnRecall) return;
+    restoreDraft(lastTurnRecall.text, lastTurnRecall.attachments);
+    setResendEdited(true);
+    onEditingLastTurnChange?.(true);
+  }, [
+    editLastTurnSupported,
+    lastTurnRecall,
+    onEditingLastTurnChange,
+    restoreDraft,
+  ]);
+
+  useEffect(() => {
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+  }, [sessionId, onEditingLastTurnChange]);
+
+  useEffect(() => {
+    if (editLastTurnSupported) return;
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+  }, [editLastTurnSupported, onEditingLastTurnChange]);
+
+  const exitEditMode = useCallback(() => {
+    if (ref.current) {
+      ref.current.value = "";
+      ref.current.style.height = "auto";
+    }
+    setDraft("");
+    onDraftChange?.("");
+    const previous = attachmentsRef.current;
+    for (const file of previous) {
+      if (!borrowedAttachmentIdsRef.current.delete(file.id)) {
+        revokeAttachment(file);
+      }
+    }
+    attachmentsRef.current = [];
+    setAttachments([]);
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
+    setPlusOpen(false);
+    setSlash(null);
+    setMention(null);
+    syncHasValue("", []);
+    ref.current?.focus();
+  }, [onDraftChange, onEditingLastTurnChange, syncHasValue]);
+
+  useEffect(() => {
+    if (!editLastTurnSupported || !onRecallLastTurnReady) return;
+    onRecallLastTurnReady(recallLastTurn);
+  }, [editLastTurnSupported, onRecallLastTurnReady, recallLastTurn]);
+
   const submit = (value: string) => {
     if (worktreeRemoved) return;
     const folderCommand = consumeSessionFolderCommand(value);
@@ -1158,6 +1270,16 @@ export function Composer({
           : orchestrationSelected
             ? "orchestrate"
             : "default",
+      ...(resendEdited
+        ? {
+            resendEdited: true,
+            onResendRejected: () => {
+              restoreDraft(text, files);
+              setResendEdited(true);
+              onEditingLastTurnChange?.(true);
+            },
+          }
+        : {}),
     });
     // The app can reject a turn before it is recorded (for example while an
     // orchestration is paused). Keep the user's text, files and selected mode
@@ -1168,7 +1290,11 @@ export function Composer({
     ref.current.style.height = "auto";
     setDraft("");
     onDraftChange?.("");
+    borrowedAttachmentIdsRef.current.clear();
+    attachmentsRef.current = [];
     setAttachments([]);
+    setResendEdited(false);
+    onEditingLastTurnChange?.(false);
     setPlanSelected(false);
     setOrchestrationSelected(false);
     setSessionFolderSelected(false);
@@ -1310,6 +1436,18 @@ export function Composer({
         }
         setSlash(null);
       }
+    }
+
+    if (
+      e.key === "ArrowUp" &&
+      editLastTurnSupported &&
+      navigationEmpty &&
+      e.currentTarget.selectionStart === 0 &&
+      e.currentTarget.selectionEnd === 0
+    ) {
+      e.preventDefault();
+      recallLastTurn();
+      return;
     }
 
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1528,10 +1666,13 @@ export function Composer({
         <div
           ref={boxRef}
           data-composer-box
+          data-composer-editing={resendEdited ? "" : undefined}
           className={`relative z-10 rounded-lg border bg-background-base/95 ${
             fileDrag
               ? "border-accent/60"
-              : "border-content/10 has-focus:border-content/20"
+              : resendEdited
+                ? "edit-last-turn-composer"
+                : "border-content/10 has-focus:border-content/20"
           }`}
         >
           {fileDrag ? (
@@ -1841,6 +1982,19 @@ export function Composer({
                 <AiIdea className="size-3.5" />
                 Plan
                 <X className="size-3" />
+              </button>
+            ) : null}
+            {resendEdited ? (
+              <button
+                type="button"
+                title="Stop editing last message"
+                aria-label="Stop editing last message"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={exitEditMode}
+                className="edit-last-turn-button flex h-6.5 shrink-0 items-center gap-1 rounded-md border border-current/20 px-2 text-[11px] font-medium transition-[background-color,color,border-color] hover:border-current/35 hover:bg-content/15 hover:text-content focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              >
+                <X className="size-3" strokeWidth={1.8} />
+                <span>Cancel edit</span>
               </button>
             ) : null}
             <div

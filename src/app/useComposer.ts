@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -7,6 +8,7 @@ import {
 import {
   appendSteerUser,
   appendUser,
+  canRewindHarnessLastTurn,
   canSteerHarness,
   cancelHarnessTurn,
   forgetHarnessSession,
@@ -15,6 +17,7 @@ import {
   isLiveHarness,
   pickTextHarness,
   promoteLastAssistantToPlan,
+  rewindHarnessLastTurn,
   sendHarnessTurn,
   steerHarnessTurn,
   stopHarnessSession,
@@ -112,6 +115,11 @@ import {
   withPlanStatus,
 } from "./sessionTransforms";
 import {
+  canEditLastTurn,
+  lastUserTurnBlock,
+  truncateBeforeLastUserTurn,
+} from "../lib/editLastTurn";
+import {
   nudgeOpenEditors,
   nudgeWorkspace,
   scheduleNudge,
@@ -201,6 +209,7 @@ export function useComposer(deps: ComposerDeps) {
     flushHarnessEvents,
     dismissNoticesForContinuedSession,
   } = deps;
+  const rewindingLastTurn = useRef(new Set<string>());
   const onModelChange = useCallback(
     (sessionId: string, harness: HarnessId, model: string) => {
       const current = sessionsRef.current.find((s) => s.id === sessionId);
@@ -289,8 +298,11 @@ export function useComposer(deps: ComposerDeps) {
         managed?: boolean;
         orchestrationRetry?: OrchestrationProposal;
         onSettled?: (outcome: ControlOutcome) => void;
+        onResendRejected?: () => void;
+        resendEdited?: boolean;
       },
     ) => {
+      if (rewindingLastTurn.current.has(sessionId)) return false;
       const controlError = orchestrator.submissionError(
         sessionId,
         options?.managed,
@@ -320,9 +332,19 @@ export function useComposer(deps: ComposerDeps) {
       if (removingSessionIds.current.has(sessionId)) return false;
       const storedCurrent = sessionsRef.current.find((s) => s.id === sessionId);
       if (!storedCurrent) return false;
-      const current = options?.buildTarget
+      let current = options?.buildTarget
         ? withPlanBuildTarget(storedCurrent, options.buildTarget)
         : storedCurrent;
+      const editedProviderTurnId = options?.resendEdited
+        ? lastUserTurnBlock(current.blocks)?.providerTurnId
+        : undefined;
+      if (options?.resendEdited) {
+        if (!canEditLastTurn(current)) return false;
+        current = {
+          ...current,
+          blocks: truncateBeforeLastUserTurn(current.blocks),
+        };
+      }
       const intent = options?.intent ?? "default";
       if (intent === "orchestrate") {
         const orchestrationError = activeOrchestrationError(sessionId);
@@ -411,7 +433,7 @@ export function useComposer(deps: ComposerDeps) {
                 : s,
             ),
           );
-          dismissNoticesForContinuedSession(sessionId);
+      dismissNoticesForContinuedSession(sessionId);
           return true;
         }
         if (
@@ -480,6 +502,15 @@ export function useComposer(deps: ComposerDeps) {
         return true;
       }
 
+      if (options?.resendEdited && canRewindHarnessLastTurn(current.harness)) {
+        rewindingLastTurn.current.add(sessionId);
+        const locked = sessionsRef.current.map((session) =>
+          session.id === sessionId ? { ...session, busy: true } : session,
+        );
+        sessionsRef.current = locked;
+        setSessions(locked);
+      }
+
       const gen = (turnGen.current.get(sessionId) ?? 0) + 1;
       turnGen.current.set(sessionId, gen);
       const proposalId =
@@ -538,6 +569,15 @@ export function useComposer(deps: ComposerDeps) {
         void cancelHarnessTurn(pendingSwitch.from, sessionId);
       }
 
+      // A resend whose provider revert runs later in the chain swaps the
+      // transcript only after the revert succeeds; truncating or appending
+      // here would lose the old turn (and duplicate the prompt) when the
+      // revert rejects.
+      const deferResend =
+        options?.resendEdited &&
+        canRewindHarnessLastTurn(current.harness) &&
+        live;
+
       dismissNoticesForContinuedSession(sessionId);
       setSessions((prev) =>
         prev.map((s) => {
@@ -560,6 +600,12 @@ export function useComposer(deps: ComposerDeps) {
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
           };
+          if (options?.resendEdited && !deferResend) {
+            next = {
+              ...next,
+              blocks: truncateBeforeLastUserTurn(next.blocks),
+            };
+          }
           if (approvedPlan && intent === "build") {
             next = {
               ...next,
@@ -610,6 +656,7 @@ export function useComposer(deps: ComposerDeps) {
               title: titled,
               pendingSwitch: undefined,
             });
+            if (deferResend) return sealed;
             return appendUser(
               appendPreparingHandoff(sealed, pendingSwitch.from, next.harness),
               visibleText,
@@ -617,6 +664,7 @@ export function useComposer(deps: ComposerDeps) {
               cards,
             );
           }
+          if (deferResend) return { ...next, title: titled };
           return appendUser(
             { ...next, title: titled },
             visibleText,
@@ -851,6 +899,69 @@ export function useComposer(deps: ComposerDeps) {
         if (turnGen.current.get(sessionId) !== gen) return;
         let buildSucceeded = false;
         try {
+          if (
+            options?.resendEdited &&
+            canRewindHarnessLastTurn(current.harness)
+          ) {
+            try {
+              await rewindHarnessLastTurn({
+                harness: current.harness,
+                sessionId,
+                cwd: workCwd,
+                model: current.model,
+                modelSettings: current.modelSettings,
+                runtimeMode: current.runtimeMode,
+                ...(editedProviderTurnId
+                  ? { providerTurnId: editedProviderTurnId }
+                  : {}),
+                onEvent: (event) => {
+                  if (turnGen.current.get(sessionId) !== gen) return;
+                  enqueueHarnessEvent(sessionId, event);
+                },
+              });
+            } catch (error) {
+              options?.onResendRejected?.();
+              throw error;
+            }
+            if (turnGen.current.get(sessionId) !== gen) {
+              const latest = sessionsRef.current.find(
+                (session) => session.id === sessionId,
+              );
+              if (
+                !latest ||
+                (!latest.busy &&
+                  latest.providerSessionId === current.providerSessionId)
+              ) {
+                await forgetHarnessSession(current.harness, sessionId);
+                if (latest) {
+                  setSessions((prev) =>
+                    prev.map((session) =>
+                      session.id === sessionId &&
+                      session.providerSessionId === current.providerSessionId
+                        ? { ...session, providerSessionId: undefined }
+                        : session,
+                    ),
+                  );
+                }
+              }
+              return;
+            }
+            // The provider revert succeeded: now swap the local transcript to
+            // the edited turn. It was left intact until now so a rejection
+            // above leaves the old turn (and no duplicate prompt) in place.
+            // Pass the truncated state through untouched: generateHarnessTitle
+            // may have updated the title while the revert was in flight.
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== sessionId) return s;
+                const truncated = {
+                  ...s,
+                  blocks: truncateBeforeLastUserTurn(s.blocks),
+                };
+                return appendUser(truncated, visibleText, visible, cards);
+              }),
+            );
+          }
           const prepared = await prepareAttachments(attachments);
           const prompt =
             intent === "build" && approvedPlan
@@ -1117,6 +1228,9 @@ export function useComposer(deps: ComposerDeps) {
           }
         })
         .finally(() => {
+          if (options?.resendEdited) {
+            rewindingLastTurn.current.delete(sessionId);
+          }
           options?.onSettled?.(
             turnGen.current.get(sessionId) !== gen
               ? { status: "cancelled", text: controlText }
