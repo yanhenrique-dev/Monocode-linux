@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FileDiff } from "./icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   keepSessionChanges,
   sessionCheckpointStatus,
@@ -10,6 +10,7 @@ import {
 import { invalidateProjectFiles } from "../lib/fileIndex";
 import { invalidateWatchedFiles } from "../lib/fileWatch";
 import { basename, notifyGitChanged, subscribeGitChanged } from "../lib/fs";
+import { useLocale } from "../lib/locale";
 import { FileTypeIcon } from "./FileTypeIcon";
 
 type Props = {
@@ -35,6 +36,7 @@ export function SessionReview({
   const [files, setFiles] = useState<CheckpointFile[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [acting, setActing] = useState<"keep" | "undo" | null>(null);
+  const { t } = useLocale();
   const filesRef = useRef(files);
   filesRef.current = files;
 
@@ -93,8 +95,17 @@ export function SessionReview({
 
   const disabled = acting != null;
   const canUndoAll = !undoLocked && files.every((file) => file.undoable);
-  const visibleFiles = expanded ? files : files.slice(0, 3);
-  const hiddenFileCount = files.length - visibleFiles.length;
+  // Files also claimed by another live session sort last under their own
+  // heading so ownership is visible instead of silently mixed.
+  const ownFiles = files.filter(
+    (file) => (file.foreignClaimants ?? []).length === 0,
+  );
+  const sharedFiles = files.filter(
+    (file) => (file.foreignClaimants ?? []).length > 0,
+  );
+  const ordered = [...ownFiles, ...sharedFiles];
+  const visibleFiles = expanded ? ordered : ordered.slice(0, 3);
+  const hiddenFileCount = ordered.length - visibleFiles.length;
   const totals = files.reduce(
     (sum, file) => ({
       additions: sum.additions + file.additions,
@@ -181,16 +192,30 @@ export function SessionReview({
             expanded ? "max-h-64 overflow-y-auto" : ""
           }`}
         >
-          {visibleFiles.map((file) => (
-            <li key={file.relative}>
-              <FileRow
-                file={file}
-                sessionId={sessionId}
-                cwd={cwd}
-                onOpenDiff={onOpenDiff}
-              />
-            </li>
-          ))}
+          {visibleFiles.map((file, index) => {
+            const shared = (file.foreignClaimants ?? []).length > 0;
+            const previousShared =
+              index > 0
+                ? (visibleFiles[index - 1].foreignClaimants ?? []).length > 0
+                : false;
+            return (
+              <Fragment key={file.relative}>
+                {shared && !previousShared ? (
+                  <li className="px-3 pt-1 text-[10px] font-medium uppercase tracking-wide text-content/40">
+                    {t("session.review.shared_heading")}
+                  </li>
+                ) : null}
+                <li>
+                  <FileRow
+                    file={file}
+                    sessionId={sessionId}
+                    cwd={cwd}
+                    onOpenDiff={onOpenDiff}
+                  />
+                </li>
+              </Fragment>
+            );
+          })}
         </ul>
         {files.length > 3 ? (
           <button
@@ -230,11 +255,20 @@ function FileRow({
     session?: { sessionId: string; cwd: string },
   ) => void;
 }) {
+  const { t } = useLocale();
   const name = basename(file.relative);
+  const claimants = file.foreignClaimants ?? [];
+  const shortClaimants = claimants
+    .map((id) => (id.length > 8 ? id.slice(0, 8) : id))
+    .join(", ");
   return (
     <button
       type="button"
-      title={file.relative}
+      title={
+        claimants.length > 0
+          ? `${file.relative} — ${t("session.review.shared_by", { sessions: claimants.join(", ") })}`
+          : file.relative
+      }
       onClick={() => onOpenDiff(file.path, { sessionId, cwd })}
       className="flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-content/65 hover:bg-content/5 hover:text-content"
     >
@@ -243,6 +277,11 @@ function FileRow({
         {file.relative}
       </span>
       <DiffCounts file={file} />
+      {claimants.length > 0 ? (
+        <span className="shrink-0 font-mono text-[11px] text-amber-300/80">
+          {shortClaimants}
+        </span>
+      ) : null}
     </button>
   );
 }

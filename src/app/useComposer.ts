@@ -859,7 +859,7 @@ export function useComposer(deps: ComposerDeps) {
                 ) {
                   revealHandoff(wrap.text);
                 }
-                nudgeOpenEditors(event, workCwd);
+                nudgeOpenEditors(event, workCwd, sessionId);
                 if (!orchestrator.forSession(sessionId))
                   trackSessionEdits(sessionId, workCwd, event);
                 const routed = routePlanEvent(event);

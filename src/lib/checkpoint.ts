@@ -10,6 +10,8 @@ export type CheckpointFile = {
   exact: boolean;
   /** False when restoring could overwrite a change made outside this session. */
   undoable: boolean;
+  /** Other live session ids in the same project claiming this path. */
+  foreignClaimants: string[];
 };
 
 export type CheckpointStatus = {
@@ -115,6 +117,21 @@ export function captureSessionCheckpoint(
       sessionId,
       cwd,
       paths,
+    }),
+  );
+}
+
+/** Opt-in heuristic: claim currently-dirty paths this session never touched
+ * via structured tools. Adopted entries are review-visible but never exact
+ * nor undoable. */
+export function adoptSessionCheckpoint(
+  sessionId: string,
+  cwd: string,
+): Promise<CheckpointStatus> {
+  return enqueueCheckpoint(sessionId, () =>
+    invoke<CheckpointStatus>("session_checkpoint_adopt", {
+      sessionId,
+      cwd,
     }),
   );
 }

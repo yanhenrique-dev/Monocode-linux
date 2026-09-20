@@ -165,6 +165,10 @@ const en = {
   "settings.general.working_agents.description":
     "When two or more chats are in flight, a card on the project rail lists them so you can jump across projects. Finished turns stay until you open that session.",
   "settings.general.working_agents.toggle": "Working agents",
+  "settings.general.session_review_shell.label": "Shell edits in review",
+  "settings.general.session_review_shell.description":
+    "After a shell command finishes, pull files it changed into this session's review card. Off by default: in a shared project the shell delta may include another session's edits, so adopted files are listed but never undoable.",
+  "settings.general.session_review_shell.toggle": "Shell edits in review",
   "settings.general.close_to_tray.label": "Close to tray",
   "settings.general.close_to_tray.description":
     "Closing a window hides it to the system tray instead of quitting, so running agents keep going. Reopen from the tray icon, and quit for real from its menu. Turn this off to have close end the window.",
@@ -532,6 +536,8 @@ const en = {
   "settings.inbox.mute.picker_past": "Choose a date and time in the future.",
   "settings.inbox.mute.picker_cancel": "Cancel",
   "settings.inbox.mute.picker_confirm": "Mute until then",
+  "session.review.shared_heading": "Shared with another session",
+  "session.review.shared_by": "Also changed by {sessions}",
 };
 
 export type LocaleKey = keyof typeof en;
@@ -608,6 +614,10 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.working_agents.description":
     "Quando dois ou mais chats estão em andamento, um cartão na barra de projetos os lista para você alternar entre projetos. Turnos finalizados permanecem até você abrir a sessão.",
   "settings.general.working_agents.toggle": "Agentes ativos",
+  "settings.general.session_review_shell.label": "Edições do shell na revisão",
+  "settings.general.session_review_shell.description":
+    "Após um comando do shell terminar, inclui os arquivos alterados no cartão de revisão desta sessão. Desativado por padrão: num projeto compartilhado o resultado pode incluir edições de outra sessão, então arquivos adotados são listados mas nunca desfeitos.",
+  "settings.general.session_review_shell.toggle": "Edições do shell na revisão",
   "settings.general.close_to_tray.label": "Fechar para a bandeja",
   "settings.general.close_to_tray.description":
     "Fechar a janela a oculta na bandeja do sistema em vez de encerrar, para os agentes continuarem rodando. Reabra pelo ícone da bandeja e encerre de verdade pelo menu. Desative para que fechar encerre a janela.",
@@ -981,6 +991,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.inbox.mute.picker_past": "Escolha data e hora futuras.",
   "settings.inbox.mute.picker_cancel": "Cancelar",
   "settings.inbox.mute.picker_confirm": "Silenciar até lá",
+  "session.review.shared_heading": "Compartilhado com outra sessão",
+  "session.review.shared_by": "Também alterado por {sessions}",
 };
 
 export const STRINGS: Record<Locale, Record<LocaleKey, string>> = {

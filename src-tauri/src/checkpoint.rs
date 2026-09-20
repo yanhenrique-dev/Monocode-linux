@@ -1,6 +1,4 @@
-#[cfg(test)]
-use std::collections::HashMap;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -82,6 +80,7 @@ impl CheckpointStore {
                 after: BTreeMap::new(),
                 stats: BTreeMap::new(),
                 diverged: BTreeSet::new(),
+                adopted: BTreeSet::new(),
             },
         )
     }
@@ -185,17 +184,57 @@ impl CheckpointStore {
         Ok(())
     }
 
+    /// Opt-in heuristic behind the shell-adopt setting: claim currently
+    /// git-dirty paths this session never touched via structured tools.
+    /// Adopted paths are review-visible but never exact nor undoable: the
+    /// delta may contain bytes written outside this session.
+    fn adopt(&self, session_id: &str, cwd: &str) -> Result<CheckpointStatus, String> {
+        let root = project_root(cwd)?;
+        let dir = self.session_dir(session_id);
+        let mut manifest = match read_manifest(&dir)? {
+            Some(manifest) if same_cwd(&manifest.cwd, cwd) => manifest,
+            _ => return Ok(CheckpointStatus { files: Vec::new() }),
+        };
+        let mut dirty = false;
+        for file in git_diff_files_for(&root).files {
+            if manifest.touched.len() >= MAX_SNAPSHOT_FILES {
+                break;
+            }
+            let Ok(relative) = resolve_repo_path(&root, &file.relative) else {
+                continue;
+            };
+            if manifest.touched.contains(&relative) || manifest.prepared.contains(&relative) {
+                continue;
+            }
+            manifest.touched.insert(relative.clone());
+            if in_head(&root, &relative) {
+                manifest.tracked.insert(relative.clone());
+            }
+            let after = snapshot_after_file(&dir, &root, &relative)?;
+            manifest.after.insert(relative.clone(), after);
+            if let Some(stats) = calculate_session_stats(&dir, &manifest, &relative) {
+                manifest.stats.insert(relative.clone(), stats);
+            }
+            manifest.adopted.insert(relative);
+            dirty = true;
+        }
+        if dirty {
+            write_manifest(&dir, &manifest)?;
+        }
+        self.status(session_id, cwd)
+    }
+
     fn status(&self, session_id: &str, cwd: &str) -> Result<CheckpointStatus, String> {
         let Some(manifest) = self.load_matching(session_id, cwd)? else {
             return Ok(CheckpointStatus { files: Vec::new() });
         };
         let root = project_root(cwd)?;
-        let foreign_touched = self.foreign_touched_paths(cwd, session_id);
+        let foreign_claimants = self.foreign_claimants(cwd, session_id);
         Ok(diff_from_manifest(
             &self.session_dir(session_id),
             &root,
             &manifest,
-            &foreign_touched,
+            &foreign_claimants,
         ))
     }
 
@@ -275,13 +314,13 @@ impl CheckpointStore {
                 out.insert(session_id.clone(), GitDiffStats::default());
                 continue;
             };
-            let foreign_touched = self.foreign_touched_paths(cwd, session_id);
+            let foreign_claimants = self.foreign_claimants(cwd, session_id);
             let status = diff_from_manifest_with(
                 &index,
                 &self.session_dir(session_id),
                 &root,
                 &manifest,
-                &foreign_touched,
+                &foreign_claimants,
             );
             out.insert(session_id.clone(), stats_from_status(&status));
         }
@@ -299,8 +338,8 @@ impl CheckpointStore {
         };
         let root = project_root(cwd)?;
         let dir = self.session_dir(session_id);
-        let foreign_touched = self.foreign_touched_paths(cwd, session_id);
-        let changed = diff_from_manifest(&dir, &root, &manifest, &foreign_touched);
+        let foreign_claimants = self.foreign_claimants(cwd, session_id);
+        let changed = diff_from_manifest(&dir, &root, &manifest, &foreign_claimants);
         if let Some(relative) = relative {
             let relative = resolve_repo_path(&root, relative)?;
             let Some(file) = changed.files.iter().find(|file| file.relative == relative) else {
@@ -360,12 +399,17 @@ impl CheckpointStore {
         Ok(Some(manifest))
     }
 
-    /// Paths already claimed by another live session in the same project.
-    fn foreign_touched_paths(&self, cwd: &str, except_session_id: &str) -> HashSet<String> {
-        let mut paths = HashSet::new();
+    /// Other live sessions in the same project claiming each path.
+    /// Map from repo-relative path to the sorted session ids claiming it.
+    fn foreign_claimants(
+        &self,
+        cwd: &str,
+        except_session_id: &str,
+    ) -> HashMap<String, Vec<String>> {
+        let mut claimants: HashMap<String, Vec<String>> = HashMap::new();
         let entries = match std::fs::read_dir(&self.root) {
             Ok(entries) => entries,
-            Err(_) => return paths,
+            Err(_) => return claimants,
         };
         for entry in entries.flatten() {
             let session_id = entry.file_name().to_string_lossy().into_owned();
@@ -379,9 +423,18 @@ impl CheckpointStore {
             if !same_cwd(&manifest.cwd, cwd) {
                 continue;
             }
-            paths.extend(manifest.touched.intersection(&manifest.prepared).cloned());
+            for relative in manifest.touched.intersection(&manifest.prepared) {
+                claimants
+                    .entry(relative.clone())
+                    .or_default()
+                    .push(session_id.clone());
+            }
         }
-        paths
+        for sessions in claimants.values_mut() {
+            sessions.sort();
+            sessions.dedup();
+        }
+        claimants
     }
 }
 
@@ -407,6 +460,10 @@ struct Manifest {
     /// Paths whose contents changed between two edits by this session.
     #[serde(default)]
     diverged: BTreeSet<String>,
+    /// Paths adopted from shell-made changes without a tool-start snapshot.
+    /// Review-visible but never exact nor undoable.
+    #[serde(default)]
+    adopted: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -444,6 +501,9 @@ pub struct CheckpointFile {
     /// so its net line ownership cannot be reconstructed exactly.
     pub exact: bool,
     pub undoable: bool,
+    /// Other live session ids in the same project claiming this path.
+    #[serde(default)]
+    pub foreign_claimants: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -529,6 +589,21 @@ pub async fn session_checkpoint_capture(
 }
 
 #[tauri::command]
+pub async fn session_checkpoint_adopt(
+    store: State<'_, CheckpointStore>,
+    session_id: String,
+    cwd: String,
+) -> Result<CheckpointStatus, String> {
+    validate_id(&session_id, "session")?;
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store.exclusive(|store| store.adopt(&session_id, &cwd))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn session_checkpoint_status(
     store: State<'_, CheckpointStore>,
     session_id: String,
@@ -595,14 +670,14 @@ fn diff_from_manifest(
     dir: &Path,
     root: &Path,
     manifest: &Manifest,
-    foreign_touched: &HashSet<String>,
+    foreign_claimants: &HashMap<String, Vec<String>>,
 ) -> CheckpointStatus {
     diff_from_manifest_with(
         &git_diff_files_for(root),
         dir,
         root,
         manifest,
-        foreign_touched,
+        foreign_claimants,
     )
 }
 
@@ -611,7 +686,7 @@ fn diff_from_manifest_with(
     dir: &Path,
     root: &Path,
     manifest: &Manifest,
-    foreign_touched: &HashSet<String>,
+    foreign_claimants: &HashMap<String, Vec<String>>,
 ) -> CheckpointStatus {
     let by_relative: BTreeMap<&str, &GitChangedFile> = index
         .files
@@ -622,9 +697,12 @@ fn diff_from_manifest_with(
     let mut files = Vec::new();
 
     for relative in &manifest.touched {
+        let adopted = manifest.adopted.contains(relative);
         // Without a tool-start snapshot there is no trustworthy session
-        // boundary. Never guess from the shared working tree.
-        if !manifest.prepared.contains(relative) {
+        // boundary. Never guess from the shared working tree, except for
+        // paths explicitly adopted through the opt-in shell heuristic: those
+        // stay review-visible but inexact.
+        if !manifest.prepared.contains(relative) && !adopted {
             continue;
         }
         if session_snapshot_differs(dir, manifest, relative) == Some(false) {
@@ -636,10 +714,13 @@ fn diff_from_manifest_with(
         // Review is always scoped to this session's captured before/after
         // snapshots. A foreign claim can make restoring the file unsafe, but
         // it does not make this session's recorded diff or counts inexact.
-        let exact = !manifest.diverged.contains(relative);
-        let undoable = exact
-            && !foreign_touched.contains(relative)
-            && after_matches_worktree(dir, root, manifest, relative);
+        let exact = !manifest.diverged.contains(relative) && !adopted;
+        let foreign: &[String] = foreign_claimants
+            .get(relative)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+        let undoable =
+            exact && foreign.is_empty() && after_matches_worktree(dir, root, manifest, relative);
         let session_change = manifest.stats.get(relative).map(|stats| {
             // Counts describe this session's own before→after change and stay
             // accurate when the worktree later diverges; only restore stays
@@ -652,6 +733,7 @@ fn diff_from_manifest_with(
             by_relative.get(relative.as_str()).copied(),
             exact,
             undoable,
+            foreign.to_vec(),
             session_change,
         ));
     }
@@ -738,6 +820,7 @@ fn describe_change(
     git: Option<&GitChangedFile>,
     exact: bool,
     undoable: bool,
+    foreign_claimants: Vec<String>,
     session_change: Option<(String, i64, i64)>,
 ) -> CheckpointFile {
     if let Some((status, additions, deletions)) = session_change {
@@ -749,6 +832,7 @@ fn describe_change(
             deletions,
             exact,
             undoable,
+            foreign_claimants,
         };
     }
     if let Some(file) = git {
@@ -760,6 +844,7 @@ fn describe_change(
             deletions: file.deletions,
             exact,
             undoable,
+            foreign_claimants,
         };
     }
     let abs = root.join(relative);
@@ -779,6 +864,7 @@ fn describe_change(
         deletions: 0,
         exact,
         undoable,
+        foreign_claimants,
     }
 }
 
@@ -838,6 +924,7 @@ fn release_path(manifest: &mut Manifest, relative: &str) {
     manifest.after.remove(relative);
     manifest.stats.remove(relative);
     manifest.diverged.remove(relative);
+    manifest.adopted.remove(relative);
 }
 
 fn restore_one(dir: &Path, root: &Path, manifest: &Manifest, relative: &str) -> Result<(), String> {
@@ -1491,6 +1578,120 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(repo.0.join("app.ts")).unwrap(),
             "session-one\n"
+        );
+    }
+
+    #[test]
+    fn shared_file_lists_foreign_claimant_session_ids() {
+        let repo = tmp("claimants");
+        if !init_git_commit(&repo.0, &[("app.ts", "head\n"), ("solo.ts", "head\n")]) {
+            return;
+        }
+        let cwd = repo.0.to_string_lossy().into_owned();
+        let (_root, store) = store();
+        store.ensure("s1", &cwd).unwrap();
+        store.ensure("s2", &cwd).unwrap();
+        store.ensure("s3", &cwd).unwrap();
+
+        store
+            .prepare("s1", &cwd, &["app.ts".into(), "solo.ts".into()])
+            .unwrap();
+        std::fs::write(repo.0.join("app.ts"), "session-one\n").unwrap();
+        std::fs::write(repo.0.join("solo.ts"), "session-one\n").unwrap();
+        store
+            .capture("s1", &cwd, &["app.ts".into(), "solo.ts".into()])
+            .unwrap();
+
+        store.prepare("s2", &cwd, &["app.ts".into()]).unwrap();
+        std::fs::write(repo.0.join("app.ts"), "session-one\nsession-two\n").unwrap();
+        store.capture("s2", &cwd, &["app.ts".into()]).unwrap();
+
+        let s1 = store.status("s1", &cwd).unwrap();
+        let app = s1
+            .files
+            .iter()
+            .find(|file| file.relative == "app.ts")
+            .unwrap();
+        assert_eq!(app.foreign_claimants, vec!["s2".to_string()]);
+        assert!(!app.undoable);
+        let solo = s1
+            .files
+            .iter()
+            .find(|file| file.relative == "solo.ts")
+            .unwrap();
+        assert!(solo.foreign_claimants.is_empty());
+        assert!(solo.undoable);
+
+        // A session that never touched the file sees no review entries at all.
+        let s3 = store.status("s3", &cwd).unwrap();
+        assert!(s3.files.is_empty());
+
+        // Foreign claims in another project do not leak across cwds.
+        let other = tmp("claimants-other");
+        if !init_git_commit(&other.0, &[("app.ts", "head\n")]) {
+            return;
+        }
+        let other_cwd = other.0.to_string_lossy().into_owned();
+        store.ensure("s9", &other_cwd).unwrap();
+        store.prepare("s9", &other_cwd, &["app.ts".into()]).unwrap();
+        std::fs::write(other.0.join("app.ts"), "other\n").unwrap();
+        store.capture("s9", &other_cwd, &["app.ts".into()]).unwrap();
+        let s1_again = store.status("s1", &cwd).unwrap();
+        let app_again = s1_again
+            .files
+            .iter()
+            .find(|file| file.relative == "app.ts")
+            .unwrap();
+        assert_eq!(app_again.foreign_claimants, vec!["s2".to_string()]);
+    }
+
+    #[test]
+    fn adopt_claims_shell_made_changes_as_inexact_review_entries() {
+        let repo = tmp("adopt");
+        if !init_git_commit(&repo.0, &[("app.ts", "head\n")]) {
+            return;
+        }
+        let cwd = repo.0.to_string_lossy().into_owned();
+        let (_root, store) = store();
+        store.ensure("s1", &cwd).unwrap();
+
+        // A shell-made change with no tool events is invisible before adopt.
+        std::fs::write(repo.0.join("app.ts"), "shell\n").unwrap();
+        assert!(store.status("s1", &cwd).unwrap().files.is_empty());
+
+        let adopted = store.adopt("s1", &cwd).unwrap();
+        let app = adopted
+            .files
+            .iter()
+            .find(|file| file.relative == "app.ts")
+            .unwrap();
+        assert!(!app.exact);
+        assert!(!app.undoable);
+        assert!(app.foreign_claimants.is_empty());
+
+        // Adopting again is stable and does not duplicate entries.
+        let again = store.adopt("s1", &cwd).unwrap();
+        assert_eq!(again.files.len(), 1);
+
+        // A later structured edit upgrades the adopted claim to a real one.
+        store.prepare("s1", &cwd, &["app.ts".into()]).unwrap();
+        std::fs::write(repo.0.join("app.ts"), "shell\ntool\n").unwrap();
+        store.capture("s1", &cwd, &["app.ts".into()]).unwrap();
+        let upgraded = store.status("s1", &cwd).unwrap();
+        let app_upgraded = upgraded
+            .files
+            .iter()
+            .find(|file| file.relative == "app.ts")
+            .unwrap();
+        assert!(app_upgraded.exact);
+        assert!(app_upgraded.undoable);
+
+        // Keep releases the adopted claim without touching the file.
+        store.keep("s1", &cwd, None).unwrap();
+        assert!(store.status("s1", &cwd).unwrap().files.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(repo.0.join("app.ts")).unwrap(),
+            "shell\ntool\n"
         );
     }
 
