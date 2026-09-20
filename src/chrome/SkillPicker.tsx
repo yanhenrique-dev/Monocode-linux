@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { looksLikeProject } from "../lib/recents";
+import { useLocale } from "../lib/locale";
 import {
   isValidSkillName,
   slugSkillName,
@@ -215,6 +216,7 @@ export function CreateSkillForm({
 
   const slug = slugSkillName(name);
   const valid = isValidSkillName(slug);
+  const { t } = useLocale();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -233,21 +235,21 @@ export function CreateSkillForm({
       className="px-2.5 py-2"
     >
       <p className="mb-2 text-[11px] text-content/50">
-        Writes a starter SKILL.md you can edit.
+        {t("settings.skills.form.hint")}
       </p>
       <input
         ref={input}
         value={name}
         spellCheck={false}
         placeholder="skill-name"
-        aria-label="Skill name"
+        aria-label={t("settings.skills.form.name_label")}
         disabled={busy}
         onChange={(e) => setName(e.target.value)}
         className={`mb-2 w-full rounded-md bg-content/10 px-2 py-1.5 text-[13px] text-content outline-none placeholder:text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
       />
       <div className="mb-2 flex gap-1">
         <ScopeButton
-          label="Project"
+          label={t("settings.skills.scope.project")}
           hint=".agents/skills"
           monospace={monospace}
           selected={scope === "project"}
@@ -255,7 +257,7 @@ export function CreateSkillForm({
           onClick={() => setScope("project")}
         />
         <ScopeButton
-          label="Personal"
+          label={t("settings.skills.scope.personal")}
           hint="~/.agents/skills"
           monospace={monospace}
           selected={scope === "user"}
@@ -267,7 +269,7 @@ export function CreateSkillForm({
         <p className="mb-2 text-[12px] text-content/70">{error}</p>
       ) : !name.trim() || valid ? null : (
         <p className="mb-2 text-[12px] text-content/50">
-          Use lowercase letters, numbers, and hyphens.
+          {t("settings.skills.form.name_hint")}
         </p>
       )}
       <div className="flex items-center justify-end gap-1">
@@ -277,14 +279,16 @@ export function CreateSkillForm({
           onClick={onCancel}
           className="rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
         >
-          Cancel
+          {t("settings.skills.form.cancel")}
         </button>
         <button
           type="submit"
           disabled={!valid || busy}
           className="rounded-md bg-content/20 px-2 py-1 text-[12px] text-content disabled:opacity-40"
         >
-          {busy ? "Creating…" : "Create"}
+          {busy
+            ? t("settings.skills.form.creating")
+            : t("settings.skills.form.create")}
         </button>
       </div>
     </form>
