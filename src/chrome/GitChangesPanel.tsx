@@ -11,7 +11,7 @@ import {
   GitBranch,
   GitPullRequest,
   ListBullet,
-  Loader,
+  LoaderCircle,
   Minus,
   Plus,
   RefreshCw,
@@ -568,7 +568,7 @@ function ChangedFiles({
             className="absolute top-1 right-1 grid size-5 place-items-center rounded-md text-content bg-content/10 hover:bg-content/20 hover:text-content disabled:opacity-40"
           >
             {busy === "generate" ? (
-              <Loader className="size-3.5 animate-spin" strokeWidth={1.75} />
+              <LoaderCircle className="size-3.5 animate-spin" strokeWidth={1.75} />
             ) : (
               <WandSparkles className="size-3" strokeWidth={1} />
             )}
@@ -887,7 +887,7 @@ function GitSyncActions({
           className={secondary}
         >
           {syncing ? (
-            <Loader
+            <LoaderCircle
               className="size-3.5 shrink-0 animate-spin"
               strokeWidth={1.75}
             />
@@ -930,7 +930,7 @@ function GitSyncActions({
           className={secondary}
         >
           {busy === "pr" ? (
-            <Loader
+            <LoaderCircle
               className="size-3.5 shrink-0 animate-spin"
               strokeWidth={1.75}
             />

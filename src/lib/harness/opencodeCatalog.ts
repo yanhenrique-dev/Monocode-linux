@@ -7,13 +7,11 @@ import {
 } from "../models";
 import { execChild, resolveOpenCodeBinary } from "./child";
 import {
-  compareSemver,
+  assertSupportedOpenCodeRelease,
   inferDefaultAgent,
   inferDefaultVariant,
   KNOWN_HIDDEN_AGENTS,
-  MINIMUM_OPENCODE_VERSION,
   openCodeVariantLabel,
-  parseOpenCodeVersion,
   sortOpenCodeVariants,
   titleCaseSlug,
 } from "./opencodeProtocol";
@@ -23,10 +21,44 @@ const AGENT_HEADER_RE = /^(.+)\s+\((\S+)\)\s*$/;
 
 type OpenCodeModelJson = {
   id?: string;
+  /** V2 native name for `id`. */
+  modelID?: string;
   name?: string;
-  variants?: Record<string, unknown>;
+  /** V1 object map; V2 uses an array with an `id` per entry. */
+  variants?: Record<string, unknown> | { id?: unknown }[];
+  /** V1 `"deprecated"` status / V2 `disabled` both mean skip. */
+  status?: string;
+  disabled?: boolean;
   limit?: { context?: number; input?: number; output?: number };
 };
+
+/**
+ * V2 consolidated two legacy provider namespaces; the migration guide
+ * canonicalizes them, so normalize at parse time for both generations.
+ */
+export function canonicalOpenCodeProviderId(providerID: string): string {
+  if (providerID === "azure-cognitive-services") return "azure";
+  if (providerID === "google-vertex-anthropic") return "google-vertex";
+  return providerID;
+}
+
+/** Normalizes one parsed model JSON across V1 and V2 native shapes. */
+function normalizeOpenCodeModelJson(model: OpenCodeModelJson): void {
+  if (!model.id && typeof model.modelID === "string") model.id = model.modelID;
+  if (Array.isArray(model.variants)) {
+    const record: Record<string, unknown> = {};
+    for (const entry of model.variants) {
+      if (entry && typeof entry === "object" && typeof entry.id === "string") {
+        record[entry.id] = entry;
+      }
+    }
+    model.variants = record;
+  }
+}
+
+function isDisabledOpenCodeModel(model: OpenCodeModelJson): boolean {
+  return model.disabled === true || model.status === "deprecated";
+}
 
 type ParsedProvider = {
   id: string;
@@ -69,17 +101,8 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   const { path } = await resolveOpenCodeBinary();
   const cwd = await homeDir();
   const versionOut = await execChild(path, ["--version"], cwd);
-  const version = parseOpenCodeVersion(versionOut);
-  if (!version) {
-    throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
-    );
-  }
-  if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {
-    throw new Error(
-      `OpenCode v${version} is too old. Upgrade to v${MINIMUM_OPENCODE_VERSION} or newer.`,
-    );
-  }
+  // Throws for undeterminable output and old V1; V2 passes on protocol.
+  assertSupportedOpenCodeRelease(versionOut);
 
   const modelsOut = await execChild(
     path,
@@ -153,7 +176,17 @@ export function parsePlainModelSlugs(stdout: string): {
     }
   }
   if (slugs === 0) return null;
-  return { providers, connected: [...providers.keys()] };
+  const canonical = new Map<string, ParsedProvider>();
+  for (const provider of providers.values()) {
+    const id = canonicalOpenCodeProviderId(provider.id);
+    const existing = canonical.get(id);
+    if (!existing) {
+      canonical.set(id, { ...provider, id });
+      continue;
+    }
+    Object.assign(existing.models, provider.models);
+  }
+  return { providers: canonical, connected: [...canonical.keys()] };
 }
 
 function parseVerboseModelsCliOutput(stdout: string): {
@@ -175,9 +208,13 @@ function parseVerboseModelsCliOutput(stdout: string): {
     if (jsonStr.length > 0) {
       try {
         const model = JSON.parse(jsonStr) as OpenCodeModelJson;
+        normalizeOpenCodeModelJson(model);
+        if (isDisabledOpenCodeModel(model)) return;
         const separator = currentSlug.indexOf("/");
         if (separator > 0) {
-          const providerID = currentSlug.slice(0, separator);
+          const providerID = canonicalOpenCodeProviderId(
+            currentSlug.slice(0, separator),
+          );
           const modelID = currentSlug.slice(separator + 1);
           let provider = providers.get(providerID);
           if (!provider) {

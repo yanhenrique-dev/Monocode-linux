@@ -12,7 +12,7 @@ import {
   Check,
   FolderTree,
   GitBranch,
-  Loader,
+  LoaderCircle,
   Plus,
   Search,
   Settings,
@@ -229,7 +229,7 @@ export function WorktreePicker({
           >
             {!data && !loadError && (
               <div className="flex items-center gap-2 p-2 text-[12px] text-content/50">
-                <Loader className="size-3.5 animate-spin" />
+                <LoaderCircle className="size-3.5 animate-spin" />
                 {t("settings.worktrees.picker_loading")}
               </div>
             )}

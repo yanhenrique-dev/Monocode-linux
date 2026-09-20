@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   isTaskListToolName,
+  lastTaskBlock,
   legacyTaskListFromText,
   normalizeTaskListStatus,
   taskListFromToolInput,
   taskListProgressLabel,
   taskListText,
 } from "./taskList";
+import type { Block } from "./session";
 
 describe("task lists", () => {
   it("normalizes provider status spellings", () => {
@@ -62,5 +64,51 @@ describe("task lists", () => {
         { text: "Two", status: "pending" },
       ]),
     ).toBe("1 of 2");
+  });
+
+  it("selects the most recent non-empty task block", () => {
+    const oldTasks = {
+      id: "t1",
+      role: "tasks",
+      text: "",
+      taskList: { items: [{ text: "Old", status: "completed" }] },
+    } as Block;
+    const user = { id: "u1", role: "user", text: "hi" } as Block;
+    const empty = { id: "t2", role: "tasks", text: "" } as Block;
+    const fresh = {
+      id: "t3",
+      role: "tasks",
+      text: "",
+      taskList: { items: [{ text: "New", status: "in_progress" }] },
+    } as Block;
+    expect(lastTaskBlock([])).toBeNull();
+    expect(lastTaskBlock([user])).toBeNull();
+    expect(lastTaskBlock([oldTasks, user, empty])).toBe(oldTasks);
+    expect(lastTaskBlock([oldTasks, user, empty, fresh])).toBe(fresh);
+  });
+});
+
+describe("lastTaskBlock", () => {
+  const block = (id: string, items?: { text: string }[]): Block =>
+    ({
+      id,
+      role: "tasks",
+      text: "",
+      ...(items ? { taskList: { items } } : {}),
+    }) as Block;
+
+  it("returns null without task blocks", () => {
+    expect(lastTaskBlock([])).toBeNull();
+    expect(
+      lastTaskBlock([{ id: "u", role: "user", text: "hi" } as Block]),
+    ).toBeNull();
+  });
+
+  it("skips empty task lists and prefers the latest block", () => {
+    const first = block("first", [{ text: "One" }]);
+    const empty = block("empty", []);
+    const latest = block("latest", [{ text: "Two" }]);
+    expect(lastTaskBlock([first, empty, latest])).toBe(latest);
+    expect(lastTaskBlock([first, empty])).toBe(first);
   });
 });

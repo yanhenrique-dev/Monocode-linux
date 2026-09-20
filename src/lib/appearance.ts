@@ -17,6 +17,7 @@ const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
+const TASKS_PILL_KEY = "monocode.tasksPill";
 const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
 const CHAT_BACKGROUND_EMPTY_OPACITY_KEY = "monocode.chatBackgroundEmptyOpacity";
@@ -51,6 +52,11 @@ export const TRANSCRIPT_LAYOUT_DEFAULT: TranscriptLayout = "full";
 export const CHANGES_VIEW_DEFAULT: ChangesView = "list";
 
 export const TRANSCRIPT_ANCHOR_DEFAULT = true;
+
+export const TASKS_PILL_DEFAULT = true;
+
+/** Fired on `window` whenever the tasks pill flips (detail: boolean). */
+export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
 
 /** Fired on `window` whenever prompt-to-top anchoring flips (detail: boolean). */
 export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
@@ -802,6 +808,20 @@ export function saveTranscriptAnchor(value: boolean) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent<boolean>(TRANSCRIPT_ANCHOR_CHANGE_EVENT, {
+      detail: value,
+    }),
+  );
+}
+
+export function loadTasksPill(): boolean {
+  return readFlag(TASKS_PILL_KEY) ?? TASKS_PILL_DEFAULT;
+}
+
+export function saveTasksPill(value: boolean) {
+  writeFlag(TASKS_PILL_KEY, value);
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<boolean>(TASKS_PILL_CHANGE_EVENT, {
       detail: value,
     }),
   );

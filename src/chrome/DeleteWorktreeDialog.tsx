@@ -16,7 +16,7 @@ import {
   FileDiff,
   Folder,
   GitBranch,
-  Loader,
+  LoaderCircle,
   MessageSquare,
 } from "./icons";
 
@@ -231,7 +231,7 @@ export function DeleteWorktreeDialog({
             disabled={busy || !confirmed}
             className="inline-flex items-center gap-1.5 rounded-md bg-red-500/20 px-3 py-1.5 font-medium text-red-400 hover:bg-red-500/30 disabled:opacity-40 disabled:hover:bg-red-500/20 active:scale-[0.97]"
           >
-            {busy && <Loader className="size-3.5 animate-spin" />}
+            {busy && <LoaderCircle className="size-3.5 animate-spin" />}
             {sessionCount && deleteSessions
               ? t(
                   sessionCount === 1

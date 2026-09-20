@@ -1,4 +1,4 @@
-import type { TaskListItem, TaskListItemStatus } from "./session";
+import type { Block, TaskListItem, TaskListItemStatus } from "./session";
 
 export function isTaskListToolName(value: string): boolean {
   const name = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -77,6 +77,17 @@ export function legacyTaskListFromText(text: string): TaskListItem[] | null {
   return items.every((item): item is TaskListItem => item !== null)
     ? items
     : null;
+}
+
+/** Most recent non-empty task block, if any. Later turns supersede earlier ones. */
+export function lastTaskBlock(blocks: readonly Block[]): Block | null {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (block.role === "tasks" && (block.taskList?.items.length ?? 0) > 0) {
+      return block;
+    }
+  }
+  return null;
 }
 
 export function taskListProgressLabel(items: TaskListItem[]): string {

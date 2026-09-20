@@ -5,57 +5,57 @@
 <h1 align="center">MonoCode Linux</h1>
 
 <p align="center">
-  <strong>Interface desktop para seus agentes de código, exclusiva para Linux.</strong>
+  <strong>A desktop interface for your coding agents, Linux only.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/yanhenrique-dev/Monocode-linux/actions/workflows/ci.yml"><img src="https://github.com/yanhenrique-dev/Monocode-linux/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/yanhenrique-dev/Monocode-linux/releases/latest"><img src="https://img.shields.io/github/v/release/yanhenrique-dev/Monocode-linux?label=release" alt="Release" /></a>
-  <img src="https://img.shields.io/badge/plataforma-Linux%20x86__64-blue" alt="Linux x86_64" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-green" alt="MIT" /></a>
-  <a href="https://ko-fi.com/yanhenriquedev"><img src="https://img.shields.io/badge/Ko--fi-Apoie-ff5e5b?logo=ko-fi&logoColor=white" alt="Apoie no Ko-fi" /></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20x86__64-blue" alt="Linux x86_64" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" /></a>
+  <a href="https://ko-fi.com/yanhenriquedev"><img src="https://img.shields.io/badge/Ko--fi-Sponsor-ff5e5b?logo=ko-fi&logoColor=white" alt="Sponsor on Ko-fi" /></a>
 </p>
 
-> Aviso de fork: este projeto deriva de [hardbeat920/monocode](https://github.com/hardbeat920/monocode.git) e é mantido com foco total em Linux. O crédito pela base original vai para o autor e os contribuidores do upstream.
+> Fork notice: this project derives from [hardbeat920/monocode](https://github.com/hardbeat920/monocode.git) and is maintained with a Linux-only focus. Credit for the original codebase goes to the upstream author and contributors.
 
 ---
 
-## Índice
+## Contents
 
-- [O que é](#o-que-é)
-- [Recursos](#recursos)
-- [Provedores suportados](#provedores-suportados)
-- [Instalação](#instalação)
-- [Compilando do código-fonte](#compilando-do-código-fonte)
-- [Uso](#uso)
-- [Estrutura do projeto](#estrutura-do-projeto)
-- [Scripts disponíveis](#scripts-disponíveis)
-- [CI e releases](#ci-e-releases)
-- [Contribuindo](#contribuindo)
-- [Licença](#licença)
+- [What is it](#what-is-it)
+- [Features](#features)
+- [Supported providers](#supported-providers)
+- [Install](#install)
+- [Build from source](#build-from-source)
+- [Usage](#usage)
+- [Project structure](#project-structure)
+- [Available scripts](#available-scripts)
+- [Contributing](#contributing)
+- [License](#license)
 
-## O que é
+## What is it
 
-O MonoCode Linux é um aplicativo desktop (Tauri + React) que reúne seus agentes de código numa interface só. Abas são sessões, o composer é a entrada, e cada provedor roda com a sua própria assinatura. O app não vende tokens.
+MonoCode Linux is a desktop app (Tauri + React) that puts your coding agents in one interface. Tabs are sessions, the composer is the input, and each provider runs on its own subscription. The app does not sell tokens.
 
-Empacotamento, documentação e automação miram um alvo só: Linux x86_64, distribuído como AppImage. Não há suporte a macOS nem Windows neste fork.
+Packaging, docs, and automation target one platform: Linux x86_64, shipped as an AppImage. This fork supports neither macOS nor Windows.
 
-## Recursos
+## Features
 
-- Abas que funcionam como sessões independentes, uma por agente.
-- Um composer só para todos os provedores, com anexos de arquivos, menções e skills.
-- Suporte a Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, fx e Hermes Agent.
-- Terminal com renderização acelerada por GPU e uma chave geral de hardware nas Configurações.
-- Explorador de arquivos com preview e revisão de mudanças lado a lado.
-- Orquestração de agentes auxiliares em diretórios isolados, com pausa, retomada e retry.
-- Histórico de sessões, grupos de projetos, lembretes e notificações por projeto.
-- Verificação de atualizações com download direto dos Releases do GitHub.
+- Tabs that work as independent sessions, one per agent.
+- A single composer for every provider, with file attachments, mentions, and skills.
+- Support for Claude Code, Codex, Cursor, Grok Build, OpenCode, Pi, omp, fx, Hermes Agent, and MiniMax Code.
+- GPU-accelerated terminal with a master hardware switch in Settings.
+- File explorer with preview and side-by-side change review.
+- Helper-agent orchestration in isolated directories, with pause, resume, and retry.
+- Session history, project groups, reminders, and per-project notifications.
+- Update checks with direct download from GitHub Releases.
+- Settings in English and Brazilian Portuguese.
 
-## Provedores suportados
+## Supported providers
 
-Instale e autentique pelo menos um provedor antes de abrir o app:
+Install and sign in to at least one provider before opening the app:
 
-| Provedor | Instalação | Login |
+| Provider | Install | Login |
 |---|---|---|
 | Claude Code | [claude.com/product/claude-code](https://claude.com/product/claude-code) | `claude auth login` |
 | Codex | [developers.openai.com/codex/cli](https://developers.openai.com/codex/cli) | `codex login` |
@@ -66,122 +66,110 @@ Instale e autentique pelo menos um provedor antes de abrir o app:
 | omp | `curl -fsSL https://omp.sh/install \| sh` | — |
 | fx | `curl -fsSL https://fx.sh/setup.sh \| bash` | `fx login` |
 | Hermes Agent | `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash` | `hermes model` |
+| MiniMax Code | `curl -fsSL https://filecdn.minimax.chat/public/install.sh \| bash` | `mcode login` |
 
-Um provedor basta: o app detecta os CLIs na inicialização e desabilita os ausentes com dica de instalação.
+One provider is enough: the app detects the CLIs at startup and disables the missing ones with an install hint.
 
-## Instalação
+## Install
 
-Baixe a versão mais recente em [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
+Grab the latest build from [GitHub Releases](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest):
 
 ```bash
 chmod +x MonoCode_*.AppImage
 ./MonoCode_*.AppImage
 ```
 
-Funciona em qualquer distro x86_64, sem instalar nada.
+It runs on any x86_64 distro, nothing to install.
 
-No Arch Linux, há também o pacote AUR [`monocode-bin`](https://aur.archlinux.org/packages/monocode-bin) (ver [docs/aur.md](docs/aur.md)).
+On Arch Linux there is also the AUR package [`monocode-bin`](https://aur.archlinux.org/packages/monocode-bin) (see [docs/aur.md](docs/aur.md)).
 
-Dependências e solução de problemas em detalhe: [docs/linux.md](docs/linux.md).
+Dependencies and troubleshooting in detail: [docs/linux.md](docs/linux.md).
 
-## Compilando do código-fonte
+## Build from source
 
-Pré-requisitos:
+Requirements:
 
-- Node.js 20 ou mais recente
-- Toolchain Rust estável (`rustup default stable`)
-- Dependências Tauri/WebKit do sistema (ex.: `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `libjavascriptcoregtk-4.1-dev`)
+- Node.js 20 or newer
+- Stable Rust toolchain (`rustup default stable`)
+- System Tauri/WebKit dependencies (e.g. `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev`, `libjavascriptcoregtk-4.1-dev`)
 
-No Ubuntu/Debian, o script do repositório instala as dependências nativas:
+On Ubuntu/Debian, the repo script installs the native dependencies:
 
 ```bash
 npm run setup:linux
 ```
 
-Build do AppImage distribuível (saída em `target/release/bundle/appimage/`):
+Distributable AppImage build (output in `target/release/bundle/appimage/`):
 
 ```bash
 npm ci
 npm run build:linux
 ```
 
-Modo desenvolvimento, com hot-reload:
+Development mode, with hot-reload:
 
 ```bash
 npm install
 npm run tauri dev
 ```
 
-Para rodar a mesma verificação do CI:
+Same checks the CI runs:
 
 ```bash
 npm run check        # web + rust
 npm run check:web    # vitest + tsc
-npm run check:rust   # cargo fmt, clippy e testes
+npm run check:rust   # cargo fmt, clippy and tests
 ```
 
-## Uso
+## Usage
 
-1. Abra o app e escolha um projeto (ou crie um).
-2. Selecione o provedor/modelo no composer.
-3. Descreva a tarefa. Cada aba guarda a própria sessão e o histórico.
-4. Acompanhe diffs, terminais e aprovações sem sair da interface.
-5. Ajuste GPU do terminal, temas e notificações em Configurações.
+1. Open the app and pick a project (or create one).
+2. Select the provider and model in the composer.
+3. Describe the task. Each tab keeps its own session and history.
+4. Follow diffs, terminals, and approvals without leaving the interface.
+5. Tune terminal GPU, themes, and notifications in Settings.
 
-## Estrutura do projeto
+## Project structure
 
 ```
 .
 ├── src/
-│   ├── app/        # hooks de app (sessões, abas, composer, orquestração)
-│   ├── chrome/     # moldura da janela (título, sidebar, composer, tabs)
-│   ├── surfaces/   # painéis da aba (transcript, editor, diff, terminal)
-│   ├── lib/        # libs compartilhadas (harness/, adapters por provedor)
-│   └── hooks/      # hooks React reutilizáveis
+│   ├── app/        # app hooks (sessions, tabs, composer, orchestration)
+│   ├── chrome/     # window frame (title, sidebar, composer, tabs)
+│   ├── surfaces/   # tab panels (transcript, editor, diff, terminal)
+│   ├── lib/        # shared libs (harness/, per-provider adapters)
+│   └── hooks/      # reusable React hooks
 ├── src-tauri/
-│   ├── src/        # lado Rust (PTYs, filesystem/git, sessões, janela)
-│   └── tauri.linux.conf.json  # config Tauri do Linux
+│   ├── src/        # Rust side (PTYs, filesystem/git, sessions, window)
+│   └── tauri.linux.conf.json  # Linux Tauri config
 ├── scripts/
-│   └── install-linux-deps.sh  # dependências Ubuntu/Debian
+│   └── install-linux-deps.sh  # Ubuntu/Debian dependencies
 ├── docs/
-│   ├── linux.md            # guia Linux completo
-│   ├── aur.md              # pacote AUR monocode-bin
-│   ├── CONTRIBUTING.md     # como contribuir
-│   ├── CODE_OF_CONDUCT.md  # código de conduta
-│   └── SECURITY.md         # política de segurança
-└── .github/workflows/  # CI (ci.yml) e release (release.yml), só Linux
+│   ├── linux.md            # full Linux guide
+│   ├── aur.md              # monocode-bin AUR package
+│   ├── CONTRIBUTING.md     # how to contribute
+│   ├── CODE_OF_CONDUCT.md  # code of conduct
+│   └── SECURITY.md         # security policy
+└── .github/workflows/  # CI (ci.yml) and release (release.yml), Linux only
 ```
 
-## Scripts disponíveis
+## Available scripts
 
-| Script | O que faz |
+| Script | What it does |
 |---|---|
-| `npm run dev` | frontend Vite em modo dev |
-| `npm run build` | `tsc` + build Vite |
-| `npm test` / `test:watch` | suíte Vitest |
-| `npm run check` | validação total (web + rust) |
-| `npm run tauri dev` | app desktop em desenvolvimento |
-| `npm run setup:linux` | instala dependências no Debian/Ubuntu |
-| `npm run build:linux` | gera o AppImage |
-| `npm run set-version` | sincroniza versão nos manifestos |
+| `npm run dev` | Vite frontend in dev mode |
+| `npm run build` | `tsc` + Vite build |
+| `npm test` / `test:watch` | Vitest suite |
+| `npm run check` | full validation (web + rust) |
+| `npm run tauri dev` | desktop app in development |
+| `npm run setup:linux` | installs dependencies on Debian/Ubuntu |
+| `npm run build:linux` | builds the AppImage |
+| `npm run set-version` | syncs the version across manifests |
 
-## CI e releases
+## Contributing
 
-- CI (`.github/workflows/ci.yml`): roda no `ubuntu-latest` a cada push/PR com Vitest, `tsc`, `cargo fmt`, Clippy e `cargo test`.
-- Release (`.github/workflows/release.yml`): a cada tag `v*`, confere a versão nos manifestos e no CHANGELOG, compila o AppImage e publica no GitHub Release.
+The project is maintained by [yanhenrique-dev](https://github.com/yanhenrique-dev), with a Linux focus. Small, focused pull requests are welcome. Large changes deserve an issue first. See how to contribute in [CONTRIBUTING.md](docs/CONTRIBUTING.md) and the conduct rules in [CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md). Report security flaws in private, via [Security Advisories](https://github.com/yanhenrique-dev/Monocode-linux/security/advisories/new). Never open a public issue for those.
 
-Para lançar uma versão:
+## License
 
-```bash
-npm run set-version 0.1.51
-# atualize o CHANGELOG.md e commite
-git tag v0.1.51 && git push origin v0.1.51
-```
-
-## Contribuindo
-
-O projeto é mantido por [yanhenrique-dev](https://github.com/yanhenrique-dev), com foco em Linux. Pull requests pequenos e focados são bem-vindos. Mudanças grandes merecem uma issue antes. Veja como contribuir em [CONTRIBUTING.md](docs/CONTRIBUTING.md) e as regras de conduta em [CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md). Falha de segurança se reporta em privado, via [Security Advisories](https://github.com/yanhenrique-dev/Monocode-linux/security/advisories/new). Nunca abra issue pública para isso.
-
-## Licença
-
-[MIT](LICENSE). Nomes e logos de provedores são marcas de seus respectivos donos, veja [NOTICE](NOTICE).
+[MIT](LICENSE). Provider names and logos are trademarks of their respective owners, see [NOTICE](NOTICE).
