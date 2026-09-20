@@ -1,8 +1,9 @@
 name: Release
 
 # Linux-only fork: builds the AppImage on Ubuntu and attaches it to the
-# GitHub Release. Other bundles (.deb, macOS .dmg, Windows .exe) were
-# removed: AppImage is the only distributed artifact.
+# GitHub Release, plus a portable tarball (raw binary + desktop entry +
+# icons, no AppImage runtime, no pacman). Other bundles (.deb, macOS .dmg,
+# Windows .exe) were removed.
 
 on:
   push:
@@ -14,7 +15,7 @@ permissions:
 
 jobs:
   linux:
-    name: Linux AppImage + GitHub Release
+    name: Linux AppImage + tarball + GitHub Release
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -85,9 +86,9 @@ jobs:
           node scripts/make-updater-json.mjs \
             "$VERSION" "${appimage[0]}" "${appimage[0]}.sig" latest.json
 
-      - name: GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build portable tarball
+        # Extract the final (repacked) AppImage once and pack the raw
+        # binary + desktop entry + icons. See scripts/make-portable-tarball.sh.
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -97,7 +98,22 @@ jobs:
             exit 1
           fi
           VERSION="${GITHUB_REF_NAME#v}"
+          bash scripts/make-portable-tarball.sh "$VERSION" "${appimage[0]}" dist
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          appimage=(target/release/bundle/appimage/*.AppImage)
+          tarball=(dist/*.tar.gz)
+          if (( ${#appimage[@]} != 1 )) || (( ${#tarball[@]} != 1 )); then
+            echo "Expected exactly one AppImage and one tarball" >&2
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" \
             --title "MonoCode Linux $VERSION" \
             --notes "See CHANGELOG.md for details." \
-            "${appimage[0]}" "${appimage[0]}.sig" latest.json
+            "${appimage[0]}" "${appimage[0]}.sig" latest.json "${tarball[0]}"
