@@ -2960,7 +2960,7 @@ const SoundCueRow = memo(function SoundCueRow({
 }) {
   const { t } = useLocale();
   const [testing, setTesting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SoundFileReason | null>(null);
   const custom = pref !== "preset";
 
   const runTest = async () => {
@@ -2969,7 +2969,7 @@ const SoundCueRow = memo(function SoundCueRow({
     try {
       if (custom) {
         const result = await playSoundFile(pref);
-        if (!result.ok) setError(t(ERROR_HINT[result.reason]));
+        if (!result.ok) setError(result.reason);
         return;
       }
       previewCue(cue);
@@ -2996,7 +2996,7 @@ const SoundCueRow = memo(function SoundCueRow({
       label={t(cueLabelKey(cue))}
       description={
         custom
-          ? pref.split("/").pop() || pref
+          ? pref.split(/[\\/]/).pop() || pref
           : undefined
       }
     >
@@ -3040,7 +3040,7 @@ const SoundCueRow = memo(function SoundCueRow({
       ) : null}
       {error ? (
         <span className="w-full text-right text-[12px] text-red-400/90">
-          {error}
+          {t(ERROR_HINT[error])}
         </span>
       ) : null}
     </Row>
