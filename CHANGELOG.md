@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.80] - 2026-09-20
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Tasks pill near the composer: surfaces the active task list progress
+  and jumps to the running card on click (toggle in Settings).
+- F11 toggles fullscreen, browser-style.
+
+### Changed
+
+- Icon system foundation: consistent stroke scale, provider marks, and
+  shared aliases across the chrome.
+- True chevron glyphs and a lighter taskbar badge fillet for separation
+  on dark docks.
+
 ## [0.1.75] - 2026-09-20
 
 ### Added
