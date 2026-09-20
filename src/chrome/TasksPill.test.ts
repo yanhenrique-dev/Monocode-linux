@@ -124,6 +124,67 @@ describe("TasksPill", () => {
     }
   });
 
+  it("scrolls to the anchor and hides on click", () => {
+    const { root } = renderPill();
+    try {
+      setIntersecting(false);
+      const anchor = container.querySelector<HTMLElement>(
+        '[data-task-anchor="t1"]',
+      )!;
+      const scrollIntoView = vi.fn();
+      anchor.scrollIntoView = scrollIntoView;
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      act(() => pill.click());
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+      expect(container.querySelector("[data-tasks-pill]")).toBeNull();
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("scrolls to a freshly mounted anchor in the paginated case", () => {
+    container.innerHTML = '<div class="agent-transcript"></div>';
+    const revealBlock = vi.fn(() => {
+      // revealBlock mounts synchronously: the anchor is in the DOM on return.
+      container
+        .querySelector(".agent-transcript")!
+        .insertAdjacentHTML("beforeend", '<div data-task-anchor="t1"></div>');
+      return true;
+    });
+    const mount = document.createElement("div");
+    container.append(mount);
+    const root = createRoot(mount);
+    act(() =>
+      root.render(
+        createElement(TasksPill, {
+          blocks: [taskBlock("t1")],
+          scope: { current: container },
+          enabled: true,
+          revealBlock,
+        }),
+      ),
+    );
+    try {
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      const scrollIntoView = vi.fn();
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scrollIntoView;
+      try {
+        act(() => pill.click());
+      } finally {
+        Element.prototype.scrollIntoView = original;
+      }
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+      expect(container.querySelector("[data-tasks-pill]")).toBeNull();
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
   it("stays hidden when disabled or without tasks", () => {
     const first = renderPill({ enabled: false });
     try {

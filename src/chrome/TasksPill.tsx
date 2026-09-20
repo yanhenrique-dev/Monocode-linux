@@ -40,8 +40,9 @@ export function TasksPill({
     );
     if (!scroller) return;
     // Paginated-out turn: the block exists but its anchor is not mounted.
-    // Treat as offscreen; this re-runs when blocks change (e.g. after
-    // revealBlock loads the turn), so the pill hides once visible.
+    // Treat as offscreen. Note the effect does NOT re-run when revealBlock
+    // mounts the turn (that only flips AgentTranscript-internal state), so
+    // the click handler below hides the pill and scrolls explicitly.
     if (!anchor) {
       setOffscreen(true);
       return;
@@ -56,6 +57,17 @@ export function TasksPill({
 
   if (!visible || !enabled || !last || !offscreen) return null;
   const items = last.taskList?.items ?? [];
+  const reveal = () => {
+    if (!revealBlock?.(last.id)) return;
+    // revealBlock mounts synchronously (flushSync), so the anchor is in the
+    // DOM here — whether the turn was just mounted or was already there.
+    // Scroll it into view (revealBlock alone preserves scroll position) and
+    // hide the pill; the observer re-shows it if scrolled away again.
+    scope.current
+      ?.querySelector<HTMLElement>(`[data-task-anchor="${last.id}"]`)
+      ?.scrollIntoView({ block: "center" });
+    setOffscreen(false);
+  };
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-10 z-30 flex justify-center">
       <button
@@ -63,7 +75,7 @@ export function TasksPill({
         title="Show tasks"
         aria-label={`Show tasks (${taskListProgressLabel(items)})`}
         data-tasks-pill
-        onClick={() => revealBlock?.(last.id)}
+        onClick={reveal}
         className="pointer-events-auto flex h-7 max-w-64 items-center gap-1.5 rounded-full border border-content/15 bg-background-base/95 px-2.5 text-content shadow-md hover:bg-content/5"
       >
         <ListEnd
