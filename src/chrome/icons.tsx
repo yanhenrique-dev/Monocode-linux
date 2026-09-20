@@ -1,4 +1,12 @@
-/** Hugeicons chrome set. Glyphs are deep-imported so the 5MB catalog is not bundled. */
+/**
+ * Hugeicons chrome set. Glyphs are deep-imported so the 5MB catalog is not bundled.
+ *
+ * Icon scale (keep new usages on it):
+ * - `size-3` for dense rows (menus, lists, table cells).
+ * - `size-3.5` for toolbar and form controls.
+ * - `size-4` for triggers, rail tabs, and status icons.
+ * - `strokeWidth` defaults to 1.75; pass 2 only for `Check` at 14px and below.
+ */
 import {
   HugeiconsIcon,
   type HugeiconsIconProps,
@@ -125,7 +133,7 @@ const stroke = {
   stroke: "currentColor",
   strokeLinecap: "round",
   strokeLinejoin: "round",
-  strokeWidth: "1.5",
+  strokeWidth: "1.75",
 } as const;
 
 /** Catalog FoldVertical/UnfoldVertical use filled chevrons; keep these stroke-only. */

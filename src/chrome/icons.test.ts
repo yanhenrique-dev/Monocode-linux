@@ -52,6 +52,19 @@ describe("hugeicons imports", () => {
     }
   });
 
+  it("uses the catalog stroke standard on custom glyphs", () => {
+    for (const Icon of [FoldVertical, UnfoldVertical]) {
+      const html = renderToStaticMarkup(createElement(Icon));
+      const widths = [...html.matchAll(/stroke-width="([^"]+)"/g)].map(
+        (match) => match[1],
+      );
+      expect(widths.length, Icon.displayName).toBeGreaterThan(0);
+      for (const width of widths) {
+        expect(width, Icon.displayName).toBe("1.75");
+      }
+    }
+  });
+
   it("optically insets the detailed Hermes artwork at UI icon sizes", () => {
     const html = renderToStaticMarkup(
       createElement(HarnessIcon, {
