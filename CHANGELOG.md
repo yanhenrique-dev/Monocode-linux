@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.95] - 2026-09-20
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Portable tarball next to the AppImage on every release: raw binary,
+  desktop entry, icons and install notes — no AppImage runtime, no
+  pacman required (`~/.local` or `/usr/local` install).
+
 ## [0.1.94] - 2026-09-20
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
