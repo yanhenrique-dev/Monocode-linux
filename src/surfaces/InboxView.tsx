@@ -116,6 +116,7 @@ import {
   markInboxItemSeen,
   markInboxItemsSeen,
   rememberInboxItems,
+  resolveSeenMark,
   useInboxSeenTick,
 } from "../lib/inboxSeen";
 import { markLinkedSessionUpdateSeen } from "../lib/linkedSessionSeen";
@@ -714,8 +715,16 @@ export function InboxView({
   const shownItemCount = listWindowSize(visibleItems.length, listLimit);
   const shownItems = visibleItems.slice(0, shownItemCount);
   const hasMoreItems = shownItemCount < visibleItems.length;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const handleSelectCard = useCallback((key: string, updatedAt: string) => {
-    markInboxItemSeen({ key, updatedAt });
+    // The card may render a stale snapshot while a poll is in flight: resolve
+    // the freshest known updatedAt so the next forced poll cannot resurrect
+    // the unread dot.
+    const fresh = itemsRef.current.find(
+      (entry) => inboxItemKey(entry) === key,
+    )?.updatedAt;
+    markInboxItemSeen({ key, updatedAt: resolveSeenMark(updatedAt, fresh) });
     setSelectedKey(key);
   }, []);
 
