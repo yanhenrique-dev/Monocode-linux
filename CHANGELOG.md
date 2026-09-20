@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in beside mode.
 - Custom pets management in Settings (add, remove, hide).
 - Font-smoothing auto on Linux.
+- Brazilian Portuguese translation for Settings (language selector,
+  dates/numbers follow the locale).
+- Dual-protocol OpenCode harness (V1/V2 auto-detect, durable prompt,
+  nested permissions/questions).
 
 ### Fixed
 
