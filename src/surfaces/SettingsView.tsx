@@ -192,22 +192,22 @@ import {
   KEYBINDINGS,
   loadClaudeHooks,
   loadCloseToTray,
-  loadComposerEffortVisible,
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
+  loadModelControls,
   loadNotesEnabled,
   loadTerminalGpu,
   saveClaudeHooks,
   saveCloseToTray,
-  saveComposerEffortVisible,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
+  saveModelControls,
   saveNotesEnabled,
   saveTerminalGpu,
   searchSettings,
@@ -215,6 +215,7 @@ import {
   settingsSectionLabel,
   type DiffViewer,
   type FollowUpBehavior,
+  type ModelControls,
   type SettingsSearchResult,
   type SettingsSectionId,
 } from "../lib/settings";
@@ -749,9 +750,8 @@ function ChatPage() {
     useState(loadTranscriptAnchor);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
-  const [composerEffortVisible, setComposerEffortVisible] = useState(
-    loadComposerEffortVisible,
-  );
+  const [modelControls, setModelControls] =
+    useState<ModelControls>(loadModelControls);
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
   const [gridArcadeEnabled, setGridArcadeEnabled] = useState(
@@ -783,9 +783,9 @@ function ChatPage() {
     setFollowUpBehavior(next);
   };
 
-  const onComposerEffortVisible = (next: boolean) => {
-    saveComposerEffortVisible(next);
-    setComposerEffortVisible(next);
+  const onModelControls = (next: ModelControls) => {
+    saveModelControls(next);
+    setModelControls(next);
   };
 
   const onDiffViewer = (next: DiffViewer) => {
@@ -857,14 +857,18 @@ function ChatPage() {
           />
         </Row>
         <Row
-          id="effort-control"
-          label="Effort control"
-          description="Show the current effort as a separate control beside the model picker for quicker changes. When off, effort stays inside the model menu."
+          id="model-controls"
+          label="Model controls"
+          description="Show model options beside the picker instead of inside the model menu."
         >
-          <Toggle
-            label="Show effort beside model picker"
-            on={composerEffortVisible}
-            onChange={onComposerEffortVisible}
+          <Segmented
+            label="Model controls"
+            value={modelControls}
+            options={[
+              { value: "menu", label: "Menu" },
+              { value: "beside", label: "Beside" },
+            ]}
+            onChange={onModelControls}
           />
         </Row>
       </Group>
