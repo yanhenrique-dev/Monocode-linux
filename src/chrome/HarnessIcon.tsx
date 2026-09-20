@@ -132,6 +132,13 @@ export function HarnessIcon({
       </MonoIcon>
     );
   }
+  if (harness === "mcode") {
+    return (
+      <MonoIcon className={className}>
+        <path d="M2 0H10L14.5 11L19 0H27V25H20V8.5L15 19.5H14L9 8.5V25H2V0Z" />
+      </MonoIcon>
+    );
+  }
   const src = HARNESS_ICONS[harness];
   if (!src) {
     return <Bot className={className} strokeWidth={1.75} aria-hidden />;

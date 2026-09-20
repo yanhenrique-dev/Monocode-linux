@@ -71,6 +71,9 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   onSelectSection = vi.fn();
+  // These tests assert the English UI: pin the locale so a pt-BR OS does
+  // not translate the surface under test.
+  localStorage.setItem("monocode.locale", "en");
 });
 
 afterEach(async () => {

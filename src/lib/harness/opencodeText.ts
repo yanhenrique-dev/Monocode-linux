@@ -8,13 +8,12 @@ import {
   unwatchChild,
   watchChild,
 } from "./child";
-import { OpenCodeClient } from "./opencodeClient";
+import { createOpenCodeClient, type OpenCodeClient } from "./opencodeClient";
 import {
-  compareSemver,
-  MINIMUM_OPENCODE_VERSION,
+  assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
-  parseOpenCodeVersion,
   parseServerUrlFromOutput,
+  type OpenCodeProtocol,
 } from "./opencodeProtocol";
 
 const TEXT_CHILD_ID = "monocode-opencode-text";
@@ -103,10 +102,12 @@ async function startLive(
 ): Promise<LiveText> {
   const { path } = await resolveOpenCodeBinary();
   const versionOut = await execChild(path, ["--version"], cwd).catch(() => "");
-  const version = parseOpenCodeVersion(versionOut);
-  if (!version || compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {
+  let protocol: OpenCodeProtocol;
+  try {
+    ({ protocol } = assertSupportedOpenCodeRelease(versionOut));
+  } catch {
     throw new Error(
-      `OpenCode v${version ?? "unknown"} is too old for text generation.`,
+      `OpenCode ${versionOut.trim() || "unknown"} is too old for text generation.`,
     );
   }
 
@@ -136,7 +137,7 @@ async function startLive(
 
   try {
     const url = await waitForUrl(() => serverUrl, SERVER_TIMEOUT_MS);
-    const client = new OpenCodeClient(url, cwd);
+    const client = createOpenCodeClient(url, cwd, protocol);
     const created = await client.createSession({
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
     });

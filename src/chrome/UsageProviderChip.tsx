@@ -14,6 +14,7 @@ import {
 import type { CodexRateLimitResetOutcome } from "../lib/rateLimitsFetch";
 import { mascotPath } from "../lib/projectMascots";
 import { resolveEffectiveMascot } from "../lib/customPets";
+import { getIntlLocale } from "../lib/locale";
 import { projectKey, projectName } from "../lib/paths";
 import { HARNESS_TITLE } from "../lib/session";
 import {
@@ -594,7 +595,7 @@ function UsageWindowCard({
           title={
             window.resetsAt == null
               ? undefined
-              : new Date(window.resetsAt).toLocaleString()
+              : new Date(window.resetsAt).toLocaleString(getIntlLocale())
           }
         >
           {window.resetsAt == null
@@ -827,7 +828,7 @@ function BankedResetRow({
           title={
             credit?.expiresAt == null
               ? undefined
-              : new Date(credit.expiresAt).toLocaleString()
+              : new Date(credit.expiresAt).toLocaleString(getIntlLocale())
           }
         >
           {credit?.expiresAt == null
