@@ -60,6 +60,14 @@ export function TasksPill({
 
   if (!visible || !enabled || !last || !offscreen) return null;
   const items = last.taskList?.items ?? [];
+  // Once every item settled, the pill would only ever read "Complete" —
+  // hide it instead of pinning a dead strip above the composer.
+  if (
+    items.every(
+      (item) => item.status === "completed" || item.status === "cancelled",
+    )
+  )
+    return null;
   const reveal = () => {
     if (!revealBlock?.(last.id)) return;
     // revealBlock mounts synchronously (flushSync), so the anchor is in the
