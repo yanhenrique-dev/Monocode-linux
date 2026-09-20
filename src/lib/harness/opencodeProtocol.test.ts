@@ -8,6 +8,7 @@ import {
 } from "./opencodeCatalog";
 import {
   buildOpenCodePermissionRules,
+  buildOpenCodePermissionRulesV2,
   compareSemver,
   contextUsedFromMessageInfo,
   turnMetricsFromMessageInfo,
@@ -19,9 +20,15 @@ import {
   isOpenCodeNotFound,
   isTurnDoneStatusEvent,
   mergeOpenCodeAssistantText,
+  normalizeServerEvent,
+  openCodeProtocolForRelease,
+  openCodeVariantLabel,
   parseOpenCodeModelSlug,
+  assertSupportedOpenCodeRelease,
+  parseOpenCodeRelease,
   parseOpenCodeVersion,
   parseServerUrlFromOutput,
+  sortOpenCodeVariants,
   toOpenCodePermissionReply,
   toolKindFromName,
 } from "./opencodeProtocol";
@@ -132,6 +139,74 @@ describe("parseOpenCodeVersion / compareSemver", () => {
   });
 });
 
+describe("openCode protocol detection", () => {
+  it("classifies stable and beta releases", () => {
+    expect(
+      openCodeProtocolForRelease(parseOpenCodeRelease("1.14.19")!),
+    ).toBe("v1");
+    expect(
+      openCodeProtocolForRelease(parseOpenCodeRelease("opencode 2.0.0")!),
+    ).toBe("v2");
+    expect(
+      openCodeProtocolForRelease(parseOpenCodeRelease("0.0.0-beta-18743")!),
+    ).toBe("v2");
+  });
+
+  it("gates old V1, accepts V2, rejects garbage", () => {
+    expect(assertSupportedOpenCodeRelease("1.14.19")).toEqual({
+      version: "1.14.19",
+      protocol: "v1",
+    });
+    expect(assertSupportedOpenCodeRelease("0.0.0-beta-18743").protocol).toBe(
+      "v2",
+    );
+    expect(() => assertSupportedOpenCodeRelease("1.14.18")).toThrow(/too old/);
+    expect(() => assertSupportedOpenCodeRelease("no version here")).toThrow(
+      /Unable to determine/,
+    );
+  });
+});
+
+describe("normalizeServerEvent", () => {
+  it("maps V2 question asks onto the V1 pipeline", () => {
+    expect(
+      normalizeServerEvent({
+        type: "question.v2.asked",
+        properties: {
+          sessionID: "s1",
+          request: {
+            id: "req-9",
+            questions: [{ prompt: "Proceed?" }],
+          },
+        },
+      }),
+    ).toMatchObject({
+      type: "question.asked",
+      properties: {
+        id: "req-9",
+        questions: [{ prompt: "Proceed?" }],
+      },
+    });
+  });
+
+  it("drops durability bookkeeping without V1 meaning", () => {
+    expect(
+      normalizeServerEvent({ type: "question.v2.replied", properties: {} }),
+    ).toBeNull();
+    expect(
+      normalizeServerEvent({
+        type: "session.next.prompt.admitted",
+        properties: {},
+      }),
+    ).toBeNull();
+  });
+
+  it("passes V1 events through untouched", () => {
+    const event = { type: "permission.asked", properties: { id: "r1" } };
+    expect(normalizeServerEvent(event)).toBe(event);
+  });
+});
+
 describe("buildOpenCodePermissionRules", () => {
   it("allows everything in full-access", () => {
     expect(buildOpenCodePermissionRules("full-access")).toEqual([
@@ -156,6 +231,16 @@ describe("buildOpenCodePermissionRules", () => {
   it("maps allow/deny onto OpenCode reply values", () => {
     expect(toOpenCodePermissionReply("allow")).toBe("once");
     expect(toOpenCodePermissionReply("deny")).toBe("reject");
+  });
+
+  it("shapes V2 permission rules from the V1 builder", () => {
+    expect(buildOpenCodePermissionRulesV2("full-access")).toEqual([
+      { action: "*", resource: "*", effect: "allow" },
+    ]);
+    expect(buildOpenCodePermissionRulesV2("supervised")).toEqual([
+      { action: "*", resource: "*", effect: "ask" },
+      { action: "question", resource: "*", effect: "allow" },
+    ]);
   });
 });
 
@@ -182,6 +267,23 @@ describe("OpenCode CLI inventory parsers", () => {
         ['opencode/big-pickle', '{"id":"big-pickle"}'].join("\n"),
       ),
     ).toBeNull();
+  });
+
+  it("normalizes V2 native shapes: arrays, modelID, canonical IDs, skips", () => {
+    const parsed = parseModelsCliOutput(
+      [
+        "azure-cognitive-services/gpt-5",
+        '{"modelID":"gpt-5"}',
+        "google-vertex-anthropic/claude",
+        '{"modelID":"claude","variants":[{"id":"high"},{"id":"low"}],"status":"deprecated"}',
+        "acme/old",
+        '{"id":"old","disabled":true}',
+      ].join("\n"),
+    );
+    // Deprecated/disabled entries are dropped; legacy IDs canonicalized.
+    expect(parsed.connected).toEqual(["azure"]);
+    const models = flattenOpenCodeModels(parsed, []);
+    expect(models.map((model) => model.nativeId)).toEqual(["azure/gpt-5"]);
   });
 
   it("parses models --verbose output", () => {
@@ -228,6 +330,33 @@ describe("OpenCode CLI inventory parsers", () => {
     expect(openCodeProviderName("opencode-go")).toBe("OpenCode Go");
     expect(openCodeProviderName("openai")).toBe("OpenAI");
     expect(openCodeProviderName("acme-cloud")).toBe("Acme Cloud");
+  });
+
+  it("sorts variant options and labels xhigh as Extra High", () => {
+    const parsed = parseModelsCliOutput(
+      [
+        "some-cloud/spark-1",
+        '{"id":"spark-1","name":"Spark 1","variants":{"high":{},"minimal":{},"xhigh":{},"low":{},"medium":{}}}',
+        "",
+      ].join("\n"),
+    );
+    const [model] = flattenOpenCodeModels(parsed, []);
+    const variant = model?.settings?.find((setting) => setting.id === "variant");
+    expect(variant?.options.map((option) => option.value)).toEqual([
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
+    expect(variant?.options.map((option) => option.label)).toEqual([
+      "Minimal",
+      "Low",
+      "Medium",
+      "High",
+      "Extra High",
+    ]);
+    expect(variant?.value).toBe("medium");
   });
 });
 
@@ -299,6 +428,31 @@ describe("OpenCode helpers", () => {
     expect(inferDefaultAgent([{ name: "plan" }, { name: "build" }])).toBe(
       "build",
     );
+  });
+
+  it("prefers medium/high variants on any provider", () => {
+    expect(inferDefaultVariant("some-cloud", ["low", "medium", "high"])).toBe(
+      "medium",
+    );
+    expect(inferDefaultVariant("some-cloud", ["low", "high"])).toBe("high");
+    expect(inferDefaultVariant("some-cloud", ["low", "xhigh"])).toBeUndefined();
+  });
+
+  it("labels variants like Codex/Cursor effort levels", () => {
+    expect(openCodeVariantLabel("xhigh")).toBe("Extra High");
+    expect(openCodeVariantLabel("extra-high")).toBe("Extra High");
+    expect(openCodeVariantLabel("minimal")).toBe("Minimal");
+    expect(openCodeVariantLabel("high")).toBe("High");
+  });
+
+  it("sorts variants from lowest to highest effort", () => {
+    expect(sortOpenCodeVariants(["high", "minimal", "xhigh", "low", "medium"])).toEqual([
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ]);
   });
 });
 

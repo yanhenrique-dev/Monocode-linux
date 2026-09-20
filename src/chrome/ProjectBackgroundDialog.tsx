@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Loader } from "./icons";
+import { LoaderCircle } from "./icons";
 import { Modal } from "./Modal";
 import {
   CHAT_BACKGROUND_OPACITY_MAX,
@@ -145,7 +145,7 @@ export function ProjectBackgroundDialog({ project, name, onClose }: Props) {
             className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-content/10 px-2.5 py-1.5 text-[12px] text-content/70 hover:bg-content/10 hover:text-content disabled:opacity-40"
           >
             {busy ? (
-              <Loader className="size-3.5 animate-spin" aria-hidden />
+              <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
             ) : null}
             {path ? "Change image" : "Choose image"}
           </button>

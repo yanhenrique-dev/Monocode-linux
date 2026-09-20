@@ -11,12 +11,19 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Composer } from "../chrome/Composer";
+import type { Worktree } from "../lib/worktrees";
+import type { WorkspaceMode } from "../lib/session";
 import { ErrorBoundary } from "../chrome/ErrorBoundary";
 import { orchestrator, sameCheckout } from "../lib/orchestration";
 import { DiscussionEmpty } from "../chrome/DiscussionEmpty";
 import { LinkedWorkItemUpdateNotice } from "../chrome/LinkedWorkItemUpdateNotice";
 import { SessionReview } from "../chrome/SessionReview";
 import { PromptOutline } from "../chrome/PromptOutline";
+import { TasksPill } from "../chrome/TasksPill";
+import {
+  loadTasksPill,
+  TASKS_PILL_CHANGE_EVENT,
+} from "../lib/appearance";
 import {
   canCompactHarnessContext,
   type ApprovalDecision,
@@ -141,6 +148,14 @@ type Props = {
     turn: Block[],
   ) => void;
   onHandoff?: (sessionId: string, target: ModelTarget, turn: Block[]) => void;
+  onWorktreeChange?: (sessionId: string, tree: Worktree) => Promise<void>;
+  onManageWorktrees?: () => void;
+  onWorkspaceModeChange: (
+    sessionId: string,
+    mode: WorkspaceMode,
+    base?: string,
+  ) => void;
+  onWorktreeBaseChange: (sessionId: string, base: string) => void;
   onNewTerminal: (sessionId: string) => void;
   onPaneDragStart?: (event: ReactPointerEvent<HTMLElement>) => void;
 };
@@ -188,6 +203,10 @@ const SessionPaneContent = memo(function SessionPaneContent({
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
+  onWorktreeChange,
+  onManageWorktrees,
+  onWorkspaceModeChange,
+  onWorktreeBaseChange,
   onNewTerminal,
   onPaneDragStart,
 }: Props) {
@@ -250,22 +269,23 @@ const SessionPaneContent = memo(function SessionPaneContent({
   );
   const onSecondOpinionForTranscript = useCallback(
     (target: ModelTarget, turn: Block[]) => {
-      if (session.inboxAsk || !onSecondOpinion) return;
+      if (session.inboxAsk || session.worktreeRemoved || !onSecondOpinion)
+        return;
       onSecondOpinion(session.id, target, turn);
     },
-    [onSecondOpinion, session.id, session.inboxAsk],
+    [onSecondOpinion, session.id, session.inboxAsk, session.worktreeRemoved],
   );
   const onHandoffForTranscript = useCallback(
     (target: ModelTarget, turn: Block[]) => {
-      if (session.inboxAsk || !onHandoff) return;
+      if (session.inboxAsk || session.worktreeRemoved || !onHandoff) return;
       onHandoff(session.id, target, turn);
     },
-    [onHandoff, session.id, session.inboxAsk],
+    [onHandoff, session.id, session.inboxAsk, session.worktreeRemoved],
   );
   const workCwdForAccessory = sessionWorkCwd(session);
   const latestTurnAccessory = useMemo(
     () =>
-      session.inboxAsk ? undefined : (
+      session.inboxAsk || session.worktreeRemoved ? undefined : (
         <SessionReview
           sessionId={session.id}
           cwd={workCwdForAccessory}
@@ -285,6 +305,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       ),
     [
       session.inboxAsk,
+      session.worktreeRemoved,
       session.id,
       session.busy,
       workCwdForAccessory,
@@ -298,6 +319,18 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const transcriptScope = useRef<HTMLDivElement>(null);
   const quoteRequestId = useRef(0);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [tasksPillEnabled, setTasksPillEnabled] = useState(loadTasksPill);
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setTasksPillEnabled(
+        (event as CustomEvent<boolean>).detail ?? loadTasksPill(),
+      );
+    };
+    window.addEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
+    };
+  }, []);
   const astraWelcomeSequence = useRef(0);
   const [astraWelcomeRun, setAstraWelcomeRun] = useState<number | null>(null);
   const dismissAstraWelcome = useCallback(() => setAstraWelcomeRun(null), []);
@@ -306,9 +339,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
   }, [visible]);
   // Restore a saved run for this lead; its agents render on the sidebar card.
   useEffect(() => {
-    if (!session.inboxAsk)
+    if (!session.inboxAsk && !session.worktreeRemoved)
       void orchestrator.hydrate(session.id).catch(console.error);
-  }, [session.id, session.inboxAsk]);
+  }, [session.id, session.inboxAsk, session.worktreeRemoved]);
   const [quoteRequest, setQuoteRequest] = useState<QuoteRequest>();
   const onJumpToBottomReady = useCallback((jump: () => void) => {
     jumpToBottomRef.current = jump;
@@ -423,6 +456,26 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onFocus={() => onFocus(session.id)}
       onCwdChange={(cwd) => onCwdChange(session.id, cwd)}
       onBranchChange={() => onBranchChange(session.id)}
+      onWorktreeChange={
+        onWorktreeChange
+          ? (tree) => onWorktreeChange(session.id, tree)
+          : undefined
+      }
+      draftWorkspace={
+        !session.inboxAsk &&
+        !session.worktreeRemoved &&
+        !managed &&
+        ((isEmpty && !session.worktreeCwd) ||
+          (!!session.workspaceMode && !session.worktreeCwd))
+      }
+      workspaceMode={session.workspaceMode}
+      worktreeBase={session.worktreeBase}
+      onWorkspaceModeChange={(mode, base) =>
+        onWorkspaceModeChange(session.id, mode, base)
+      }
+      onWorktreeBaseChange={(base) => onWorktreeBaseChange(session.id, base)}
+      worktreeRemoved={session.worktreeRemoved}
+      onManageWorktrees={onManageWorktrees}
       onNewTerminal={() => onNewTerminal(session.id)}
       onModelChange={(harness, model) => {
         onModelChange(session.id, harness, model);
@@ -579,7 +632,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 model={session.model}
                 modelSettings={session.modelSettings}
                 pendingQuestion={!!session.pendingQuestion}
-                onApproval={approve}
+                onApproval={session.worktreeRemoved ? undefined : approve}
                 onAddToChat={addSelectionToChat}
                 onSaveNote={notesEnabled ? saveNote : undefined}
                 onSaveSelectionNote={
@@ -588,14 +641,18 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 onOpenFile={onOpenFile}
                 onOpenDiff={onOpenDiff}
                 onOpenPlan={openPlan}
-                onBuildPlan={buildPlan}
+                onBuildPlan={session.worktreeRemoved ? undefined : buildPlan}
                 onSecondOpinion={
-                  !session.inboxAsk && onSecondOpinion
+                  !session.inboxAsk &&
+                  !session.worktreeRemoved &&
+                  onSecondOpinion
                     ? onSecondOpinionForTranscript
                     : undefined
                 }
                 onHandoff={
-                  !session.inboxAsk && onHandoff
+                  !session.inboxAsk &&
+                  !session.worktreeRemoved &&
+                  onHandoff
                     ? onHandoffForTranscript
                     : undefined
                 }
@@ -608,6 +665,13 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 blocks={session.blocks}
                 scope={transcriptScope}
                 visible={visible}
+                revealBlock={revealBlock}
+              />
+              <TasksPill
+                blocks={session.blocks}
+                scope={transcriptScope}
+                visible={visible}
+                enabled={tasksPillEnabled}
                 revealBlock={revealBlock}
               />
               {showJumpToBottom ? (

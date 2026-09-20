@@ -63,8 +63,8 @@ const MENU_WIDTH = 240;
 const SUBMENU_WIDTH = 240;
 const SUBMENU_MAX_HEIGHT = 288;
 const EFFORT_MENU_WIDTH = 200;
-/** The flyout tucks under the parent menu's edge rather than floating free. */
-const SUBMENU_OVERLAP = -4;
+/** Gap positivo: dois cards distintos, mesma regra do ModelPicker. */
+const SUBMENU_GAP = 8;
 /** Neither menu is inside the other, so a click in one is not a click away. */
 const SELF = "[data-provider-target]";
 
@@ -455,7 +455,7 @@ export function SecondOpinionButton({
               ref={lockOverscroll}
               anchor={activeRow}
               side="right"
-              gap={SUBMENU_OVERLAP}
+              gap={SUBMENU_GAP}
               width={SUBMENU_WIDTH}
               maxHeight={SUBMENU_MAX_HEIGHT}
               layer={LAYER.submenu}
@@ -529,7 +529,7 @@ export function SecondOpinionButton({
               key={`${activeModel.id}:effort`}
               anchor={activeModelRow}
               side="right"
-              gap={SUBMENU_OVERLAP}
+              gap={SUBMENU_GAP}
               width={EFFORT_MENU_WIDTH}
               layer={LAYER.submenu + 1}
               role="menu"

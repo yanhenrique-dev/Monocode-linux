@@ -17,18 +17,22 @@ const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
+const TASKS_PILL_KEY = "monocode.tasksPill";
 const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
 const CHAT_BACKGROUND_EMPTY_OPACITY_KEY = "monocode.chatBackgroundEmptyOpacity";
 const CHAT_BACKGROUND_SESSION_OPACITY_KEY =
   "monocode.chatBackgroundSessionOpacity";
 const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
+const CHAT_BACKGROUND_BLUR_KEY = "monocode.chatBackgroundBlur";
 const CHANGES_VIEW_KEY = "monocode.changesView";
 let chatBackgroundRevision = Date.now();
 let nativeGlassReady = false;
 
 export const CHAT_BACKGROUND_PATH_CHANGE_EVENT =
   "monocode:chat-background-path-change";
+export const CHAT_BACKGROUND_BLUR_CHANGE_EVENT =
+  "monocode:chat-background-blur-change";
 
 export type ColorScheme = "dark" | "light";
 export type ThemePreference = ColorScheme | "system";
@@ -48,6 +52,11 @@ export const TRANSCRIPT_LAYOUT_DEFAULT: TranscriptLayout = "full";
 export const CHANGES_VIEW_DEFAULT: ChangesView = "list";
 
 export const TRANSCRIPT_ANCHOR_DEFAULT = true;
+
+export const TASKS_PILL_DEFAULT = true;
+
+/** Fired on `window` whenever the tasks pill flips (detail: boolean). */
+export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
 
 /** Fired on `window` whenever prompt-to-top anchoring flips (detail: boolean). */
 export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
@@ -104,6 +113,9 @@ export const CHAT_BACKGROUND_EMPTY_OPACITY_DEFAULT =
 export const CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT =
   CHAT_BACKGROUND_OPACITY_DEFAULT;
 export const CHAT_BACKGROUND_SCOPE_DEFAULT: ChatBackgroundScope = "all";
+export const CHAT_BACKGROUND_BLUR_MIN = 0;
+export const CHAT_BACKGROUND_BLUR_MAX = 24;
+export const CHAT_BACKGROUND_BLUR_DEFAULT = 0;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -295,6 +307,7 @@ export function initAppearance() {
   applyChatBackground(loadChatBackgroundPath());
   applyChatBackgroundEmptyOpacity(loadChatBackgroundEmptyOpacity());
   applyChatBackgroundSessionOpacity(loadChatBackgroundSessionOpacity());
+  applyChatBackgroundBlur(loadChatBackgroundBlur());
   applyChatBackgroundScope(loadChatBackgroundScope());
   void applyUiScale(loadUiScale());
 }
@@ -606,6 +619,48 @@ export function applyChatBackgroundSessionOpacity(value: number) {
   );
 }
 
+function clampChatBackgroundBlur(value: number): number {
+  return clamp(
+    Number.isFinite(value) ? Math.round(value) : CHAT_BACKGROUND_BLUR_DEFAULT,
+    CHAT_BACKGROUND_BLUR_MIN,
+    CHAT_BACKGROUND_BLUR_MAX,
+  );
+}
+
+export function loadChatBackgroundBlur(): number {
+  return clampChatBackgroundBlur(
+    readNumber(CHAT_BACKGROUND_BLUR_KEY) ?? CHAT_BACKGROUND_BLUR_DEFAULT,
+  );
+}
+
+export function saveChatBackgroundBlur(value: number) {
+  const next = clampChatBackgroundBlur(value);
+  writeNumber(CHAT_BACKGROUND_BLUR_KEY, next);
+  applyChatBackgroundBlur(next);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CHAT_BACKGROUND_BLUR_CHANGE_EVENT));
+  }
+  return next;
+}
+
+export function applyChatBackgroundBlur(value: number) {
+  const next = clampChatBackgroundBlur(value);
+  if (typeof document !== "undefined") {
+    document.documentElement.style.setProperty(
+      "--chat-background-blur",
+      `${next}px`,
+    );
+  }
+  return next;
+}
+
+export function subscribeChatBackgroundBlur(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(CHAT_BACKGROUND_BLUR_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(CHAT_BACKGROUND_BLUR_CHANGE_EVENT, onStoreChange);
+}
+
 function isChatBackgroundScope(value: unknown): value is ChatBackgroundScope {
   return value === "empty" || value === "all";
 }
@@ -753,6 +808,20 @@ export function saveTranscriptAnchor(value: boolean) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent<boolean>(TRANSCRIPT_ANCHOR_CHANGE_EVENT, {
+      detail: value,
+    }),
+  );
+}
+
+export function loadTasksPill(): boolean {
+  return readFlag(TASKS_PILL_KEY) ?? TASKS_PILL_DEFAULT;
+}
+
+export function saveTasksPill(value: boolean) {
+  writeFlag(TASKS_PILL_KEY, value);
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<boolean>(TASKS_PILL_CHANGE_EVENT, {
       detail: value,
     }),
   );

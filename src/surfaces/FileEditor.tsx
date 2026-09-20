@@ -27,7 +27,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import {
-  AlertCircle,
+  CircleAlert,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -379,7 +379,7 @@ export function FileEditor({
     return (
       <div className="grid h-full place-items-center p-6">
         <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-3 size-5 text-red-400" />
+          <CircleAlert className="mx-auto mb-3 size-5 text-red-400" />
           <p className="text-[13px] text-content">
             Couldn’t open {basename(path)}
           </p>

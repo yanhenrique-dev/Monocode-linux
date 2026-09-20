@@ -11,28 +11,28 @@ import {
   watchChild,
 } from "./child";
 import {
-  OpenCodeClient,
+  createOpenCodeClient,
   OpenCodeHttpError,
+  type OpenCodeClient,
   type OpenCodeMessage,
 } from "./opencodeClient";
 import {
   appendOpenCodeAssistantTextDelta,
   asRecord,
-  buildOpenCodePermissionRules,
-  compareSemver,
   contextUsedFromMessageInfo,
   turnMetricsFromMessageInfo,
   detailFromToolPart,
   eventSessionId,
   isOpenCodeNotFound,
   isTurnDoneStatusEvent,
+  normalizeServerEvent,
   openCodeChildSessionId,
   mergeOpenCodeAssistantText,
-  MINIMUM_OPENCODE_VERSION,
   KNOWN_HIDDEN_AGENTS,
+  assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
-  parseOpenCodeVersion,
   parseServerUrlFromOutput,
+  type OpenCodeProtocol,
   permissionTitle,
   previewFromToolPart,
   sessionErrorMessage,
@@ -296,7 +296,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     existing.onEvent = input.onEvent;
     if (existing.runtimeMode !== input.runtimeMode) {
       await existing.client.updateSession(existing.openCodeSessionId, {
-        permission: buildOpenCodePermissionRules(input.runtimeMode),
+        permission: existing.client.sessionPermissionRules(input.runtimeMode),
       });
     }
     existing.runtimeMode = input.runtimeMode;
@@ -314,7 +314,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   }
 
   const { path } = await resolveOpenCodeBinaryImpl();
-  await assertOpenCodeVersion(path, input.cwd);
+  const { protocol } = await assertOpenCodeVersion(path, input.cwd);
 
   const liveRef: { current: Live | null } = { current: null };
   let serverUrl = "";
@@ -360,7 +360,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
       () => serverExited,
       SERVER_TIMEOUT_MS,
     );
-    const client = new OpenCodeClient(url, input.cwd);
+    const client = createOpenCodeClient(url, input.cwd, protocol);
     const openCodeSession = await resolveSession(client, {
       resume: canResume ? resume : undefined,
       runtimeMode: input.runtimeMode,
@@ -473,7 +473,7 @@ async function resolveSession(
     cwd: string;
   },
 ) {
-  const permission = buildOpenCodePermissionRules(input.runtimeMode);
+  const permission = client.sessionPermissionRules(input.runtimeMode);
   if (input.resume) {
     try {
       const adopted = await client.getSession(input.resume.sessionId);
@@ -548,8 +548,10 @@ async function runCompaction(
 
 async function handleEvent(
   live: Live,
-  event: Record<string, unknown>,
+  rawEvent: Record<string, unknown>,
 ): Promise<void> {
+  const event = normalizeServerEvent(rawEvent);
+  if (!event) return;
   const type = typeof event.type === "string" ? event.type : "";
   const properties = asRecord(event.properties) ?? {};
   // Session lifecycle events establish ancestry, including nested subagents.
@@ -688,13 +690,18 @@ async function handleEvent(
         const decision =
           kind === "read" || kind === "search" ? "allow" : "deny";
         await live.client.replyPermission(
+          live.openCodeSessionId,
           id,
           toOpenCodePermissionReply(decision),
         );
         break;
       }
       if (live.runtimeMode === "full-access") {
-        await live.client.replyPermission(id, "once");
+        await live.client.replyPermission(
+          live.openCodeSessionId,
+          id,
+          "once",
+        );
         break;
       }
       const uiId = live.nextApprovalUiId++;
@@ -1096,7 +1103,11 @@ async function waitApproval(
   });
   live.approvals.delete(uiId);
   live.onEvent({ type: "approval.resolved", requestId: uiId, decision });
-  await live.client.replyPermission(id, toOpenCodePermissionReply(decision));
+  await live.client.replyPermission(
+    live.openCodeSessionId,
+    id,
+    toOpenCodePermissionReply(decision),
+  );
 }
 
 async function waitQuestion(
@@ -1116,13 +1127,13 @@ async function waitQuestion(
   });
   showNextQuestion(live);
   if (reply.kind !== "answered") {
-    await live.client.rejectQuestion(id);
+    await live.client.rejectQuestion(live.openCodeSessionId, id);
     return;
   }
   const answers = questions.map((question) =>
     selectedAnswerLabels(question, reply),
   );
-  await live.client.replyQuestion(id, answers);
+  await live.client.replyQuestion(live.openCodeSessionId, id, answers);
 }
 
 function showNextQuestion(live: Live): void {
@@ -1274,19 +1285,12 @@ function unsupportedFileMediaType(error: unknown): string | undefined {
   );
 }
 
-async function assertOpenCodeVersion(path: string, cwd: string): Promise<void> {
+async function assertOpenCodeVersion(
+  path: string,
+  cwd: string,
+): Promise<{ version: string; protocol: OpenCodeProtocol }> {
   const output = await execChild(path, ["--version"], cwd).catch(() => "");
-  const version = parseOpenCodeVersion(output);
-  if (!version) {
-    throw new Error(
-      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
-    );
-  }
-  if (compareSemver(version, MINIMUM_OPENCODE_VERSION) < 0) {
-    throw new Error(
-      `OpenCode v${version} is too old. Upgrade to v${MINIMUM_OPENCODE_VERSION} or newer.`,
-    );
-  }
+  return assertSupportedOpenCodeRelease(output);
 }
 
 function waitForServerUrl(

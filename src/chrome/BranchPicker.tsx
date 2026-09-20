@@ -1,4 +1,4 @@
-import { Check, GitBranch, Plus, Search } from "./icons";
+import { Check, FolderTree, GitBranch, Plus, Search } from "./icons";
 import {
   useEffect,
   useMemo,
@@ -26,6 +26,10 @@ type Props = {
   cwd: string;
   branch?: string;
   enabled?: boolean;
+  /** Working-copy mode: folder icon plus a Worktree badge. */
+  worktree?: boolean;
+  initialOpen?: boolean;
+  onDismiss?: () => void;
   onChange?: () => void;
   onClose?: () => void;
 };
@@ -47,10 +51,13 @@ export function BranchPicker({
   cwd,
   branch,
   enabled = true,
+  worktree = false,
+  initialOpen = false,
+  onDismiss,
   onChange,
   onClose,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -84,6 +91,7 @@ export function BranchPicker({
     setBlocked(null);
     setBlockedError(null);
     setBlockedBusy(null);
+    onDismiss?.();
     if (restore) onCloseRef.current?.();
   };
 
@@ -306,7 +314,11 @@ export function BranchPicker({
                 } disabled:opacity-40 disabled:hover:text-content/50`
           }
         >
-          <GitBranch className="size-3.5 shrink-0" strokeWidth={1.5} />
+          {worktree ? (
+            <FolderTree className="size-3.5 shrink-0" strokeWidth={1.5} />
+          ) : (
+            <GitBranch className="size-3.5 shrink-0" strokeWidth={1.5} />
+          )}
           <span className="relative truncate font-mono text-[12px]">
             {awaitingBranch ? (
               <>
@@ -323,6 +335,11 @@ export function BranchPicker({
               label
             )}
           </span>
+          {worktree ? (
+            <span className="shrink-0 rounded bg-content/8 px-1 text-[10px] text-content/45">
+              Worktree
+            </span>
+          ) : null}
         </button>
         {blocked ? (
           <SwitchBranchDialog

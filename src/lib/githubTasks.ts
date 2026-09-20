@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getIntlLocale } from "./locale";
 import { clearKnownInboxItems } from "./inboxSeen";
 import {
   linearConnected,
@@ -351,7 +352,7 @@ export function inboxPersonAvatarUrl(
 export function formatRelativeTime(
   iso: string,
   now = Date.now(),
-  locale?: string,
+  locale: string = getIntlLocale(),
 ): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return "";

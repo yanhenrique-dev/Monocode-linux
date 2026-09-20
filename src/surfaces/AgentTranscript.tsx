@@ -55,6 +55,7 @@ import {
 import { copyText } from "../lib/clipboard";
 import { visibleUserPrompt } from "../lib/orchestration";
 import { playCue } from "../lib/sounds";
+import { getIntlLocale } from "../lib/locale";
 import { legacyTaskListFromText } from "../lib/taskList";
 import { displayPath, resolveWorkspacePath } from "../lib/paths";
 import { resolveModel } from "../lib/models";
@@ -953,7 +954,7 @@ function hasTurnMetrics(metrics: TurnMetrics): boolean {
 }
 
 function formatMetricCount(value: number): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getIntlLocale(), {
     notation: "compact",
     maximumFractionDigits: value >= 1000 ? 1 : 0,
   }).format(Math.max(0, Math.round(value)));
@@ -961,7 +962,7 @@ function formatMetricCount(value: number): string {
 
 /** Wall-clock stamp for a finished turn, in the reader's own locale. */
 function formatClockTime(epochMs: number): string {
-  return new Date(epochMs).toLocaleTimeString(undefined, {
+  return new Date(epochMs).toLocaleTimeString(getIntlLocale(), {
     hour: "numeric",
     minute: "2-digit",
   });
@@ -1106,7 +1107,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   if (block.role === "tasks") {
     if (!block.taskList?.items.length) return null;
     return (
-      <div className="px-4 py-1">
+      <div className="px-4 py-1" data-task-anchor={block.id}>
         <TaskListPreview
           items={block.taskList.items}
           explanation={block.taskList.explanation}
@@ -1327,7 +1328,7 @@ function UserMessageBlock({
           <div className="flex justify-end px-1 pt-1">
             <time
               dateTime={new Date(block.startedAt).toISOString()}
-              title={new Date(block.startedAt).toLocaleString()}
+              title={new Date(block.startedAt).toLocaleString(getIntlLocale())}
               className="font-sans text-xs text-content/40"
             >
               {formatClockTime(block.startedAt)}

@@ -1,4 +1,4 @@
-import { Loader, WandSparkles } from "./icons";
+import { LoaderCircle, WandSparkles } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { generateCommitMessage } from "../lib/harness";
@@ -83,7 +83,7 @@ export function SwitchBranchDialog({
         aria-busy={Boolean(busy) || generating}
         aria-label={creating ? `Create ${branch}` : `Switch to ${branch}`}
         onMouseDown={(event) => event.stopPropagation()}
-        className="absolute left-1/2 top-[22%] flex w-[min(420px,calc(100vw-24px))] -translate-x-1/2 flex-col gap-3 rounded-lg border border-content/10 bg-content/5 p-4 shadow-xl glass-blur backdrop-blur-xl"
+        className="absolute left-1/2 top-[22%] flex w-[min(420px,calc(100vw-24px))] -translate-x-1/2 flex-col gap-3 rounded-lg border border-content/10 bg-content/5 p-4 shadow-xl glass-blur backdrop-blur-md"
       >
         <div className="flex flex-col gap-1">
           <h2 className="text-[13px] font-medium leading-tight text-content">
@@ -126,7 +126,7 @@ export function SwitchBranchDialog({
             className="absolute top-1 right-1 grid size-5 place-items-center rounded-md bg-content/10 text-content hover:bg-content/20 hover:text-content disabled:opacity-40"
           >
             {generating ? (
-              <Loader className="size-3.5 animate-spin" strokeWidth={1.75} />
+              <LoaderCircle className="size-3.5 animate-spin" strokeWidth={1.75} />
             ) : (
               <WandSparkles className="size-3" strokeWidth={1} />
             )}
@@ -155,7 +155,7 @@ export function SwitchBranchDialog({
             className="inline-flex items-center gap-1.5 rounded-md bg-content/10 px-3 py-1.5 text-[12px] font-medium text-content hover:bg-content/15 disabled:opacity-40"
           >
             {busy === "commit" ? (
-              <Loader className="size-3.5 animate-spin" strokeWidth={1.75} />
+              <LoaderCircle className="size-3.5 animate-spin" strokeWidth={1.75} />
             ) : null}
             Commit & switch
           </button>
@@ -166,7 +166,7 @@ export function SwitchBranchDialog({
             className="inline-flex items-center gap-1.5 rounded-md bg-content px-3 py-1.5 text-[12px] font-medium text-background-base hover:bg-content/80 disabled:opacity-40"
           >
             {busy === "stash" ? (
-              <Loader className="size-3.5 animate-spin" strokeWidth={1.75} />
+              <LoaderCircle className="size-3.5 animate-spin" strokeWidth={1.75} />
             ) : null}
             Stash & switch
           </button>

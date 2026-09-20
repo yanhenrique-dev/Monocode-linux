@@ -4,23 +4,24 @@ import {
   searchSettings,
   SETTINGS_INDEX,
   settingsSectionsByGroup,
-  COMPOSER_EFFORT_VISIBLE_DEFAULT,
+  MODEL_CONTROLS_DEFAULT,
   DIFF_VIEWER_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
   GRID_ARCADE_ENABLED_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
+  keybindingWhenLabel,
   loadComposerRunner,
-  loadComposerEffortVisible,
   loadDiffViewer,
   loadFollowUpBehavior,
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
+  loadModelControls,
   loadNotesEnabled,
   loadTerminalGpu,
   NOTES_ENABLED_DEFAULT,
   saveComposerRunner,
-  saveComposerEffortVisible,
+  saveModelControls,
   saveDiffViewer,
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
@@ -31,9 +32,11 @@ import {
   TERMINAL_GPU_DEFAULT,
 } from "./settings";
 import { MOD, SHIFT } from "./platform";
+import { t } from "./locale";
 
 const KEY = "monocode.composerRunner";
-const COMPOSER_EFFORT_VISIBLE_KEY = "monocode.composerEffortVisible";
+const MODEL_CONTROLS_KEY = "monocode.modelControls";
+const LEGACY_EFFORT_VISIBLE_KEY = "monocode.composerEffortVisible";
 const NOTES_KEY = "monocode.notesEnabled";
 const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
 const GRID_ARCADE_KEY = "monocode.gridArcadeEnabled";
@@ -107,23 +110,37 @@ describe("composer runner setting", () => {
   });
 });
 
-describe("composer effort control setting", () => {
+describe("model controls setting", () => {
   beforeEach(mockLocalStorage);
   afterEach(() => {
-    localStorage.removeItem(COMPOSER_EFFORT_VISIBLE_KEY);
+    localStorage.removeItem(MODEL_CONTROLS_KEY);
+    localStorage.removeItem(LEGACY_EFFORT_VISIBLE_KEY);
   });
 
-  it("keeps effort in the model picker by default", () => {
-    expect(COMPOSER_EFFORT_VISIBLE_DEFAULT).toBe(false);
-    expect(loadComposerEffortVisible()).toBe(false);
+  it("keeps options in the model menu by default", () => {
+    expect(MODEL_CONTROLS_DEFAULT).toBe("menu");
+    expect(loadModelControls()).toBe("menu");
   });
 
-  it("persists the standalone effort control preference", () => {
-    saveComposerEffortVisible(true);
-    expect(localStorage.getItem(COMPOSER_EFFORT_VISIBLE_KEY)).toBe("1");
-    expect(loadComposerEffortVisible()).toBe(true);
-    saveComposerEffortVisible(false);
-    expect(loadComposerEffortVisible()).toBe(false);
+  it("persists the beside-picker preference", () => {
+    saveModelControls("beside");
+    expect(localStorage.getItem(MODEL_CONTROLS_KEY)).toBe("beside");
+    expect(loadModelControls()).toBe("beside");
+    saveModelControls("menu");
+    expect(loadModelControls()).toBe("menu");
+  });
+
+  it("ignores unknown stored values", () => {
+    localStorage.setItem(MODEL_CONTROLS_KEY, "everywhere");
+    expect(loadModelControls()).toBe("menu");
+  });
+
+  it("migrates the previous effort-control toggle", () => {
+    localStorage.setItem(LEGACY_EFFORT_VISIBLE_KEY, "1");
+    expect(loadModelControls()).toBe("beside");
+    localStorage.setItem(LEGACY_EFFORT_VISIBLE_KEY, "0");
+    localStorage.removeItem(MODEL_CONTROLS_KEY);
+    expect(loadModelControls()).toBe("menu");
   });
 });
 
@@ -246,16 +263,19 @@ describe("workspace navigation keybindings", () => {
   it("documents the command palette and reload shortcuts", () => {
     expect(
       KEYBINDINGS.filter((row) =>
-        ["App: Command Palette", "View: Reload"].includes(row.command),
+        [
+          "settings.keybindings.cmd.app_command_palette",
+          "settings.keybindings.cmd.view_reload",
+        ].includes(row.command),
       ),
     ).toEqual([
       {
-        command: "App: Command Palette",
+        command: "settings.keybindings.cmd.app_command_palette",
         keys: `${MOD}${SHIFT}P`,
         when: "Always",
       },
       {
-        command: "View: Reload",
+        command: "settings.keybindings.cmd.view_reload",
         keys: `${MOD}${SHIFT}R`,
         when: "Always",
       },
@@ -263,19 +283,31 @@ describe("workspace navigation keybindings", () => {
   });
   it("documents session and project cycling in the shortcut list", () => {
     const rows = KEYBINDINGS.filter((row) =>
-      /^(Session|Project): (Previous|Next)$/.test(row.command),
+      [
+        "settings.keybindings.cmd.session_previous",
+        "settings.keybindings.cmd.session_next",
+        "settings.keybindings.cmd.project_previous",
+        "settings.keybindings.cmd.project_next",
+      ].includes(row.command),
     );
     expect(rows.map((row) => row.command)).toEqual([
-      "Session: Previous",
-      "Session: Next",
-      "Project: Previous",
-      "Project: Next",
+      "settings.keybindings.cmd.session_previous",
+      "settings.keybindings.cmd.session_next",
+      "settings.keybindings.cmd.project_previous",
+      "settings.keybindings.cmd.project_next",
     ]);
     expect(
       rows.every(
         (row) => row.when === "!overlay && (!textFocus || emptyComposer)",
       ),
     ).toBe(true);
+  });
+  it("resolves English command names through the dictionary", () => {
+    expect(t("en", "settings.keybindings.cmd.session_previous")).toBe(
+      "Session: Previous",
+    );
+    expect(keybindingWhenLabel("Always", "en")).toBe("Always");
+    expect(keybindingWhenLabel("Always", "pt-BR")).toBe("Sempre");
   });
 });
 
@@ -308,9 +340,9 @@ describe("settings navigation", () => {
   it("lists every section under exactly one rail group", () => {
     const groups = settingsSectionsByGroup();
     expect(groups.map((group) => group.label)).toEqual([
-      "App",
-      "Agents",
-      "Workspace",
+      "settings.group.app",
+      "settings.group.agents",
+      "settings.group.workspace",
     ]);
     expect(groups.flatMap((group) => group.sections.map((s) => s.id))).toEqual([
       "general",
@@ -321,6 +353,7 @@ describe("settings navigation", () => {
       "skills",
       "inbox",
       "archive",
+      "worktrees",
     ]);
   });
 
@@ -334,6 +367,19 @@ describe("settings navigation", () => {
       expect(sections.has(entry.section), entry.id).toBe(true);
     }
   });
+
+  it("documents the draft workspace toggle", () => {
+    expect(
+      KEYBINDINGS.find(
+        (row) =>
+          row.command === "settings.keybindings.cmd.composer_toggle_workspace",
+      ),
+    ).toEqual({
+      command: "settings.keybindings.cmd.composer_toggle_workspace",
+      keys: `${MOD}${SHIFT}G`,
+      when: "Draft session composer",
+    });
+  });
 });
 
 describe("settings search", () => {
@@ -342,7 +388,9 @@ describe("settings search", () => {
   });
 
   it("ranks label matches over keyword matches, and pages last", () => {
-    expect(searchSettings("glass").map((result) => result.label)).toEqual([
+    expect(
+      searchSettings("glass", 8, "en").map((result) => result.label),
+    ).toEqual([
       "Main pane glass",
       "Blur radius",
       "Interface blur",
@@ -352,7 +400,7 @@ describe("settings search", () => {
   });
 
   it("finds a setting by a word that is not in its label", () => {
-    expect(searchSettings("steer")[0]).toMatchObject({
+    expect(searchSettings("steer", 8, "en")[0]).toMatchObject({
       section: "chat",
       sectionLabel: "Chat",
       settingId: "follow-up",
@@ -360,8 +408,19 @@ describe("settings search", () => {
     });
   });
 
+  it("searches in Portuguese when pt-BR is active", () => {
+    expect(
+      searchSettings("desfoque", 8, "pt-BR").map((result) => result.label),
+    ).toContain("Desfoque da interface");
+    expect(searchSettings("idioma", 8, "pt-BR")[0]).toMatchObject({
+      section: "general",
+      settingId: "language",
+      label: "Idioma",
+    });
+  });
+
   it("returns a whole page with no setting id", () => {
-    expect(searchSettings("skills")).toEqual([
+    expect(searchSettings("skills", 8, "en")).toEqual([
       {
         section: "skills",
         sectionLabel: "Skills",
@@ -372,6 +431,6 @@ describe("settings search", () => {
   });
 
   it("caps the result list", () => {
-    expect(searchSettings("e", 4)).toHaveLength(4);
+    expect(searchSettings("e", 4, "en")).toHaveLength(4);
   });
 });

@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { Bot } from "./icons";
 import claude from "../assets/providers/claude.svg";
 import codex from "../assets/providers/codex.svg";
 import cursor from "../assets/providers/cursor.svg";
 import fx from "../assets/providers/fx.svg";
 import grok from "../assets/providers/grok.svg";
 import hermes from "../assets/providers/hermes.svg";
+import mcode from "../assets/providers/mcode.svg";
 import omp from "../assets/providers/omp.svg";
 import opencode from "../assets/providers/opencode.svg";
 import pi from "../assets/providers/pi.svg";
@@ -20,6 +22,7 @@ export const HARNESS_ICONS: Record<HarnessId, string> = {
   omp,
   fx,
   hermes,
+  mcode,
 };
 
 /** White marks that must follow `currentColor` so they stay visible in light mode. */
@@ -30,6 +33,7 @@ export const MONOCHROME_HARNESSES = new Set<HarnessId>([
   "pi",
   "fx",
   "hermes",
+  "mcode",
 ]);
 
 function MonoIcon({
@@ -101,7 +105,7 @@ export function HarnessIcon({
   }
   if (harness === "grok") {
     return (
-      <MonoIcon className={className} viewBox="0 0 35 33">
+      <MonoIcon className={className} viewBox="-4.8 -4.6 44.6 42.2">
         <path d="M13.2371 21.0407L24.3186 12.8506C24.8619 12.4491 25.6384 12.6057 25.8973 13.2294C27.2597 16.5185 26.651 20.4712 23.9403 23.1851C21.2297 25.8989 17.4581 26.4941 14.0108 25.1386L10.2449 26.8843C15.6463 30.5806 22.2053 29.6665 26.304 25.5601C29.5551 22.3051 30.562 17.8683 29.6205 13.8673L29.629 13.8758C28.2637 7.99809 29.9647 5.64871 33.449 0.844576C33.5314 0.730667 33.6139 0.616757 33.6964 0.5L29.1113 5.09055V5.07631L13.2343 21.0436" />
         <path d="M10.9503 23.0313C7.07343 19.3235 7.74185 13.5853 11.0498 10.2763C13.4959 7.82722 17.5036 6.82767 21.0021 8.2971L24.7595 6.55998C24.0826 6.07017 23.215 5.54334 22.2195 5.17313C17.7198 3.31926 12.3326 4.24192 8.67479 7.90126C5.15635 11.4239 4.0499 16.8403 5.94992 21.4622C7.36924 24.9165 5.04257 27.3598 2.69884 29.826C1.86829 30.7002 1.0349 31.5745 0.36364 32.5L10.9474 23.0341" />
       </MonoIcon>
@@ -128,9 +132,34 @@ export function HarnessIcon({
       </MonoIcon>
     );
   }
+  if (harness === "mcode") {
+    return (
+      <MonoIcon className={className}>
+        <path d="M2 0H10L14.5 11L19 0H27V25H20V8.5L15 19.5H14L9 8.5V25H2V0Z" />
+      </MonoIcon>
+    );
+  }
+  if (harness === "claude") {
+    return (
+      <MonoIcon className={className}>
+        <path d="M5.684 19.285L11.397 16.095L11.484 15.805L11.397 15.66H11.107L10.15 15.602L6.902 15.515L4.06 15.37L1.305 15.225L0.609 15.08L0 14.21L0.058 13.775L0.638 13.398L1.479 13.456L3.306 13.601L6.061 13.775L8.062 13.891L11.02 14.239H11.484L11.542 14.036L11.397 13.92L11.281 13.804L8.41 11.89L5.336 9.86L3.712 8.671L2.842 8.091L2.407 7.511L2.233 6.293L3.016 5.423L4.089 5.51L4.35 5.568L5.423 6.409L7.743 8.178L10.73 10.44L11.165 10.788L11.339 10.672L11.368 10.585L11.165 10.266L9.57 7.25L7.83 4.234L7.047 2.987L6.844 2.233C6.757 1.943 6.728 1.653 6.728 1.363L7.598 0.145L8.12 0L9.338 0.174L9.802 0.58L10.556 2.32L11.745 5.017L13.63 8.671L14.21 9.773L14.5 10.759L14.587 11.049H14.79V10.904L14.935 8.816L15.225 6.293L15.515 3.045L15.602 2.117L16.066 1.015L16.936 0.435L17.69 0.754L18.27 1.595L18.183 2.117L17.864 4.35L17.11 7.859L16.675 10.237H16.936L17.226 9.918L18.415 8.352L20.416 5.858L21.286 4.843L22.33 3.77L22.997 3.248H24.244L25.143 4.611L24.737 6.032L23.461 7.656L22.388 9.019L20.851 11.078L19.923 12.731L20.01 12.847H20.213L23.693 12.093L25.549 11.774L27.753 11.397L28.768 11.861L28.884 12.325L28.478 13.311L26.1 13.891L23.316 14.471L19.169 15.428L19.111 15.457L19.169 15.544L21.025 15.718L21.837 15.776H23.809L27.463 16.066L28.42 16.646L28.971 17.429L28.884 18.009L27.405 18.763L25.433 18.299L20.793 17.197L19.227 16.82H18.995V16.936L20.329 18.241L22.736 20.416L25.81 23.229L25.955 23.925L25.578 24.505L25.172 24.447L22.504 22.417L21.46 21.547L19.14 19.575H18.995V19.778L19.517 20.561L22.359 24.824L22.504 26.129L22.301 26.535L21.547 26.825L20.764 26.651L19.082 24.331L17.342 21.721L15.979 19.343L15.834 19.459L14.993 28.217L14.616 28.652L13.746 29L13.021 28.42L12.615 27.55L13.021 25.752L13.485 23.432L13.862 21.576L14.21 19.285L14.413 18.531V18.473H14.21L12.47 20.88L9.86 24.447L7.772 26.651L7.279 26.854L6.409 26.419L6.496 25.607L6.96 24.94L9.86 21.228L11.6 18.937L12.76 17.603L12.731 17.458H12.644L4.988 22.446L3.625 22.62L3.045 22.04L3.103 21.17L3.393 20.88L5.713 19.285H5.684Z" />
+      </MonoIcon>
+    );
+  }
+  if (harness === "omp") {
+    return (
+      <MonoIcon className={className} viewBox="-9 -9 82 82">
+        <path d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
+      </MonoIcon>
+    );
+  }
+  const src = HARNESS_ICONS[harness];
+  if (!src) {
+    return <Bot className={className} strokeWidth={1.75} aria-hidden />;
+  }
   return (
     <img
-      src={HARNESS_ICONS[harness]}
+      src={src}
       alt=""
       draggable={false}
       className={`block object-contain ${className}`}

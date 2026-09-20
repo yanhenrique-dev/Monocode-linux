@@ -1,4 +1,12 @@
-/** Hugeicons chrome set. Glyphs are deep-imported so the 5MB catalog is not bundled. */
+/**
+ * Hugeicons chrome set. Glyphs are deep-imported so the 5MB catalog is not bundled.
+ *
+ * Icon scale (keep new usages on it):
+ * - `size-3` for dense rows (menus, lists, table cells).
+ * - `size-3.5` for toolbar and form controls.
+ * - `size-4` for triggers, rail tabs, and status icons.
+ * - `strokeWidth` defaults to 1.75; pass 2 only for `Check` at 14px and below.
+ */
 import {
   HugeiconsIcon,
   type HugeiconsIconProps,
@@ -9,10 +17,8 @@ import AddSquareIcon from "@hugeicons/core-free-icons/AddSquareIcon";
 import AlertCircleIcon from "@hugeicons/core-free-icons/AlertCircleIcon";
 import AppWindowIcon from "@hugeicons/core-free-icons/AppWindowIcon";
 import Archive02Icon from "@hugeicons/core-free-icons/Archive02Icon";
-import ArrowDown01Icon from "@hugeicons/core-free-icons/ArrowDown01Icon";
 import ArrowExpand01Icon from "@hugeicons/core-free-icons/ArrowExpand01Icon";
 import ArrowLeft01Icon from "@hugeicons/core-free-icons/ArrowLeft01Icon";
-import ArrowRight01Icon from "@hugeicons/core-free-icons/ArrowRight01Icon";
 import ArrowTurnForwardIcon from "@hugeicons/core-free-icons/ArrowTurnForwardIcon";
 import ArrowUp01Icon from "@hugeicons/core-free-icons/ArrowUp01Icon";
 import BotIcon from "@hugeicons/core-free-icons/BotIcon";
@@ -20,6 +26,10 @@ import AiIdeaIcon from "@hugeicons/core-free-icons/AiIdeaIcon";
 import Cancel01Icon from "@hugeicons/core-free-icons/Cancel01Icon";
 import CaseSensitiveIcon from "@hugeicons/core-free-icons/CaseSensitiveIcon";
 import CheckmarkCircle02Icon from "@hugeicons/core-free-icons/CheckmarkCircle02Icon";
+import ChevronDownIcon from "@hugeicons/core-free-icons/ChevronDownIcon";
+import ChevronLeftIcon from "@hugeicons/core-free-icons/ChevronLeftIcon";
+import ChevronRightIcon from "@hugeicons/core-free-icons/ChevronRightIcon";
+import ChevronUpIcon from "@hugeicons/core-free-icons/ChevronUpIcon";
 import CircleArrowDown01Icon from "@hugeicons/core-free-icons/CircleArrowDown01Icon";
 import CancelCircleIcon from "@hugeicons/core-free-icons/CancelCircleIcon";
 import ChartBreakoutSquareIcon from "@hugeicons/core-free-icons/ChartBreakoutSquareIcon";
@@ -56,7 +66,7 @@ import ImageAdd01Icon from "@hugeicons/core-free-icons/ImageAdd01Icon";
 import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import NotificationOff01Icon from "@hugeicons/core-free-icons/NotificationOff01Icon";
 import KeyboardIcon from "@hugeicons/core-free-icons/KeyboardIcon";
-import LayoutAlignRightIcon from "@hugeicons/core-free-icons/LayoutAlignRightIcon";
+import SidebarLeft01Icon from "@hugeicons/core-free-icons/SidebarLeft01Icon";
 import LayoutBottomIcon from "@hugeicons/core-free-icons/LayoutBottomIcon";
 import LayoutTopIcon from "@hugeicons/core-free-icons/LayoutTopIcon";
 import LeftToRightListBulletIcon from "@hugeicons/core-free-icons/LeftToRightListBulletIcon";
@@ -125,7 +135,7 @@ const stroke = {
   stroke: "currentColor",
   strokeLinecap: "round",
   strokeLinejoin: "round",
-  strokeWidth: "1.5",
+  strokeWidth: "1.75",
 } as const;
 
 /** Catalog FoldVertical/UnfoldVertical use filled chevrons; keep these stroke-only. */
@@ -148,7 +158,6 @@ const UnfoldVerticalIcon: IconSvgElement = [
   ["path", { d: "M7 17L12 22L17 17", ...stroke, key: "5" }],
 ];
 
-export const AlertCircle = wrap(AlertCircleIcon, "AlertCircle");
 export const AppWindow = wrap(AppWindowIcon, "AppWindow");
 export const Archive = wrap(Archive02Icon, "Archive");
 export const ArrowDownCircle = wrap(CircleArrowDown01Icon, "ArrowDownCircle");
@@ -160,11 +169,11 @@ export const CaseSensitive = wrap(CaseSensitiveIcon, "CaseSensitive");
 export const Check = wrap(Tick02Icon, "Check");
 export const CheckCheck = wrap(TickDouble02Icon, "CheckCheck");
 export const CheckCircle = wrap(CheckmarkCircle02Icon, "CheckCircle");
-export const ChevronDown = wrap(ArrowDown01Icon, "ChevronDown");
-export const ChevronLeft = wrap(ArrowLeft01Icon, "ChevronLeft");
-export const ChevronRight = wrap(ArrowRight01Icon, "ChevronRight");
+export const ChevronDown = wrap(ChevronDownIcon, "ChevronDown");
+export const ChevronLeft = wrap(ChevronLeftIcon, "ChevronLeft");
+export const ChevronRight = wrap(ChevronRightIcon, "ChevronRight");
 export const CornerDownRight = wrap(ArrowTurnForwardIcon, "CornerDownRight");
-export const ChevronUp = wrap(ArrowUp01Icon, "ChevronUp");
+export const ChevronUp = wrap(ChevronUpIcon, "ChevronUp");
 export const CircleAlert = wrap(AlertCircleIcon, "CircleAlert");
 export const CircleDashed = wrap(CircleDashedIcon, "CircleDashed");
 export const CircleDot = wrap(CircleDotIcon, "CircleDot");
@@ -209,7 +218,6 @@ export const Keyboard = wrap(KeyboardIcon, "Keyboard");
 export const ListBullet = wrap(LeftToRightListBulletIcon, "ListBullet");
 export const ListEnd = wrap(ListEndIcon, "ListEnd");
 export const ListFilter = wrap(FilterIcon, "ListFilter");
-export const Loader = wrap(Loading03Icon, "Loader");
 export const LoaderCircle = wrap(Loading03Icon, "LoaderCircle");
 export const Lock = wrap(SquareLock02Icon, "Lock");
 export const LockOpen = wrap(SquareUnlock01Icon, "LockOpen");
@@ -222,7 +230,7 @@ export const MoreHorizontal = wrap(MoreHorizontalIcon, "MoreHorizontal");
 export const Palette = wrap(PaintBoardIcon, "Palette");
 export const Pause = wrap(PauseIcon, "Pause");
 export const PanelBottom = wrap(LayoutBottomIcon, "PanelBottom");
-export const PanelLeft = wrap(LayoutAlignRightIcon, "PanelLeft");
+export const PanelLeft = wrap(SidebarLeft01Icon, "PanelLeft");
 export const PanelRight = wrap(SidebarRight01Icon, "PanelRight");
 export const PanelTop = wrap(LayoutTopIcon, "PanelTop");
 export const PenLine = wrap(PencilEdit01Icon, "PenLine");

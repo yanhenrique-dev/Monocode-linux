@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { supportsWebGL2 } from "./webgl";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetWebGL2Support, supportsWebGL2 } from "./webgl";
 
 describe("supportsWebGL2", () => {
+  beforeEach(resetWebGL2Support);
   it("reports true when the probe returns a context", () => {
     expect(supportsWebGL2(() => ({}))).toBe(true);
   });
@@ -20,5 +21,21 @@ describe("supportsWebGL2", () => {
 
   it("reports false without a DOM", () => {
     expect(supportsWebGL2()).toBe(false);
+  });
+
+  it("caches the DOM probe until reset", () => {
+    let context: unknown = {};
+    vi.stubGlobal("document", {
+      createElement: () => ({ getContext: () => context }),
+    });
+    try {
+      expect(supportsWebGL2()).toBe(true);
+      context = null;
+      expect(supportsWebGL2()).toBe(true);
+      resetWebGL2Support();
+      expect(supportsWebGL2()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

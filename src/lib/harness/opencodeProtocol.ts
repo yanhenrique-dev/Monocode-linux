@@ -16,6 +16,67 @@ import type { HarnessEvent } from "./types";
 export const MINIMUM_OPENCODE_VERSION = "1.14.19";
 export const OPENCODE_SERVER_READY_PREFIX = "opencode server listening";
 export const KNOWN_HIDDEN_AGENTS = new Set(["compaction", "summary", "title"]);
+
+/**
+ * Release line reported by `opencode --version`. V2 ships as beta builds
+ * (`0.0.0-beta-NNNNN`) and eventually `2.x`; both select the V2 protocol.
+ */
+export type OpenCodeRelease = {
+  version: string;
+  major: number;
+  prerelease: string | null;
+};
+
+export type OpenCodeProtocol = "v1" | "v2";
+
+const RELEASE_RE = /(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/;
+
+export function parseOpenCodeRelease(output: string): OpenCodeRelease | null {
+  const match = output.match(RELEASE_RE);
+  if (!match) return null;
+  return {
+    version: `${match[1]}.${match[2]}.${match[3]}`,
+    major: Number.parseInt(match[1], 10) || 0,
+    prerelease: match[4] ?? null,
+  };
+}
+
+export function openCodeProtocolForRelease(
+  release: OpenCodeRelease,
+): OpenCodeProtocol {
+  if (release.major >= 2) return "v2";
+  if (
+    release.major === 0 &&
+    release.prerelease !== null &&
+    /beta|alpha|rc|dev|next/i.test(release.prerelease)
+  ) {
+    return "v2";
+  }
+  return "v1";
+}
+
+/**
+ * Shared `opencode --version` gate: V1 needs the minimum stable, V2 (beta or
+ * newer) is accepted on protocol — the V2 transport owns compatibility.
+ */
+export function assertSupportedOpenCodeRelease(output: string): {
+  version: string;
+  protocol: OpenCodeProtocol;
+} {
+  const release = parseOpenCodeRelease(output);
+  if (!release) {
+    throw new Error(
+      `Unable to determine OpenCode version. MonoCode requires v${MINIMUM_OPENCODE_VERSION} or newer.`,
+    );
+  }
+  const protocol = openCodeProtocolForRelease(release);
+  if (protocol === "v1" && compareSemver(release.version, MINIMUM_OPENCODE_VERSION) < 0) {
+    throw new Error(
+      `OpenCode v${release.version} is too old. Upgrade to v${MINIMUM_OPENCODE_VERSION} or newer.`,
+    );
+  }
+  return { version: release.version, protocol };
+}
 /**
  * Newer servers emit `session.idle` alongside `session.status=idle`.
  * Treat both as turn completion so a server upgrade cannot wedge a turn.
@@ -29,6 +90,48 @@ export function isTurnDoneStatusEvent(
   if (type === "session.idle") return true;
   if (type !== "session.status") return false;
   return stringField(asRecord(properties.status), "type") === "idle";
+}
+
+/**
+ * V2 SSE names normalized onto the V1 pipeline. Approvals, questions,
+ * subagents, and the turn latch only know V1 names; mapping here keeps one
+ * pipeline for both protocols. Returns null to drop events with no V1
+ * meaning (durability bookkeeping the wait-route already covers).
+ *
+ * VERIFY live: the V2 event catalog is still beta and may rename again.
+ */
+export function normalizeServerEvent(
+  event: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const type = typeof event.type === "string" ? event.type : "";
+  if (type === "question.v2.asked") {
+    const properties = asRecord(event.properties) ?? {};
+    const request = asRecord(properties.request) ?? {};
+    return {
+      ...event,
+      type: "question.asked",
+      properties: {
+        ...properties,
+        id:
+          stringField(properties, "requestID") ??
+          stringField(request, "id") ??
+          stringField(properties, "id"),
+        questions: properties.questions ?? request.questions ?? [],
+      },
+    };
+  }
+  if (type === "question.v2.replied" || type === "question.v2.rejected") {
+    // Resolution flows through our own reply calls, as in V1.
+    return null;
+  }
+  if (
+    type === "session.next.prompt.admitted" ||
+    type === "session.next.prompt.promoted"
+  ) {
+    // Admission receipts; completion is observed via the wait route.
+    return null;
+  }
+  return event;
 }
 
 const OPENCODE_DEFAULT_TITLE_PATTERN =
@@ -181,6 +284,29 @@ export function toOpenCodePermissionReply(
   return decision === "allow" ? "once" : "reject";
 }
 
+export type OpenCodePermissionRuleV2 = {
+  action: string;
+  resource: string;
+  effect: "allow" | "deny" | "ask";
+};
+
+/**
+ * V2 native permission shape. Field renames follow the migration guide
+ * (`permission`→`action`, `pattern`→`resource`, `action`→`effect`); V1 tool
+ * names (`question`, `read`, `*`) ride along — V2 warns and continues past
+ * unknown actions, so misses stay loud instead of silently open.
+ * VERIFY live: exact V2 acceptance of carried-over names.
+ */
+export function buildOpenCodePermissionRulesV2(
+  runtimeMode: RuntimeMode,
+): OpenCodePermissionRuleV2[] {
+  return buildOpenCodePermissionRules(runtimeMode).map((rule) => ({
+    action: rule.permission,
+    resource: rule.pattern,
+    effect: rule.action,
+  }));
+}
+
 export function toFileUrl(path: string): string {
   const normalized = path.replace(/\\/g, "/");
   const abs = normalized.startsWith("/") ? normalized : `/${normalized}`;
@@ -281,14 +407,56 @@ export function inferDefaultVariant(
   if (providerID === "anthropic" || providerID.startsWith("google")) {
     return variants.includes("high") ? "high" : undefined;
   }
-  if (providerID === "openai" || providerID === "opencode") {
-    return variants.includes("medium")
-      ? "medium"
-      : variants.includes("high")
-        ? "high"
-        : undefined;
-  }
+  // Variants are reasoning levels on every provider (e.g. minimal/low/medium
+  // /high/xhigh), so prefer medium, then high, regardless of provider.
+  if (variants.includes("medium")) return "medium";
+  if (variants.includes("high")) return "high";
   return undefined;
+}
+
+const VARIANT_LABELS: Record<string, string> = {
+  none: "None",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra High",
+  "extra-high": "Extra High",
+  max: "Max",
+  ultra: "Ultra",
+};
+
+const VARIANT_ORDER = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "extra-high",
+  "max",
+  "ultra",
+];
+
+/** Human label for an OpenCode variant value, matching Codex/Cursor effort labels. */
+export function openCodeVariantLabel(value: string): string {
+  return (
+    VARIANT_LABELS[value] ??
+    VARIANT_LABELS[value.toLowerCase()] ??
+    titleCaseSlug(value)
+  );
+}
+
+/** Sort variant values from lowest to highest effort; unknown values sort last. */
+export function sortOpenCodeVariants(values: string[]): string[] {
+  const rank = (value: string): number => {
+    const index = VARIANT_ORDER.indexOf(value.toLowerCase());
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return [...values].sort((left, right) => {
+    const delta = rank(left) - rank(right);
+    return delta !== 0 ? delta : left.localeCompare(right);
+  });
 }
 
 export function inferDefaultAgent(agents: Array<{ name: string }>): string | undefined {
