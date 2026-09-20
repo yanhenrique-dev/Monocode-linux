@@ -8,7 +8,7 @@
   "homepage": "https://github.com/yanhenrique-dev/Monocode-linux",
   "author": "yanhenrique-dev",
   "private": true,
-  "version": "0.1.92",
+  "version": "0.1.94",
   "type": "module",
   "scripts": {
     "dev": "vite",

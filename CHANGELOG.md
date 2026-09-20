@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.94] - 2026-09-20
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Fixed
+
+- Composer tasks pill hides once every task settled instead of pinning
+  a dead "Complete" strip above the input.
+- Queued-message card fuses with the tasks strip (no double border or
+  radius) so strip, queue and input read as one surface.
+
 ## [0.1.92] - 2026-09-20
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
