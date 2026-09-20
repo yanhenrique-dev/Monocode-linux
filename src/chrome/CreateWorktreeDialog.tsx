@@ -5,7 +5,7 @@ import { createWorktree, type Worktree } from "../lib/worktrees";
 import { prettyCwd } from "../lib/paths";
 import { Modal } from "./Modal";
 import { SearchableSelect } from "./SearchableSelect";
-import { Loader } from "./icons";
+import { LoaderCircle } from "./icons";
 
 export function CreateWorktreeDialog({
   cwd,
@@ -171,7 +171,7 @@ export function CreateWorktreeDialog({
             disabled={busy || !name.trim()}
             className="inline-flex items-center gap-1.5 rounded-md bg-content px-3 py-1.5 text-[12px] font-medium text-background-base disabled:opacity-40 active:scale-[0.97]"
           >
-            {busy && <Loader className="size-3.5 animate-spin" />}Create
+            {busy && <LoaderCircle className="size-3.5 animate-spin" />}Create
             worktree
           </button>
         </div>

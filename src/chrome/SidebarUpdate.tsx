@@ -1,4 +1,4 @@
-import { ArrowDownCircle, Loader } from "./icons";
+import { ArrowDownCircle, LoaderCircle } from "./icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   installPendingUpdate,
@@ -130,7 +130,7 @@ export function SidebarUpdate({
     >
       <span className="grid size-[18px] shrink-0 place-items-center">
         {busy ? (
-          <Loader className="size-4 animate-spin opacity-70" aria-hidden />
+          <LoaderCircle className="size-4 animate-spin opacity-70" aria-hidden />
         ) : (
           <ArrowDownCircle className="size-4 text-accent" aria-hidden />
         )}

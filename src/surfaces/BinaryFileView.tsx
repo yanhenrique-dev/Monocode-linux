@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
+  CircleAlert,
   Check,
   Copy,
   Folder,
@@ -108,7 +108,7 @@ export function BinaryFileView({ path, cwd }: Props) {
         cwd={cwd}
         title={`Couldn’t open ${basename(path)}`}
         detail={state.message}
-        icon={<AlertCircle className="mx-auto mb-3 size-5 text-red-400" />}
+        icon={<CircleAlert className="mx-auto mb-3 size-5 text-red-400" />}
         onRetry={reload}
       />
     );
