@@ -270,6 +270,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "scroll position sticky message fixar topo",
   },
   {
+    id: "tasks-pill",
+    section: "chat",
+    label: "settings.chat.tasks_pill.label",
+    keywords: "tasks todo pill near chat composer fixar tarefas",
+  },
+  {
     id: "follow-up",
     section: "chat",
     label: "settings.chat.follow_up.label",

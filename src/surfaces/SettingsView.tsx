@@ -80,6 +80,7 @@ import {
   loadThemeSaturation,
   loadTranscriptLayout,
   loadTranscriptAnchor,
+  loadTasksPill,
   loadUiBlur,
   previewSidebarBlur,
   saveBodyGlass,
@@ -97,6 +98,7 @@ import {
   saveThemeSaturation,
   saveTranscriptLayout,
   saveTranscriptAnchor,
+  saveTasksPill,
   saveUiBlur,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
   SIDEBAR_BLUR_DEFAULT,
@@ -827,6 +829,7 @@ function ChatPage() {
     useState<TranscriptLayout>(loadTranscriptLayout);
   const [transcriptAnchor, setTranscriptAnchor] =
     useState(loadTranscriptAnchor);
+  const [tasksPill, setTasksPill] = useState(loadTasksPill);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
   const [modelControls, setModelControls] =
@@ -856,6 +859,11 @@ function ChatPage() {
   const onTranscriptAnchor = (next: boolean) => {
     saveTranscriptAnchor(next);
     setTranscriptAnchor(next);
+  };
+
+  const onTasksPill = (next: boolean) => {
+    saveTasksPill(next);
+    setTasksPill(next);
   };
 
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
@@ -919,6 +927,17 @@ function ChatPage() {
             label={t("settings.chat.anchor_prompts.toggle")}
             on={transcriptAnchor}
             onChange={onTranscriptAnchor}
+          />
+        </Row>
+        <Row
+          id="tasks-pill"
+          label={t("settings.chat.tasks_pill.label")}
+          description={t("settings.chat.tasks_pill.description")}
+        >
+          <Toggle
+            label={t("settings.chat.tasks_pill.toggle")}
+            on={tasksPill}
+            onChange={onTasksPill}
           />
         </Row>
       </Group>

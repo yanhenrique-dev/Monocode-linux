@@ -1107,7 +1107,7 @@ const TranscriptBlock = memo(function TranscriptBlock({
   if (block.role === "tasks") {
     if (!block.taskList?.items.length) return null;
     return (
-      <div className="px-4 py-1">
+      <div className="px-4 py-1" data-task-anchor={block.id}>
         <TaskListPreview
           items={block.taskList.items}
           explanation={block.taskList.explanation}

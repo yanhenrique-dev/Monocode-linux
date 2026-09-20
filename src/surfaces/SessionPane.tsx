@@ -19,6 +19,11 @@ import { DiscussionEmpty } from "../chrome/DiscussionEmpty";
 import { LinkedWorkItemUpdateNotice } from "../chrome/LinkedWorkItemUpdateNotice";
 import { SessionReview } from "../chrome/SessionReview";
 import { PromptOutline } from "../chrome/PromptOutline";
+import { TasksPill } from "../chrome/TasksPill";
+import {
+  loadTasksPill,
+  TASKS_PILL_CHANGE_EVENT,
+} from "../lib/appearance";
 import {
   canCompactHarnessContext,
   type ApprovalDecision,
@@ -314,6 +319,18 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const transcriptScope = useRef<HTMLDivElement>(null);
   const quoteRequestId = useRef(0);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [tasksPillEnabled, setTasksPillEnabled] = useState(loadTasksPill);
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setTasksPillEnabled(
+        (event as CustomEvent<boolean>).detail ?? loadTasksPill(),
+      );
+    };
+    window.addEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
+    };
+  }, []);
   const astraWelcomeSequence = useRef(0);
   const [astraWelcomeRun, setAstraWelcomeRun] = useState<number | null>(null);
   const dismissAstraWelcome = useCallback(() => setAstraWelcomeRun(null), []);
@@ -648,6 +665,13 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 blocks={session.blocks}
                 scope={transcriptScope}
                 visible={visible}
+                revealBlock={revealBlock}
+              />
+              <TasksPill
+                blocks={session.blocks}
+                scope={transcriptScope}
+                visible={visible}
+                enabled={tasksPillEnabled}
                 revealBlock={revealBlock}
               />
               {showJumpToBottom ? (
