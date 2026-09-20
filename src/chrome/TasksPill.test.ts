@@ -178,6 +178,7 @@ describe("TasksPill", () => {
       } finally {
         Element.prototype.scrollIntoView = original;
       }
+      expect(revealBlock).toHaveBeenCalledWith("t1");
       expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
       expect(container.querySelector("[data-tasks-pill]")).toBeNull();
     } finally {
