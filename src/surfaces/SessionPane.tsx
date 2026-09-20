@@ -667,13 +667,6 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 visible={visible}
                 revealBlock={revealBlock}
               />
-              <TasksPill
-                blocks={session.blocks}
-                scope={transcriptScope}
-                visible={visible}
-                enabled={tasksPillEnabled}
-                revealBlock={revealBlock}
-              />
               {showJumpToBottom ? (
                 <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center">
                   <button
@@ -692,7 +685,16 @@ const SessionPaneContent = memo(function SessionPaneContent({
           )}
         </div>
         {dockComposer ? (
-          <div className="mx-auto w-full max-w-4xl shrink-0">{composer}</div>
+          <div className="mx-auto w-full max-w-4xl shrink-0">
+            <TasksPill
+              blocks={session.blocks}
+              scope={transcriptScope}
+              visible={visible}
+              enabled={tasksPillEnabled}
+              revealBlock={revealBlock}
+            />
+            {composer}
+          </div>
         ) : null}
       </div>
     </div>
