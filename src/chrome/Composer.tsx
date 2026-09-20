@@ -111,7 +111,7 @@ import { FileTypeIcon } from "./FileTypeIcon";
 import { InboxMiniCard } from "./InboxMiniCard";
 import { NoteMiniCard } from "./NoteMiniCard";
 import { HandoffMiniCard } from "./HandoffMiniCard";
-import { EffortPicker, ModelPicker } from "./ModelPicker";
+import { ModelControlPills, ModelPicker } from "./ModelPicker";
 import { QuestionForm } from "./QuestionForm";
 import { SkillPicker } from "./SkillPicker";
 import { pathKey, projectKey } from "../lib/paths";
@@ -120,10 +120,10 @@ import { consumeQuoteRequest, type QuoteRequest } from "../lib/quoteDraft";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import {
   COMPOSER_RUNNER_CHANGE_EVENT,
-  loadComposerEffortVisible,
   loadComposerRunner,
+  loadModelControls,
   loadNotesEnabled,
-  subscribeComposerEffortVisible,
+  subscribeModelControls,
   subscribeNotesEnabled,
 } from "../lib/settings";
 import {
@@ -543,11 +543,12 @@ export function Composer({
     loadNotesEnabled,
     () => true,
   );
-  const composerEffortVisible = useSyncExternalStore(
-    subscribeComposerEffortVisible,
-    loadComposerEffortVisible,
-    () => false,
+  const modelControls = useSyncExternalStore(
+    subscribeModelControls,
+    loadModelControls,
+    () => "menu" as const,
   );
+  const controlsBeside = modelControls === "beside";
   const [notes, setNotes] = useState<Note[]>(() => peekNotes() ?? []);
   const [mention, setMention] = useState<MentionToken | null>(null);
   const [mentionActive, setMentionActive] = useState(0);
@@ -1848,7 +1849,7 @@ export function Composer({
                 if (
                   e.target instanceof Element &&
                   e.target.closest(
-                    "[data-model-picker], [data-effort-picker], [data-access-picker], [data-model-settings]",
+                    "[data-model-picker], [data-model-control], [data-access-picker], [data-model-settings]",
                   )
                 ) {
                   return;
@@ -1863,7 +1864,7 @@ export function Composer({
                   harness={harness}
                   model={model}
                   values={modelSettings}
-                  hideEffort={composerEffortVisible}
+                  hideSettings={controlsBeside}
                   hotkeys={hotkeys && enabled}
                   onChange={onModelChange}
                   onSettingsChange={(settings) =>
@@ -1871,8 +1872,8 @@ export function Composer({
                   }
                   onClose={() => ref.current?.focus()}
                 />
-                {composerEffortVisible ? (
-                  <EffortPicker
+                {controlsBeside ? (
+                  <ModelControlPills
                     harness={harness}
                     model={model}
                     values={modelSettings}
