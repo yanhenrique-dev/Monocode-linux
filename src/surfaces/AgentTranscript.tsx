@@ -5,6 +5,7 @@ import {
   Copy,
   FilePlusCorner,
   Minus,
+  Pencil,
   Bot,
   ChartBreakoutSquare,
   PenLine,
@@ -139,6 +140,8 @@ type Props = {
   onBuildPlan?: (blockId: string, target?: PlanBuildTarget) => void;
   onSecondOpinion?: (target: ModelTarget, turn: Block[]) => void;
   onHandoff?: (target: ModelTarget, turn: Block[]) => void;
+  onEditLastTurn?: () => void;
+  editingLastTurn?: boolean;
   onJumpToBottomChange?: (show: boolean) => void;
   onJumpToBottomReady?: (jump: () => void) => void;
   /** Passes a function that renders the turn that holds a block. The render completes before the function returns. */
@@ -169,6 +172,8 @@ function AgentTranscriptContent({
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
+  onEditLastTurn,
+  editingLastTurn = false,
   onJumpToBottomChange,
   onJumpToBottomReady,
   onRevealReady,
@@ -581,6 +586,20 @@ function AgentTranscriptContent({
                 planModel={model}
                 planModelSettings={modelSettings}
                 cwd={cwd}
+                onEditLastTurn={
+                  onEditLastTurn &&
+                  isLastTurn &&
+                  settled &&
+                  item.block.role === "user"
+                    ? onEditLastTurn
+                    : undefined
+                }
+                editing={
+                  editingLastTurn &&
+                  isLastTurn &&
+                  settled &&
+                  item.block.role === "user"
+                }
               />
             );
           // The fold reaches across a stack of delegated runs, but those rows
@@ -1061,6 +1080,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planHarness,
   planModel,
   planModelSettings,
+  onEditLastTurn,
+  editing = false,
 }: {
   block: Block;
   layout: TranscriptLayout;
@@ -1077,6 +1098,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
   planHarness?: HarnessId;
   planModel?: string;
   planModelSettings?: Record<string, string>;
+  onEditLastTurn?: () => void;
+  editing?: boolean;
 }) {
   if (block.role === "user") {
     return (
@@ -1084,6 +1107,8 @@ const TranscriptBlock = memo(function TranscriptBlock({
         block={block}
         layout={layout}
         stickyIndex={stickyIndex}
+        onEdit={onEditLastTurn}
+        editing={editing}
       />
     );
   }
@@ -1195,10 +1220,14 @@ function UserMessageBlock({
   block,
   layout,
   stickyIndex,
+  onEdit,
+  editing = false,
 }: {
   block: Block;
   layout: TranscriptLayout;
   stickyIndex: number;
+  onEdit?: () => void;
+  editing?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -1271,19 +1300,42 @@ function UserMessageBlock({
   return (
     <div
       data-prompt-anchor={block.id}
-      className={
+      data-editing-last-turn={editing ? "true" : undefined}
+      className={`group/usermsg ${
         chat ? "flex justify-end pt-1.5 pr-4 pb-4 pl-14" : "p-1.5 pb-3"
-      }
+      }`}
     >
       <div
-        className={`user-message-bubble min-w-0 bg-content/10 px-3 py-2 font-sans text-content ${
+        className={`user-message-bubble relative min-w-0 py-2 pl-3 font-sans text-content transition-[background-color,outline-color] duration-200 ${
+          onEdit && !chat ? "pr-10" : "pr-3"
+        } ${editing ? "edit-last-turn-bubble" : "bg-content/[0.14]"} ${
           chat
-            ? `w-fit max-w-xl ${singleLine ? "rounded-full" : "rounded-xl"}`
+            ? `w-fit max-w-xl ${singleLine && !editing ? "rounded-full" : "rounded-xl"}`
             : "rounded-lg border border-content/10"
         }`}
         style={{ zIndex: stickyIndex }}
         onClick={overflows ? toggle : undefined}
       >
+        {onEdit ? (
+          <button
+            type="button"
+            title="Edit and resend"
+            aria-label="Edit and resend"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+            className={`absolute ${
+              chat ? "-left-8 top-1/2 -translate-y-1/2" : "right-1.5 top-1.5"
+            } grid size-6 place-items-center rounded-md transition-[background-color,color,opacity] duration-150 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-accent ${
+              editing
+                ? "edit-last-turn-button opacity-100"
+                : "text-content/35 opacity-0 hover:bg-content/10 hover:text-content/70 group-hover/usermsg:opacity-100"
+            }`}
+          >
+            <Pencil className="size-3.5" strokeWidth={1.75} />
+          </button>
+        ) : null}
         {block.attachments?.length ? (
           <div
             className={`flex flex-wrap gap-1.5 ${text || card || note ? "mb-2" : ""}`}
