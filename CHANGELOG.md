@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.89] - 2026-09-20
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Session review attribution across parallel sessions: shared files are
+  grouped per claimant, adopted shell changes stay review-visible.
+- Notifications/Performance split in Settings with full pt-BR coverage.
+- Composer submit guardrails extracted as named guards with
+  characterization tests.
+
+### Fixed
+
+- External links open non-blocking with client-side validation and a
+  15s timeout (timed-out helpers are killed and reaped); xdg-open no
+  longer inherits the bundled LD_LIBRARY_PATH.
+- Busy state of the worktree dialogs announced to assistive tech
+  (en/pt-BR).
+
 ## [0.1.80] - 2026-09-20
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
