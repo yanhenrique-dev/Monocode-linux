@@ -11,7 +11,8 @@ export type SettingsSectionId =
   | "providers"
   | "skills"
   | "inbox"
-  | "archive";
+  | "archive"
+  | "worktrees";
 
 /** Rail buckets. Sections list in order under their group label. */
 export type SettingsGroupId = "app" | "agents" | "workspace";
@@ -91,6 +92,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "settings.section.archive.label",
     description: "settings.section.archive.description",
     keywords: "archived restore delete hidden arquivado restaurar excluir",
+  },
+  {
+    id: "worktrees",
+    group: "workspace",
+    label: "settings.worktrees.label",
+    description: "settings.worktrees.description",
+    keywords: "git branch worktree working copy project create delete",
   },
 ];
 
@@ -238,6 +246,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "zoom font size bigger smaller ui escala fonte maior menor",
   },
   {
+    id: "pets",
+    section: "appearance",
+    label: "settings.appearance.pets.label",
+    keywords: "mascot pets pixel sprite hide custom draw",
+  },
+  {
     id: "chat-background",
     section: "appearance",
     label: "settings.appearance.chat_background.title",
@@ -321,6 +335,12 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     section: "archive",
     label: "settings.archive.show_archived.label",
     keywords: "hidden conversations list ocultas arquivadas",
+  },
+  {
+    id: "project-worktrees",
+    section: "worktrees",
+    label: "settings.worktrees.project.label",
+    keywords: "git branch working copy create delete manage",
   },
 ];
 
@@ -800,7 +820,8 @@ export function keybindingWhenLabel(
 
 /**
  * Mirrors the bindings we actually handle: the native menu accelerators in
- * `src-tauri/src/menu.rs`, `tabCommand`, and the window key handler in App.
+ * `src-tauri/src/menu.rs`, `tabCommand`, the window key handler in App, and
+ * focused surface handlers such as the draft composer workspace toggle.
  */
 export const KEYBINDINGS: KeybindingRow[] = [
   { command: "settings.keybindings.cmd.app_search", keys: `${MOD}K`, when: "Always" },
@@ -811,6 +832,11 @@ export const KEYBINDINGS: KeybindingRow[] = [
   { command: "settings.keybindings.cmd.app_new_window", keys: `${MOD}${SHIFT}N`, when: "Always" },
   { command: "settings.keybindings.cmd.app_toggle_sidebar", keys: `${MOD}B`, when: "Always" },
   { command: "settings.keybindings.cmd.app_switch_model", keys: `${MOD}.`, when: "Always" },
+  {
+    command: "settings.keybindings.cmd.composer_toggle_workspace",
+    keys: `${MOD}${SHIFT}G`,
+    when: "Draft session composer",
+  },
   { command: "settings.keybindings.cmd.view_reload", keys: `${MOD}${SHIFT}R`, when: "Always" },
   { command: "settings.keybindings.cmd.view_zoom_in", keys: `${MOD}+`, when: "Always" },
   { command: "settings.keybindings.cmd.view_zoom_out", keys: `${MOD}-`, when: "Always" },

@@ -2,6 +2,7 @@ import {
   Archive,
   ArrowLeft,
   Bot,
+  FolderTree,
   Inbox,
   Keyboard,
   MessageSquare,
@@ -25,6 +26,7 @@ const SECTION_ICONS: Record<SettingsSectionId, IconComponent> = {
   providers: Bot,
   skills: Sparkles,
   inbox: Inbox,
+  worktrees: FolderTree,
   archive: Archive,
 };
 
@@ -96,7 +98,7 @@ function NavRow({
           : "text-content/50 hover:bg-content/5 hover:text-content"
       }`}
     >
-      <Icon className="size-4 shrink-0 opacity-70" strokeWidth={1.75} />
+      <Icon className="size-4 shrink-0" strokeWidth={1.75} />
       <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">
         {label}
       </span>

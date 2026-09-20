@@ -7,6 +7,7 @@ import {
   resolveFxBinary,
   resolveGrokBinary,
   resolveHermesBinary,
+  resolveMcodeBinary,
   resolveOmpBinary,
   resolveOpenCodeBinary,
   resolvePiBinary,
@@ -40,6 +41,11 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
     install:
       "Install from hermes-agent.nousresearch.com, then run hermes model",
   },
+  mcode: {
+    name: "MiniMax Code CLI",
+    install:
+      "Install from https://filecdn.minimax.chat/public/install.sh, then run `mcode login`",
+  },
 };
 
 let availability: HarnessAvailability = {
@@ -52,6 +58,7 @@ let availability: HarnessAvailability = {
   omp: false,
   fx: false,
   hermes: false,
+  mcode: false,
 };
 let version = 0;
 let inflight: Promise<void> | null = null;
@@ -176,6 +183,14 @@ export function probeHarnessAvailability(
       if (id === "hermes") {
         try {
           await resolveHermesBinary();
+          return [id, true] as const;
+        } catch {
+          return [id, false] as const;
+        }
+      }
+      if (id === "mcode") {
+        try {
+          await resolveMcodeBinary();
           return [id, true] as const;
         } catch {
           return [id, false] as const;

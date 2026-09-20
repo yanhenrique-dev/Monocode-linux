@@ -20,7 +20,7 @@ import {
 import { normalizeHex } from "../lib/colorUtils";
 import { projectKey } from "../lib/paths";
 import { clearProjectLogo, pickAndSetProjectLogo } from "../lib/projectLogos";
-import { PROJECT_MASCOTS, projectMascot } from "../lib/projectMascots";
+import { effectivePets, resolveEffectiveMascot } from "../lib/customPets";
 import { TAB_GROUP_COLORS } from "../lib/tabGroups";
 import { ColorPickerPopover, ColorSwatchRow } from "./ColorPickerPopover";
 import { Popover } from "./Popover";
@@ -179,7 +179,8 @@ export function TabGroupMenu({
     input.current?.select();
   }, []);
 
-  const shownMascot = projectMascot(mascotProject, mascotName).name;
+  const shownMascot = resolveEffectiveMascot(mascotProject, mascotName).name;
+  const pickerPets = effectivePets();
 
   const commitName = () => {
     onRename(groupId, name.trim());
@@ -311,7 +312,7 @@ export function TabGroupMenu({
         <div className="mb-2 px-0.5">
           <p className="mb-1 text-[11px] text-content/50">Mascot</p>
           <div className="flex items-center justify-between gap-1">
-            {PROJECT_MASCOTS.map((mascot) => (
+            {pickerPets.map((mascot) => (
               <MascotSwatch
                 key={mascot.name}
                 title={mascot.name}

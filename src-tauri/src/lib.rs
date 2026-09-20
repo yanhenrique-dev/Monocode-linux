@@ -6,6 +6,7 @@ mod control;
 pub mod control_cli;
 mod cursor_store;
 mod external_editor;
+mod external_url;
 mod fs;
 mod gitlab;
 mod harness;
@@ -31,6 +32,8 @@ mod window;
 mod window_transfer;
 #[cfg(windows)]
 mod windows;
+mod worktree_lifecycle;
+mod worktrees;
 
 // Phase 1 seam: spawn / kill harness children per MonoCode thread.
 // Adapters own the protocol; this host only supervises processes.
@@ -254,6 +257,7 @@ pub fn run() {
             reminders::reminder_open,
             external_editor::list_external_editors,
             external_editor::open_in_external_editor,
+            external_url::open_external_url,
             fs::list_dir,
             fs::list_project_files,
             fs::git_diff_stats,
@@ -311,6 +315,11 @@ pub fn run() {
             fs::git_checkout,
             fs::git_create_branch,
             fs::git_stash,
+            worktrees::git_worktrees,
+            worktrees::git_worktree_create,
+            worktrees::git_worktree_rename_branch,
+            worktrees::git_worktree_check_remove,
+            worktrees::git_worktree_remove,
             fs::create_path,
             fs::rename_path,
             fs::delete_path,
@@ -342,6 +351,7 @@ pub fn run() {
             harness::harness_resolve_pi,
             harness::harness_resolve_fx,
             harness::harness_resolve_grok,
+            harness::harness_resolve_mcode,
             harness::harness_resolve_hermes,
             harness::harness_free_port,
             harness::harness_spawn,

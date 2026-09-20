@@ -12,7 +12,8 @@ import {
   type RateLimitWindow,
 } from "../lib/rateLimits";
 import type { CodexRateLimitResetOutcome } from "../lib/rateLimitsFetch";
-import { mascotPath, projectMascot } from "../lib/projectMascots";
+import { mascotPath } from "../lib/projectMascots";
+import { resolveEffectiveMascot } from "../lib/customPets";
 import { getIntlLocale } from "../lib/locale";
 import { projectKey, projectName } from "../lib/paths";
 import { HARNESS_TITLE } from "../lib/session";
@@ -715,7 +716,7 @@ function BankedResetMascot({
   color: string;
   happy: boolean;
 }) {
-  const mascot = projectMascot(project, name);
+  const mascot = resolveEffectiveMascot(project, name);
   const spritePath = `${mascot.restPath}${mascotFacePlatePath(mascot.rest)}`;
   const maskId = `banked-reset-mascot-${useId().replace(/:/g, "")}`;
   return (

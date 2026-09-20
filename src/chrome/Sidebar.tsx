@@ -1,5 +1,5 @@
 import { OrchestrationSidebarAgents } from "./OrchestrationSidebarAgents";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import {
   Archive,
   Check,
@@ -171,6 +171,8 @@ type Props = {
   cwd: string;
   /** Working copy for Changes / explorer git. Falls back to `cwd`. */
   gitCwd?: string;
+  /** Branch identity shown for a worktree whose folder has a temporary name. */
+  explorerRootLabel?: string;
   open: boolean;
   sessions: SessionSummary[];
   busySessionIds: Set<string>;
@@ -262,6 +264,7 @@ type Props = {
 function SidebarComponent({
   cwd,
   gitCwd,
+  explorerRootLabel,
   open,
   sessions,
   busySessionIds,
@@ -1253,6 +1256,7 @@ function SidebarComponent({
               <FileTree
                 key={gitRoot}
                 cwd={gitRoot}
+                rootLabel={explorerRootLabel}
                 onOpenFile={onOpenFile}
                 onOpenTerminal={onOpenTerminal}
                 onFileMoved={onFileMoved}
@@ -2240,17 +2244,17 @@ function SessionCard({
         event.preventDefault();
         event.stopPropagation();
         if (event.metaKey || event.ctrlKey) {
-          void openUrl(linkedWorkItem.url).catch(() => undefined);
+          void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
           return;
         }
         if (onOpenWorkItem) onOpenWorkItem(linkedWorkItem, session.id);
-        else void openUrl(linkedWorkItem.url).catch(() => undefined);
+        else void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
       }}
       onAuxClick={(event) => {
         if (event.button !== 1) return;
         event.preventDefault();
         event.stopPropagation();
-        void openUrl(linkedWorkItem.url).catch(() => undefined);
+        void openExternalUrl(linkedWorkItem.url).catch(() => undefined);
       }}
       className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-0.5 text-[11px] tabular-nums text-accent hover:underline"
     >

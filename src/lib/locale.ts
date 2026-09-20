@@ -226,6 +226,11 @@ const en = {
   "settings.chat.model_controls.selector": "Model controls",
   "settings.chat.model_controls.menu": "Menu",
   "settings.chat.model_controls.beside": "Beside",
+  "settings.worktrees.label": "Worktrees",
+  "settings.worktrees.description":
+    "Manage additional worktrees for each project.",
+  "settings.worktrees.project.label": "Project worktrees",
+  "settings.appearance.pets.label": "Pets",
   "settings.chat.code_review.title": "Code review",
   "settings.chat.code_review.description":
     "Where a turn's changes open when you go to read them.",
@@ -333,7 +338,9 @@ const en = {
   "settings.appearance.blur.slider": "Blur radius",
   "settings.appearance.interface_blur.label": "Interface blur",
   "settings.appearance.interface_blur.description":
-    "Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces keep their tint, just flat.",
+    "Backdrop blur inside popovers, toasts, pickers, and dialogs. Turn it off for the fastest paint on software compositing — surfaces go solid instead of translucent.",
+  "settings.appearance.interface_blur.description_disabled":
+    "Disabled while Hardware acceleration is off: the master switch already suspends every blur.",
   "settings.appearance.interface_blur.toggle": "Interface blur",
   "settings.appearance.main_pane_glass.label": "Main pane glass",
   "settings.appearance.main_pane_glass.description":
@@ -389,6 +396,7 @@ const en = {
   "settings.keybindings.cmd.app_new_window": "App: New Window",
   "settings.keybindings.cmd.app_toggle_sidebar": "App: Toggle Sidebar",
   "settings.keybindings.cmd.app_switch_model": "App: Switch Model",
+  "settings.keybindings.cmd.composer_toggle_workspace": "Composer: Toggle Workspace",
   "settings.keybindings.cmd.view_reload": "View: Reload",
   "settings.keybindings.cmd.view_zoom_in": "View: Zoom In",
   "settings.keybindings.cmd.view_zoom_out": "View: Zoom Out",
@@ -659,6 +667,11 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.model_controls.selector": "Controles do modelo",
   "settings.chat.model_controls.menu": "Menu",
   "settings.chat.model_controls.beside": "Ao lado",
+  "settings.worktrees.label": "Worktrees",
+  "settings.worktrees.description":
+    "Gerencie worktrees adicionais para cada projeto.",
+  "settings.worktrees.project.label": "Worktrees do projeto",
+  "settings.appearance.pets.label": "Pets",
   "settings.chat.code_review.title": "Revisão de código",
   "settings.chat.code_review.description":
     "Onde as alterações de um turno abrem quando você vai lê-las.",
@@ -766,7 +779,9 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.blur.slider": "Raio do desfoque",
   "settings.appearance.interface_blur.label": "Desfoque da interface",
   "settings.appearance.interface_blur.description":
-    "Desfoque de fundo em popovers, avisos, seletores e diálogos. Desligue para pintura mais rápida na composição por software — as superfícies mantêm a cor, só sem desfoque.",
+    "Desfoque de fundo em popovers, avisos, seletores e diálogos. Desligue para pintura mais rápida na composição por software — as superfícies ficam sólidas em vez de translúcidas.",
+  "settings.appearance.interface_blur.description_disabled":
+    "Desativado enquanto Aceleração de hardware está desligada: o interruptor mestre já suspende todo desfoque.",
   "settings.appearance.interface_blur.toggle": "Desfoque da interface",
   "settings.appearance.main_pane_glass.label": "Vidro no painel principal",
   "settings.appearance.main_pane_glass.description":
@@ -823,6 +838,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.keybindings.cmd.app_new_window": "App: Nova janela",
   "settings.keybindings.cmd.app_toggle_sidebar": "App: Alternar barra lateral",
   "settings.keybindings.cmd.app_switch_model": "App: Trocar modelo",
+  "settings.keybindings.cmd.composer_toggle_workspace": "Composer: Alternar workspace",
   "settings.keybindings.cmd.view_reload": "Exibir: Recarregar",
   "settings.keybindings.cmd.view_zoom_in": "Exibir: Ampliar",
   "settings.keybindings.cmd.view_zoom_out": "Exibir: Reduzir",

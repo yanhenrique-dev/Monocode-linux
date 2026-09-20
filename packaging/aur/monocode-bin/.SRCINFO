@@ -1,0 +1,24 @@
+pkgbase = monocode-bin
+	pkgdesc = MonoCode Linux — interface desktop para agentes de código (Tauri + React)
+	pkgver = 0.1.67
+	pkgrel = 1
+	url = https://github.com/yanhenrique-dev/Monocode-linux
+	arch = x86_64
+	license = MIT
+	depends = gtk3
+	depends = webkit2gtk-4.1
+	depends = libsoup3
+	depends = libayatana-appindicator
+	depends = openssl
+	depends = librsvg
+	depends = zenity
+	depends = hicolor-icon-theme
+	optdepends = claude-code: provedor Claude Code
+	provides = monocode
+	conflicts = monocode
+	source = monocode-bin-0.1.67.AppImage::https://github.com/yanhenrique-dev/Monocode-linux/releases/download/v0.1.67/MonoCode_0.1.67_amd64.AppImage
+	source = LICENSE::https://github.com/yanhenrique-dev/Monocode-linux/raw/v0.1.67/LICENSE
+	sha256sums = 3ebdcb5761a109882df70b0fc5b810494337e8cac64f3175dede617fd75e8add
+	sha256sums = f0da354982eb716d0036375be9322e2e77792acd0a782f1655ee75ea36c17640
+
+pkgname = monocode-bin

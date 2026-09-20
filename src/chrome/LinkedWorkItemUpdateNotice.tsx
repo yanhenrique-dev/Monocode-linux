@@ -1,4 +1,4 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalUrl } from "../lib/openExternal";
 import { useEffect, useState } from "react";
 import {
   linkedWorkItemActivityPrompt,
@@ -114,7 +114,7 @@ export function LinkedWorkItemUpdateNotice({
       onOpenDiscussion();
       return;
     }
-    void openUrl(latest?.url || card.url);
+    void openExternalUrl(latest?.url || card.url);
   };
   const dismiss = () => {
     onAcknowledge();
@@ -165,7 +165,7 @@ export function LinkedWorkItemUpdateNotice({
             type="button"
             onClick={() => {
               onAcknowledge();
-              void openUrl(card.url);
+              void openExternalUrl(card.url);
             }}
             className="block w-full text-left"
           >
@@ -191,7 +191,7 @@ export function LinkedWorkItemUpdateNotice({
                 onClick={() => {
                   if (entry.url) {
                     onAcknowledge();
-                    void openUrl(entry.url);
+                    void openExternalUrl(entry.url);
                   }
                 }}
                 className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-content/5 disabled:cursor-default disabled:hover:bg-transparent"

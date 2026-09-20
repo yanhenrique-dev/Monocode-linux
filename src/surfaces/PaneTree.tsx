@@ -44,6 +44,8 @@ import {
 import { FilePane } from "./FilePane";
 import { SessionPane } from "./SessionPane";
 import type { SessionFolderTarget } from "../lib/sessionFolders";
+import type { Worktree } from "../lib/worktrees";
+import type { WorkspaceMode } from "../lib/session";
 
 type Shared = {
   visible: boolean;
@@ -132,6 +134,14 @@ type Shared = {
     turn: Block[],
   ) => void;
   onHandoff?: (sessionId: string, target: ModelTarget, turn: Block[]) => void;
+  onWorktreeChange?: (sessionId: string, tree: Worktree) => Promise<void>;
+  onManageWorktrees?: () => void;
+  onWorkspaceModeChange: (
+    sessionId: string,
+    mode: WorkspaceMode,
+    base?: string,
+  ) => void;
+  onWorktreeBaseChange: (sessionId: string, base: string) => void;
   onMovePane: (fromId: string, toId: string, edge: PaneEdge) => void;
   onDetachPane: (
     paneId: string,
@@ -206,6 +216,10 @@ function PaneTreeComponent({
   onBuildPlan,
   onSecondOpinion,
   onHandoff,
+  onWorktreeChange,
+  onManageWorktrees,
+  onWorkspaceModeChange,
+  onWorktreeBaseChange,
   onMovePane,
   onDetachPane,
   onNewTerminal,
@@ -445,6 +459,10 @@ function PaneTreeComponent({
                 onBuildPlan={onBuildPlan}
                 onSecondOpinion={onSecondOpinion}
                 onHandoff={onHandoff}
+                onWorktreeChange={onWorktreeChange}
+                onManageWorktrees={onManageWorktrees}
+                onWorkspaceModeChange={onWorkspaceModeChange}
+                onWorktreeBaseChange={onWorktreeBaseChange}
                 onNewTerminal={onNewTerminal}
                 onPaneDragStart={onPaneDragStart}
               />
