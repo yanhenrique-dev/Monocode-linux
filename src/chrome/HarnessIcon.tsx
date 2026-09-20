@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Bot } from "./icons";
 import claude from "../assets/providers/claude.svg";
 import codex from "../assets/providers/codex.svg";
 import cursor from "../assets/providers/cursor.svg";
@@ -128,9 +129,13 @@ export function HarnessIcon({
       </MonoIcon>
     );
   }
+  const src = HARNESS_ICONS[harness];
+  if (!src) {
+    return <Bot className={className} strokeWidth={1.75} aria-hidden />;
+  }
   return (
     <img
-      src={HARNESS_ICONS[harness]}
+      src={src}
       alt=""
       draggable={false}
       className={`block object-contain ${className}`}

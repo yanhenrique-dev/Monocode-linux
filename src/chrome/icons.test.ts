@@ -62,4 +62,5 @@ describe("hugeicons imports", () => {
     expect(html).toContain("items-center justify-center");
     expect(html).toContain("size-[72%]");
   });
+
 });
