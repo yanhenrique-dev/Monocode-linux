@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.92] - 2026-09-20
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Per-cue custom notification sounds: each alert (turn finished, inbox
+  activity, linked PR/issue activity, update available) can keep its
+  built-in cue or use any local audio file, with test/reset controls
+  and full pt-BR coverage.
+- Browser-preview shim so the app boots outside the native webview
+  (inert inside the packaged app).
+
+### Changed
+
+- `fs.rs` split into `src-tauri/src/fs/` domain modules (read, write,
+  git, github, omp, path) with no logic changes.
+
+### Fixed
+
+- `read_file_preview` no longer panics on multibyte lines near the
+  200-byte cut; truncation now lands on char boundaries.
+- Commit view accepts 64-char SHA-256 hashes, matching the rest of
+  the git module.
+
 ## [0.1.89] - 2026-09-20
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
