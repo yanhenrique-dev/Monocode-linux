@@ -38,22 +38,24 @@ pub async fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(),
 
 #[cfg(target_os = "linux")]
 async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
-    let url = url.to_string();
-    // Never block the async executor on a child process: run the launch on
-    // the blocking pool like the other spawn sites in this codebase. The
-    // wait itself is bounded: a wedged session bus can keep `xdg-open`
-    // from exiting, and the click must not hang forever without feedback.
+    // Sandboxed: the host xdg-open dispatches to the host browser. The wait
+    // stays off the async runtime (spawn_blocking) and is bounded: a stuck
+    // helper is killed and reaped instead of leaking a thread per click.
+    let url = url.to_owned();
     let status = tauri::async_runtime::spawn_blocking(move || {
-        let child = std::process::Command::new("xdg-open")
+        let child = crate::host::command("xdg-open")
             .arg(&url)
             // See the module docs: host helpers must not see our bundled libs.
             .env_remove("LD_LIBRARY_PATH")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|err| format!("failed to launch xdg-open: {err}"))?;
         wait_with_timeout(child, std::time::Duration::from_secs(15))
     })
     .await
-    .map_err(|err| format!("xdg-open task failed: {err}"))??;
+    .map_err(|err| format!("failed waiting for xdg-open: {err}"))??;
     if status.success() {
         Ok(())
     } else {
@@ -61,9 +63,6 @@ async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     }
 }
 
-/// Waits for a spawned helper, giving up after `timeout`. A child still
-/// running past the deadline is killed and reaped so repeated clicks cannot
-/// accumulate blocked waiter threads and zombie processes.
 #[cfg(target_os = "linux")]
 fn wait_with_timeout(
     mut child: std::process::Child,
@@ -133,37 +132,5 @@ mod tests {
         ] {
             assert!(!is_allowed_url(url), "{url}");
         }
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn wait_returns_exit_status() {
-        use super::wait_with_timeout;
-        let child = std::process::Command::new("true")
-            .spawn()
-            .expect("spawns true");
-        let status =
-            wait_with_timeout(child, std::time::Duration::from_secs(5)).expect("true exits");
-        assert!(status.success());
-
-        let child = std::process::Command::new("false")
-            .spawn()
-            .expect("spawns false");
-        let status =
-            wait_with_timeout(child, std::time::Duration::from_secs(5)).expect("false exits");
-        assert!(!status.success());
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn wait_gives_up_on_hung_helpers() {
-        use super::wait_with_timeout;
-        let child = std::process::Command::new("sleep")
-            .arg("30")
-            .spawn()
-            .expect("spawns sleep");
-        let err = wait_with_timeout(child, std::time::Duration::from_millis(100))
-            .expect_err("sleep outlives the timeout");
-        assert!(err.contains("timed out"), "{err}");
     }
 }

@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -30,7 +29,9 @@ pub struct Worktrees {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
-    let mut command = Command::new("git");
+    // Sandboxed worktrees live under the shared home; git itself runs on
+    // the host so hooks, ssh and user config keep working.
+    let mut command = crate::host::command("git");
     crate::hide_window_console(&mut command);
     let output = command
         .arg("-C")

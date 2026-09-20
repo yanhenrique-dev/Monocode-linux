@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=MonoCode
+GenericName=AI coding workspace
+Comment=Run coding agents from one desktop workspace
+Exec=monocode
+Icon=com.monocode.desktop
+Terminal=false
+Categories=Development;IDE;
+Keywords=AI;Agent;Coding;Development;IDE;
+StartupNotify=true
+StartupWMClass=monocode

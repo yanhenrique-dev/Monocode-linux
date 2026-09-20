@@ -10,6 +10,7 @@ mod external_url;
 mod fs;
 mod gitlab;
 mod harness;
+mod host;
 mod inbox_media;
 mod linear;
 mod link_preview;
@@ -194,9 +195,16 @@ fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     #[cfg(windows)]
     windows::initialize().expect("Failed to initialize Windows process safety");
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+    // Flathub forbids self-updaters: the sandbox build skips the updater
+    // plugin entirely (the frontend also hides its update UI — see
+    // `flatpak_sandboxed`). Native AppImage builds keep it.
+    let builder = tauri::Builder::default().plugin(tauri_plugin_process::init());
+    let builder = if host::in_flatpak() {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    };
+    let app = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -244,6 +252,7 @@ pub fn run() {
             control::control_turn_finished,
             default_cwd,
             home_dir,
+            host::flatpak_sandboxed,
             notifications::notification_permission,
             notifications::request_notification_permission,
             notifications::show_notification,

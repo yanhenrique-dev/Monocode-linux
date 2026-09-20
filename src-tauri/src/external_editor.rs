@@ -1,7 +1,9 @@
 #[cfg(target_os = "macos")]
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+#[cfg(target_os = "macos")]
+use std::process::Command;
+use std::process::Stdio;
 
 use serde::Serialize;
 
@@ -225,7 +227,8 @@ fn launch_editor_sync(editor_id: &str, cwd: &str) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     let mut command = match launcher {
         EditorLauncher::Command(program) => {
-            let mut command = Command::new(program);
+            // Sandboxed: external editors are host applications.
+            let mut command = crate::host::command(program);
             command.arg(&cwd);
             command
         }
