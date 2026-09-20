@@ -229,10 +229,16 @@ export async function notifySession(
   event: NotificationEvent,
   sessionVisible: boolean,
 ): Promise<boolean> {
-  if (session.inboxAsk) return false;
+  if (session.inboxAsk) {
+    console.debug("[notifications] skip: inbox-ask thread", session.id);
+    return false;
+  }
   const occurredAt = Date.now();
   const project = knownNotificationProject(session.cwd);
-  if (!project) return false;
+  if (!project) {
+    console.debug("[notifications] skip: no project for cwd", session.cwd);
+    return false;
+  }
   return notifyProjectSession(session, event, sessionVisible, {
     projectId: project.id,
     category: event === "finished" ? "agentFinished" : "agentInput",
@@ -245,10 +251,16 @@ export async function announceSessionFinished(
   session: Session,
   sessionVisible: boolean,
 ): Promise<void> {
-  if (session.inboxAsk) return;
+  if (session.inboxAsk) {
+    console.debug("[notifications] skip: inbox-ask thread", session.id);
+    return;
+  }
   const occurredAt = Date.now();
   const project = knownNotificationProject(session.cwd);
-  if (!project) return;
+  if (!project) {
+    console.debug("[notifications] skip: no project for cwd", session.cwd);
+    return;
+  }
   const subject: NotificationSubject = {
     projectId: project.id,
     category: "agentFinished",
@@ -269,14 +281,29 @@ async function notifyProjectSession(
   sessionVisible: boolean,
   subject: NotificationSubject,
 ): Promise<boolean> {
-  if (!allowsProjectNotification(subject)) return false;
+  if (!allowsProjectNotification(subject)) {
+    console.debug(
+      "[notifications] skip: project policy blocks",
+      subject.projectId,
+      subject.category,
+    );
+    return false;
+  }
   const decision = shouldNotify({
     enabled: loadNotificationsEnabled(),
     permission,
     windowFocused,
     sessionVisible,
   });
-  if (!decision) return false;
+  if (!decision) {
+    console.debug("[notifications] skip: not eligible", {
+      enabled: loadNotificationsEnabled(),
+      permission,
+      windowFocused,
+      sessionVisible,
+    });
+    return false;
+  }
   const { title, subtitle, body } = notificationText(session, event);
   try {
     await invoke("show_notification", {
@@ -287,7 +314,10 @@ async function notifyProjectSession(
       sound: loadSoundsEnabled(),
     });
     return true;
-  } catch {
+  } catch (error) {
+    // Swallowed by design (the in-app cue stands in), but loud in DevTools:
+    // a rejected dispatch is the only signal when the OS side fails.
+    console.warn("[notifications] show_notification rejected:", error);
     return false;
   }
 }
