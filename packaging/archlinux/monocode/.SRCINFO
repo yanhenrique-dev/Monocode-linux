@@ -1,6 +1,6 @@
 pkgbase = monocode
 	pkgdesc = MonoCode Linux — interface desktop para agentes de código (Tauri + React)
-	pkgver = 0.1.94
+	pkgver = 0.1.95
 	pkgrel = 1
 	url = https://github.com/yanhenrique-dev/Monocode-linux
 	arch = x86_64
@@ -21,9 +21,9 @@ pkgbase = monocode
 	optdepends = claude-code: provedor Claude Code
 	provides = monocode
 	conflicts = monocode-bin
-	source = monocode-0.1.94::git+https://github.com/yanhenrique-dev/Monocode-linux.git#tag=v0.1.94
+	source = monocode-0.1.95::git+https://github.com/yanhenrique-dev/Monocode-linux.git#tag=v0.1.95
 	source = monocode.desktop
-	source = LICENSE::https://github.com/yanhenrique-dev/Monocode-linux/raw/v0.1.94/LICENSE
+	source = LICENSE::https://github.com/yanhenrique-dev/Monocode-linux/raw/v0.1.95/LICENSE
 	sha256sums = SKIP
 	sha256sums = SKIP
 	sha256sums = SKIP
