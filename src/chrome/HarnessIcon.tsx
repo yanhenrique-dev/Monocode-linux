@@ -129,7 +129,9 @@ export function HarnessIcon({
       </MonoIcon>
     );
   }
-  if (harness === "mcode") {
+  // "mcode" lands with the mcode-harness session; the cast keeps this
+  // forward-compat branch compiling until HarnessId grows to include it.
+  if ((harness as string) === "mcode") {
     return (
       <MonoIcon className={className}>
         <path d="M2 0H10L14.5 11L19 0H27V25H20V8.5L15 19.5H14L9 8.5V25H2V0Z" />
