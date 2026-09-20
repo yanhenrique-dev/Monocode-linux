@@ -88,4 +88,34 @@ describe("hugeicons imports", () => {
     expect(html).toContain('fill="currentColor"');
     expect(html).not.toContain("<img");
   });
+
+  it("renders single-color marks inline instead of <img>", () => {
+    for (const harness of ["claude", "omp"] as const) {
+      const html = renderToStaticMarkup(
+        createElement(HarnessIcon, { harness, className: "size-4" }),
+      );
+      expect(html, harness).toContain('fill="currentColor"');
+      expect(html, harness).not.toContain("<img");
+    }
+  });
+
+  it("keeps multicolor brand art on <img> instead of flattening it", () => {
+    const html = renderToStaticMarkup(
+      createElement(HarnessIcon, {
+        harness: "codex",
+        className: "size-4",
+      }),
+    );
+    expect(html).toContain("<img");
+  });
+
+  it("gives the grok mark the same optical padding as the catalog", () => {
+    const html = renderToStaticMarkup(
+      createElement(HarnessIcon, {
+        harness: "grok",
+        className: "size-4",
+      }),
+    );
+    expect(html).toContain('viewBox="-4.8 -4.6 44.6 42.2"');
+  });
 });
