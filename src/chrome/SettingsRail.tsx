@@ -16,6 +16,7 @@ import {
   settingsSectionsByGroup,
   type SettingsSectionId,
 } from "../lib/settings";
+import { useLocale } from "../lib/locale";
 
 const SECTION_ICONS: Record<SettingsSectionId, IconComponent> = {
   general: SlidersHorizontal,
@@ -38,23 +39,24 @@ type Props = {
 /** Body of the project rail while settings are open. */
 export function SettingsNav({ section, onSelect, onClose }: Props) {
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
+  const { t } = useLocale();
 
   return (
     <>
       <div
         ref={lockOverscroll}
-        aria-label="Settings"
+        aria-label={t("settings.header.region_aria")}
         className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-none px-2 py-3"
       >
         {settingsSectionsByGroup().map((group) => (
           <div key={group.id} className="flex flex-col gap-px">
             <div className="px-2 pb-1 text-xs font-semibold text-content/35">
-              {group.label}
+              {t(group.label)}
             </div>
             {group.sections.map((item) => (
               <NavRow
                 key={item.id}
-                label={item.label}
+                label={t(item.label)}
                 icon={SECTION_ICONS[item.id]}
                 active={item.id === section}
                 onClick={() => onSelect(item.id)}
@@ -64,7 +66,11 @@ export function SettingsNav({ section, onSelect, onClose }: Props) {
         ))}
       </div>
       <div className="flex shrink-0 flex-col gap-px p-2">
-        <NavRow label="Back" icon={ArrowLeft} onClick={onClose} />
+        <NavRow
+          label={t("settings.header.back")}
+          icon={ArrowLeft}
+          onClick={onClose}
+        />
       </div>
     </>
   );

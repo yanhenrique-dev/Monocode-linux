@@ -6,6 +6,7 @@ import {
   loadNotificationPreferences,
   updateNotificationPreferences,
 } from "../lib/notificationPreferences";
+import { getIntlLocale } from "../lib/locale";
 import { ProjectRail } from "./ProjectRail";
 import { invoke } from "@tauri-apps/api/core";
 import { rememberNotificationProjects } from "../lib/notificationProjects";
@@ -36,6 +37,9 @@ let root: Root;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   localStorage.clear();
+  // English UI assertions below: pin the locale so a pt-BR OS does not
+  // translate the surface under test.
+  localStorage.setItem("monocode.locale", "en");
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -151,7 +155,7 @@ it("shows persisted mute status on the project and in its reopened menu", async 
   }));
   const timedIndicator = container.querySelector('[role="img"][aria-label^="Muted until "]');
   expect(timedIndicator?.getAttribute("title")).toBe(
-    `Muted until ${new Date(2030, 0, 15, 16, 30).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`,
+    `Muted until ${new Date(2030, 0, 15, 16, 30).toLocaleString(getIntlLocale(), { dateStyle: "medium", timeStyle: "short" })}`,
   );
   await act(async () => project.dispatchEvent(new KeyboardEvent("keydown", {
     key: "ContextMenu", bubbles: true,

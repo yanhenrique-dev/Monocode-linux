@@ -1,3 +1,4 @@
+import { getIntlLocale } from "../lib/locale";
 import { openExternalUrl } from "../lib/openExternal";
 import {
   Check,
@@ -2346,7 +2347,7 @@ export function InboxDetail({
                     <span aria-hidden>·</span>
                     <time
                       dateTime={item.createdAt}
-                      title={new Date(item.createdAt).toLocaleString()}
+                      title={new Date(item.createdAt).toLocaleString(getIntlLocale())}
                     >
                       Created {formatRelativeTime(item.createdAt)}
                     </time>

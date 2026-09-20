@@ -1,4 +1,5 @@
 import { ALT, IS_MAC, IS_WIN, MOD, SHIFT } from "./platform";
+import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
 
 const SECTION_KEY = "monocode.settingsSection";
 
@@ -16,17 +17,17 @@ export type SettingsSectionId =
 /** Rail buckets. Sections list in order under their group label. */
 export type SettingsGroupId = "app" | "agents" | "workspace";
 
-export const SETTINGS_GROUPS: { id: SettingsGroupId; label: string }[] = [
-  { id: "app", label: "App" },
-  { id: "agents", label: "Agents" },
-  { id: "workspace", label: "Workspace" },
+export const SETTINGS_GROUPS: { id: SettingsGroupId; label: LocaleKey }[] = [
+  { id: "app", label: "settings.group.app" },
+  { id: "agents", label: "settings.group.agents" },
+  { id: "workspace", label: "settings.group.workspace" },
 ];
 
 export type SettingsSection = {
   id: SettingsSectionId;
   group: SettingsGroupId;
-  label: string;
-  description: string;
+  label: LocaleKey;
+  description: LocaleKey;
   /** Extra words search matches the section on, beyond its label. */
   keywords?: string;
 };
@@ -35,78 +36,75 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: "general",
     group: "app",
-    label: "General",
-    description:
-      "The build you are running, how MonoCode reaches you, and the panels it shows.",
-    keywords: "version update sounds notifications notes rail gpu hardware acceleration performance terminal",
+    label: "settings.section.general.label",
+    description: "settings.section.general.description",
+    keywords:
+      "version update sounds notifications notes rail gpu hardware acceleration performance terminal language idioma portugues locale traducao translation",
   },
   {
     id: "appearance",
     group: "app",
-    label: "Appearance",
-    description:
-      "Theme, tint, translucency, and the image behind your conversations.",
-    keywords: "theme dark light color accent glass blur zoom scale wallpaper",
+    label: "settings.section.appearance.label",
+    description: "settings.section.appearance.description",
+    keywords:
+      "theme dark light color accent glass blur zoom scale wallpaper tema escuro claro cor destaque vidro desfoque escala",
   },
   {
     id: "keybindings",
     group: "app",
-    label: "Keybindings",
-    description:
-      "Every shortcut the workspace handles, from the app menu and the key handler.",
-    keywords: "shortcut hotkey keyboard binding",
+    label: "settings.section.keybindings.label",
+    description: "settings.section.keybindings.description",
+    keywords: "shortcut hotkey keyboard binding atalho teclado",
   },
   {
     id: "chat",
     group: "agents",
-    label: "Chat",
-    description:
-      "How transcripts read, what the composer does with a follow-up, and how diffs open.",
-    keywords: "transcript composer prompt message diff review layout",
+    label: "settings.section.chat.label",
+    description: "settings.section.chat.description",
+    keywords: "transcript composer prompt message diff review layout transcricao conversa mensagem",
   },
   {
     id: "providers",
     group: "agents",
-    label: "Providers",
-    description:
-      "Agent CLIs MonoCode can drive, and the model new sessions start with.",
-    keywords: "model harness claude codex gemini cli default hooks",
+    label: "settings.section.providers.label",
+    description: "settings.section.providers.description",
+    keywords:
+      "model harness claude codex gemini cli default hooks modelo provedor padrao",
   },
   {
     id: "skills",
     group: "agents",
-    label: "Skills",
-    description:
-      "Discover and manage file skills from project, personal, and harness folders.",
-    keywords: "skill instructions prompt",
+    label: "settings.section.skills.label",
+    description: "settings.section.skills.description",
+    keywords: "skill instructions prompt habilidade instrucao",
   },
   {
     id: "inbox",
     group: "workspace",
-    label: "Inbox",
-    description:
-      "Manage Inbox services and notification preferences for each project.",
-    keywords: "github gitlab linear connect token integration",
+    label: "settings.section.inbox.label",
+    description: "settings.section.inbox.description",
+    keywords:
+      "github gitlab linear connect token integration caixa entrada integracao",
   },
   {
     id: "archive",
     group: "workspace",
-    label: "Archive",
-    description: "Projects and conversations you have archived.",
-    keywords: "archived restore delete hidden",
+    label: "settings.section.archive.label",
+    description: "settings.section.archive.description",
+    keywords: "archived restore delete hidden arquivado restaurar excluir",
   },
   {
     id: "worktrees",
     group: "workspace",
-    label: "Worktrees",
-    description: "Manage additional worktrees for each project.",
+    label: "settings.worktrees.label",
+    description: "settings.worktrees.description",
     keywords: "git branch worktree working copy project create delete",
   },
 ];
 
 export function settingsSectionsByGroup(): {
   id: SettingsGroupId;
-  label: string;
+  label: LocaleKey;
   sections: SettingsSection[];
 }[] {
   return SETTINGS_GROUPS.map((group) => ({
@@ -122,7 +120,7 @@ export function settingsSectionsByGroup(): {
 export type SettingsEntry = {
   id: string;
   section: SettingsSectionId;
-  label: string;
+  label: LocaleKey;
   keywords?: string;
 };
 
@@ -130,209 +128,218 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   {
     id: "update",
     section: "general",
-    label: "Version",
-    keywords: "update upgrade release what's new build changelog",
+    label: "settings.general.update.label",
+    keywords:
+      "update upgrade release what's new build changelog atualizacao versao novidades",
   },
   {
     id: "sounds",
     section: "general",
-    label: "Sounds",
-    keywords: "audio cue chime mute volume",
+    label: "settings.general.sounds.label",
+    keywords: "audio cue chime mute volume som mudo",
   },
   {
     id: "notifications",
     section: "general",
-    label: "Notifications",
-    keywords: "notify alert toast permission reminder background",
+    label: "settings.general.notifications.label",
+    keywords: "notify alert toast permission reminder background notificar aviso permissao",
+  },
+  {
+    id: "language",
+    section: "general",
+    label: "settings.general.language.label",
+    keywords: "language idioma portugues locale translation traducao",
   },
   {
     id: "notes",
     section: "general",
-    label: "Notes",
-    keywords: "notebook markdown rail scratchpad",
+    label: "settings.general.notes.label",
+    keywords: "notebook markdown rail scratchpad notas bloco",
   },
   {
     id: "working-agents",
     section: "general",
-    label: "Working agents",
-    keywords: "live running sessions rail card",
+    label: "settings.general.working_agents.label",
+    keywords: "live running sessions rail card agentes ativos",
   },
   {
     id: "hardware-acceleration",
     section: "general",
-    label: "Hardware acceleration",
-    keywords: "gpu webgl terminal performance render",
+    label: "settings.general.hardware_acceleration.label",
+    keywords: "gpu webgl terminal performance render aceleracao hardware desempenho",
   },
   {
     id: "terminal-gpu",
     section: "general",
-    label: "Terminal GPU rendering",
+    label: "settings.general.terminal_gpu.label",
     keywords: "gpu webgl terminal performance render xterm",
   },
   ...(IS_WIN
     ? [
         {
           id: "close-to-tray",
-          section: "general" as const,
-          label: "Close to tray",
-          keywords: "minimize background quit exit window taskbar windows",
-        },
+          section: "general",
+          label: "settings.general.close_to_tray.label",
+          keywords:
+            "minimize background quit exit window taskbar windows bandeja",
+        } satisfies SettingsEntry,
       ]
     : []),
   {
     id: "theme",
     section: "appearance",
-    label: "Theme",
-    keywords: "dark light system appearance mode",
+    label: "settings.appearance.theme.label",
+    keywords: "dark light system appearance mode escuro claro sistema tema",
   },
   {
     id: "accent-color",
     section: "appearance",
-    label: "Accent color",
-    keywords: "highlight bubble send button tint",
+    label: "settings.appearance.accent.label",
+    keywords: "highlight bubble send button tint destaque",
   },
   {
     id: "hue",
     section: "appearance",
-    label: "Hue",
-    keywords: "tint color chrome",
+    label: "settings.appearance.hue.label",
+    keywords: "tint color chrome matiz",
   },
   {
     id: "saturation",
     section: "appearance",
-    label: "Saturation",
-    keywords: "tint color neutral grey gray",
+    label: "settings.appearance.saturation.label",
+    keywords: "tint color neutral grey gray saturacao cinza",
   },
   {
     id: "dark-lightness",
     section: "appearance",
-    label: "Dark-mode lightness",
-    keywords: "black brightness contrast background",
+    label: "settings.appearance.dark_lightness.label",
+    keywords: "black brightness contrast background preto brilho luminosidade",
   },
   {
     id: "sidebar-opacity",
     section: "appearance",
-    label: "Sidebar opacity",
-    keywords: "glass translucent transparency vibrancy",
+    label: "settings.appearance.sidebar_opacity.label",
+    keywords: "glass translucent transparency vibrancy opacidade barra lateral",
   },
   {
     id: "blur",
     section: "appearance",
-    label: "Blur radius",
-    keywords: "glass translucent vibrancy backdrop",
+    label: "settings.appearance.blur.label",
+    keywords: "glass translucent vibrancy backdrop desfoque",
   },
   {
     id: "interface-blur",
     section: "appearance",
-    label: "Interface blur",
-    keywords: "glass blur backdrop popover toast picker dialog performance",
+    label: "settings.appearance.interface_blur.label",
+    keywords: "glass blur backdrop popover toast picker dialog performance desfoque interface",
   },
   {
     id: "main-pane-glass",
     section: "appearance",
-    label: "Main pane glass",
-    keywords: "translucent transparency body window",
+    label: "settings.appearance.main_pane_glass.label",
+    keywords: "translucent transparency body window painel principal vidro",
   },
   {
     id: "interface-scale",
     section: "appearance",
-    label: "Interface scale",
-    keywords: "zoom font size bigger smaller ui",
+    label: "settings.appearance.interface_scale.label",
+    keywords: "zoom font size bigger smaller ui escala fonte maior menor",
   },
   {
     id: "pets",
     section: "appearance",
-    label: "Pets",
+    label: "settings.appearance.pets.label",
     keywords: "mascot pets pixel sprite hide custom draw",
   },
   {
     id: "chat-background",
     section: "appearance",
-    label: "Chat background",
-    keywords: "wallpaper image picture opacity backdrop",
+    label: "settings.appearance.chat_background.title",
+    keywords: "wallpaper image picture opacity backdrop fundo imagem",
   },
   {
     id: "transcript-layout",
     section: "chat",
-    label: "Transcript layout",
-    keywords: "full width chat bubble message",
+    label: "settings.chat.transcript_layout.label",
+    keywords: "full width chat bubble message largura total transcricao",
   },
   {
     id: "anchor-prompts",
     section: "chat",
-    label: "Anchor prompts to top",
-    keywords: "scroll position sticky message",
+    label: "settings.chat.anchor_prompts.label",
+    keywords: "scroll position sticky message fixar topo",
   },
   {
     id: "follow-up",
     section: "chat",
-    label: "Follow-up behavior",
-    keywords: "queue steer interrupt send while running",
+    label: "settings.chat.follow_up.label",
+    keywords: "queue steer interrupt send while running fila redirecionar acompanhamento",
   },
   {
     id: "model-controls",
     section: "chat",
-    label: "Model controls",
-    keywords: "effort thinking reasoning fast service tier model picker composer",
+    label: "settings.chat.model_controls.label",
+    keywords:
+      "effort thinking reasoning fast service tier model picker composer esforco modelo controles",
   },
   {
     id: "composer-mascot",
     section: "chat",
-    label: "Composer mascot",
-    keywords: "runner animation coin fun",
+    label: "settings.chat.composer_mascot.label",
+    keywords: "runner animation coin fun mascote animacao",
   },
   {
     id: "diff-view",
     section: "chat",
-    label: "Diff view",
-    keywords: "unified editor review changes working tree",
+    label: "settings.chat.diff_view.label",
+    keywords: "unified editor review changes working tree unificada revisao",
   },
   {
     id: "empty-session-games",
     section: "chat",
-    label: "Empty session games",
-    keywords: "pacman snake arcade grid fun",
+    label: "settings.chat.empty_session_games.label",
+    keywords: "pacman snake arcade grid fun jogos cobrinha",
   },
   {
     id: "claude-hooks",
     section: "providers",
-    label: "Claude Code hooks",
-    keywords: "pretooluse settings.json block command notification",
+    label: "settings.providers.claude_hooks.label",
+    keywords: "pretooluse settings.json block command notification hooks",
   },
   {
     id: "project-notifications",
     section: "inbox",
-    label: "Project notifications",
-    keywords: "mute resume sounds banners reminders categories",
+    label: "settings.inbox.project_notifications.title",
+    keywords: "mute resume sounds banners reminders categories silenciar notificacoes",
   },
   {
     id: "github",
     section: "inbox",
-    label: "GitHub",
-    keywords: "gh cli connect pull request sign in",
+    label: "settings.inbox.github.title",
+    keywords: "gh cli connect pull request sign in conectar",
   },
   {
     id: "gitlab",
     section: "inbox",
-    label: "GitLab",
-    keywords: "token self-managed merge request connect",
+    label: "settings.inbox.gitlab.title",
+    keywords: "token self-managed merge request connect conectar",
   },
   {
     id: "linear",
     section: "inbox",
-    label: "Linear",
-    keywords: "api key issues teams connect",
+    label: "settings.inbox.linear.title",
+    keywords: "api key issues teams connect chave equipes",
   },
   {
     id: "show-archived",
     section: "archive",
-    label: "Show archived in the sidebar",
-    keywords: "hidden conversations list",
+    label: "settings.archive.show_archived.label",
+    keywords: "hidden conversations list ocultas arquivadas",
   },
   {
     id: "project-worktrees",
     section: "worktrees",
-    label: "Project worktrees",
+    label: "settings.worktrees.project.label",
     keywords: "git branch working copy create delete manage",
   },
 ];
@@ -362,39 +369,42 @@ function matchScore(
 export function searchSettings(
   query: string,
   limit = 8,
+  locale: Locale = loadLocale(),
 ): SettingsSearchResult[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
   const scored: { score: number; result: SettingsSearchResult }[] = [];
 
   for (const entry of SETTINGS_INDEX) {
-    const score = matchScore(needle, entry.label, entry.keywords);
+    const label = t(locale, entry.label);
+    const score = matchScore(needle, label, entry.keywords);
     if (score == null) continue;
     scored.push({
       score,
       result: {
         section: entry.section,
-        sectionLabel: settingsSectionLabel(entry.section),
+        sectionLabel: t(locale, settingsSectionLabel(entry.section)),
         settingId: entry.id,
-        label: entry.label,
+        label,
       },
     });
   }
 
   for (const section of SETTINGS_SECTIONS) {
+    const label = t(locale, section.label);
     const score = matchScore(
       needle,
-      section.label,
-      `${section.description} ${section.keywords ?? ""}`,
+      label,
+      `${label} ${t(locale, section.description)} ${section.keywords ?? ""}`,
     );
     if (score == null) continue;
     scored.push({
       score: score + 0.5,
       result: {
         section: section.id,
-        sectionLabel: section.label,
+        sectionLabel: label,
         settingId: null,
-        label: section.label,
+        label,
       },
     });
   }
@@ -416,15 +426,17 @@ export function isSettingsSectionId(
   return SETTINGS_SECTIONS.some((section) => section.id === value);
 }
 
-export function settingsSectionLabel(id: SettingsSectionId): string {
+export function settingsSectionLabel(id: SettingsSectionId): LocaleKey {
   return (
-    SETTINGS_SECTIONS.find((section) => section.id === id)?.label ?? "General"
+    SETTINGS_SECTIONS.find((section) => section.id === id)?.label ??
+    "settings.section.general.label"
   );
 }
 
-export function settingsSectionDescription(id: SettingsSectionId): string {
+export function settingsSectionDescription(id: SettingsSectionId): LocaleKey {
   return (
-    SETTINGS_SECTIONS.find((section) => section.id === id)?.description ?? ""
+    SETTINGS_SECTIONS.find((section) => section.id === id)?.description ??
+    "settings.section.general.description"
   );
 }
 
@@ -791,10 +803,20 @@ export function saveClaudeHooks(value: boolean) {
 const CTRL = IS_MAC ? "⌃" : "Ctrl+";
 
 export type KeybindingRow = {
-  command: string;
+  command: LocaleKey;
   keys: string;
   when: string;
 };
+
+/** The single human `when` value; technical expressions render verbatim. */
+export const KEYBINDING_ALWAYS_KEY = "settings.keybindings.when.always" as const;
+
+export function keybindingWhenLabel(
+  when: string,
+  locale: Locale = loadLocale(),
+): string {
+  return when === "Always" ? t(locale, KEYBINDING_ALWAYS_KEY) : when;
+}
 
 /**
  * Mirrors the bindings we actually handle: the native menu accelerators in
@@ -802,91 +824,95 @@ export type KeybindingRow = {
  * focused surface handlers such as the draft composer workspace toggle.
  */
 export const KEYBINDINGS: KeybindingRow[] = [
-  { command: "App: Search", keys: `${MOD}K`, when: "Always" },
-  { command: "App: Go to File", keys: `${MOD}P`, when: "Always" },
-  { command: "App: Command Palette", keys: `${MOD}${SHIFT}P`, when: "Always" },
-  { command: "App: Find in Files", keys: `${MOD}${SHIFT}F`, when: "Always" },
-  { command: "App: Open Project", keys: `${MOD}O`, when: "Always" },
-  { command: "App: New Window", keys: `${MOD}${SHIFT}N`, when: "Always" },
-  { command: "App: Toggle Sidebar", keys: `${MOD}B`, when: "Always" },
-  { command: "App: Switch Model", keys: `${MOD}.`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_search", keys: `${MOD}K`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_go_to_file", keys: `${MOD}P`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_command_palette", keys: `${MOD}${SHIFT}P`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_find_in_files", keys: `${MOD}${SHIFT}F`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_open_project", keys: `${MOD}O`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_new_window", keys: `${MOD}${SHIFT}N`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_toggle_sidebar", keys: `${MOD}B`, when: "Always" },
+  { command: "settings.keybindings.cmd.app_switch_model", keys: `${MOD}.`, when: "Always" },
   {
-    command: "Composer: Toggle Workspace",
+    command: "settings.keybindings.cmd.composer_toggle_workspace",
     keys: `${MOD}${SHIFT}G`,
     when: "Draft session composer",
   },
-  { command: "View: Reload", keys: `${MOD}${SHIFT}R`, when: "Always" },
-  { command: "View: Zoom In", keys: `${MOD}+`, when: "Always" },
-  { command: "View: Zoom Out", keys: `${MOD}-`, when: "Always" },
-  { command: "View: Reset Zoom", keys: `${MOD}0`, when: "Always" },
-  { command: "Tab: New", keys: `${MOD}T`, when: "Always" },
-  { command: "Tab: Close Others", keys: `${MOD}${ALT}T`, when: "Always" },
-  { command: "Tab: Close All", keys: `${MOD}${SHIFT}W`, when: "Always" },
-  { command: "Tab: Next", keys: `${MOD}${SHIFT}]`, when: "Always" },
-  { command: "Tab: Previous", keys: `${MOD}${SHIFT}[`, when: "Always" },
-  { command: "Tab: Cycle Next", keys: `${CTRL}Tab`, when: "Always" },
+  { command: "settings.keybindings.cmd.view_reload", keys: `${MOD}${SHIFT}R`, when: "Always" },
+  { command: "settings.keybindings.cmd.view_zoom_in", keys: `${MOD}+`, when: "Always" },
+  { command: "settings.keybindings.cmd.view_zoom_out", keys: `${MOD}-`, when: "Always" },
+  { command: "settings.keybindings.cmd.view_reset_zoom", keys: `${MOD}0`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_new", keys: `${MOD}T`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_close_others", keys: `${MOD}${ALT}T`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_close_all", keys: `${MOD}${SHIFT}W`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_next", keys: `${MOD}${SHIFT}]`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_previous", keys: `${MOD}${SHIFT}[`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_cycle_next", keys: `${CTRL}Tab`, when: "Always" },
   {
-    command: "Tab: Cycle Previous",
+    command: "settings.keybindings.cmd.tab_cycle_previous",
     keys: `${CTRL}${SHIFT}Tab`,
     when: "Always",
   },
-  { command: "Tab: Back", keys: `${MOD}[`, when: "Always" },
-  { command: "Tab: Forward", keys: `${MOD}]`, when: "Always" },
-  { command: "Tab: Activate 1–8", keys: `${MOD}1 … ${MOD}8`, when: "Always" },
-  { command: "Tab: Activate Last", keys: `${MOD}9`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_back", keys: `${MOD}[`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_forward", keys: `${MOD}]`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_activate_range", keys: `${MOD}1 … ${MOD}8`, when: "Always" },
+  { command: "settings.keybindings.cmd.tab_activate_last", keys: `${MOD}9`, when: "Always" },
   {
-    command: "Session: Archive",
+    command: "settings.keybindings.cmd.session_archive",
     keys: `${MOD}${SHIFT}A`,
     when: "sessionFocus && !overlay",
   },
   {
-    command: "Session: Previous",
+    command: "settings.keybindings.cmd.session_previous",
     keys: `${MOD}${SHIFT}↑`,
     when: "!overlay && (!textFocus || emptyComposer)",
   },
   {
-    command: "Session: Next",
+    command: "settings.keybindings.cmd.session_next",
     keys: `${MOD}${SHIFT}↓`,
     when: "!overlay && (!textFocus || emptyComposer)",
   },
   {
-    command: "Project: Previous",
+    command: "settings.keybindings.cmd.project_previous",
     keys: `${MOD}${SHIFT}←`,
     when: "!overlay && (!textFocus || emptyComposer)",
   },
   {
-    command: "Project: Next",
+    command: "settings.keybindings.cmd.project_next",
     keys: `${MOD}${SHIFT}→`,
     when: "!overlay && (!textFocus || emptyComposer)",
   },
-  { command: "Pane: Close", keys: `${MOD}W`, when: "Always" },
-  { command: "Pane: Split Right", keys: `${MOD}D`, when: "!editorFocus" },
+  { command: "settings.keybindings.cmd.pane_close", keys: `${MOD}W`, when: "Always" },
+  { command: "settings.keybindings.cmd.pane_split_right", keys: `${MOD}D`, when: "!editorFocus" },
   {
-    command: "Pane: Split Down",
+    command: "settings.keybindings.cmd.pane_split_down",
     keys: `${MOD}${SHIFT}D`,
     when: "!editorFocus",
   },
-  { command: "Pane: Focus Left", keys: `${MOD}${ALT}←`, when: "Always" },
-  { command: "Pane: Focus Right", keys: `${MOD}${ALT}→`, when: "Always" },
-  { command: "Pane: Focus Up", keys: `${MOD}${ALT}↑`, when: "Always" },
-  { command: "Pane: Focus Down", keys: `${MOD}${ALT}↓`, when: "Always" },
-  { command: "Terminal: New", keys: `${MOD}\``, when: "Always" },
-  { command: "Terminal: New Tab", keys: `${MOD}${SHIFT}\``, when: "Always" },
-  { command: "Terminal: Toggle Dock", keys: `${MOD}J`, when: "Always" },
-  { command: "Editor: Find", keys: `${MOD}F`, when: "editorFocus" },
-  { command: "Editor: Replace", keys: `${MOD}${ALT}F`, when: "editorFocus" },
+  { command: "settings.keybindings.cmd.pane_focus_left", keys: `${MOD}${ALT}←`, when: "Always" },
+  { command: "settings.keybindings.cmd.pane_focus_right", keys: `${MOD}${ALT}→`, when: "Always" },
+  { command: "settings.keybindings.cmd.pane_focus_up", keys: `${MOD}${ALT}↑`, when: "Always" },
+  { command: "settings.keybindings.cmd.pane_focus_down", keys: `${MOD}${ALT}↓`, when: "Always" },
+  { command: "settings.keybindings.cmd.terminal_new", keys: `${MOD}\``, when: "Always" },
+  { command: "settings.keybindings.cmd.terminal_new_tab", keys: `${MOD}${SHIFT}\``, when: "Always" },
+  { command: "settings.keybindings.cmd.terminal_toggle_dock", keys: `${MOD}J`, when: "Always" },
+  { command: "settings.keybindings.cmd.editor_find", keys: `${MOD}F`, when: "editorFocus" },
+  { command: "settings.keybindings.cmd.editor_replace", keys: `${MOD}${ALT}F`, when: "editorFocus" },
 ];
 
 export function filterKeybindings(
   rows: KeybindingRow[],
   query: string,
+  locale: Locale = loadLocale(),
 ): KeybindingRow[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return rows;
-  return rows.filter(
-    (row) =>
-      row.command.toLowerCase().includes(needle) ||
+  return rows.filter((row) => {
+    const command = t(locale, row.command).toLowerCase();
+    return (
+      command.includes(needle) ||
       row.keys.toLowerCase().includes(needle) ||
-      row.when.toLowerCase().includes(needle),
-  );
+      row.when.toLowerCase().includes(needle) ||
+      keybindingWhenLabel(row.when, locale).toLowerCase().includes(needle)
+    );
+  });
 }

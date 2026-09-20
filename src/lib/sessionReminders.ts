@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getIntlLocale } from "./locale";
 import type { HarnessId } from "./session";
 
 export const REMINDERS_CHANGED = "monocode:reminders-changed";
@@ -34,7 +35,7 @@ export function reminderTime(preset: string, now = new Date()): number | null {
 }
 
 export function formatReminderTime(dueAt: number): string {
-  return new Date(dueAt).toLocaleString(undefined, {
+  return new Date(dueAt).toLocaleString(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",
