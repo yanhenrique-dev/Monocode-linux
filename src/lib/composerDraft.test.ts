@@ -15,8 +15,9 @@ describe("composerDraft", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     invoke.mockReset();
-    // flushDraft chains `.catch` on the invoke result, so the default mock
-    // must resolve (Once-stubs registered per test still take priority).
+    // Persists propagate invoke rejections (the timer path logs them, the
+    // explicit-flush path rejects), so the default mock must resolve
+    // (Once-stubs registered per test still take priority).
     invoke.mockResolvedValue(undefined);
   });
 
@@ -84,11 +85,33 @@ describe("composerDraft", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("swallows write failures", async () => {
+  it("flushSessionDraft rejects on write failure and keeps the draft for retry", async () => {
     invoke.mockRejectedValueOnce(new Error("db locked"));
     saveSessionDraft("s-4", "text");
-    await vi.advanceTimersByTimeAsync(600);
-    expect(invoke).toHaveBeenCalledTimes(1);
+    await expect(flushSessionDraft()).rejects.toThrow("db locked");
+    await flushSessionDraft();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenNthCalledWith(2, "composer_draft_set", {
+      sessionId: "s-4",
+      text: "text",
+    });
+  });
+
+  it("an older write finishing late does not drop newer text", async () => {
+    saveSessionDraft("s-5", "old");
+    const first = flushSessionDraft();
+    saveSessionDraft("s-5", "new");
+    await first;
+    await flushSessionDraft();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenNthCalledWith(1, "composer_draft_set", {
+      sessionId: "s-5",
+      text: "old",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "composer_draft_set", {
+      sessionId: "s-5",
+      text: "new",
+    });
   });
 
   it("loads a draft and treats failures as empty", async () => {

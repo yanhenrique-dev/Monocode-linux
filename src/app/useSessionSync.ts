@@ -697,8 +697,14 @@ export function useSessionSync(deps: SessionSyncDeps) {
         void (async () => {
           // Hide/destroy end the JS context before the draft debounce timer
           // would fire, so push any pending composer drafts out first.
+          // A failed write cannot block window teardown; it stays pending
+          // in memory and is simply lost with the context.
           // (porte #321)
-          await flushSessionDraft();
+          try {
+            await flushSessionDraft();
+          } catch (reason) {
+            console.error(reason);
+          }
           if (hasInFlightSessions(sessionsRef.current)) {
             flushHarnessEvents();
             if (!toTray && !IS_MAC) {

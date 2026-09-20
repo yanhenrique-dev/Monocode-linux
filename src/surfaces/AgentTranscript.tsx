@@ -2415,7 +2415,8 @@ function ActivityToolRow({
   const pending = needsApproval(block);
   const failed = !pending && state === "rejected";
   // #328: success rows carry output too — expandable, closed by default.
-  const detail = !pending ? block.tool?.detail?.trim() : undefined;
+  const detail =
+    state !== "pending" ? block.tool?.detail?.trim() : undefined;
   const truncated = detail?.endsWith("\n…") ?? false;
   const summary = (
     <ToolCallSummary

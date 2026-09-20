@@ -141,8 +141,16 @@ export function useAppViews(deps: AppViewsDeps) {
 
   const onReload = useCallback(() => {
     // The reload tears down JS before the draft debounce timer fires.
+    // A failed write still reloads (the pending entry survives in memory
+    // only, so there is nothing more to do) — but surface the error first.
     // (porte #321)
-    void flushSessionDraft().finally(() => window.location.reload());
+    void flushSessionDraft().then(
+      () => window.location.reload(),
+      (reason) => {
+        console.error(reason);
+        window.location.reload();
+      },
+    );
   }, []);
 
   const onFindInProject = useCallback(() => {

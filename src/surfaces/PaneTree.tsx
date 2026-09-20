@@ -82,7 +82,7 @@ type Shared = {
     attachments: Attachment[],
     options?: ComposerTurnOptions,
   ) => boolean | void;
-  onStop: (sessionId: string) => void;
+  onStop: (sessionId: string) => Promise<void>;
   onCompactContext: (sessionId: string) => boolean;
   onPlaceSessionInFolder: (
     sessionId: string,

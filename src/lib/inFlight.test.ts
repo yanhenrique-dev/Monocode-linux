@@ -266,7 +266,7 @@ describe("shouldWriteInFlightSnapshot", () => {
 });
 
 describe("markTurnInterrupted with a model-swap note", () => {
-  it("does not stack another interrupt note after the swap note", () => {
+  it("appends the interrupt note after the swap note so auto-continue works", () => {
     const swapped = chat("/tmp/a", {
       busy: true,
       blocks: [
@@ -279,7 +279,8 @@ describe("markTurnInterrupted with a model-swap note", () => {
       ],
     });
     const result = markTurnInterrupted(swapped);
-    expect(result.blocks).toHaveLength(2);
+    expect(result.blocks).toHaveLength(3);
+    expect(result.blocks[2]?.text).toBe(INTERRUPT_MESSAGE);
     expect(result.busy).toBe(false);
   });
 });

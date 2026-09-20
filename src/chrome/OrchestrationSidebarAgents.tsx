@@ -271,10 +271,7 @@ export function OrchestrationSidebarAgents({
                 className={action}
                 disabled={pending}
                 title={`Stop ${resumeBlocker.title || "the other conversation"} so this run can resume`}
-                onClick={() => void perform(() => {
-                  actions.stop!(resumeBlocker.id);
-                  return Promise.resolve();
-                })}
+                onClick={() => void perform(() => actions.stop!(resumeBlocker.id))}
               >
                 Stop blocker
               </button>

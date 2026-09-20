@@ -593,13 +593,10 @@ export function useTurnActions(deps: TurnActionsDeps) {
   );
 
   const onStop = useCallback(
-    (sessionId: string, managed = false) => {
+    (sessionId: string, managed = false): Promise<void> => {
       if (!managed) {
         const stopping = orchestrator.stopForSession(sessionId);
-        if (stopping) {
-          void stopping.catch(console.error);
-          return;
-        }
+        if (stopping) return stopping;
       }
       const session = sessionsRef.current.find((s) => s.id === sessionId);
       turnGen.current.set(sessionId, (turnGen.current.get(sessionId) ?? 0) + 1);
@@ -630,6 +627,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       } else {
         notifyReviewChanged(sessionId);
       }
+      return Promise.resolve();
     },
     [flushHarnessEvents],
   );
@@ -671,7 +669,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
         ) {
           return;
         }
-        onStop(sessionId);
+        onStop(sessionId).catch(console.error);
       });
     };
     window.addEventListener("keydown", onEscape);
@@ -879,7 +877,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       },
       stop: async (id) => {
         const session = sessionsRef.current.find((entry) => entry.id === id);
-        onStop(id, true);
+        await onStop(id, true).catch(console.error);
         try {
           if (session)
             await Promise.all(

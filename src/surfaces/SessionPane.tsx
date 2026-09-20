@@ -103,7 +103,7 @@ type Props = {
     attachments: Attachment[],
     options?: ComposerTurnOptions,
   ) => boolean | void;
-  onStop: (sessionId: string) => void;
+  onStop: (sessionId: string) => Promise<void>;
   onCompactContext: (sessionId: string) => boolean;
   onPlaceSessionInFolder: (
     sessionId: string,
@@ -433,7 +433,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   }, [session.id]);
   useEffect(() => {
     return () => {
-      void flushSessionDraft();
+      void flushSessionDraft().catch(console.error);
     };
   }, [session.id]);
   const composer = (
@@ -520,7 +520,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onSubmit={(text, attachments, options) =>
         onSubmit(session.id, text, attachments, options)
       }
-      onStop={() => onStop(session.id)}
+      onStop={() => void onStop(session.id).catch(console.error)}
       onCompactContext={() => onCompactContext(session.id)}
       onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
       queuedMessages={session.queuedMessages}
