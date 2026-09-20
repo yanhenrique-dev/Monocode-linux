@@ -61,22 +61,28 @@ async fn open_url(_app: &tauri::AppHandle, url: &str) -> Result<(), String> {
     }
 }
 
-/// Waits for a spawned helper, giving up after `timeout`. A timed-out child
-/// is left running: `xdg-open` delegates and exits on its own in the common
-/// case, and killing by pid from here would race its own reparenting.
+/// Waits for a spawned helper, giving up after `timeout`. A child still
+/// running past the deadline is killed and reaped so repeated clicks cannot
+/// accumulate blocked waiter threads and zombie processes.
 #[cfg(target_os = "linux")]
 fn wait_with_timeout(
     mut child: std::process::Child,
     timeout: std::time::Duration,
 ) -> Result<std::process::ExitStatus, String> {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait());
-    });
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(status)) => Ok(status),
-        Ok(Err(err)) => Err(format!("failed waiting for xdg-open: {err}")),
-        Err(_) => Err(format!("xdg-open timed out after {}s", timeout.as_secs())),
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("xdg-open timed out after {}s", timeout.as_secs()));
+            }
+            Err(err) => return Err(format!("failed waiting for xdg-open: {err}")),
+        }
     }
 }
 
