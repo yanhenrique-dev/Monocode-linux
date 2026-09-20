@@ -544,6 +544,17 @@ html.is-resizing * {
   scrollbar-width: none;
 }
 
+/*
+ * Tasks strip fused to the composer (see TasksPill): the strip carries the
+ * top corners and bottom divider, so the composer box drops its own top
+ * border and top rounding to read as one continuous input surface.
+ */
+[data-tasks-strip] + [data-composer] [data-composer-box] {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 html.theme-light [data-composer-box] {
   background: var(--color-background-base);
   box-shadow:

@@ -109,6 +109,23 @@ describe("TasksPill", () => {
     }
   });
 
+  it("renders as a strip fused to the composer, not a floating popup", () => {
+    const { root } = renderPill();
+    try {
+      setIntersecting(false);
+      const strip = container.querySelector("[data-tasks-strip]")!;
+      expect(strip).not.toBeNull();
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      expect(pill.className).toContain("rounded-t-lg");
+      expect(pill.className).not.toContain("rounded-full");
+      expect(pill.parentElement).toBe(strip);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
   it("shows when the task turn is paginated out (no anchor mounted)", () => {
     container.innerHTML = '<div class="agent-transcript"></div>';
     const { root, revealBlock } = renderPill();
