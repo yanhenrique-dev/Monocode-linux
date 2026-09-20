@@ -1,4 +1,5 @@
-import { MASCOT_GRID, projectMascot } from "../lib/projectMascots";
+import { MASCOT_GRID } from "../lib/projectMascots";
+import { resolveEffectiveMascot } from "../lib/customPets";
 
 type Props = {
   project: string;
@@ -24,7 +25,7 @@ export function ProjectMascot({
   className = "size-4 shrink-0",
   active = false,
 }: Props) {
-  const mascot = projectMascot(project, name);
+  const mascot = resolveEffectiveMascot(project, name);
   return (
     <svg
       aria-hidden

@@ -158,6 +158,7 @@ export {
   bindHarnessSession,
   refreshHarnessCatalogs,
   generateHarnessTitle,
+  generateHarnessBranchName,
   generateHarnessCommitMessage,
   generateHarnessPrContent,
 } from "./registry";

@@ -6,6 +6,7 @@ import App from "./App";
 import { ErrorBoundary } from "./chrome/ErrorBoundary";
 import { activateWindowAppearance, initAppearance } from "./lib/appearance";
 import { initHardwareAcceleration } from "./lib/hardwareAcceleration";
+import { initLocale, LocaleProvider } from "./lib/locale";
 import { initSounds } from "./lib/sounds";
 import {
   abortQuit,
@@ -19,6 +20,7 @@ import "./index.css";
 
 initAppearance();
 initHardwareAcceleration();
+initLocale();
 initSounds();
 
 function dismissBootSplash() {
@@ -70,13 +72,15 @@ void loadBootWorkspace().then(
       <React.StrictMode>
         <BootGate>
           <ErrorBoundary label="MonoCode">
-            <App
-              windowTransfer={windowTransfer}
-              resumed={resumed}
-              installedUpdate={installedUpdate}
-              history={history}
-              historyCwd={historyCwd}
-            />
+            <LocaleProvider>
+              <App
+                windowTransfer={windowTransfer}
+                resumed={resumed}
+                installedUpdate={installedUpdate}
+                history={history}
+                historyCwd={historyCwd}
+              />
+            </LocaleProvider>
           </ErrorBoundary>
         </BootGate>
       </React.StrictMode>,

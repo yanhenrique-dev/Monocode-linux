@@ -7,11 +7,13 @@ import {
   resolveFxBinary,
   resolveGrokBinary,
   resolveHermesBinary,
+  resolveMcodeBinary,
   resolveOmpBinary,
   resolveOpenCodeBinary,
   resolvePiBinary,
 } from "./child";
 import { isLiveHarness } from "./registry";
+import { loadLocale, t, type Locale } from "../locale";
 
 export type HarnessAvailability = Record<HarnessId, boolean>;
 
@@ -39,6 +41,11 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
     install:
       "Install from hermes-agent.nousresearch.com, then run hermes model",
   },
+  mcode: {
+    name: "MiniMax Code CLI",
+    install:
+      "Install from https://filecdn.minimax.chat/public/install.sh, then run `mcode login`",
+  },
 };
 
 let availability: HarnessAvailability = {
@@ -51,6 +58,7 @@ let availability: HarnessAvailability = {
   omp: false,
   fx: false,
   hermes: false,
+  mcode: false,
 };
 let version = 0;
 let inflight: Promise<void> | null = null;
@@ -89,10 +97,13 @@ export function isHarnessAvailable(id: HarnessId): boolean {
   return availability[id];
 }
 
-export function harnessUnavailableHint(id: HarnessId): string {
+export function harnessUnavailableHint(
+  id: HarnessId,
+  locale: Locale = loadLocale(),
+): string {
   const { name, install } = CLI[id];
   const how = install ? ` (\`${install}\`)` : "";
-  return `${name} not found${how}. Install it, or restart MonoCode if it is already installed.`;
+  return t(locale, "settings.providers.row.unavailable", { name, how });
 }
 
 export function probeHarnessAvailability(
@@ -172,6 +183,14 @@ export function probeHarnessAvailability(
       if (id === "hermes") {
         try {
           await resolveHermesBinary();
+          return [id, true] as const;
+        } catch {
+          return [id, false] as const;
+        }
+      }
+      if (id === "mcode") {
+        try {
+          await resolveMcodeBinary();
           return [id, true] as const;
         } catch {
           return [id, false] as const;

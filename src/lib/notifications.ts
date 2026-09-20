@@ -5,7 +5,10 @@ import {
   allowsProjectNotification,
   type NotificationSubject,
 } from "./notificationPreferences";
-import { knownNotificationProject } from "./notificationProjects";
+import {
+  knownNotificationProject,
+  type NotificationProject,
+} from "./notificationProjects";
 
 const KEY = "monocode.notifications";
 
@@ -220,6 +223,29 @@ function clip(text: string): string {
 }
 
 /**
+ * Project + policy subject for a session, or null when it can never
+ * notify (inbox-ask threads and non-project paths). Single source for the
+ * preamble shared by banners, finish announcements, and their sound
+ * fallbacks.
+ */
+export function sessionNotificationSubject(
+  session: Session,
+  category: NotificationSubject["category"],
+  occurredAt = Date.now(),
+): {
+  project: NotificationProject;
+  subject: NotificationSubject;
+} | null {
+  if (session.inboxAsk) return null;
+  const project = knownNotificationProject(session.cwd);
+  if (!project) return null;
+  return {
+    project,
+    subject: { projectId: project.id, category, occurredAt },
+  };
+}
+
+/**
  * Sends the banner when policy allows. Resolves true once the OS accepted it
  * so callers can skip the in-app cue: the OS sound stands in for it. A
  * rejected dispatch resolves false so the cue still plays.
@@ -229,21 +255,15 @@ export async function notifySession(
   event: NotificationEvent,
   sessionVisible: boolean,
 ): Promise<boolean> {
-  if (session.inboxAsk) {
-    console.debug("[notifications] skip: inbox-ask thread", session.id);
+  const entry = sessionNotificationSubject(
+    session,
+    event === "finished" ? "agentFinished" : "agentInput",
+  );
+  if (!entry) {
+    console.debug("[notifications] skip: no notifiable subject", session.id);
     return false;
   }
-  const occurredAt = Date.now();
-  const project = knownNotificationProject(session.cwd);
-  if (!project) {
-    console.debug("[notifications] skip: no project for cwd", session.cwd);
-    return false;
-  }
-  return notifyProjectSession(session, event, sessionVisible, {
-    projectId: project.id,
-    category: event === "finished" ? "agentFinished" : "agentInput",
-    occurredAt,
-  });
+  return notifyProjectSession(session, event, sessionVisible, entry.subject);
 }
 
 /** One policy decision covers both the OS banner and its in-app sound fallback. */
@@ -251,28 +271,18 @@ export async function announceSessionFinished(
   session: Session,
   sessionVisible: boolean,
 ): Promise<void> {
-  if (session.inboxAsk) {
-    console.debug("[notifications] skip: inbox-ask thread", session.id);
+  const entry = sessionNotificationSubject(session, "agentFinished");
+  if (!entry) {
+    console.debug("[notifications] skip: no notifiable subject", session.id);
     return;
   }
-  const occurredAt = Date.now();
-  const project = knownNotificationProject(session.cwd);
-  if (!project) {
-    console.debug("[notifications] skip: no project for cwd", session.cwd);
-    return;
-  }
-  const subject: NotificationSubject = {
-    projectId: project.id,
-    category: "agentFinished",
-    occurredAt,
-  };
   const sent = await notifyProjectSession(
     session,
     "finished",
     sessionVisible,
-    subject,
+    entry.subject,
   );
-  if (!sent) playCue("turnFinished", subject);
+  if (!sent) playCue("turnFinished", entry.subject);
 }
 
 async function notifyProjectSession(

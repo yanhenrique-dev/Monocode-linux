@@ -6,6 +6,7 @@ import cursor from "../assets/providers/cursor.svg";
 import fx from "../assets/providers/fx.svg";
 import grok from "../assets/providers/grok.svg";
 import hermes from "../assets/providers/hermes.svg";
+import mcode from "../assets/providers/mcode.svg";
 import omp from "../assets/providers/omp.svg";
 import opencode from "../assets/providers/opencode.svg";
 import pi from "../assets/providers/pi.svg";
@@ -21,6 +22,7 @@ export const HARNESS_ICONS: Record<HarnessId, string> = {
   omp,
   fx,
   hermes,
+  mcode,
 };
 
 /** White marks that must follow `currentColor` so they stay visible in light mode. */
@@ -31,6 +33,7 @@ export const MONOCHROME_HARNESSES = new Set<HarnessId>([
   "pi",
   "fx",
   "hermes",
+  "mcode",
 ]);
 
 function MonoIcon({
@@ -126,6 +129,13 @@ export function HarnessIcon({
           d="M1 1H22V14.4997H14.9998V21.2499H8.0002V28H1V1ZM8.0002 7.75014V14.4997H14.9998V7.75014H8.0002Z"
         />
         <path d="M22 15H28V28H22V15Z" />
+      </MonoIcon>
+    );
+  }
+  if (harness === "mcode") {
+    return (
+      <MonoIcon className={className}>
+        <path d="M2 0H10L14.5 11L19 0H27V25H20V8.5L15 19.5H14L9 8.5V25H2V0Z" />
       </MonoIcon>
     );
   }
