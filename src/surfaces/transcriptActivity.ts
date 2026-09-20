@@ -1,5 +1,4 @@
 import {
-  composeToolTitle,
   isAgentTool,
   isEditTool,
   isExecuteTool,
@@ -8,10 +7,13 @@ import {
   isWeakToolTitle,
 } from "../lib/harness/preview";
 import { leafName } from "../lib/fileName";
-import { displayPath } from "../lib/paths";
 import { INTERRUPT_MESSAGE } from "../lib/inFlight";
 import type { Block } from "../lib/session";
 import { allModels } from "../lib/models";
+import { toolCallLabel } from "../lib/toolCallLabel";
+// Re-exported: owned by lib (see ../lib/toolCallLabel) so lib callers don't
+// depend on the surfaces layer.
+export { toolCallLabel };
 
 export type ToolCallState = "pending" | "accepted" | "rejected";
 
@@ -52,23 +54,6 @@ export function toolCallState(block: Block): ToolCallState {
     return "accepted";
   }
   return "pending";
-}
-
-export function toolCallLabel(block: Block, cwd?: string): string {
-  const preview = block.tool?.preview;
-  const path = preview?.path
-    ? displayPath(preview.path, cwd)
-    : preview?.fileName;
-  return (
-    composeToolTitle({
-      kind: block.tool?.kind,
-      title: block.text || block.tool?.title,
-      path,
-      query: preview?.query,
-      previewKind: preview?.kind,
-      cwd,
-    }) || "Working"
-  );
 }
 
 export function isIncompleteTool(
