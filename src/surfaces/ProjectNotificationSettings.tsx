@@ -180,10 +180,14 @@ export function ProjectNotificationSettings({
                     }
                   />
                   {selectedIds.length
-                    ? t(
-                        "settings.inbox.project_notifications.selected_count",
-                        { count: selectedIds.length },
-                      )
+                    ? selectedIds.length === 1
+                      ? t(
+                          "settings.inbox.project_notifications.selected_count_one",
+                        )
+                      : t(
+                          "settings.inbox.project_notifications.selected_count_other",
+                          { count: selectedIds.length },
+                        )
                     : t("settings.inbox.project_notifications.select_all")}
                 </label>
                 {selectedIds.length ? (

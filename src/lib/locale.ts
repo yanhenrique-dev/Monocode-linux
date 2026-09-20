@@ -488,7 +488,9 @@ const en = {
   "settings.inbox.project_notifications.empty":
     "Open a project or connect an Inbox provider to configure its notifications.",
   "settings.inbox.project_notifications.select_all": "Select all projects",
-  "settings.inbox.project_notifications.selected_count": "{count} selected",
+  "settings.inbox.project_notifications.selected_count_one": "1 selected",
+  "settings.inbox.project_notifications.selected_count_other":
+    "{count} selected",
   "settings.inbox.project_notifications.mute_selected":
     "Mute selected projects",
   "settings.inbox.project_notifications.select_project": "Select {name}",
@@ -934,7 +936,8 @@ const ptBR: Record<LocaleKey, string> = {
     "Abra um projeto ou conecte um provedor para configurar as notificações.",
   "settings.inbox.project_notifications.select_all":
     "Selecionar todos os projetos",
-  "settings.inbox.project_notifications.selected_count":
+  "settings.inbox.project_notifications.selected_count_one": "1 selecionado",
+  "settings.inbox.project_notifications.selected_count_other":
     "{count} selecionados",
   "settings.inbox.project_notifications.mute_selected":
     "Silenciar projetos selecionados",

@@ -682,8 +682,8 @@ function GeneralPage({
 
   const onLanguage = (value: string) => {
     const next: Locale = value === "pt-BR" ? "pt-BR" : "en";
-    applyLocale(next);
     saveLocale(next);
+    applyLocale(next);
   };
 
   return (
