@@ -113,7 +113,7 @@ export function ProjectNotificationSettings({
     <section
       id="settings-project-notifications"
       aria-label={t("settings.inbox.project_notifications.title")}
-      className="@container/notifications"
+      className="@container/notifications pt-8 first:pt-0"
     >
       <div className="flex flex-wrap items-end gap-4 pb-2.5">
         <div className="min-w-[min(100%,240px)] flex-1">
@@ -289,7 +289,7 @@ export function ProjectNotificationSettings({
                                   seed,
                                 )}
                                 name={resolveTabGroupMascot(key, groupMascots)}
-                                className="size-3"
+                                className="size-4 shrink-0"
                               />
                             ) : (
                               <Folder

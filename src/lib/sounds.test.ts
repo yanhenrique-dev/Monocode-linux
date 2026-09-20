@@ -12,16 +12,30 @@ vi.mock("cuelume", () => ({
 
 import {
   announceUpdateAvailable,
+  CUSTOMIZABLE_CUES,
+  loadSoundPrefs,
   loadSoundsEnabled,
   playCue,
   resetSoundCues,
+  resetSoundPref,
+  saveSoundPrefs,
   saveSoundsEnabled,
+  soundPref,
   SOUNDS_DEFAULT,
   SOUNDS_VOLUME,
 } from "./sounds";
 import { updateNotificationPreferences } from "./notificationPreferences";
+import { playSoundFile } from "./soundFiles";
+
+vi.mock("./soundFiles", () => ({
+  playSoundFile: (...args: unknown[]) => playSoundFileMock(...args),
+  setSoundFileVolume: vi.fn(),
+}));
+
+const playSoundFileMock = vi.fn();
 
 const KEY = "monocode.sounds";
+const PREFS_KEY = "monocode.soundPrefs";
 
 function mockLocalStorage() {
   const data = new Map<string, string>();
@@ -58,7 +72,9 @@ describe("sounds", () => {
 
   afterEach(() => {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(PREFS_KEY);
     resetSoundCues();
+    playSoundFileMock.mockReset();
   });
 
   it("defaults to on", () => {
@@ -97,6 +113,44 @@ describe("sounds", () => {
     play.mockClear();
     playCue("turnFinished", { projectId: "work", category: "agentFinished" });
     expect(play).not.toHaveBeenCalled();
+  });
+
+  it("plays a custom file instead of the preset when one is set", () => {
+    saveSoundPrefs({ turnFinished: "/home/user/ding.ogg" });
+    playCue("turnFinished", { projectId: "work", category: "agentFinished" });
+    expect(playSoundFileMock).toHaveBeenCalledWith("/home/user/ding.ogg");
+    expect(play).not.toHaveBeenCalled();
+    // Non-customizable cues always use their preset.
+    playCue("copy");
+    expect(play).toHaveBeenCalledWith("scan");
+    expect(playSoundFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores, reads and resets per-cue prefs", () => {
+    expect(soundPref("turnFinished")).toBe("preset");
+    saveSoundPrefs({ turnFinished: "/a.ogg", inboxUnseen: "preset" });
+    expect(loadSoundPrefs()).toEqual({ turnFinished: "/a.ogg" });
+    expect(soundPref("turnFinished")).toBe("/a.ogg");
+    expect(soundPref("inboxUnseen")).toBe("preset");
+    expect(localStorage.getItem(PREFS_KEY)).not.toContain("inboxUnseen");
+    resetSoundPref("turnFinished");
+    expect(loadSoundPrefs()).toEqual({});
+    expect(localStorage.getItem(PREFS_KEY)).toBeNull();
+  });
+
+  it("ignores malformed prefs and non-customizable cues", () => {
+    localStorage.setItem(PREFS_KEY, "not json");
+    expect(loadSoundPrefs()).toEqual({});
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ copy: "/x.ogg" }));
+    expect(loadSoundPrefs()).toEqual({});
+    expect(CUSTOMIZABLE_CUES).not.toContain("copy");
+  });
+
+  it("still respects project policy when a custom file is set", () => {
+    saveSoundPrefs({ turnFinished: "/home/user/ding.ogg" });
+    updateNotificationPreferences(["private"], { mutedUntil: null });
+    playCue("turnFinished", { projectId: "private", category: "agentFinished" });
+    expect(playSoundFileMock).not.toHaveBeenCalled();
   });
 
   it("suppresses project cues without silencing allowed projects or app-wide cues", () => {

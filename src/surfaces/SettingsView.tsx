@@ -3,8 +3,10 @@ import {
   ArrowDownCircle,
   Check,
   ChevronDown,
+  File as FileIcon,
   ImagePlus,
   LoaderCircle,
+  Play as PlayIcon,
   RefreshCw,
   RotateCcw,
   Search,
@@ -202,6 +204,7 @@ import {
   saveLocale,
   useLocale,
   type Locale,
+  type LocaleKey,
 } from "../lib/locale";
 import {
   filterKeybindings,
@@ -243,7 +246,24 @@ import {
   saveHardwareAcceleration,
   subscribeHardwareAcceleration,
 } from "../lib/hardwareAcceleration";
-import { loadSoundsEnabled, playCue, saveSoundsEnabled } from "../lib/sounds";
+import {
+  CUSTOMIZABLE_CUES,
+  cueLabelKey,
+  loadSoundPrefs,
+  loadSoundsEnabled,
+  playCue,
+  saveSoundsEnabled,
+  saveSoundPrefs,
+  previewCue,
+  SOUNDS_PREFS_EVENT,
+  type CustomizableCue,
+  type SoundPref,
+} from "../lib/sounds";
+import {
+  pickSoundFile,
+  playSoundFile,
+  type SoundFileReason,
+} from "../lib/soundFiles";
 import {
   cachedNotificationPermission,
   loadNotificationsEnabled,
@@ -751,6 +771,7 @@ function NotificationsPage({
   notificationSettingsRequest?: number;
 }) {
   const [soundsEnabled, setSoundsEnabled] = useState(loadSoundsEnabled);
+  const [soundPrefs, setSoundPrefs] = useState(loadSoundPrefs);
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     loadNotificationsEnabled,
   );
@@ -774,6 +795,17 @@ function NotificationsPage({
   const onSoundsEnabled = (next: boolean) => {
     saveSoundsEnabled(next);
     setSoundsEnabled(next);
+  };
+
+  useEffect(() => {
+    const sync = () => setSoundPrefs(loadSoundPrefs());
+    window.addEventListener(SOUNDS_PREFS_EVENT, sync);
+    return () => window.removeEventListener(SOUNDS_PREFS_EVENT, sync);
+  }, []);
+
+  const onSoundPref = (cue: CustomizableCue, pref: SoundPref) => {
+    saveSoundPrefs({ [cue]: pref });
+    setSoundPrefs(loadSoundPrefs());
   };
 
   const onNotificationsEnabled = (next: boolean) => {
@@ -819,6 +851,20 @@ function NotificationsPage({
             onChange={onNotificationsEnabled}
           />
         </Row>
+      </Group>
+
+      <Group
+        title={t("settings.general.sounds.custom.title")}
+        description={t("settings.general.sounds.custom.description")}
+      >
+        {CUSTOMIZABLE_CUES.map((cue) => (
+          <SoundCueRow
+            key={cue}
+            cue={cue}
+            pref={soundPrefs[cue] ?? "preset"}
+            onPref={onSoundPref}
+          />
+        ))}
       </Group>
 
       <div
@@ -2896,6 +2942,110 @@ function Row({
     </div>
   );
 }
+
+const ERROR_HINT: Record<SoundFileReason, LocaleKey> = {
+  missing: "settings.general.sounds.error.missing",
+  decode: "settings.general.sounds.error.decode",
+  unavailable: "settings.general.sounds.error.unavailable",
+};
+
+const SoundCueRow = memo(function SoundCueRow({
+  cue,
+  pref,
+  onPref,
+}: {
+  cue: CustomizableCue;
+  pref: SoundPref;
+  onPref: (cue: CustomizableCue, pref: SoundPref) => void;
+}) {
+  const { t } = useLocale();
+  const [testing, setTesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const custom = pref !== "preset";
+
+  const runTest = async () => {
+    setTesting(true);
+    setError(null);
+    try {
+      if (custom) {
+        const result = await playSoundFile(pref);
+        if (!result.ok) setError(t(ERROR_HINT[result.reason]));
+        return;
+      }
+      previewCue(cue);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const pick = async () => {
+    const path = await pickSoundFile();
+    if (!path) return;
+    setError(null);
+    onPref(cue, path);
+  };
+
+  const reset = () => {
+    setError(null);
+    onPref(cue, "preset");
+  };
+
+  return (
+    <Row
+      id={`sounds-${cue}`}
+      label={t(cueLabelKey(cue))}
+      description={
+        custom
+          ? pref.split("/").pop() || pref
+          : undefined
+      }
+    >
+      <button
+        type="button"
+        aria-label={t("settings.general.sounds.test")}
+        title={t("settings.general.sounds.test")}
+        disabled={testing}
+        onClick={() => void runTest()}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-content/10 text-content/60 hover:text-content disabled:opacity-50"
+      >
+        <PlayIcon className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => void pick()}
+        title={custom ? pref : undefined}
+        className={`flex h-7 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[12px] ${
+          custom
+            ? "border-accent/40 bg-accent/10 text-content"
+            : "border-content/10 text-content/60 hover:text-content"
+        }`}
+      >
+        <FileIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="max-w-44 truncate">
+          {custom
+            ? t("settings.general.sounds.custom.file")
+            : t("settings.general.sounds.custom.pick")}
+        </span>
+      </button>
+      {custom ? (
+        <button
+          type="button"
+          aria-label={t("settings.general.sounds.reset")}
+          title={t("settings.general.sounds.reset")}
+          onClick={reset}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-content/10 text-content/60 hover:text-content"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {error ? (
+        <span className="w-full text-right text-[12px] text-red-400/90">
+          {error}
+        </span>
+      ) : null}
+    </Row>
+  );
+});
 
 function Segmented<T extends string>({
   label,

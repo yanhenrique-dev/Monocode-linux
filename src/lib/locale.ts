@@ -151,6 +151,23 @@ const en = {
   "settings.general.sounds.description":
     "Short cues for project activity, finished turns, and available updates. Choose project notification categories in Inbox settings. Switches and Copy on a finished turn also play.",
   "settings.general.sounds.toggle": "Sounds",
+  "settings.general.sounds.custom.title": "Custom sounds",
+  "settings.general.sounds.custom.description":
+    "Give each alert its own sound: keep the built-in cue or pick any audio file from this machine (.ogg, .wav, .mp3, .flac, .m4a, .opus).",
+  "settings.general.sounds.cue.turnFinished": "Turn finished",
+  "settings.general.sounds.cue.inboxUnseen": "Inbox activity",
+  "settings.general.sounds.cue.linkedActivity": "Linked PR/issue activity",
+  "settings.general.sounds.cue.updateAvailable": "Update available",
+  "settings.general.sounds.preset": "Preset",
+  "settings.general.sounds.custom.pick": "Custom file…",
+  "settings.general.sounds.custom.file": "Custom file",
+  "settings.general.sounds.test": "Test",
+  "settings.general.sounds.reset": "Reset",
+  "settings.general.sounds.error.missing": "File not found — pick it again",
+  "settings.general.sounds.error.decode":
+    "This format cannot be decoded here — try .ogg or .wav",
+  "settings.general.sounds.error.unavailable":
+    "Audio playback is unavailable on this system",
   "settings.general.notifications.label": "Notifications",
   "settings.general.notifications.description":
     "Notify when a reminder is due, or when an agent finishes or needs input in another session or while MonoCode is in the background. Click the notification to open that session.",
@@ -763,6 +780,23 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.sounds.description":
     "Sons curtos para atividade do projeto, turnos finalizados e atualizações disponíveis. Escolha as categorias nas configurações da Caixa de entrada. Alternar e Copiar em um turno finalizado também emitem som.",
   "settings.general.sounds.toggle": "Sons",
+  "settings.general.sounds.custom.title": "Sons personalizados",
+  "settings.general.sounds.custom.description":
+    "Dê a cada alerta o próprio som: mantenha o som embutido ou escolha um arquivo de áudio desta máquina (.ogg, .wav, .mp3, .flac, .m4a, .opus).",
+  "settings.general.sounds.cue.turnFinished": "Turno finalizado",
+  "settings.general.sounds.cue.inboxUnseen": "Atividade na Caixa de entrada",
+  "settings.general.sounds.cue.linkedActivity": "Atividade em PR/issue vinculado",
+  "settings.general.sounds.cue.updateAvailable": "Atualização disponível",
+  "settings.general.sounds.preset": "Padrão",
+  "settings.general.sounds.custom.pick": "Arquivo personalizado…",
+  "settings.general.sounds.custom.file": "Arquivo personalizado",
+  "settings.general.sounds.test": "Testar",
+  "settings.general.sounds.reset": "Redefinir",
+  "settings.general.sounds.error.missing": "Arquivo não encontrado — selecione novamente",
+  "settings.general.sounds.error.decode":
+    "Este formato não pode ser decodificado aqui — tente .ogg ou .wav",
+  "settings.general.sounds.error.unavailable":
+    "Reprodução de áudio indisponível neste sistema",
   "settings.general.notifications.label": "Notificações",
   "settings.general.notifications.description":
     "Avisar quando um lembrete vencer ou quando um agente terminar ou precisar de atenção em outra sessão ou com o MonoCode em segundo plano. Clique na notificação para abrir a sessão.",

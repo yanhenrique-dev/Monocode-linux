@@ -6,6 +6,57 @@
     <link rel="icon" href="/monocode.png" />
     <title>MonoCode</title>
     <script>
+      // Browser-preview shim: outside the native webview there is no Tauri
+      // IPC bridge, and the bootstrap calls it before React mounts. Install a
+      // minimal stub only when the real injection is missing — this block is
+      // inert inside the packaged app, where __TAURI_INTERNALS__ exists.
+      if (!window.__TAURI_INTERNALS__) {
+        (function () {
+          var nextCallbackId = 0;
+          window.__TAURI_INTERNALS__ = {
+            metadata: {
+              currentWindow: { label: "main" },
+              currentWebview: { label: "main" },
+            },
+            plugins: {},
+            transformCallback: function (callback) {
+              var id = nextCallbackId++;
+              Object.defineProperty(window, "_" + id, {
+                value: callback,
+                writable: false,
+                configurable: false,
+              });
+              return id;
+            },
+            // Unknown commands resolve to null (or [] for list-shaped ones) so
+            // `.catch`-guarded calls and feature probes degrade gracefully
+            // instead of killing boot. Event listen/unlisten get throwaway ids
+            // with harmless unlisten stubs so effect cleanups stay silent.
+            invoke: function (cmd) {
+              var name = String(cmd);
+              if (name === "plugin:event|listen") {
+                var eventId = 100000 + nextCallbackId++;
+                Object.defineProperty(window, "_" + eventId, {
+                  value: { unregisterListener: function () {} },
+                  writable: false,
+                  configurable: false,
+                });
+                return Promise.resolve(eventId);
+              }
+              if (name === "plugin:event|unlisten") return Promise.resolve(null);
+              var listy =
+                /list|history|sessions|projects|files|entries|dir|skills|worktree|providers|models|accounts|reminders|notes|search/i.test(
+                  name,
+                );
+              return Promise.resolve(listy ? [] : null);
+            },
+            registerListener: function () {},
+            unregisterListener: function () {},
+          };
+        })();
+      }
+    </script>
+    <script>
       (function () {
         try {
           var root = document.documentElement;
