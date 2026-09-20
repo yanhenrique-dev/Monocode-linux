@@ -353,6 +353,7 @@ export function SettingsView({
   const { t } = useLocale();
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const [revealed, setRevealed] = useState<string | null>(anchor);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   // Appearance state lives in AppearancePage, not here: a slider drag must
@@ -426,7 +427,7 @@ export function SettingsView({
           {section === "appearance" ? (
             <button
               type="button"
-              onClick={() => restoreAppearanceRef.current()}
+              onClick={() => setConfirmingRestore(true)}
               className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
             >
               <RotateCcw className="size-3.5" strokeWidth={1.75} />
@@ -437,6 +438,25 @@ export function SettingsView({
         </div>
         {IS_MAC ? null : <WindowControls />}
       </div>
+
+      {confirmingRestore ? (
+        <ConfirmDialog
+          title={t("settings.appearance.restore_defaults.confirm_title")}
+          description={t(
+            "settings.appearance.restore_defaults.confirm_description",
+          )}
+          confirmLabel={t(
+            "settings.appearance.restore_defaults.confirm_action",
+          )}
+          cancelLabel={t("settings.archive.dialog.cancel")}
+          danger
+          onCancel={() => setConfirmingRestore(false)}
+          onConfirm={() => {
+            setConfirmingRestore(false);
+            restoreAppearanceRef.current();
+          }}
+        />
+      ) : null}
 
       {section === "skills" ? (
         <SkillsPage
@@ -1270,7 +1290,10 @@ function GithubSettings() {
         </SecondaryButton>
       </Row>
       {error ? (
-        <p className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0">
+        <p
+          role="alert"
+          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+        >
           {error}
         </p>
       ) : null}
@@ -1400,7 +1423,10 @@ function GitlabSettings() {
         )}
       </Row>
       {error ? (
-        <p className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0">
+        <p
+          role="alert"
+          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+        >
           {error}
         </p>
       ) : null}
@@ -1534,7 +1560,10 @@ function LinearSettings() {
         )}
       </Row>
       {error ? (
-        <p className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0">
+        <p
+          role="alert"
+          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+        >
           {error}
         </p>
       ) : null}
@@ -1553,6 +1582,8 @@ function LinearSettings() {
                 <button
                   key={team.id}
                   type="button"
+                  role="switch"
+                  aria-checked={checked}
                   onClick={() => toggleTeam(team.id)}
                   className="flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px] text-content hover:bg-content/5"
                 >
@@ -1561,6 +1592,11 @@ function LinearSettings() {
                     {team.key ? (
                       <span className="ml-1.5 text-content/40">{team.key}</span>
                     ) : null}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-content/40">
+                    {checked
+                      ? t("settings.inbox.linear.teams.shown")
+                      : t("settings.inbox.linear.teams.hidden")}
                   </span>
                   {checked ? (
                     <Check className="size-3.5 shrink-0" strokeWidth={2.25} />
@@ -2231,6 +2267,7 @@ function ChatBackgroundCard({
   );
   const busy = appearance.chatBackgroundBusy;
   const { t } = useLocale();
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   return (
     <Group
@@ -2238,6 +2275,24 @@ function ChatBackgroundCard({
       title={t("settings.appearance.chat_background.title")}
       description={t("settings.appearance.chat_background.description")}
     >
+      {confirmingRemove ? (
+        <ConfirmDialog
+          title={t("settings.appearance.chat_background.remove_title")}
+          description={t(
+            "settings.appearance.chat_background.remove_description",
+          )}
+          confirmLabel={t(
+            "settings.appearance.chat_background.remove_action",
+          )}
+          cancelLabel={t("settings.archive.dialog.cancel")}
+          danger
+          onCancel={() => setConfirmingRemove(false)}
+          onConfirm={() => {
+            setConfirmingRemove(false);
+            void appearance.onClearChatBackground();
+          }}
+        />
+      ) : null}
       <div className="border-b border-content/5 p-4 last:border-b-0">
         <div className="overflow-hidden rounded-lg border border-content/10">
           {hasImage ? (
@@ -2288,7 +2343,7 @@ function ChatBackgroundCard({
               {t("settings.appearance.chat_background.change")}
             </SecondaryButton>
             <SecondaryButton
-              onClick={() => void appearance.onClearChatBackground()}
+              onClick={() => setConfirmingRemove(true)}
               disabled={busy}
               danger
             >
@@ -2297,7 +2352,7 @@ function ChatBackgroundCard({
           </div>
         ) : null}
         {appearance.chatBackgroundError ? (
-          <p className="mt-2 text-[12px] text-red-400">
+          <p role="alert" className="mt-2 text-[12px] text-red-400">
             {appearance.chatBackgroundError}
           </p>
         ) : null}
@@ -3039,7 +3094,10 @@ const SoundCueRow = memo(function SoundCueRow({
         </button>
       ) : null}
       {error ? (
-        <span className="w-full text-right text-[12px] text-red-400/90">
+        <span
+          role="alert"
+          className="w-full text-right text-[12px] text-red-400/90"
+        >
           {t(ERROR_HINT[error])}
         </span>
       ) : null}
@@ -3269,7 +3327,7 @@ function AccentColorPicker({
 function NotificationsBlocked() {
   const { t } = useLocale();
   return (
-    <span className="flex items-center gap-2 text-[12px] text-content/45">
+    <span className="flex flex-wrap items-center gap-2 text-[12px] text-content/45">
       {t("settings.general.notifications.permission_needed")}
       {IS_MAC || IS_WIN ? (
         <button
@@ -3281,7 +3339,11 @@ function NotificationsBlocked() {
         >
           {t("settings.general.notifications.open_system_settings")}
         </button>
-      ) : null}
+      ) : (
+        <span className="basis-full">
+          {t("settings.general.notifications.linux_denied_hint")}
+        </span>
+      )}
     </span>
   );
 }

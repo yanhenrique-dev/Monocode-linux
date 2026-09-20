@@ -905,14 +905,24 @@ export type KeybindingRow = {
   when: string;
 };
 
-/** The single human `when` value; technical expressions render verbatim. */
+/** Human labels for `when` guards; unknown expressions render verbatim. */
 export const KEYBINDING_ALWAYS_KEY = "settings.keybindings.when.always" as const;
+
+const KEYBINDING_WHEN_LABELS: Record<string, LocaleKey> = {
+  Always: KEYBINDING_ALWAYS_KEY,
+  "sessionFocus && !overlay": "settings.keybindings.when.session_focus",
+  "!overlay && (!textFocus || emptyComposer)":
+    "settings.keybindings.when.browsing",
+  "!editorFocus": "settings.keybindings.when.outside_editor",
+  "Draft session composer": "settings.keybindings.when.composer",
+};
 
 export function keybindingWhenLabel(
   when: string,
   locale: Locale = loadLocale(),
 ): string {
-  return when === "Always" ? t(locale, KEYBINDING_ALWAYS_KEY) : when;
+  const key = KEYBINDING_WHEN_LABELS[when];
+  return key ? t(locale, key) : when;
 }
 
 /**

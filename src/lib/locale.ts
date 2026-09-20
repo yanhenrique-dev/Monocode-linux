@@ -177,6 +177,8 @@ const en = {
   "settings.general.notifications.permission_needed": "Permission needed",
   "settings.general.notifications.open_system_settings":
     "Open System Settings",
+  "settings.general.notifications.linux_denied_hint":
+    "If notifications stay silent, allow them in your desktop's notification settings, then return here.",
   "settings.general.workspace.title": "Workspace",
   "settings.general.workspace.description":
     "Panels the project rail can carry. Turning one off hides it everywhere.",
@@ -489,6 +491,8 @@ const en = {
   "settings.inbox.linear.teams.title": "Teams",
   "settings.inbox.linear.teams.description":
     "Unchecked teams stay out of the inbox.",
+  "settings.inbox.linear.teams.shown": "Shown",
+  "settings.inbox.linear.teams.hidden": "Hidden",
   "settings.appearance.theme_group.title": "Theme",
   "settings.appearance.theme_group.description":
     "Dark and light share the same tint, so the color settings below apply to both.",
@@ -552,6 +556,15 @@ const en = {
   "settings.appearance.chat_background.choose": "Choose an image",
   "settings.appearance.chat_background.change": "Change",
   "settings.appearance.chat_background.remove": "Remove",
+  "settings.appearance.chat_background.remove_title": "Remove chat background?",
+  "settings.appearance.chat_background.remove_description":
+    "The conversation background returns to the default.",
+  "settings.appearance.chat_background.remove_action": "Remove",
+  "settings.appearance.restore_defaults.confirm_title":
+    "Restore appearance defaults?",
+  "settings.appearance.restore_defaults.confirm_description":
+    "Theme, colors, translucency, chat background, and interface scale return to their defaults.",
+  "settings.appearance.restore_defaults.confirm_action": "Restore",
   "settings.appearance.chat_background.scope.label": "Show on",
   "settings.appearance.chat_background.scope.description":
     "Empty sessions only, or every conversation.",
@@ -582,6 +595,10 @@ const en = {
   "settings.keybindings.table.when": "When",
   "settings.keybindings.list.empty": "No matching bindings",
   "settings.keybindings.when.always": "Always",
+  "settings.keybindings.when.session_focus": "In session",
+  "settings.keybindings.when.browsing": "When not typing",
+  "settings.keybindings.when.outside_editor": "Outside the editor",
+  "settings.keybindings.when.composer": "Draft session composer",
   "settings.keybindings.cmd.app_search": "App: Search",
   "settings.keybindings.cmd.app_go_to_file": "App: Go to File",
   "settings.keybindings.cmd.app_command_palette": "App: Command Palette",
@@ -642,6 +659,52 @@ const en = {
     "Show {harness} in the model picker",
   "settings.providers.row.unavailable":
     "{name} not found{how}. Install it, or restart MonoCode if it is already installed.",
+  "settings.skills.filter.placeholder": "Filter",
+  "settings.skills.filter.aria": "Filter skills",
+  "settings.skills.refresh": "Refresh skills",
+  "settings.skills.refresh_hint": "Rescan skill folders",
+  "settings.skills.count.one": "1 skill",
+  "settings.skills.count.other": "{count} skills",
+  "settings.skills.loading": "Loading skills…",
+  "settings.skills.empty.none":
+    "No skills yet. Add skill creates a starter SKILL.md.",
+  "settings.skills.empty.no_match": "No matching skills",
+  "settings.skills.scope.personal": "Personal",
+  "settings.skills.scope.project": "Project",
+  "settings.skills.preview.label": "Skill preview",
+  "settings.skills.preview.close": "Close skill preview",
+  "settings.skills.preview.close_hint": "Close preview (Escape)",
+  "settings.skills.preview.loading": "Loading skill…",
+  "settings.skills.preview.error": "Could not read SKILL.md. {error}",
+  "settings.skills.preview.name_hint": "Preview {name}",
+  "settings.skills.list.preview_action": "Preview skill",
+  "settings.skills.list.preview_of": "Preview skill {name}",
+  "settings.skills.list.copy_action": "Copy path",
+  "settings.skills.list.copy_of": "Copy path of {name}",
+  "settings.skills.list.reveal_action": "Reveal in file manager",
+  "settings.skills.list.reveal_of": "Reveal {name} in file explorer",
+  "settings.skills.list.include": "Include {name} in MonoCode catalog",
+  "settings.skills.error.save":
+    "Could not save the skill preference. Try again.",
+  "settings.skills.error.reveal": "Could not open the folder: {error}",
+  "settings.skills.error.copy": "Could not copy the path to the clipboard.",
+  "settings.skills.footer.lead":
+    "Hidden skills stay on disk and are excluded from MonoCode's file-skill catalog. Provider-managed skills and native commands are unaffected. Skills live in ",
+  "settings.skills.footer.middle": " for this project and ",
+  "settings.skills.footer.tail":
+    " for you personally; harness folders are also picked up.",
+  "settings.skills.form.hint": "Writes a starter SKILL.md you can edit.",
+  "settings.skills.form.name_label": "Skill name",
+  "settings.skills.form.name_hint":
+    "Use lowercase letters, numbers, and hyphens.",
+  "settings.skills.form.add": "Add skill",
+  "settings.skills.form.close": "Close",
+  "settings.skills.form.close_hint": "Close skill form",
+  "settings.skills.form.create_hint":
+    "Create a starter SKILL.md you can edit",
+  "settings.skills.form.cancel": "Cancel",
+  "settings.skills.form.create": "Create",
+  "settings.skills.form.creating": "Creating…",
   "settings.archive.projects.title": "Archived projects",
   "settings.archive.projects.description":
     "Archive a project from the rail to keep its chats without listing it in the sidebar.",
@@ -668,6 +731,12 @@ const en = {
     "{count} saved conversations will be removed.",
   "settings.archive.dialog.cancel": "Cancel",
   "settings.archive.dialog.confirm": "Delete",
+  "settings.sessions.delete.title": "Delete “{name}”?",
+  "settings.sessions.delete.body": "“{name}” will be permanently deleted.",
+  "settings.sessions.delete.worktree": "Also delete the unused worktree",
+  "settings.sessions.delete.worktree_note":
+    "The branch is kept. If files have uncommitted changes, the worktree stays.",
+  "settings.sessions.delete.confirm": "Delete session",
   "settings.inbox.category.pull_requests": "Pull requests / Merge requests",
   "settings.inbox.category.issues": "Issues and Linear tasks",
   "settings.inbox.category.agent_finished": "Agent finished",
@@ -817,6 +886,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.notifications.permission_needed": "Permissão necessária",
   "settings.general.notifications.open_system_settings":
     "Abrir Configurações do Sistema",
+  "settings.general.notifications.linux_denied_hint":
+    "Se as notificações continuarem silenciosas, libere-as nas configurações de notificação do seu ambiente e volte aqui.",
   "settings.general.workspace.title": "Espaço de trabalho",
   "settings.general.workspace.description":
     "Painéis que a barra de projetos pode exibir. Desativar um deles o oculta em todos os lugares.",
@@ -1129,6 +1200,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.inbox.linear.teams.title": "Equipes",
   "settings.inbox.linear.teams.description":
     "Equipes desmarcadas ficam fora da caixa de entrada.",
+  "settings.inbox.linear.teams.shown": "Exibida",
+  "settings.inbox.linear.teams.hidden": "Oculta",
   "settings.appearance.theme_group.title": "Tema",
   "settings.appearance.theme_group.description":
     "Os modos claro e escuro compartilham a mesma matiz, então os ajustes abaixo valem para ambos.",
@@ -1193,6 +1266,16 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.chat_background.choose": "Escolher imagem",
   "settings.appearance.chat_background.change": "Trocar",
   "settings.appearance.chat_background.remove": "Remover",
+  "settings.appearance.chat_background.remove_title":
+    "Remover fundo do chat?",
+  "settings.appearance.chat_background.remove_description":
+    "O fundo das conversas volta ao padrão.",
+  "settings.appearance.chat_background.remove_action": "Remover",
+  "settings.appearance.restore_defaults.confirm_title":
+    "Restaurar padrões de aparência?",
+  "settings.appearance.restore_defaults.confirm_description":
+    "Tema, cores, translucidez, fundo do chat e escala da interface voltam aos padrões.",
+  "settings.appearance.restore_defaults.confirm_action": "Restaurar",
   "settings.appearance.chat_background.scope.label": "Exibir em",
   "settings.appearance.chat_background.scope.description":
     "Só sessões vazias ou todas as conversas.",
@@ -1223,6 +1306,10 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.keybindings.table.when": "Quando",
   "settings.keybindings.list.empty": "Nenhum atalho correspondente",
   "settings.keybindings.when.always": "Sempre",
+  "settings.keybindings.when.session_focus": "Na sessão",
+  "settings.keybindings.when.browsing": "Quando não estiver digitando",
+  "settings.keybindings.when.outside_editor": "Fora do editor",
+  "settings.keybindings.when.composer": "Composer de rascunho",
   "settings.keybindings.cmd.app_search": "App: Pesquisar",
   "settings.keybindings.cmd.app_go_to_file": "App: Ir para arquivo",
   "settings.keybindings.cmd.app_command_palette": "App: Paleta de comandos",
@@ -1284,6 +1371,53 @@ const ptBR: Record<LocaleKey, string> = {
     "Exibir {harness} no seletor de modelos",
   "settings.providers.row.unavailable":
     "{name} não encontrado{how}. Instale-o ou reinicie o MonoCode se já estiver instalado.",
+  "settings.skills.filter.placeholder": "Filtrar",
+  "settings.skills.filter.aria": "Filtrar skills",
+  "settings.skills.refresh": "Atualizar skills",
+  "settings.skills.refresh_hint": "Reescanear pastas de skills",
+  "settings.skills.count.one": "1 skill",
+  "settings.skills.count.other": "{count} skills",
+  "settings.skills.loading": "Carregando skills…",
+  "settings.skills.empty.none":
+    "Nenhuma skill ainda. Adicionar skill cria um SKILL.md inicial.",
+  "settings.skills.empty.no_match": "Nenhuma skill correspondente",
+  "settings.skills.scope.personal": "Pessoal",
+  "settings.skills.scope.project": "Projeto",
+  "settings.skills.preview.label": "Prévia da skill",
+  "settings.skills.preview.close": "Fechar pré-visualização da skill",
+  "settings.skills.preview.close_hint": "Fechar pré-visualização (Escape)",
+  "settings.skills.preview.loading": "Carregando skill…",
+  "settings.skills.preview.error": "Não foi possível ler SKILL.md. {error}",
+  "settings.skills.preview.name_hint": "Prévia de {name}",
+  "settings.skills.list.preview_action": "Prévia da skill",
+  "settings.skills.list.preview_of": "Prévia da skill {name}",
+  "settings.skills.list.copy_action": "Copiar caminho",
+  "settings.skills.list.copy_of": "Copiar caminho de {name}",
+  "settings.skills.list.reveal_action": "Revelar no gerenciador de arquivos",
+  "settings.skills.list.reveal_of": "Revelar {name} no explorador de arquivos",
+  "settings.skills.list.include": "Incluir {name} no catálogo do MonoCode",
+  "settings.skills.error.save":
+    "Não foi possível salvar a preferência da skill. Tente de novo.",
+  "settings.skills.error.reveal": "Não foi possível abrir a pasta: {error}",
+  "settings.skills.error.copy":
+    "Não foi possível copiar o caminho para a área de transferência.",
+  "settings.skills.footer.lead":
+    "Skills ocultas permanecem no disco e ficam fora do catálogo de file-skills do MonoCode. Skills gerenciadas pelo provedor e comandos nativos não são afetados. Skills ficam em ",
+  "settings.skills.footer.middle": " deste projeto e ",
+  "settings.skills.footer.tail":
+    " para você pessoalmente; pastas de harness também são detectadas.",
+  "settings.skills.form.hint": "Escreve um SKILL.md inicial que você pode editar.",
+  "settings.skills.form.name_label": "Nome da skill",
+  "settings.skills.form.name_hint":
+    "Use letras minúsculas, números e hifens.",
+  "settings.skills.form.add": "Adicionar skill",
+  "settings.skills.form.close": "Fechar",
+  "settings.skills.form.close_hint": "Fechar formulário de skill",
+  "settings.skills.form.create_hint":
+    "Criar um SKILL.md inicial que você pode editar",
+  "settings.skills.form.cancel": "Cancelar",
+  "settings.skills.form.create": "Criar",
+  "settings.skills.form.creating": "Criando…",
   "settings.archive.projects.title": "Projetos arquivados",
   "settings.archive.projects.description":
     "Arquive um projeto pela barra para guardar os chats sem listá-lo na barra lateral.",
@@ -1311,6 +1445,12 @@ const ptBR: Record<LocaleKey, string> = {
     "{count} conversas salvas serão removidas.",
   "settings.archive.dialog.cancel": "Cancelar",
   "settings.archive.dialog.confirm": "Excluir",
+  "settings.sessions.delete.title": "Excluir “{name}”?",
+  "settings.sessions.delete.body": "“{name}” será excluída permanentemente.",
+  "settings.sessions.delete.worktree": "Excluir também o worktree não utilizado",
+  "settings.sessions.delete.worktree_note":
+    "O branch é mantido. Se houver alterações não commitadas, o worktree permanece.",
+  "settings.sessions.delete.confirm": "Excluir sessão",
   "settings.inbox.category.pull_requests": "Pull requests / Merge requests",
   "settings.inbox.category.issues": "Issues e tarefas da Linear",
   "settings.inbox.category.agent_finished": "Agente finalizado",

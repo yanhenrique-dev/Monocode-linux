@@ -309,6 +309,24 @@ describe("workspace navigation keybindings", () => {
     expect(keybindingWhenLabel("Always", "en")).toBe("Always");
     expect(keybindingWhenLabel("Always", "pt-BR")).toBe("Sempre");
   });
+  it("humanizes technical when guards instead of echoing expressions", () => {
+    expect(keybindingWhenLabel("sessionFocus && !overlay", "en")).toBe(
+      "In session",
+    );
+    expect(keybindingWhenLabel("sessionFocus && !overlay", "pt-BR")).toBe(
+      "Na sessão",
+    );
+    expect(
+      keybindingWhenLabel("!overlay && (!textFocus || emptyComposer)", "en"),
+    ).toBe("When not typing");
+    expect(keybindingWhenLabel("!editorFocus", "en")).toBe(
+      "Outside the editor",
+    );
+    expect(keybindingWhenLabel("Draft session composer", "pt-BR")).toBe(
+      "Composer de rascunho",
+    );
+    expect(keybindingWhenLabel("something-new", "en")).toBe("something-new");
+  });
 });
 
 describe("diff viewer setting", () => {
