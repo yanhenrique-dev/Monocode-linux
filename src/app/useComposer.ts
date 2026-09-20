@@ -433,7 +433,7 @@ export function useComposer(deps: ComposerDeps) {
                 : s,
             ),
           );
-          dismissNoticesForContinuedSession(sessionId);
+      dismissNoticesForContinuedSession(sessionId);
           return true;
         }
         if (
@@ -569,6 +569,15 @@ export function useComposer(deps: ComposerDeps) {
         void cancelHarnessTurn(pendingSwitch.from, sessionId);
       }
 
+      // A resend whose provider revert runs later in the chain swaps the
+      // transcript only after the revert succeeds; truncating or appending
+      // here would lose the old turn (and duplicate the prompt) when the
+      // revert rejects.
+      const deferResend =
+        options?.resendEdited &&
+        canRewindHarnessLastTurn(current.harness) &&
+        live;
+
       dismissNoticesForContinuedSession(sessionId);
       setSessions((prev) =>
         prev.map((s) => {
@@ -591,7 +600,7 @@ export function useComposer(deps: ComposerDeps) {
             noteCard: rawCommand ? s.noteCard : undefined,
             handoffCard: rawCommand ? s.handoffCard : undefined,
           };
-          if (options?.resendEdited) {
+          if (options?.resendEdited && !deferResend) {
             next = {
               ...next,
               blocks: truncateBeforeLastUserTurn(next.blocks),
@@ -647,6 +656,7 @@ export function useComposer(deps: ComposerDeps) {
               title: titled,
               pendingSwitch: undefined,
             });
+            if (deferResend) return sealed;
             return appendUser(
               appendPreparingHandoff(sealed, pendingSwitch.from, next.harness),
               visibleText,
@@ -654,6 +664,7 @@ export function useComposer(deps: ComposerDeps) {
               cards,
             );
           }
+          if (deferResend) return { ...next, title: titled };
           return appendUser(
             { ...next, title: titled },
             visibleText,
@@ -935,6 +946,24 @@ export function useComposer(deps: ComposerDeps) {
               }
               return;
             }
+            // The provider revert succeeded: now swap the local transcript to
+            // the edited turn. It was left intact until now so a rejection
+            // above leaves the old turn (and no duplicate prompt) in place.
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== sessionId) return s;
+                const truncated = {
+                  ...s,
+                  blocks: truncateBeforeLastUserTurn(s.blocks),
+                };
+                return appendUser(
+                  { ...truncated, title: isFirstTurn ? titleSeed : s.title },
+                  visibleText,
+                  visible,
+                  cards,
+                );
+              }),
+            );
           }
           const prepared = await prepareAttachments(attachments);
           const prompt =

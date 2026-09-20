@@ -183,7 +183,11 @@ export async function rewindCodexLastTurn(
   if (cancelledThreads.delete(input.sessionId)) return { submitted: false };
 
   live.onEvent = input.onEvent;
-  await live.turns;
+  // A previously failed turn/start leaves live.turns rejected; consume it so
+  // the rewind below can still reach thread/revert. activeTurnId stays null
+  // on that path (it is only set after a successful response), so the guard
+  // below still applies.
+  await live.turns.catch(() => undefined);
   if (live.activeTurnId) {
     throw new Error("Stop the current turn before editing the last message");
   }

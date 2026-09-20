@@ -58,6 +58,7 @@ import { visibleUserPrompt } from "../lib/orchestration";
 import { playCue } from "../lib/sounds";
 import { getIntlLocale } from "../lib/locale";
 import { legacyTaskListFromText } from "../lib/taskList";
+import { lastUserTurnBlock } from "../lib/editLastTurn";
 import { displayPath, resolveWorkspacePath } from "../lib/paths";
 import { resolveModel } from "../lib/models";
 import { harnessForTurn } from "../lib/secondOpinion";
@@ -221,6 +222,10 @@ function AgentTranscriptContent({
   const transcriptLayout = useTranscriptLayout();
   const promptAnchor = useTranscriptAnchor();
   const lastUserId = lastUserBlockId(blocks, managed);
+  // The edit control restores exactly this block (see lastTurnRecall): a
+  // steered turn may hold several user blocks, but only the turn-start block
+  // may expose the pencil.
+  const editableBlockId = lastUserTurnBlock(blocks)?.id;
   const seenUserId = useRef(lastUserId);
   if (lastUserId !== seenUserId.current) {
     seenUserId.current = lastUserId;
@@ -590,7 +595,8 @@ function AgentTranscriptContent({
                   onEditLastTurn &&
                   isLastTurn &&
                   settled &&
-                  item.block.role === "user"
+                  item.block.role === "user" &&
+                  item.block.id === editableBlockId
                     ? onEditLastTurn
                     : undefined
                 }
@@ -598,7 +604,8 @@ function AgentTranscriptContent({
                   editingLastTurn &&
                   isLastTurn &&
                   settled &&
-                  item.block.role === "user"
+                  item.block.role === "user" &&
+                  item.block.id === editableBlockId
                 }
               />
             );
