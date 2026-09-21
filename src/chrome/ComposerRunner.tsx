@@ -25,6 +25,7 @@ import {
   poseAt,
   recoilAlong,
   scaleTrackX,
+  selectRunnerLedge,
   stepAlong,
   runnerTrack,
   spriteClipBottom,
@@ -174,11 +175,16 @@ export function ComposerRunner({
       const shell = box.closest("[data-composer]");
       const review = shell?.querySelector("[data-session-review]");
       const queue = shell?.querySelector("[data-message-queue-card]");
-      const ledge = review ?? queue;
-      const track = runnerTrack(
-        box.getBoundingClientRect(),
-        ledge?.getBoundingClientRect() ?? null,
+      // The tasks strip is the composer's previous sibling, outside
+      // [data-composer]. It fuses with the box, so it wins the ledge.
+      const pane = box.closest("[data-session-drop]") ?? shell?.parentElement;
+      const tasks = pane?.querySelector("[data-tasks-strip]");
+      const ledge = selectRunnerLedge(
+        tasks?.getBoundingClientRect() ?? null,
+        review?.getBoundingClientRect() ?? null,
+        queue?.getBoundingClientRect() ?? null,
       );
+      const track = runnerTrack(box.getBoundingClientRect(), ledge);
       if (track.width <= 0) return false;
       trackWidth = track.width;
       trackLeft = track.left;

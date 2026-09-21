@@ -84,6 +84,50 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("appearance draft revert", () => {
+  it("restores saved values when a slider drag aborts", async () => {
+    localStorage.setItem("monocode.themeHue", "100");
+    await render("appearance");
+    const hue = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Hue"]',
+    )!;
+    const painted = () =>
+      document.documentElement.style.getPropertyValue("--theme-hue");
+
+    act(() => {
+      hue.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    });
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(hue, "200");
+      hue.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(painted()).toBe("200");
+    act(() => {
+      hue.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+    });
+    expect(painted()).toBe("100");
+    expect(localStorage.getItem("monocode.themeHue")).toBe("100");
+  });
+});
+describe("settings search reveal", () => {
+  it("moves focus to the revealed row and announces it", async () => {
+    await render("general", { anchor: "update" });
+    const target = container.querySelector<HTMLElement>(
+      '[data-setting-id="update"]',
+    )!;
+    expect(document.activeElement).toBe(target);
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live?.textContent).toContain("Version");
+  });
+});
+
 describe("settings pages", () => {
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
     vi.useFakeTimers();
@@ -465,5 +509,6 @@ describe("UpdateRow busy feedback", () => {
     // Settings renders the result inline: no native dialog for this surface.
     expect(message).not.toHaveBeenCalled();
     expect(container.textContent).toContain("You're on the latest version.");
+    expect(container.textContent).toContain("Last checked");
   });
 });

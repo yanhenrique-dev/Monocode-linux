@@ -574,18 +574,18 @@ it("uses the shared project picker without leaking late worktree responses", asy
   expect(picker.parentElement?.className).toContain("w-fit");
   expect(picker.parentElement?.className).not.toContain("flex-1");
   expect(picker.className.split(/\s+/)).not.toContain("w-full");
-  expect(picker.className).toContain("h-7.5");
+  expect(picker.className).toContain("h-8");
   expect(picker.querySelectorAll("svg").length).toBeGreaterThanOrEqual(2);
   const create = button("Create worktree");
-  expect(create.className).toContain("h-7.5");
+  expect(create.className).toContain("h-8");
   const refresh = container.querySelector<HTMLButtonElement>(
     '[aria-label="Refresh worktrees"]',
   )!;
   expect(refresh.textContent).toBe("Refresh");
-  expect(refresh.className).toContain("bg-content/8");
-  expect(refresh.parentElement?.textContent).toContain(
-    "Deleting one keeps its sessions by default",
-  );
+  expect(refresh.className).toContain("bg-content/10");
+  expect(
+    container.querySelector("section")?.textContent,
+  ).toContain("Deleting one keeps its sessions by default");
   await act(async () => picker.click());
   expect(
     document.querySelector('input[placeholder="Search projects..."]'),
