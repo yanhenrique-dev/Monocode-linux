@@ -80,6 +80,36 @@ function audioContext(): AudioContext | null {
   }
 }
 
+export type AudioPlaybackState = "running" | "suspended" | "unavailable";
+
+/**
+ * Diagnostic state of the shared Web Audio context. "suspended" means the
+ * webview is holding audio for a user gesture (common on WebKitGTK before
+ * the first click); "unavailable" means no Web Audio implementation exists.
+ */
+export function audioPlaybackState(): AudioPlaybackState {
+  const ctx = audioContext();
+  if (!ctx) return "unavailable";
+  return ctx.state === "running" ? "running" : "suspended";
+}
+
+/**
+ * Resume the shared context from a user gesture. Call once from
+ * `pointerdown`/`keydown` so later background cues are allowed to play.
+ * Browsers reject `resume()` without a gesture; the rejection is expected
+ * and stays silent.
+ */
+export function unlockAudio(): void {
+  try {
+    const ctx = audioContext();
+    if (ctx && ctx.state === "suspended") {
+      void ctx.resume().catch(() => {});
+    }
+  } catch {
+    // Audio stays locked; the next cue attempt reports it.
+  }
+}
+
 async function mtimeOf(path: string): Promise<number | null> {
   try {
     const [stat] = await statFiles([path]);
@@ -120,7 +150,10 @@ async function decodedBuffer(
   }
   decoded.set(path, { buffer, mtimeMs, reason: buffer ? undefined : reason });
   if (buffer) lastErrors.delete(path);
-  else lastErrors.set(path, { ok: false, reason });
+  else {
+    lastErrors.set(path, { ok: false, reason });
+    console.warn("[sounds] custom sound not decoded:", path, reason);
+  }
   return { buffer, reason };
 }
 
@@ -156,10 +189,19 @@ export async function playSoundFile(path: string): Promise<SoundFileResult> {
     if (!ElementCtor) return { ok: false, reason };
     const element = new ElementCtor(convertFileSrc(path));
     element.volume = volume;
-    await element.play();
+    try {
+      await element.play();
+    } catch (error) {
+      // The webview media stack (GStreamer on Linux) rejected the file:
+      // missing codec plugins or an asset-scope denial surface here.
+      console.warn("[sounds] fallback playback failed:", path, reason, error);
+      lastErrors.set(path, { ok: false, reason });
+      return { ok: false, reason };
+    }
     clearSoundFileError(path);
     return { ok: true };
-  } catch {
+  } catch (error) {
+    console.warn("[sounds] custom sound failed:", path, reason, error);
     lastErrors.set(path, { ok: false, reason });
     return { ok: false, reason };
   }

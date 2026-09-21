@@ -825,9 +825,9 @@ function NotificationsPage({
   const { t } = useLocale();
 
   // The user may flip the switch in System Settings and come back: re-read
-  // the OS state whenever the window regains focus while the toggle is on.
+  // the OS state on open and whenever the window regains focus. Probe even
+  // while the toggle is off so the pre-opt-in state is accurate.
   useEffect(() => {
-    if (!notificationsEnabled) return;
     const refresh = () => {
       void probeNotificationPermission().then(setNotificationPermission);
     };

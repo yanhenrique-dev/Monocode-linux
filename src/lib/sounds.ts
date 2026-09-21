@@ -6,7 +6,12 @@ import {
   type NotificationSubject,
 } from "./notificationPreferences";
 import { inboxNotificationProject } from "./notificationProjects";
-import { playSoundFile, setSoundFileVolume } from "./soundFiles";
+import {
+  audioPlaybackState,
+  playSoundFile,
+  setSoundFileVolume,
+  unlockAudio,
+} from "./soundFiles";
 
 const KEY = "monocode.sounds";
 const ENABLED_AT_KEY = "monocode.soundsEnabledAt";
@@ -123,12 +128,22 @@ function customPathFor(cue: SoundCue): string | null {
  */
 export function previewCue(cue: CustomizableCue): void {
   applySoundEngine();
+  unlockAudio();
   const custom = customPathFor(cue);
   if (custom) {
     void playSoundFile(custom);
     return;
   }
-  play(CUES[cue]);
+  try {
+    play(CUES[cue]);
+  } catch (error) {
+    console.warn("[sounds] preset cue failed:", cue, error);
+  }
+}
+
+/** True once the webview lets audio play without another user gesture. */
+export function isAudioUnlocked(): boolean {
+  return audioPlaybackState() === "running";
 }
 
 
@@ -163,9 +178,19 @@ function applySoundEngine() {
   setSoundFileVolume(SOUNDS_VOLUME);
 }
 
+let audioUnlockInstalled = false;
+
 /** Apply the stored mute/volume before the first cue. */
 export function initSounds() {
   applySoundEngine();
+  // WebKitGTK starts Web Audio suspended until a user gesture. Unlock on
+  // the first click/keypress so later background cues are allowed to play.
+  // Each preview/cue also nudges `resume()`, but only a gesture unlocks it.
+  if (audioUnlockInstalled || typeof window === "undefined") return;
+  audioUnlockInstalled = true;
+  const unlock = () => unlockAudio();
+  window.addEventListener("pointerdown", unlock, { passive: true });
+  window.addEventListener("keydown", unlock);
 }
 
 type ProjectSoundCue = "turnFinished" | "inboxUnseen" | "linkedActivity";
@@ -179,12 +204,23 @@ export function playCue(
 export function playCue(cue: SoundCue, subject?: NotificationSubject): boolean {
   if (!loadSoundsEnabled()) return false;
   if (subject && !allowsProjectNotification(subject)) return false;
+  // Skip only events that predates a manual re-enable, so stale backlog
+  // never catches up. Events without a timestamp always play.
   if (subject?.occurredAt !== undefined) {
+    let enabledAt: number | null = null;
     try {
-      if (subject.occurredAt < Number(localStorage.getItem(ENABLED_AT_KEY)))
-        return false;
+      const raw = localStorage.getItem(ENABLED_AT_KEY);
+      enabledAt = raw == null ? null : Number(raw);
     } catch {
       /* Audio can still play when storage is unavailable. */
+    }
+    if (
+      enabledAt !== null &&
+      Number.isFinite(enabledAt) &&
+      subject.occurredAt < enabledAt
+    ) {
+      console.debug("[sounds] skip: predates re-enable", cue, subject);
+      return false;
     }
   }
   applySoundEngine();
@@ -193,7 +229,15 @@ export function playCue(cue: SoundCue, subject?: NotificationSubject): boolean {
     void playSoundFile(custom);
     return true;
   }
-  play(CUES[cue]);
+  try {
+    play(CUES[cue]);
+  } catch (error) {
+    console.warn("[sounds] preset cue failed:", cue, error);
+    return false;
+  }
+  if (audioPlaybackState() === "suspended") {
+    console.debug("[sounds] cue sent while audio suspended:", cue);
+  }
   return true;
 }
 

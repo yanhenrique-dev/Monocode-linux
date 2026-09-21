@@ -5,6 +5,9 @@ export const IS_MAC =
 export const IS_WIN =
   typeof navigator !== "undefined" && /Win/i.test(navigator.platform);
 
+export const IS_LINUX =
+  typeof navigator !== "undefined" && /Linux/i.test(navigator.platform);
+
 /** Native desktop blur: macOS vibrancy and Windows acrylic. Linux stays opaque. */
 export const HAS_NATIVE_GLASS = IS_MAC || IS_WIN;
 
