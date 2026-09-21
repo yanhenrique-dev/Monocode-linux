@@ -233,6 +233,7 @@ import {
   saveReviewAdoptShell,
   saveTerminalGpu,
   searchSettings,
+  SETTINGS_INDEX,
   settingsSectionDescription,
   settingsSectionLabel,
   type DiffViewer,
@@ -365,15 +366,27 @@ export function SettingsView({
 
   useEffect(() => setRevealed(anchor), [anchor, notificationSettingsRequest]);
 
+  // Announced when search lands on a setting, so screen readers follow the jump.
+  const revealedEntry = revealed
+    ? SETTINGS_INDEX.find((entry) => entry.id === revealed)
+    : undefined;
+  const revealedAnnouncement = revealedEntry
+    ? t(revealedEntry.label)
+    : revealed
+      ? t(settingsSectionLabel(section))
+      : "";
+
   // Section is a dependency so a search result on another page scrolls once
   // that page has mounted the row.
   useEffect(() => {
     if (!revealed) return;
     // A project quick action lets the project card focus itself after discovery.
     if (!(revealed === "project-notifications" && notificationProjectPath)) {
-      document
-        .getElementById(settingDomId(revealed))
-        ?.scrollIntoView?.({ block: "center" });
+      const target = document.getElementById(settingDomId(revealed));
+      target?.scrollIntoView?.({ block: "center" });
+      // Move focus so keyboard and screen-reader users land on the row.
+      // Group/Row carry tabIndex -1: focusable programmatically, never by Tab.
+      target?.focus?.({ preventScroll: true });
     }
     const timer = window.setTimeout(() => setRevealed(null), 1800);
     return () => window.clearTimeout(timer);
@@ -437,6 +450,10 @@ export function SettingsView({
           <SettingsSearch onReveal={onReveal} />
         </div>
         {IS_MAC ? null : <WindowControls />}
+      </div>
+
+      <div aria-live="polite" className="sr-only">
+        {revealedAnnouncement}
       </div>
 
       {confirmingRestore ? (
@@ -2461,7 +2478,10 @@ function KeybindingsPage() {
       description={t("settings.keybindings.group.description")}
       action={
         <div className="flex items-center gap-3">
-          <span className="shrink-0 text-[12px] text-content/40 tabular-nums">
+          <span
+            aria-live="polite"
+            className="shrink-0 text-[12px] text-content/40 tabular-nums"
+          >
             {rows.length}{" "}
             {rows.length === 1
               ? t("settings.keybindings.count.singular")
@@ -2478,6 +2498,17 @@ function KeybindingsPage() {
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
             />
+            {query ? (
+              <button
+                type="button"
+                aria-label={t("settings.search.clear")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setQuery("")}
+                className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
+              >
+                <X className="size-3" strokeWidth={2} />
+              </button>
+            ) : null}
           </label>
         </div>
       }
@@ -2936,7 +2967,8 @@ function Group({
     <section
       id={id ? settingDomId(id) : undefined}
       data-setting-id={id}
-      className="pt-8"
+      tabIndex={-1}
+      className="pt-8 outline-none"
     >
       <div className="flex items-end gap-4 pb-2.5">
         <div className="min-w-0 flex-1">
@@ -2979,7 +3011,8 @@ function Row({
     <div
       id={id ? settingDomId(id) : undefined}
       data-setting-id={id}
-      className={`settings-row flex items-start gap-6 border-b border-content/5 px-4 py-3.5 transition-colors last:border-b-0 ${
+      tabIndex={-1}
+      className={`settings-row flex items-start gap-6 border-b border-content/5 px-4 py-3.5 outline-none transition-colors last:border-b-0 ${
         flash ? "bg-accent/10" : ""
       }`}
     >

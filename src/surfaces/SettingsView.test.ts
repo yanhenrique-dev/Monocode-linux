@@ -84,6 +84,18 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("settings search reveal", () => {
+  it("moves focus to the revealed row and announces it", async () => {
+    await render("general", { anchor: "update" });
+    const target = container.querySelector<HTMLElement>(
+      '[data-setting-id="update"]',
+    )!;
+    expect(document.activeElement).toBe(target);
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live?.textContent).toContain("Version");
+  });
+});
+
 describe("settings pages", () => {
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
     vi.useFakeTimers();
