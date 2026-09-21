@@ -327,6 +327,8 @@ export function useTurnActions(deps: TurnActionsDeps) {
         flushHarnessEvents();
         return;
       }
+      // Intentional: steering an explicitly picked queued message bypasses
+      // loadFollowUpBehavior() — the user asked to interrupt right now.
       onSubmit(sessionId, message.text, message.attachments, {
         followUpBehavior: "steer",
         queuedMessageId: message.id,
@@ -358,6 +360,8 @@ export function useTurnActions(deps: TurnActionsDeps) {
             : entry,
         ),
       );
+      // Intentional: resuming a paused queue must dispatch now, so it
+      // bypasses loadFollowUpBehavior() like an explicit steer.
       onSubmit(sessionId, CONTINUE_PROMPT, [], {
         followUpBehavior: "steer",
       });
