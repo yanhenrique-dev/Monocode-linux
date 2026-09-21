@@ -19,6 +19,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1750,8 +1751,10 @@ function useAppearanceSettings() {
   );
   // Mirror for syncAppearanceFromStore: applyChatBackground bumps the image
   // revision on every call, so the sync paints only on a real path change.
-  const chatBackgroundPathRef = useRef<string | null>(null);
-  useEffect(() => {
+  // Layout-phase sync: a synchronous appearance notification between commit
+  // and a passive effect would otherwise read a stale ref.
+  const chatBackgroundPathRef = useRef<string | null>(chatBackgroundPath);
+  useLayoutEffect(() => {
     chatBackgroundPathRef.current = chatBackgroundPath;
   }, [chatBackgroundPath]);
   const [chatBackgroundEmptyOpacity, setChatBackgroundEmptyOpacity] = useState(
