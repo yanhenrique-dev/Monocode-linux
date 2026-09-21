@@ -134,6 +134,61 @@ describe("GitHub pull request actions", () => {
     });
   });
 
+  it("blocks a confirm opened before mergeability resolved", async () => {
+    let resolveMergeInfo!: (
+      info: Awaited<ReturnType<typeof githubPrMergeInfo>>,
+    ) => void;
+    vi.mocked(githubPrMergeInfo).mockReturnValue(
+      new Promise((resolve) => {
+        resolveMergeInfo = resolve;
+      }),
+    );
+    await act(async () =>
+      root.render(
+        createElement(GithubPrActions, {
+          item: pr(),
+          baseRef: "main",
+          headRef: "feature/inbox",
+        }),
+      ),
+    );
+
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Merge options"]')!
+        .click(),
+    );
+    const squash = [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+    ].find((button) => button.textContent?.includes("Squash and merge"))!;
+    act(() => squash.click());
+
+    const primary = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Squash and merge",
+    )!;
+    act(() => primary.click());
+    const dialog = document.querySelector<HTMLElement>(
+      '[role="dialog"][aria-label="Squash and merge?"]',
+    )!;
+
+    // Mergeability resolves to conflicts while the dialog stands open.
+    await act(async () => {
+      resolveMergeInfo({
+        viewerPermission: "WRITE",
+        mergeable: "CONFLICTING",
+        mergeStateStatus: "DIRTY",
+      });
+      await Promise.resolve();
+    });
+    const confirm = [...dialog.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Squash and merge",
+    )!;
+    expect(confirm.disabled).toBe(true);
+    expect(confirm.title).toContain("conflicts");
+    act(() => confirm.click());
+    expect(githubPrAction).not.toHaveBeenCalled();
+  });
+
   it("disables merge and lifecycle actions without push access", async () => {
     vi.mocked(githubPrMergeInfo).mockResolvedValue({
       viewerPermission: "READ",

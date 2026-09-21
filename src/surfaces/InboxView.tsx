@@ -1613,8 +1613,20 @@ export function GithubPrActions({
     setActionError(null);
   };
 
+  // The permission/conflict state loads lazily and can resolve while the
+  // confirmation dialog is open: re-check it here and on the confirm button
+  // so a late block cannot be confirmed through.
+  const confirmationBlockedReason =
+    confirmation === null
+      ? null
+      : confirmation.action === "merge" ||
+          confirmation.action === "squash" ||
+          confirmation.action === "rebase"
+        ? mergeBlockedReason
+        : writeBlockedReason;
+
   const runAction = async () => {
-    if (!confirmation || busy) return;
+    if (!confirmation || busy || confirmationBlockedReason != null) return;
     const action = confirmation.action;
     setBusy(true);
     setActionError(null);
@@ -1826,7 +1838,8 @@ export function GithubPrActions({
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || confirmationBlockedReason != null}
+              title={confirmationBlockedReason ?? undefined}
               onClick={() => void runAction()}
               className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[12px] font-medium disabled:cursor-default disabled:opacity-60 ${
                 confirmation.action === "close"
