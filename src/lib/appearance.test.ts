@@ -33,7 +33,6 @@ import {
   saveThemePreference,
   saveThemeHue,
   saveBodyGlass,
-  saveChatBackgroundScope,
   subscribeAppearance,
   APPEARANCE_CHANGE_EVENT,
   resolveColorScheme,
@@ -374,6 +373,30 @@ describe("appearance change event", () => {
     });
     stop();
     saveThemeHue(120);
+    expect(count).toBe(0);
+  });
+
+  it("stays silent when persistence fails", () => {
+    mockWindowEvents();
+    // Private mode / quota: every write throws, so nothing persisted and
+    // no subscriber may observe a value the store does not hold.
+    const storage = globalThis.localStorage;
+    vi.spyOn(storage, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    vi.spyOn(storage, "removeItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    let count = 0;
+    const stop = subscribeAppearance(() => {
+      count += 1;
+    });
+    saveThemeHue(120);
+    saveAccentColor("#ff0000");
+    saveThemePreference("dark");
+    saveBodyGlass(false);
+    saveChatBackgroundScope("empty");
+    stop();
     expect(count).toBe(0);
   });
 

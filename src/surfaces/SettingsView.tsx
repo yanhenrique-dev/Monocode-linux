@@ -1748,6 +1748,12 @@ function useAppearanceSettings() {
   const [chatBackgroundPath, setChatBackgroundPath] = useState(
     loadChatBackgroundPath,
   );
+  // Mirror for syncAppearanceFromStore: applyChatBackground bumps the image
+  // revision on every call, so the sync paints only on a real path change.
+  const chatBackgroundPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    chatBackgroundPathRef.current = chatBackgroundPath;
+  }, [chatBackgroundPath]);
   const [chatBackgroundEmptyOpacity, setChatBackgroundEmptyOpacity] = useState(
     loadChatBackgroundEmptyOpacity,
   );
@@ -1936,9 +1942,12 @@ function useAppearanceSettings() {
   // helper there; keep the bodies identical so the rebase drops one).
   const syncAppearanceFromStore = useCallback(() => {
     cancelSidebarBlurPreview();
+    setThemePreference(applyThemePreference(loadThemePreference()));
     const tint = applyThemeTint(loadThemeHue(), loadThemeSaturation());
     setThemeHue(tint.hue);
     setThemeSaturation(tint.saturation);
+    setBodyGlass(applyBodyGlass(loadBodyGlass()));
+    setUiBlur(applyUiBlur(loadUiBlur()));
     const darkLightness = applyThemeDarkLightness(loadThemeDarkLightness());
     setThemeDarkLightness(darkLightness);
     const nextOpacity = applySidebarOpacity(loadSidebarOpacity());
@@ -1957,6 +1966,17 @@ function useAppearanceSettings() {
     setChatBackgroundSessionOpacity(session);
     const bgBlur = applyChatBackgroundBlur(loadChatBackgroundBlur());
     setChatBackgroundBlur(bgBlur);
+    setChatBackgroundScope(
+      applyChatBackgroundScope(loadChatBackgroundScope()),
+    );
+    // State drives the background section visibility; paint only on a real
+    // change — applyChatBackground bumps the image revision every call.
+    const bgPath = loadChatBackgroundPath();
+    if (bgPath !== chatBackgroundPathRef.current) {
+      chatBackgroundPathRef.current = bgPath;
+      applyChatBackground(bgPath);
+    }
+    setChatBackgroundPath(bgPath);
     const scale = loadUiScale();
     setUiScale(scale);
     void applyUiScale(scale);

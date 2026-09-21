@@ -151,11 +151,14 @@ function readNumber(key: string): number | null {
   }
 }
 
-function writeNumber(key: string, value: number) {
+/** True when the value landed in storage. Broadcasts must wait for this. */
+function writeNumber(key: string, value: number): boolean {
   try {
     localStorage.setItem(key, String(value));
+    return true;
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return false;
   }
 }
 
@@ -171,11 +174,13 @@ function readFlag(key: string): boolean | null {
   }
 }
 
-function writeFlag(key: string, value: boolean) {
+function writeFlag(key: string, value: boolean): boolean {
   try {
     localStorage.setItem(key, value ? "1" : "0");
+    return true;
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return false;
   }
 }
 
@@ -211,7 +216,8 @@ export function saveAccentColor(value: string | null) {
     if (next == null) localStorage.removeItem(ACCENT_COLOR_KEY);
     else localStorage.setItem(ACCENT_COLOR_KEY, next);
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return;
   }
   notifyAppearanceChanged();
 }
@@ -243,11 +249,14 @@ export function loadThemeHue(): number {
 }
 
 export function saveThemeHue(value: number) {
-  writeNumber(
-    THEME_HUE_KEY,
-    Math.round(clamp(value, THEME_HUE_MIN, THEME_HUE_MAX)),
-  );
-  notifyAppearanceChanged();
+  if (
+    writeNumber(
+      THEME_HUE_KEY,
+      Math.round(clamp(value, THEME_HUE_MIN, THEME_HUE_MAX)),
+    )
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function loadThemeSaturation(): number {
@@ -261,11 +270,14 @@ export function loadThemeSaturation(): number {
 }
 
 export function saveThemeSaturation(value: number) {
-  writeNumber(
-    THEME_SATURATION_KEY,
-    Math.round(clamp(value, THEME_SATURATION_MIN, THEME_SATURATION_MAX)),
-  );
-  notifyAppearanceChanged();
+  if (
+    writeNumber(
+      THEME_SATURATION_KEY,
+      Math.round(clamp(value, THEME_SATURATION_MIN, THEME_SATURATION_MAX)),
+    )
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function loadThemeDarkLightness(): number {
@@ -279,13 +291,16 @@ export function loadThemeDarkLightness(): number {
 }
 
 export function saveThemeDarkLightness(value: number) {
-  writeNumber(
-    THEME_DARK_LIGHTNESS_KEY,
-    Math.round(
-      clamp(value, THEME_DARK_LIGHTNESS_MIN, THEME_DARK_LIGHTNESS_MAX),
-    ),
-  );
-  notifyAppearanceChanged();
+  if (
+    writeNumber(
+      THEME_DARK_LIGHTNESS_KEY,
+      Math.round(
+        clamp(value, THEME_DARK_LIGHTNESS_MIN, THEME_DARK_LIGHTNESS_MAX),
+      ),
+    )
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applyThemeDarkLightness(value: number) {
@@ -352,7 +367,8 @@ export function saveThemePreference(value: ThemePreference) {
   try {
     localStorage.setItem(SCHEME_KEY, value);
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return;
   }
   notifyAppearanceChanged();
 }
@@ -413,11 +429,14 @@ export function loadSidebarOpacity(): number {
 }
 
 export function saveSidebarOpacity(value: number) {
-  writeNumber(
-    OPACITY_KEY,
-    clamp(value, SIDEBAR_OPACITY_MIN, SIDEBAR_OPACITY_MAX),
-  );
-  notifyAppearanceChanged();
+  if (
+    writeNumber(
+      OPACITY_KEY,
+      clamp(value, SIDEBAR_OPACITY_MIN, SIDEBAR_OPACITY_MAX),
+    )
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applySidebarOpacity(value: number) {
@@ -437,11 +456,14 @@ export function loadSidebarBlur(): number {
 }
 
 export function saveSidebarBlur(value: number) {
-  writeNumber(
-    BLUR_KEY,
-    Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX)),
-  );
-  notifyAppearanceChanged();
+  if (
+    writeNumber(
+      BLUR_KEY,
+      Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX)),
+    )
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applySidebarBlur(value: number) {
@@ -490,8 +512,9 @@ export function loadBodyGlass(): boolean {
 }
 
 export function saveBodyGlass(value: boolean) {
-  writeFlag(BODY_KEY, value);
-  notifyAppearanceChanged();
+  if (writeFlag(BODY_KEY, value)) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applyBodyGlass(value: boolean) {
@@ -510,8 +533,9 @@ export function loadUiBlur(): boolean {
 }
 
 export function saveUiBlur(value: boolean) {
-  writeFlag(UI_BLUR_KEY, value);
-  notifyAppearanceChanged();
+  if (writeFlag(UI_BLUR_KEY, value)) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applyUiBlur(value: boolean) {
@@ -532,7 +556,8 @@ export function saveChatBackgroundPath(value: string | null) {
     if (value) localStorage.setItem(CHAT_BACKGROUND_PATH_KEY, value);
     else localStorage.removeItem(CHAT_BACKGROUND_PATH_KEY);
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return;
   }
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(CHAT_BACKGROUND_PATH_CHANGE_EVENT));
@@ -601,8 +626,11 @@ function loadChatBackgroundOpacityValue(key: string): number {
   return next;
 }
 
-function saveChatBackgroundOpacityValue(key: string, value: number) {
-  writeNumber(
+function saveChatBackgroundOpacityValue(
+  key: string,
+  value: number,
+): boolean {
+  return writeNumber(
     key,
     clamp(value, CHAT_BACKGROUND_OPACITY_MIN, CHAT_BACKGROUND_OPACITY_MAX),
   );
@@ -623,8 +651,9 @@ export function loadChatBackgroundEmptyOpacity(): number {
 }
 
 export function saveChatBackgroundEmptyOpacity(value: number) {
-  saveChatBackgroundOpacityValue(CHAT_BACKGROUND_EMPTY_OPACITY_KEY, value);
-  notifyAppearanceChanged();
+  if (saveChatBackgroundOpacityValue(CHAT_BACKGROUND_EMPTY_OPACITY_KEY, value)) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applyChatBackgroundEmptyOpacity(value: number) {
@@ -639,8 +668,11 @@ export function loadChatBackgroundSessionOpacity(): number {
 }
 
 export function saveChatBackgroundSessionOpacity(value: number) {
-  saveChatBackgroundOpacityValue(CHAT_BACKGROUND_SESSION_OPACITY_KEY, value);
-  notifyAppearanceChanged();
+  if (
+    saveChatBackgroundOpacityValue(CHAT_BACKGROUND_SESSION_OPACITY_KEY, value)
+  ) {
+    notifyAppearanceChanged();
+  }
 }
 
 export function applyChatBackgroundSessionOpacity(value: number) {
@@ -666,7 +698,10 @@ export function loadChatBackgroundBlur(): number {
 
 export function saveChatBackgroundBlur(value: number) {
   const next = clampChatBackgroundBlur(value);
-  writeNumber(CHAT_BACKGROUND_BLUR_KEY, next);
+  if (!writeNumber(CHAT_BACKGROUND_BLUR_KEY, next)) {
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return next;
+  }
   applyChatBackgroundBlur(next);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(CHAT_BACKGROUND_BLUR_CHANGE_EVENT));
@@ -710,7 +745,8 @@ export function saveChatBackgroundScope(value: ChatBackgroundScope) {
   try {
     localStorage.setItem(CHAT_BACKGROUND_SCOPE_KEY, value);
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it
+    return;
   }
   notifyAppearanceChanged();
 }
