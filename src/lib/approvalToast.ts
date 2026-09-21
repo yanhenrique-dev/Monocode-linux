@@ -1,3 +1,4 @@
+import { leafIds, type WorkspaceTab } from "./layout";
 import type { Block, Session } from "./session";
 import { toolCallLabel } from "./toolCallLabel";
 
@@ -38,16 +39,30 @@ export function pendingApprovalForSession(
   return null;
 }
 
+/** True when conversation pane for session focused and active. */
+export function isSessionConversationFocused(
+  sessionId: string,
+  activeTabId: string,
+  tabs: WorkspaceTab[],
+  composerFocused: boolean,
+): boolean {
+  const tab = tabs.find((entry) => entry.id === activeTabId);
+  if (!tab) return false;
+  if (!leafIds(tab.layout).includes(sessionId)) return false;
+  if (tab.focusedId !== sessionId) return false;
+  return composerFocused;
+}
+
 /**
- * Every session with a pending approval or question, including the focused
- * one. The toast used to stay hidden while its conversation was focused, on
- * the assumption the inline Allow/Deny row speaks for itself — but the row
- * is easy to miss (out of view, subtle), so the request looked like nothing
- * happened until the user switched sessions. The toast is the prominent
- * surface everywhere now; it resolves the same request the inline row does.
+ * Pending approvals/questions in background sessions only. Focused
+ * conversation uses inline Allow/Deny row on tool line itself (ex: Find),
+ * never corner popup. Popup exists only when user cannot see inline row.
  */
-export function approvalNotices(
+export function hiddenApprovalNotices(
   sessions: Session[],
+  activeTabId: string,
+  tabs: WorkspaceTab[],
+  composerFocused: boolean,
 ): Array<PendingApprovalNotice & { session: Session }> {
   const notices: Array<PendingApprovalNotice & { session: Session }> = [];
   for (const session of sessions) {
@@ -56,6 +71,16 @@ export function approvalNotices(
     if (session.orchestrationLeadId) continue;
     const pending = pendingApprovalForSession(session);
     if (!pending) continue;
+    if (
+      isSessionConversationFocused(
+        session.id,
+        activeTabId,
+        tabs,
+        composerFocused,
+      )
+    ) {
+      continue;
+    }
     notices.push({ ...pending, session });
   }
   return notices;

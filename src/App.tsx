@@ -486,7 +486,7 @@ export default function App({
     setReminderNoticesHeight,
     unseenFinishedIds,
     liveAgents,
-    approvalToasts,
+    hiddenApprovalToasts,
     refreshHistory,
     persistSession,
     activateTab,
@@ -1549,7 +1549,7 @@ export default function App({
           ) : null}
 
           <ApprovalToasts
-            notices={approvalToasts}
+            notices={hiddenApprovalToasts}
             topOffset={
               12 + (reminderNoticesHeight ? reminderNoticesHeight + 8 : 0)
             }
