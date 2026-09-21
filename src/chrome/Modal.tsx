@@ -149,7 +149,7 @@ export function Modal(props: Props) {
   const animationsEnabled = useExperimentalAnimations();
   const { closing, requestClose, handleAnimationEnd } = useExitAnimation({
     enabled: animationsEnabled,
-    durationMs: 200,
+    durationMs: 150,
     onExit: props.onClose,
   });
   const requestModalClose = useCallback(() => {

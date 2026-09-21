@@ -261,7 +261,7 @@ const en = {
   "settings.chat.tasks_pill.toggle": "Tasks near chat",
   "settings.chat.experimental_animations.label": "Experimental animations",
   "settings.chat.experimental_animations.description":
-    "Animate the tasks strip sliding in and out above the composer. Off keeps the instant show and hide.",
+    "Smooth enter/exit for sidebars, the file pane, popovers, modals and work folds (180ms in, 150ms out). Off by default; off keeps the instant show and hide.",
   "settings.chat.experimental_animations.toggle": "Experimental animations",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
@@ -992,7 +992,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.tasks_pill.toggle": "Tarefas perto do chat",
   "settings.chat.experimental_animations.label": "Animações experimentais",
   "settings.chat.experimental_animations.description":
-    "Anima a barra de tarefas entrando e saindo acima do composer. Desligado mantém mostrar e esconder na hora.",
+    "Entrada/saída suave para sidebars, painel de arquivos, popovers, modais e dobras de trabalho (180ms entrando, 150ms saindo). Desligado por padrão; desligado mantém mostrar e esconder na hora.",
   "settings.chat.experimental_animations.toggle": "Animações experimentais",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":

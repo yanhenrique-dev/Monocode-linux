@@ -562,8 +562,11 @@ function SidebarComponent({
     inProject;
   // Smooth enter/exit behind the experimental-animations flag: hold the
   // panel mounted while the outro plays instead of unmounting instantly.
+  // The boot layout appears dry; the intro plays only on later opens.
   const sidebarAnimations = useExperimentalAnimations();
   const [sidebarHeld, setSidebarHeld] = useState(sidebarVisible);
+  const [sidebarEntered, setSidebarEntered] = useState(false);
+  const sidebarSeen = useRef(false);
   const {
     closing: sidebarClosing,
     requestClose: requestSidebarClose,
@@ -571,13 +574,17 @@ function SidebarComponent({
     cancelClose: cancelSidebarClose,
   } = useExitAnimation({
     enabled: sidebarAnimations,
-    durationMs: 200,
+    durationMs: 150,
     onExit: () => setSidebarHeld(false),
   });
   useEffect(() => {
     if (sidebarVisible) {
       cancelSidebarClose();
       setSidebarHeld(true);
+      // The first commit that finds the sidebar already visible is the
+      // boot layout: appear dry, animate only later opens.
+      if (sidebarSeen.current) setSidebarEntered(true);
+      sidebarSeen.current = true;
     } else if (sidebarHeld) {
       requestSidebarClose();
     }
@@ -1216,7 +1223,9 @@ function SidebarComponent({
         sidebarAnimations
           ? sidebarClosing
             ? " sidebar-anim-out"
-            : " sidebar-anim-in"
+            : sidebarEntered
+              ? " sidebar-anim-in"
+              : ""
           : ""
       }`}
     >

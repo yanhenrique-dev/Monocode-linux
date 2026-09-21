@@ -123,7 +123,7 @@ export function useAnimatedReorder<T extends string>(
           delete element.dataset.settling;
         }
         releasePointer();
-        if (active) suppressClickUntil.current = performance.now() + 400;
+        if (active) suppressClickUntil.current = performance.now() + 150;
         latest.current.externalDrop?.onEnd?.(id);
         cleanup.current = null;
         finishSettling.current = null;
@@ -135,9 +135,16 @@ export function useAnimatedReorder<T extends string>(
         for (let index = 0; index < tabs.length; index++) {
           if (index === from) continue;
           const slot = reordered.indexOf(items[index]);
-          tabs[index].style.transform = transform(
-            rects[slot].start - rects[index].start,
-          );
+          const offset = rects[slot].start - rects[index].start;
+          // Only displaced neighbors keep a transition: untouched tabs
+          // stay out of the compositor instead of idling with one.
+          if (offset === 0) {
+            tabs[index].style.removeProperty("transition");
+            tabs[index].style.removeProperty("transform");
+          } else {
+            tabs[index].style.transition = transition;
+            tabs[index].style.transform = transform(offset);
+          }
         }
       }
 
@@ -223,7 +230,7 @@ export function useAnimatedReorder<T extends string>(
         if (commit) paint(false);
         handle.dataset.settling = "true";
         releasePointer();
-        suppressClickUntil.current = performance.now() + duration + 400;
+        suppressClickUntil.current = performance.now() + duration + 150;
         const to = commit ? destination : from;
         preview(to);
         handle.style.transition = transition;
