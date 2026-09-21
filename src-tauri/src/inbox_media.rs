@@ -8,6 +8,67 @@ const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_REDIRECTS: usize = 5;
 const MAX_URL_BYTES: usize = 8192;
 const USER_AGENT: &str = "MonoCode";
+/// `gh auth token` is a subprocess per call; the token is long-lived.
+const TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
+/// Cap for cached media blobs; image-heavy threads re-request the same URLs.
+const MEDIA_CACHE_MAX_BYTES: usize = 50 * 1024 * 1024;
+const MEDIA_CACHE_MAX_ENTRIES: usize = 256;
+
+fn token_cache() -> &'static std::sync::Mutex<(std::time::Instant, String)> {
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<(std::time::Instant, String)>> =
+        std::sync::OnceLock::new();
+    CACHE.get_or_init(|| {
+        std::sync::Mutex::new((std::time::Instant::now() - TOKEN_TTL, String::new()))
+    })
+}
+
+type MediaCacheEntry = (std::time::Instant, Vec<u8>);
+type MediaCache = std::sync::Mutex<std::collections::HashMap<String, MediaCacheEntry>>;
+
+fn media_cache() -> &'static MediaCache {
+    static CACHE: std::sync::OnceLock<MediaCache> = std::sync::OnceLock::new();
+    CACHE.get_or_init(Default::default)
+}
+
+/// Per-URL locks so concurrent renders of the same image download once.
+fn media_locks() -> &'static std::sync::Mutex<
+    std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>,
+> {
+    static LOCKS: std::sync::OnceLock<
+        std::sync::Mutex<
+            std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>,
+        >,
+    > = std::sync::OnceLock::new();
+    LOCKS.get_or_init(Default::default)
+}
+
+fn media_cache_get(url: &str) -> Option<Vec<u8>> {
+    media_cache()
+        .lock()
+        .ok()?
+        .get(url)
+        .map(|(_, bytes)| bytes.clone())
+}
+
+fn media_cache_insert(url: &str, bytes: Vec<u8>) {
+    if let Ok(mut cache) = media_cache().lock() {
+        cache.insert(url.to_string(), (std::time::Instant::now(), bytes));
+        while cache.len() > MEDIA_CACHE_MAX_ENTRIES
+            || cache.values().map(|(_, b)| b.len()).sum::<usize>() > MEDIA_CACHE_MAX_BYTES
+        {
+            let oldest = cache
+                .iter()
+                .min_by_key(|(_, (at, _))| *at)
+                .map(|(key, _)| key.clone());
+            match oldest {
+                Some(key) => {
+                    cache.remove(&key);
+                }
+                None => break,
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct MediaUrl {
@@ -27,6 +88,16 @@ pub async fn fetch_inbox_media(url: String) -> Result<tauri::ipc::Response, Stri
 }
 
 fn fetch_inbox_media_sync(url: &str) -> Result<Vec<u8>, String> {
+    let lock = media_locks().lock().ok().map(|mut locks| {
+        locks
+            .entry(url.to_string())
+            .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
+            .clone()
+    });
+    let _guard = lock.as_ref().map(|lock| lock.lock());
+    if let Some(bytes) = media_cache_get(url) {
+        return Ok(bytes);
+    }
     let mut current = parse_allowed_media_url(url)?;
     let token = if github_auth_host(&current.host) {
         github_auth_token()
@@ -68,7 +139,9 @@ fn fetch_inbox_media_sync(url: &str) -> Result<Vec<u8>, String> {
             current = redirect_target(&current.url, &location)?;
             continue;
         }
-        return read_media_body(response);
+        let bytes = read_media_body(response)?;
+        media_cache_insert(url, bytes.clone());
+        return Ok(bytes);
     }
     Err("Too many media redirects".into())
 }
@@ -261,6 +334,11 @@ fn path_has_dotdot(path: &str) -> bool {
 }
 
 fn github_auth_token() -> Option<String> {
+    if let Ok(cache) = token_cache().lock() {
+        if cache.0.elapsed() < TOKEN_TTL && !cache.1.is_empty() {
+            return Some(cache.1.clone());
+        }
+    }
     let home = dirs_home()?;
     // Sandboxed: `gh` runs on the host where the user's auth lives. Resolve
     // on the host side — a sandbox-resolved absolute path may not exist
@@ -283,6 +361,9 @@ fn github_auth_token() -> Option<String> {
     if token.is_empty() {
         None
     } else {
+        if let Ok(mut cache) = token_cache().lock() {
+            *cache = (std::time::Instant::now(), token.clone());
+        }
         Some(token)
     }
 }

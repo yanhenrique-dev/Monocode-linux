@@ -20,6 +20,13 @@ type Listener = () => void;
 
 const listeners = new Set<Listener>();
 const knownItems = new Map<string, InboxSeenEntry & { projectPaths: string[] }>();
+/** Cap for the in-memory activity snapshot shared across views. */
+const MAX_KNOWN_ITEMS = 5000;
+/** Cap for persisted read marks; the oldest stamps go first. */
+const MAX_SEEN_ITEMS = 2000;
+/** Last write that localStorage rejected (quota/private mode): kept in
+ * memory so read marks still hold for this session. */
+let memoryFallback: SeenMap | null = null;
 
 /** Share fetched activity across the Inbox view, background poll, and rail menu. */
 export function rememberInboxItems(entries: readonly (InboxSeenEntry & { projectPath: string })[]) {
@@ -36,6 +43,11 @@ export function rememberInboxItems(entries: readonly (InboxSeenEntry & { project
       projectPaths: knownPath ? projectPaths : [...projectPaths, entry.projectPath],
     });
     changed = true;
+  }
+  while (knownItems.size > MAX_KNOWN_ITEMS) {
+    const oldest = knownItems.keys().next();
+    if (oldest.done) break;
+    knownItems.delete(oldest.value);
   }
   if (changed) notifyInboxSeen();
 }
@@ -79,26 +91,50 @@ function loadInboxSeenStore(): SeenStore {
     }
     const record = parsed as { seeded?: unknown; items?: unknown };
     if (typeof record.seeded === "boolean" && isSeenMap(record.items)) {
-      return { seeded: record.seeded, items: record.items };
+      return { seeded: record.seeded, items: withMemoryFallback(record.items) };
     }
     if (isSeenMap(parsed)) {
-      return { seeded: true, items: parsed };
+      return { seeded: true, items: withMemoryFallback(parsed) };
     }
-    return { seeded: false, items: {} };
+    return { seeded: false, items: withMemoryFallback({}) };
   } catch {
-    return { seeded: false, items: {} };
+    return { seeded: false, items: withMemoryFallback({}) };
   }
 }
 
+function withMemoryFallback(items: SeenMap): SeenMap {
+  if (!memoryFallback) return items;
+  const merged = { ...items };
+  for (const [key, stamp] of Object.entries(memoryFallback)) {
+    merged[key] = Math.max(merged[key] ?? 0, stamp);
+  }
+  return merged;
+}
+
+/** Drop the oldest read marks past the cap, keeping the newest stamps. */
+function pruneSeenMap(items: SeenMap): SeenMap {
+  const keys = Object.keys(items);
+  if (keys.length <= MAX_SEEN_ITEMS) return items;
+  const ordered = keys.sort((a, b) => (items[a] ?? 0) - (items[b] ?? 0));
+  const next: SeenMap = {};
+  for (const key of ordered.slice(keys.length - MAX_SEEN_ITEMS)) {
+    next[key] = items[key]!;
+  }
+  return next;
+}
+
 function saveInboxSeenStore(store: SeenStore): boolean {
+  const pruned = { ...store, items: pruneSeenMap(store.items) };
   try {
     localStorage.setItem(
       KEY,
-      JSON.stringify({ seeded: store.seeded, items: store.items }),
+      JSON.stringify({ seeded: pruned.seeded, items: pruned.items }),
     );
   } catch {
+    memoryFallback = pruned.items;
     return false;
   }
+  memoryFallback = null;
   try {
     localStorage.removeItem(LEGACY_KEY);
   } catch {
