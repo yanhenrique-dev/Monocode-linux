@@ -323,6 +323,14 @@ describe("Composer worktree drafts", () => {
     const card = container.querySelector("[data-message-queue-card]");
     expect(card).not.toBeNull();
     expect(card!.textContent).toContain("Wait for me");
+    // The card must sit above the input, not below it: compare DOM order
+    // against the textarea so a layout regression fails here.
+    const textarea = container.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect(
+      card!.compareDocumentPosition(textarea!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("locks a started session to its worktree while keeping its branch editable", async () => {
