@@ -1623,9 +1623,10 @@ function UpdateRow({
     phase: "idle",
     currentVersion: "…",
   });
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [holding, setHolding] = useState(false);
   const [isFlatpak, setIsFlatpak] = useState(false);
+  const [lastChecked, setLastChecked] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1660,6 +1661,7 @@ function UpdateRow({
         return;
       }
       await runUpdateFlow(true, setSnapshot, { showDialog: false });
+      setLastChecked(Date.now());
     } finally {
       const remaining = MIN_BUSY_MS - (Date.now() - startedAt);
       if (remaining > 0) {
@@ -1670,6 +1672,18 @@ function UpdateRow({
   };
 
   // Sandboxed (Flatpak) builds have no self-updater: Flathub owns updates.
+  const checkedSuffix =
+    lastChecked == null ||
+    snapshot.phase === "checking" ||
+    snapshot.phase === "downloading" ||
+    snapshot.phase === "available"
+      ? ""
+      : ` · ${t("settings.general.update.last_checked", {
+          time: new Intl.DateTimeFormat(getIntlLocale(locale), {
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(lastChecked),
+        })}`;
   const status = isFlatpak
     ? t("settings.general.update.flatpak")
     : snapshot.phase === "available"
@@ -1685,10 +1699,13 @@ function UpdateRow({
         : snapshot.phase === "checking"
           ? t("settings.general.update.checking")
           : snapshot.phase === "current"
-            ? t("settings.general.update.current")
+            ? `${t("settings.general.update.current")}${checkedSuffix}`
             : snapshot.phase === "error"
-              ? (snapshot.error ?? t("settings.general.update.failed"))
-              : t("settings.general.update.idle");
+              ? `${t("settings.general.update.failed_detail", {
+                  error:
+                    snapshot.error ?? t("settings.general.update.failed"),
+                })}${checkedSuffix}`
+              : `${t("settings.general.update.idle")}${checkedSuffix}`;
 
   return (
     <Row
@@ -1705,7 +1722,11 @@ function UpdateRow({
     >
       <div className="flex items-center gap-2">
         <SecondaryButton
-          onClick={() => onOpenWhatsNew(snapshot.currentVersion)}
+          onClick={() =>
+            onOpenWhatsNew(
+              snapshot.availableVersion ?? snapshot.currentVersion,
+            )
+          }
           disabled={snapshot.currentVersion === "…"}
         >
           {t("settings.general.update.whats_new")}
@@ -1719,9 +1740,12 @@ function UpdateRow({
             ) : (
               <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
             )}
-            {hasUpdate
-              ? t("settings.general.update.download")
-              : t("settings.general.update.check")}
+            {t("settings.general.update.check")}
+            {hasUpdate && !busy && snapshot.availableVersion ? (
+              <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+                {snapshot.availableVersion}
+              </span>
+            ) : null}
           </SecondaryButton>
         )}
       </div>
