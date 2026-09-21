@@ -459,11 +459,13 @@ export function saveSidebarBlur(value: number) {
 }
 
 export function applySidebarBlur(value: number) {
-  return Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
+  const next = Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
+  document.documentElement.style.setProperty("--sidebar-blur", `${next}px`);
+  return next;
 }
 
 export function previewSidebarBlur(value: number): number {
-  return Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
+  return applySidebarBlur(value);
 }
 
 /** No native blur preview is in flight on Linux; kept for the slider API. */

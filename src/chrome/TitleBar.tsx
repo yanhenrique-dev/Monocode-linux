@@ -770,38 +770,36 @@ function TitleBarComponent({
       railClosed &&
       Boolean(onOpenInbox || onOpenNotes || onOpenSettings)) ||
     (railClosed && !projectless);
-  const trailingControls = showTrailingActions ? (
-    <div className="flex h-full shrink-0 items-stretch">
-      {showTrailingActions ? (
-        <div className="flex items-center gap-0.5 px-2">
-          {projectless && railClosed && onOpenInbox ? (
-            <IconButton label="Inbox" onClick={onOpenInbox}>
-              <Inbox className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-          ) : null}
-          {projectless && railClosed && onOpenNotes ? (
-            <IconButton label="Notes" onClick={onOpenNotes}>
-              <StickyNote className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-          ) : null}
-          {railClosed && !projectless ? (
-            <>
-              <IconButton label={`Go to File (${MOD}P)`} onClick={onGoToFile}>
-                <Search className="size-3.5" strokeWidth={1.75} />
-              </IconButton>
-              <IconButton label={`New session (${MOD}T)`} onClick={onNew}>
-                <Plus className="size-3.5" strokeWidth={1.75} />
-              </IconButton>
-            </>
-          ) : null}
-          {!projectRailOpen && !showCurrentProject && onOpenSettings ? (
-            <IconButton label={`Settings (${MOD},)`} onClick={onOpenSettings}>
-              <Settings className="size-3.5" strokeWidth={1.75} />
-            </IconButton>
-          ) : null}
-        </div>
+  // Window controls stay mounted in every state: with decorations off the
+  // main bar is the only place offering minimize/maximize/close. Only the
+  // action buttons (inbox, new session, settings) hide with the rail.
+  const trailingActions = showTrailingActions ? (
+    <div className="flex items-center gap-0.5 px-2">
+      {projectless && railClosed && onOpenInbox ? (
+        <IconButton label="Inbox" onClick={onOpenInbox}>
+          <Inbox className="size-3.5" strokeWidth={1.75} />
+        </IconButton>
       ) : null}
-      <WindowControls />
+      {projectless && railClosed && onOpenNotes ? (
+        <IconButton label="Notes" onClick={onOpenNotes}>
+          <StickyNote className="size-3.5" strokeWidth={1.75} />
+        </IconButton>
+      ) : null}
+      {railClosed && !projectless ? (
+        <>
+          <IconButton label={`Go to File (${MOD}P)`} onClick={onGoToFile}>
+            <Search className="size-3.5" strokeWidth={1.75} />
+          </IconButton>
+          <IconButton label={`New session (${MOD}T)`} onClick={onNew}>
+            <Plus className="size-3.5" strokeWidth={1.75} />
+          </IconButton>
+        </>
+      ) : null}
+      {!projectRailOpen && !showCurrentProject && onOpenSettings ? (
+        <IconButton label={`Settings (${MOD},)`} onClick={onOpenSettings}>
+          <Settings className="size-3.5" strokeWidth={1.75} />
+        </IconButton>
+      ) : null}
     </div>
   ) : null;
 
@@ -914,7 +912,10 @@ function TitleBarComponent({
             identify the project and session, and the OS still gets
             `systemTitle` via setTitle. On borderless Linux this label
             duplicated "MonoCode" next to the tabs. */}
-        {trailingControls}
+        <div className="flex h-full shrink-0 items-stretch">
+          {trailingActions}
+          <WindowControls />
+        </div>
       </div>
       {tabMenu && contextTab ? (
         <ExplorerMenu
