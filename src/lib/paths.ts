@@ -89,6 +89,28 @@ export function joinPath(parent: string, relative: string): string {
   return out;
 }
 
+/**
+ * Home directory, recognised the same way `prettyCwd` finds one inside a
+ * project path. This module has no direct OS access, so a `~/` reference can
+ * only be expanded when the project's own cwd sits under a recognisable home.
+ */
+function homeDirFromCwd(cwd: string): string | undefined {
+  const trimmed = trimSlash(cwd);
+  if (trimmed === "~") return undefined;
+  const parts = trimmed.split("/").filter(Boolean);
+  if (parts.length >= 2 && (parts[0] === "Users" || parts[0] === "home")) {
+    return `/${parts[0]}/${parts[1]}`;
+  }
+  if (
+    parts.length >= 3 &&
+    /^[A-Za-z]:$/.test(parts[0]) &&
+    parts[1] === "Users"
+  ) {
+    return `${parts[0]}/${parts[1]}/${parts[2]}`;
+  }
+  return undefined;
+}
+
 /** Absolute path for a workspace file href, or `undefined` if it is not a local file. */
 export function resolveWorkspacePath(
   href: string,
@@ -144,6 +166,18 @@ function parseWorkspaceFileReference(
   value = slash(value);
   // File URLs can also decode to UNC paths. Windows accepts mixed separators.
   if ((decodeUrl || fileUrl) && /^[\\/]{2}/.test(value)) return undefined;
+  // A provider-relative `~/` reference means the user's home directory, not a
+  // path relative to the project's cwd. Expand it to an absolute path up
+  // front when a home directory can be recognised, so it flows through the
+  // same absolute-path handling below instead of being joined onto cwd.
+  if (value === "~" || value.startsWith("~/")) {
+    const home = cwd ? homeDirFromCwd(cwd) : undefined;
+    // Without a recognisable home, joining "~/..." onto cwd like an ordinary
+    // relative path would silently produce a nonsense location instead of
+    // the file the reference actually means.
+    if (!home) return undefined;
+    value = value === "~" ? home : joinPath(home, value.slice(2));
+  }
   // A bare filename's :line[:column] suffix must be removed before this check.
   if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^[A-Za-z]:\//.test(value))
     return undefined;

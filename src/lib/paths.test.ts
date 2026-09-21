@@ -106,6 +106,30 @@ describe("workspace file references", () => {
       "//server/share/file.md",
     );
   });
+
+  it("expands a leading ~/ to the home directory recognised in cwd, not a path relative to cwd", () => {
+    expect(
+      resolveWorkspacePath(
+        "~/.codex/skills/zuse/SKILL.md",
+        "/Users/dev/project",
+      ),
+    ).toBe("/Users/dev/.codex/skills/zuse/SKILL.md");
+    expect(resolveWorkspacePath("~", "/Users/dev/project")).toBe(
+      "/Users/dev",
+    );
+    expect(
+      resolveWorkspacePath("~/skills/SKILL.md", "C:/Users/dev/project"),
+    ).toBe("C:/Users/dev/skills/SKILL.md");
+  });
+
+  it("leaves a ~/ reference unresolved when cwd has no recognisable home directory", () => {
+    expect(
+      resolveWorkspacePath("~/.codex/skills/zuse/SKILL.md", "/data/project"),
+    ).toBeUndefined();
+    expect(
+      resolveWorkspacePath("~/.codex/skills/zuse/SKILL.md", undefined),
+    ).toBeUndefined();
+  });
 });
 
 describe("slash", () => {
