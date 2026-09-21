@@ -54,6 +54,16 @@ pub async fn request_notification_permission(app: AppHandle) -> Permission {
     platform::request_permission(&app).await
 }
 
+/// Outcome of a dispatched banner. `os_sound` reports whether the platform
+/// itself played a sound: Linux only sends a `sound-name` hint the server
+/// may ignore (or the sound theme may lack), so the frontend still plays
+/// its in-app cue there even when the banner showed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowOutcome {
+    pub os_sound: bool,
+}
+
 /// Resolves only once the platform reports the banner as scheduled: the
 /// frontend skips its own turn-finished cue on success, so returning early
 /// would silence a turn that never got a notification.
@@ -65,7 +75,7 @@ pub async fn show_notification(
     subtitle: String,
     body: String,
     sound: bool,
-) -> Result<(), String> {
+) -> Result<ShowOutcome, String> {
     platform::show(&app, &session_id, &title, &subtitle, &body, sound).await
 }
 
@@ -256,7 +266,7 @@ mod platform {
         subtitle: &str,
         body: &str,
         sound: bool,
-    ) -> Result<(), String> {
+    ) -> Result<super::ShowOutcome, String> {
         // Asked here rather than trusted from the frontend, whose cached
         // permission goes stale when alerts are switched off in System
         // Settings and whose badge-only case the center accepts silently.
@@ -269,6 +279,7 @@ mod platform {
         )
         .await
         .unwrap_or_else(|| Err("notification dispatch timed out".into()))
+        .map(|()| super::ShowOutcome { os_sound: sound })
     }
 
     pub(super) fn open_settings(app: &AppHandle) -> Result<(), String> {
@@ -436,6 +447,12 @@ mod platform {
         Permission::Granted
     }
 
+    /// Desktop entry name installed by `scripts/install-linux-desktop.sh`.
+    /// The Arch package installs the same artwork as `monocode` instead, so
+    /// the icon lookup tries both names before giving up on an icon.
+    const DESKTOP_ENTRY: &str = "com.monocode.desktop";
+    const ICON_FALLBACK: &str = "monocode";
+
     pub(super) async fn show(
         app: &AppHandle,
         session_id: &str,
@@ -443,23 +460,32 @@ mod platform {
         subtitle: &str,
         body: &str,
         sound: bool,
-    ) -> Result<(), String> {
+    ) -> Result<super::ShowOutcome, String> {
         let mut notification = notify_rust::Notification::new();
         notification
             .appname("MonoCode")
             .summary(&format!("{title}: {subtitle}"))
             // The body is agent output; servers render it as markup.
             .body(&escape_markup(body))
-            .icon("monocode")
             // Servers only report the click when a "default" action exists.
-            .action("default", "Show");
+            .action("default", "Show")
+            // Lets GNOME attribute the banner to this app even when the
+            // AppImage runs without desktop integration installed.
+            .hint(notify_rust::Hint::DesktopEntry(DESKTOP_ENTRY.into()));
+        if let Some(icon) = resolve_icon() {
+            notification.icon(&icon);
+        }
         if sound {
+            // Best-effort hint only: servers may ignore it and sound themes
+            // may lack the name, so the frontend still plays its in-app cue.
             notification.sound_name("message-new-instant");
         }
-        let handle = notification.show().map_err(|err| err.to_string())?;
+        let handle = notification.show().map_err(map_show_error)?;
         let app = app.clone();
         let session_id = session_id.to_string();
-        // `wait_for_action` blocks until the notification closes.
+        // `wait_for_action` blocks until the notification closes, so it runs
+        // on a detached thread; the server owns banner expiry, which is why
+        // no explicit timeout is set here.
         std::thread::spawn(move || {
             handle.wait_for_action(|action| {
                 if action == "default" {
@@ -467,7 +493,89 @@ mod platform {
                 }
             });
         });
-        Ok(())
+        Ok(super::ShowOutcome { os_sound: false })
+    }
+
+    /// Icon theme name for the banner, or `None` when neither installed name
+    /// resolves. Passing a missing name degrades some servers to a generic
+    /// (or silent) banner, so lookup happens before the icon is set.
+    fn resolve_icon() -> Option<String> {
+        for name in [DESKTOP_ENTRY, ICON_FALLBACK] {
+            if icon_exists(name) {
+                return Some(name.into());
+            }
+        }
+        None
+    }
+
+    fn icon_exists(name: &str) -> bool {
+        for dir in icon_dirs() {
+            for size in ["32x32", "48x48", "64x64", "128x128", "256x256", "scalable"] {
+                for ext in ["png", "svg", "xpm"] {
+                    if dir
+                        .join(size)
+                        .join("apps")
+                        .join(format!("{name}.{ext}"))
+                        .is_file()
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Icon theme roots searched for the banner icon, user scope first.
+    fn icon_dirs() -> Vec<std::path::PathBuf> {
+        let mut dirs = Vec::new();
+        if let Some(data_home) = std::env::var_os("XDG_DATA_HOME")
+            .map(std::path::PathBuf::from)
+            .filter(|path| !path.as_os_str().is_empty())
+        {
+            dirs.push(data_home.join("icons"));
+        } else if let Some(home) = std::env::var_os("HOME") {
+            dirs.push(
+                std::path::PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join("icons"),
+            );
+        }
+        if let Some(data_dirs) = std::env::var_os("XDG_DATA_DIRS") {
+            for dir in std::env::split_paths(&data_dirs) {
+                dirs.push(dir.join("icons"));
+            }
+        }
+        dirs.push(std::path::PathBuf::from("/usr/local/share/icons"));
+        dirs.push(std::path::PathBuf::from("/usr/share/icons"));
+        dirs
+    }
+
+    /// Translates a dispatch failure into an actionable message. A missing
+    /// notification daemon is the common AppImage case (minimal window
+    /// managers, daemons not on the session bus).
+    fn map_show_error(err: notify_rust::error::Error) -> String {
+        let message = err.to_string();
+        let lowered = message.to_lowercase();
+        if lowered.contains("zbus")
+            || lowered.contains("z-bus")
+            || lowered.contains("d-bus")
+            || lowered.contains("dbus")
+            || lowered.contains("not connected")
+            || lowered.contains("connection")
+            || lowered.contains("service unknown")
+            || lowered.contains("org.freedesktop.notifications")
+        {
+            return format!(
+                "notification daemon unavailable (org.freedesktop.Notifications not on D-Bus): {message}. \
+                 Start your desktop's notification service and retry; the in-app cue stands in meanwhile"
+            );
+        }
+        if lowered.contains("timed out") || lowered.contains("timeout") {
+            return format!("notification dispatch timed out: {message}");
+        }
+        format!("notification failed: {message}")
     }
 
     /// The freedesktop spec parses the body as a subset of HTML.
@@ -485,18 +593,84 @@ mod platform {
     }
 
     pub(super) fn open_settings(_app: &AppHandle) -> Result<(), String> {
-        Err("no notification settings page on this platform".into())
+        // Linux has no single notifications settings URL. Try the panel of
+        // the running desktop; otherwise tell the user where to look.
+        // `xdg-open` is intentionally the host's (the bundle prunes its own
+        // copy in `scripts/repack-appimage.sh`), but no `settings://` scheme
+        // is standard, so DE binaries are tried directly.
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+            .unwrap_or_default()
+            .to_lowercase();
+        let mut attempts: Vec<(&str, Vec<&str>)> = Vec::new();
+        if desktop.contains("gnome") {
+            attempts.push(("gnome-control-center", vec!["notifications"]));
+        } else if desktop.contains("kde") {
+            attempts.push(("systemsettings", vec!["kcm_notifications"]));
+            attempts.push(("kcmshell6", vec!["kcm_notifications"]));
+            attempts.push(("kcmshell5", vec!["kcm_notifications"]));
+        } else if desktop.contains("xfce") {
+            attempts.push(("xfce4-notifyd-config", vec![]));
+        }
+        for (cmd, args) in &attempts {
+            if std::process::Command::new(cmd).args(args).spawn().is_ok() {
+                return Ok(());
+            }
+        }
+        Err("no notification settings panel found: enable notifications in your desktop's settings \
+             (GNOME: Settings > Notifications; KDE: System Settings > Notifications), then return here"
+            .into())
     }
 
     #[cfg(test)]
     mod tests {
-        use super::escape_markup;
+        use super::{escape_markup, icon_dirs, map_show_error, resolve_icon};
 
         #[test]
         fn escapes_markup_in_bodies() {
             assert_eq!(
                 escape_markup("<b>x</b> & y"),
                 "&lt;b&gt;x&lt;/b&gt; &amp; y"
+            );
+        }
+
+        #[test]
+        fn outcome_reports_no_os_sound_on_linux() {
+            let outcome = super::super::ShowOutcome { os_sound: false };
+            assert_eq!(
+                serde_json::to_value(outcome).unwrap(),
+                serde_json::json!({ "osSound": false })
+            );
+        }
+
+        #[test]
+        fn icon_lookup_covers_both_installed_names() {
+            // No assertion on the host's icon theme: the lookup must simply
+            // return one of the two known names, or nothing, never a third.
+            assert!(resolve_icon().is_none_or(|name| {
+                name == super::DESKTOP_ENTRY || name == super::ICON_FALLBACK
+            }));
+            assert!(!icon_dirs().is_empty());
+        }
+
+        #[test]
+        fn daemon_errors_stay_actionable() {
+            let message =
+                map_show_error(notify_rust::error::Error::from("zbus: connection closed"));
+            assert!(
+                message.contains("notification daemon unavailable"),
+                "unexpected: {message}"
+            );
+            let message = map_show_error(notify_rust::error::Error::from(
+                "org.freedesktop.DBus.Error.ServiceUnknown",
+            ));
+            assert!(
+                message.contains("notification daemon unavailable"),
+                "unexpected: {message}"
+            );
+            let message = map_show_error(notify_rust::error::Error::from("some other failure"));
+            assert!(
+                message.starts_with("notification failed:"),
+                "unexpected: {message}"
             );
         }
     }
@@ -579,7 +753,7 @@ mod platform {
         subtitle: &str,
         body: &str,
         sound: bool,
-    ) -> Result<(), String> {
+    ) -> Result<super::ShowOutcome, String> {
         // `Toast` is `!Send`, so construct and dispatch it inside the blocking
         // thread; only owned `Send` data crosses into the closure.
         let app = app.clone();
@@ -592,7 +766,8 @@ mod platform {
             show_blocking(&app, &app_id, &session_id, &title, &subtitle, &body, sound)
         })
         .await
-        .map_err(|err| err.to_string())?
+        .map_err(|err| err.to_string())??;
+        Ok(super::ShowOutcome { os_sound: sound })
     }
 
     /// Dispatches on the blocking thread a `Toast` needs, honouring a Windows
