@@ -470,10 +470,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
       quoteRequest={quoteRequest}
       initialDraft={
         draftRef.current ??
-        restoredDraft ??
         (session.inboxCard || session.noteCard || session.handoffCard
           ? undefined
-          : session.composerSeed)
+          : (session.composerSeed ?? restoredDraft))
       }
       onDraftChange={(text) => {
         draftRef.current = text;

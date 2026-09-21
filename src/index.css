@@ -1657,10 +1657,16 @@ html.is-resizing .glass-blur {
   }
 }
 
-/* Keep the original glass tint in dark mode. Light popovers use an opaque
-   surface so underlying content cannot show through. */
+/* Dark popovers sit on a mostly-opaque surface so text has solid ground.
+   A near-transparent tint lets bright wallpapers bleed through the blur
+   and halo thin text; the backdrop blur still softens what shows at the
+   rounded edge. Light popovers stay fully opaque. */
 .popover-backdrop {
-  background: color-mix(in srgb, var(--color-content) 2%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-background-base) 88%,
+    transparent
+  );
 }
 
 html.theme-light .popover-backdrop {
