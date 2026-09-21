@@ -132,12 +132,7 @@ describe("file tab context menu", () => {
     await pick("Open in Default App");
     expect(actions.openPath).toHaveBeenCalledWith("/repo/src/app.ts");
 
-    const revealLabel = /Mac/.test(navigator.platform)
-      ? "Reveal in Finder"
-      : /Win/i.test(navigator.platform)
-        ? "Reveal in File Explorer"
-        : "Open Containing Folder";
-    await pick(revealLabel);
+    await pick("Open Containing Folder");
     expect(actions.revealPath).toHaveBeenCalledWith("/repo/src/app.ts");
 
     await pick("Close");

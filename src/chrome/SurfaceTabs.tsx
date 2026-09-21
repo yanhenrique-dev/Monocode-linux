@@ -17,7 +17,6 @@ import {
   type FilePaneTab,
 } from "../lib/layout";
 import { displayPath } from "../lib/paths";
-import { IS_MAC, IS_WIN } from "../lib/platform";
 import { releaseNotesTitle } from "../lib/releaseNotes";
 import { terminalTabLabel } from "../lib/terminalTab";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
@@ -53,11 +52,7 @@ type SurfaceTabMenu = {
   fileId: string;
 };
 
-const REVEAL_LABEL = IS_MAC
-  ? "Reveal in Finder"
-  : IS_WIN
-    ? "Reveal in File Explorer"
-    : "Open Containing Folder";
+const REVEAL_LABEL = "Open Containing Folder";
 
 export function surfaceTabMenuItems(
   file: FilePaneTab,

@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { HARNESS_TITLE, sessionDisplayTitle, type Session } from "./session";
-import { IS_LINUX } from "./platform";
 import { loadSoundsEnabled, playCue } from "./sounds";
 import {
   allowsProjectNotification,
@@ -74,10 +73,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     permission = "unsupported";
   }
   return permission;
-}
-
-export function openNotificationSettings(): Promise<void> {
-  return invoke<void>("open_notification_settings");
 }
 
 /**
@@ -262,13 +257,14 @@ type NotifyOutcome = {
   osSound: boolean;
 };
 
-function readShowResult(raw: unknown, soundRequested: boolean): ShowNotificationResult {
+function readShowResult(raw: unknown): ShowNotificationResult {
   if (raw && typeof raw === "object" && "osSound" in raw) {
     return { osSound: Boolean((raw as { osSound: unknown }).osSound) };
   }
-  // Backwards compatibility with backends that resolve void: every platform
-  // except Linux guarantees its requested sound, so only Linux assumes mute.
-  return { osSound: IS_LINUX ? false : soundRequested };
+  // Backwards compatibility with backends that resolve void: the freedesktop
+  // bus only sends a hint, so assume the sound was muted and let the in-app
+  // cue cover it.
+  return { osSound: false };
 }
 
 /**
@@ -375,7 +371,7 @@ async function notifyProjectSession(
         sound: soundRequested,
       },
     );
-    const { osSound } = readShowResult(raw, soundRequested);
+    const { osSound } = readShowResult(raw);
     console.debug("[notifications] banner shown", {
       sessionId: session.id,
       category: subject.category,

@@ -22,11 +22,6 @@ vi.mock("../lib/fileWatch", () => ({
   watchFile: () => () => {},
 }));
 
-vi.mock("../lib/platform", () => ({
-  IS_MAC: true,
-  IS_WIN: false,
-}));
-
 let container: HTMLDivElement;
 let root: Root;
 

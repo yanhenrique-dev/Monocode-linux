@@ -196,10 +196,6 @@ const en = {
   "settings.general.session_review_shell.description":
     "After a shell command finishes, pull files it changed into this session's review card. Off by default: in a shared project the shell delta may include another session's edits, so adopted files are listed but never undoable.",
   "settings.general.session_review_shell.toggle": "Shell edits in review",
-  "settings.general.close_to_tray.label": "Close to tray",
-  "settings.general.close_to_tray.description":
-    "Closing a window hides it to the system tray instead of quitting, so running agents keep going. Reopen from the tray icon, and quit for real from its menu. Turn this off to have close end the window.",
-  "settings.general.close_to_tray.toggle": "Close to tray",
   "settings.general.performance.title": "Performance",
   "settings.general.performance.description":
     "How MonoCode uses your hardware. The master switch gates every fast path at once: terminal GPU rendering, glass blur, and off-viewport skipping in transcripts, diffs, and diagrams.",
@@ -930,10 +926,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.session_review_shell.description":
     "Após um comando do shell terminar, inclui os arquivos alterados no cartão de revisão desta sessão. Desativado por padrão: num projeto compartilhado o resultado pode incluir edições de outra sessão, então arquivos adotados são listados mas nunca desfeitos.",
   "settings.general.session_review_shell.toggle": "Edições do shell na revisão",
-  "settings.general.close_to_tray.label": "Fechar para a bandeja",
-  "settings.general.close_to_tray.description":
-    "Fechar a janela a oculta na bandeja do sistema em vez de encerrar, para os agentes continuarem rodando. Reabra pelo ícone da bandeja e encerre de verdade pelo menu. Desative para que fechar encerre a janela.",
-  "settings.general.close_to_tray.toggle": "Fechar para a bandeja",
   "settings.general.performance.title": "Desempenho",
   "settings.general.performance.description":
     "Como o MonoCode usa seu hardware. A chave principal controla de uma vez todos os recursos rápidos: renderização do terminal via GPU, desfoque de vidro e omissão de conteúdo fora da tela em conversas, diffs e diagramas.",

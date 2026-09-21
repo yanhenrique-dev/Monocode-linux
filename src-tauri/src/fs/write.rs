@@ -1,6 +1,5 @@
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::constants::{MAX_ATTACHMENT_EMBED_BYTES, MAX_TEXT_FILE_BYTES};
@@ -503,37 +502,33 @@ pub fn reveal_path(path: String) -> Result<(), String> {
     if !path.exists() {
         return Err(format!("{}: No such file or directory", path.display()));
     }
-    #[cfg(target_os = "macos")]
-    {
-        let path_str = path.to_str().ok_or_else(|| "Invalid path".to_string())?;
-        let status = Command::new("open")
-            .args(["-R", path_str])
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err("Could not reveal in Finder.".into());
-        }
-        Ok(())
+    // AppImage/Flatpak environments leak their own library paths; system file
+    // managers must not inherit them.
+    // `gio open` has no `--select` flag, so select through the FileManager1
+    // bus API and fall back to opening the parent.
+    let uri = url::Url::from_file_path(&path)
+        .map(|uri| uri.to_string())
+        .unwrap_or_else(|_| format!("file://{}", path.display()));
+    let select = crate::host::command("dbus-send")
+        .arg("--session")
+        .arg("--print-reply")
+        .arg("--dest=org.freedesktop.FileManager1")
+        .arg("/org/freedesktop/FileManager1")
+        .arg("org.freedesktop.FileManager1.ShowItems")
+        .arg(format!("array:string:\"{uri}\""))
+        .arg("string:\"\"")
+        .env_remove("LD_LIBRARY_PATH")
+        .status();
+    if matches!(select, Ok(status) if status.success()) {
+        return Ok(());
     }
-
-    #[cfg(target_os = "windows")]
-    {
-        // explorer.exe returns 1 even when it opened the folder.
-        let path_str = path.to_string_lossy().replace('/', "\\");
-        Command::new("explorer")
-            .arg(format!("/select,{path_str}"))
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let parent = path
             .parent()
             .ok_or_else(|| "File has no parent directory.".to_string())?;
-        let status = Command::new("xdg-open")
+        let status = crate::host::command("xdg-open")
             .arg(parent)
+            .env_remove("LD_LIBRARY_PATH")
             .status()
             .map_err(|e| e.to_string())?;
         if !status.success() {

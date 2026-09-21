@@ -1,4 +1,4 @@
-import { ALT, IS_MAC, IS_WIN, MOD, SHIFT } from "./platform";
+import { ALT, MOD, SHIFT } from "./platform";
 import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
 
 const SECTION_KEY = "monocode.settingsSection";
@@ -223,17 +223,6 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     label: "settings.general.terminal_gpu.label",
     keywords: "gpu webgl terminal performance render xterm",
   },
-  ...(IS_WIN
-    ? [
-        {
-          id: "close-to-tray",
-          section: "general",
-          label: "settings.general.close_to_tray.label",
-          keywords:
-            "minimize background quit exit window taskbar windows bandeja",
-        } satisfies SettingsEntry,
-      ]
-    : []),
   {
     id: "theme",
     section: "appearance",
@@ -707,8 +696,6 @@ export function subscribeLiveAgentsEnabled(onStoreChange: () => void) {
     window.removeEventListener(LIVE_AGENTS_ENABLED_CHANGE_EVENT, onStoreChange);
 }
 
-const CLOSE_TO_TRAY_KEY = "monocode.closeToTray";
-
 const REVIEW_ADOPT_SHELL_KEY = "monocode.reviewAdoptShell";
 
 /** Adopt shell-made file changes into session review. Off by default: in a
@@ -749,28 +736,6 @@ export function subscribeReviewAdoptShell(onStoreChange: () => void) {
   window.addEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
   return () =>
     window.removeEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
-}
-
-export const CLOSE_TO_TRAY_DEFAULT = true;
-
-export function loadCloseToTray(): boolean {
-  // Close to tray is Windows-only: nowhere else installs a tray icon.
-  if (!IS_WIN) return false;
-  try {
-    const raw = localStorage.getItem(CLOSE_TO_TRAY_KEY);
-    if (raw == null) return CLOSE_TO_TRAY_DEFAULT;
-    return raw === "1" || raw === "true";
-  } catch {
-    return CLOSE_TO_TRAY_DEFAULT;
-  }
-}
-
-export function saveCloseToTray(value: boolean) {
-  try {
-    localStorage.setItem(CLOSE_TO_TRAY_KEY, value ? "1" : "0");
-  } catch {
-    // private mode / quota
-  }
 }
 
 const GRID_ARCADE_ENABLED_KEY = "monocode.gridArcadeEnabled";
@@ -916,7 +881,7 @@ export function saveClaudeHooks(value: boolean) {
   }
 }
 
-const CTRL = IS_MAC ? "⌃" : "Ctrl+";
+const CTRL = "Ctrl+";
 
 export type KeybindingRow = {
   command: LocaleKey;

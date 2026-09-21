@@ -7,7 +7,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-#[cfg(not(windows))]
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -409,6 +408,12 @@ pub fn harness_spawn(
             "Working directory does not exist: {}",
             workdir.display()
         ));
+    }
+    // The frontend only ever spawns resolved provider CLIs; refuse anything
+    // else so a compromised renderer cannot turn this command into arbitrary
+    // code execution (same gate as `harness_exec`).
+    if !is_resolved_harness_binary(&command) {
+        return Err("harness_spawn: not a resolved harness CLI".to_string());
     }
     // Hold a spawn reservation until the child is registered below: without
     // it, a worktree removal can pass its preflight while this process is
@@ -814,6 +819,8 @@ fn is_resolved_harness_binary(command: &str) -> bool {
         resolve_omp(),
         resolve_fx(),
         resolve_grok(),
+        resolve_hermes(),
+        resolve_mcode(),
         resolve_antigravity(),
     ]
     .into_iter()
@@ -882,15 +889,12 @@ fn exec_capture(command: &str, args: &[String], cwd: Option<&str>) -> Result<Str
 const KILL_ESCALATE: Duration = Duration::from_secs(2);
 /// Quit and `Drop` cannot wait on a detached escalate thread — the process
 /// exits first and isolated harness groups stay behind as PID-1 orphans.
-#[cfg(not(windows))]
 const KILL_ALL_GRACE: Duration = Duration::from_millis(300);
-#[cfg(not(windows))]
 const KILL_ALL_KILL_WAIT: Duration = Duration::from_millis(150);
 const HARNESS_PARENT_ENV: &str = "MONOCODE_HARNESS_PARENT";
 
 /// An interactive shell has to source the user's whole rc file; nvm alone can
 /// take a second.
-#[cfg(not(windows))]
 const LOGIN_SHELL_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// A spawn that was cancelled mid-fork. The session it was starting is already
@@ -908,28 +912,10 @@ fn isolate_child(cmd: &mut Command) {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-        cmd.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = cmd;
-    }
 }
 
 fn spawn_managed(cmd: &mut Command) -> std::io::Result<std::process::Child> {
-    #[cfg(windows)]
-    {
-        crate::windows::spawn_managed(cmd)
-    }
-    #[cfg(not(windows))]
-    {
-        cmd.spawn()
-    }
+    cmd.spawn()
 }
 
 fn terminate(pid: u32) {
@@ -940,31 +926,18 @@ fn terminate_after(pid: u32, escalate: Duration) {
     if pid == 0 || pid == 1 {
         return;
     }
-    #[cfg(windows)]
-    {
-        let _ = escalate;
-        signal_tree(pid, TreeSignal::Kill);
-    }
-    #[cfg(not(windows))]
-    {
-        signal_tree(pid, TreeSignal::Term);
-        thread::spawn(move || {
-            thread::sleep(escalate);
-            if tree_alive(pid) {
-                signal_tree(pid, TreeSignal::Kill);
-            }
-        });
-    }
+    signal_tree(pid, TreeSignal::Term);
+    thread::spawn(move || {
+        thread::sleep(escalate);
+        if tree_alive(pid) {
+            signal_tree(pid, TreeSignal::Kill);
+        }
+    });
 }
 
 /// SIGTERM every tree, then SIGKILL whatever is still standing, before return.
 pub(crate) fn terminate_all(pids: &[u32]) {
     let pids: Vec<u32> = pids.iter().copied().filter(|pid| *pid > 1).collect();
-    #[cfg(windows)]
-    for pid in pids {
-        signal_tree(pid, TreeSignal::Kill);
-    }
-    #[cfg(not(windows))]
     {
         if pids.is_empty() {
             return;
@@ -992,7 +965,6 @@ pub(crate) fn terminate_all(pids: &[u32]) {
 /// answering `kill(pid, 0)` within a poll or two. Reaping here instead would
 /// race that thread for the exit status and free the pid while we still signal
 /// it.
-#[cfg(not(windows))]
 fn wait_until_dead(pids: &[u32], until: Instant) {
     while Instant::now() < until {
         if pids.iter().all(|pid| !tree_alive(*pid)) {
@@ -1003,7 +975,6 @@ fn wait_until_dead(pids: &[u32], until: Instant) {
 }
 
 enum TreeSignal {
-    #[cfg(not(windows))]
     Term,
     Kill,
 }
@@ -1036,57 +1007,24 @@ fn signal_tree(pid: u32, signal: TreeSignal) {
             libc::kill(ipid, sig);
         }
     }
-    #[cfg(windows)]
-    {
-        let _ = signal;
-        let mut cmd = Command::new("taskkill");
-        crate::hide_window_console(&mut cmd);
-        cmd.args(["/PID", &pid.to_string(), "/T", "/F"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        let _ = cmd.status();
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = signal;
-        let _ = Command::new("kill").arg(pid.to_string()).status();
-    }
 }
 
-#[cfg(not(windows))]
 fn tree_alive(pid: u32) -> bool {
-    #[cfg(unix)]
-    {
-        if crate::host::in_flatpak() {
-            return crate::host::host_alive(pid);
-        }
-        let ipid = pid as i32;
-        unsafe { libc::kill(ipid, 0) == 0 || libc::kill(-ipid, 0) == 0 }
+    if crate::host::in_flatpak() {
+        return crate::host::host_alive(pid);
     }
-    #[cfg(not(unix))]
-    {
-        let _ = pid;
-        false
-    }
+    let ipid = pid as i32;
+    unsafe { libc::kill(ipid, 0) == 0 || libc::kill(-ipid, 0) == 0 }
 }
 
-#[cfg(unix)]
 fn process_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
-    #[cfg(unix)]
-    {
-        if crate::host::in_flatpak() {
-            return crate::host::host_alive(pid);
-        }
-        unsafe { libc::kill(pid as i32, 0) == 0 }
+    if crate::host::in_flatpak() {
+        return crate::host::host_alive(pid);
     }
-    #[cfg(not(unix))]
-    {
-        let _ = pid;
-        false
-    }
+    unsafe { libc::kill(pid as i32, 0) == 0 }
 }
 
 #[cfg(any(unix, test))]
@@ -1100,6 +1038,51 @@ struct ProcessSnapshot {
 
 /// Kill harness trees left behind by a previous MonoCode that exited
 /// before SIGKILL ran (crash, force-quit, or the detached escalate thread).
+fn snapshot_from_proc() -> Vec<ProcessSnapshot> {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    let mut rows: Vec<ProcessSnapshot> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let pid: u32 = entry.file_name().to_str()?.parse().ok()?;
+            let dir = entry.path();
+            let cmdline = std::fs::read(dir.join("cmdline")).ok()?;
+            if cmdline.is_empty() {
+                return None;
+            }
+            Some(ProcessSnapshot {
+                pid,
+                ppid: proc_ppid(&dir)?,
+                args: String::from_utf8_lossy(&cmdline).replace('\0', " "),
+                harness_parent: None,
+            })
+        })
+        .collect();
+    attach_markers_from_env(&mut rows);
+    rows
+}
+
+fn attach_markers_from_env(rows: &mut [ProcessSnapshot]) {
+    let pids: Vec<u32> = rows
+        .iter()
+        .filter(|row| row.harness_parent.is_none() && looks_like_harness_argv(&row.args))
+        .map(|row| row.pid)
+        .collect();
+    if pids.is_empty() {
+        return;
+    }
+    let parents = read_harness_parents(&pids);
+    for row in rows {
+        if row.harness_parent.is_some() {
+            continue;
+        }
+        if let Some(parent) = parents.get(&row.pid).copied() {
+            row.harness_parent = Some(parent);
+        }
+    }
+}
+
 /// Off-thread: the sweep shells out to `ps` and then waits on a SIGKILL, and
 /// launch would otherwise hold the first window for both. Nothing this run
 /// spawns can be caught by it — our own children carry our pid as the marker.
@@ -1180,7 +1163,7 @@ fn is_harness_argv_token(part: &str) -> bool {
     )
 }
 
-#[cfg(any(all(unix, not(target_os = "linux")), test))]
+#[cfg(test)]
 fn parse_ps_row(line: &str) -> Option<ProcessSnapshot> {
     let s = line.trim();
     let pid_end = s.find(char::is_whitespace)?;
@@ -1222,142 +1205,28 @@ fn harness_parent_from_bytes(buf: &[u8]) -> Option<u32> {
 /// List processes by argv, then open environ only for agent CLIs. Linux
 /// orphans sit under `systemd --user`, not pid 1, so the marker (not ppid)
 /// is what identifies them.
-#[cfg(unix)]
 fn snapshot_processes() -> Vec<ProcessSnapshot> {
-    #[cfg(target_os = "linux")]
-    {
-        // The sandbox /proc cannot see host processes (where our sandboxed
-        // children actually run), so list them through the host instead.
-        if crate::host::in_flatpak() {
-            let mut rows: Vec<ProcessSnapshot> = crate::host::host_process_snapshot()
-                .into_iter()
-                .map(|(pid, ppid, args)| ProcessSnapshot {
-                    pid,
-                    ppid,
-                    args,
-                    harness_parent: None,
-                })
-                .collect();
-            // Same marker attach as the /proc path, resolved through the
-            // host: without it only legacy orphans would be reaped.
-            attach_markers_from_env(&mut rows);
-            return rows;
-        }
-        snapshot_from_proc()
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        snapshot_from_ps()
-    }
-}
-
-/// `ps -E`/`-e` dumps every process environment; skip that. List argv only,
-/// then open environ for agent CLIs. Linux orphans sit under `systemd --user`,
-/// not pid 1, so the marker (not ppid) is what identifies them.
-#[cfg(all(unix, not(target_os = "linux")))]
-fn snapshot_from_ps() -> Vec<ProcessSnapshot> {
-    let mut cmd = Command::new("ps");
-    #[cfg(target_os = "macos")]
-    {
-        cmd.args(["-axww", "-o", "pid=", "-o", "ppid=", "-o", "command="]);
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        cmd.args(["-axww", "-o", "pid=", "-o", "ppid=", "-o", "args="]);
-    }
-    let Ok(output) = cmd.output() else {
-        return Vec::new();
-    };
-    let mut rows: Vec<ProcessSnapshot> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(parse_ps_row)
-        .collect();
-    attach_markers_from_env(&mut rows);
-    rows
-}
-
-#[cfg(target_os = "linux")]
-fn snapshot_from_proc() -> Vec<ProcessSnapshot> {
-    let Ok(entries) = std::fs::read_dir("/proc") else {
-        return Vec::new();
-    };
-    let mut rows: Vec<ProcessSnapshot> = entries
-        .flatten()
-        .filter_map(|entry| {
-            let pid: u32 = entry.file_name().to_str()?.parse().ok()?;
-            let dir = entry.path();
-            let cmdline = std::fs::read(dir.join("cmdline")).ok()?;
-            if cmdline.is_empty() {
-                return None;
-            }
-            Some(ProcessSnapshot {
+    // The sandbox /proc cannot see host processes (where our sandboxed
+    // children actually run), so list them through the host instead.
+    if crate::host::in_flatpak() {
+        let mut rows: Vec<ProcessSnapshot> = crate::host::host_process_snapshot()
+            .into_iter()
+            .map(|(pid, ppid, args)| ProcessSnapshot {
                 pid,
-                ppid: proc_ppid(&dir)?,
-                args: String::from_utf8_lossy(&cmdline).replace('\0', " "),
+                ppid,
+                args,
                 harness_parent: None,
             })
-        })
-        .collect();
-    attach_markers_from_env(&mut rows);
-    rows
+            .collect();
+        // Same marker attach as the /proc path, resolved through the
+        // host: without it only legacy orphans would be reaped.
+        attach_markers_from_env(&mut rows);
+        return rows;
+    }
+    snapshot_from_proc()
 }
 
-#[cfg(unix)]
-fn attach_markers_from_env(rows: &mut [ProcessSnapshot]) {
-    let pids: Vec<u32> = rows
-        .iter()
-        .filter(|row| row.harness_parent.is_none() && looks_like_harness_argv(&row.args))
-        .map(|row| row.pid)
-        .collect();
-    if pids.is_empty() {
-        return;
-    }
-    let parents = read_harness_parents(&pids);
-    for row in rows {
-        if row.harness_parent.is_some() {
-            continue;
-        }
-        if let Some(parent) = parents.get(&row.pid).copied() {
-            row.harness_parent = Some(parent);
-        }
-    }
-}
-
-#[cfg(all(unix, not(target_os = "linux")))]
-fn read_harness_parents(pids: &[u32]) -> HashMap<u32, u32> {
-    let mut found = HashMap::new();
-    if pids.is_empty() {
-        return found;
-    }
-    let list = pids
-        .iter()
-        .map(|pid| pid.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
-    let mut cmd = Command::new("ps");
-    #[cfg(target_os = "macos")]
-    {
-        cmd.args(["-Eww", "-p", &list, "-o", "pid=", "-o", "command="]);
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        cmd.args(["-eww", "-p", &list, "-o", "pid=", "-o", "args="]);
-    }
-    let Ok(output) = cmd.output() else {
-        return found;
-    };
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Some((pid, command)) = parse_ps_pid_command(line) else {
-            continue;
-        };
-        if let Some(parent) = harness_parent_from_bytes(command.as_bytes()) {
-            found.insert(pid, parent);
-        }
-    }
-    found
-}
-
-#[cfg(any(all(unix, not(target_os = "linux")), test))]
+#[cfg(test)]
 fn parse_ps_pid_command(line: &str) -> Option<(u32, String)> {
     let s = line.trim();
     let pid_end = s.find(char::is_whitespace)?;
@@ -1369,7 +1238,6 @@ fn parse_ps_pid_command(line: &str) -> Option<(u32, String)> {
     Some((pid, command.to_string()))
 }
 
-#[cfg(target_os = "linux")]
 fn read_harness_parents(pids: &[u32]) -> HashMap<u32, u32> {
     let sandboxed = crate::host::in_flatpak();
     pids.iter()
@@ -1384,7 +1252,6 @@ fn read_harness_parents(pids: &[u32]) -> HashMap<u32, u32> {
         .collect()
 }
 
-#[cfg(target_os = "linux")]
 fn proc_ppid(dir: &Path) -> Option<u32> {
     parse_proc_ppid(&std::fs::read_to_string(dir.join("stat")).ok()?)
 }
@@ -1405,14 +1272,12 @@ fn resolve_cursor_agent() -> Option<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     // Stable shims first. `command -v` often returns a versioned path
-    // (`…/versions/<build>/cursor-agent`); macOS TCC then treats each
-    // upgrade as a new binary.
+    // (`…/versions/<build>/cursor-agent`).
     if let Some(home) = &home {
         candidates.push(home.join(".local/bin/cursor-agent"));
         candidates.push(home.join(".local/bin/agent"));
         candidates.push(home.join(".cargo/bin/cursor-agent"));
     }
-    candidates.push(PathBuf::from("/opt/homebrew/bin/cursor-agent"));
     candidates.push(PathBuf::from("/usr/local/bin/cursor-agent"));
     candidates.push(PathBuf::from("/usr/bin/cursor-agent"));
     candidates.push(PathBuf::from("/snap/bin/cursor-agent"));
@@ -1513,8 +1378,6 @@ fn resolve_pi() -> Option<PathBuf> {
         }
     }
     for name in ["pi-coding-agent", "pi"] {
-        #[cfg(target_os = "macos")]
-        candidates.push(PathBuf::from("/opt/homebrew/bin").join(name));
         candidates.push(PathBuf::from("/usr/local/bin").join(name));
         candidates.push(PathBuf::from("/usr/bin").join(name));
         candidates.push(PathBuf::from("/snap/bin").join(name));
@@ -1541,8 +1404,6 @@ fn resolve_omp() -> Option<PathBuf> {
         candidates.push(home.join(".cargo/bin/omp"));
         candidates.push(home.join("n/bin/omp"));
     }
-    #[cfg(target_os = "macos")]
-    candidates.push(PathBuf::from("/opt/homebrew/bin/omp"));
     candidates.push(PathBuf::from("/usr/local/bin/omp"));
     candidates.push(PathBuf::from("/usr/bin/omp"));
     candidates.push(PathBuf::from("/snap/bin/omp"));
@@ -1578,8 +1439,6 @@ fn resolve_fx() -> Option<PathBuf> {
         candidates.push(home.join(".cargo/bin/fx"));
         candidates.push(home.join("n/bin/fx"));
     }
-    #[cfg(target_os = "macos")]
-    candidates.push(PathBuf::from("/opt/homebrew/bin/fx"));
     candidates.push(PathBuf::from("/usr/local/bin/fx"));
     candidates.push(PathBuf::from("/usr/bin/fx"));
     candidates.push(PathBuf::from("/snap/bin/fx"));
@@ -1601,8 +1460,6 @@ fn resolve_grok() -> Option<PathBuf> {
         candidates.push(home.join(".cargo/bin/grok"));
         candidates.push(home.join("n/bin/grok"));
     }
-    #[cfg(target_os = "macos")]
-    candidates.push(PathBuf::from("/opt/homebrew/bin/grok"));
     candidates.push(PathBuf::from("/usr/local/bin/grok"));
     candidates.push(PathBuf::from("/usr/bin/grok"));
     candidates.push(PathBuf::from("/snap/bin/grok"));
@@ -1627,14 +1484,6 @@ fn resolve_hermes() -> Option<PathBuf> {
         candidates.push(home.join(".cargo/bin/hermes"));
         candidates.push(home.join("n/bin/hermes"));
     }
-    #[cfg(windows)]
-    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
-        // Native Windows installer launchers, then the underlying virtualenv.
-        candidates.push(local_app_data.join("hermes/bin/hermes"));
-        candidates.push(local_app_data.join("hermes/hermes-agent/venv/Scripts/hermes"));
-    }
-    #[cfg(target_os = "macos")]
-    candidates.push(PathBuf::from("/opt/homebrew/bin/hermes"));
     candidates.push(PathBuf::from("/usr/local/bin/hermes"));
     candidates.push(PathBuf::from("/usr/bin/hermes"));
     candidates.push(PathBuf::from("/snap/bin/hermes"));
@@ -2047,48 +1896,13 @@ fn first_binary_matching(
 }
 
 fn existing_binary(path: PathBuf) -> Option<PathBuf> {
-    #[cfg(windows)]
-    if path.extension().is_none() {
-        for ext in ["exe", "cmd", "bat", "com"] {
-            let candidate = path.with_extension(ext);
-            if is_executable_file(&candidate) {
-                return Some(candidate);
-            }
-        }
-    }
     is_executable_file(&path).then_some(path)
-}
-
-#[cfg(all(test, windows))]
-mod windows_launcher_tests {
-    use super::*;
-
-    #[test]
-    fn npm_shell_shim_does_not_hide_windows_launcher() {
-        let dir = std::env::temp_dir().join(format!("monocode-launcher-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let bare = dir.join("agent");
-        let cmd = dir.join("agent.cmd");
-        std::fs::write(&bare, b"#!/bin/sh\n").unwrap();
-        std::fs::write(&cmd, b"@echo off\n").unwrap();
-        assert_eq!(existing_binary(bare.clone()), Some(cmd.clone()));
-        std::fs::remove_file(&cmd).unwrap();
-        assert_eq!(existing_binary(bare.clone()), None);
-        std::fs::remove_file(bare).unwrap();
-        std::fs::remove_dir(dir).unwrap();
-    }
 }
 
 fn binary_name_eq(path: &Path, expected: &str) -> bool {
     path.file_stem()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| {
-            if cfg!(windows) {
-                name.eq_ignore_ascii_case(expected)
-            } else {
-                name == expected
-            }
-        })
+        .is_some_and(|name| name == expected)
 }
 
 fn path_has_component(path: &Path, needle: &str) -> bool {
@@ -2153,20 +1967,11 @@ fn gui_search_path_from(
         parts.push(format!("{home}/.grok/bin").into());
         parts.push(format!("{home}/.npm-global/bin").into());
         parts.push(format!("{home}/.bun/bin").into());
-        parts.push(format!("{home}/AppData/Roaming/npm").into());
-        parts.push(format!("{home}/AppData/Local/Yarn/bin").into());
-        parts.push(format!("{home}/scoop/shims").into());
     }
-    parts.push("/opt/homebrew/bin".into());
     parts.push("/usr/local/bin".into());
     parts.push("/usr/bin".into());
     parts.push("/bin".into());
     parts.push("/snap/bin".into());
-    #[cfg(windows)]
-    {
-        parts.push(r"C:\Program Files\Git\cmd".into());
-        parts.push(r"C:\Program Files\nodejs".into());
-    }
     if let Some(existing) = existing {
         parts.extend(std::env::split_paths(&existing));
     }
@@ -2182,7 +1987,6 @@ fn apply_gui_path(cmd: &mut Command) {
 
 pub(crate) fn apply_gui_env(cmd: &mut Command) {
     apply_gui_path(cmd);
-    crate::hide_window_console(cmd);
     if let Some(id) = passwd_identity() {
         if std::env::var_os("HOME").is_none() {
             cmd.env("HOME", &id.home);
@@ -2196,14 +2000,6 @@ pub(crate) fn apply_gui_env(cmd: &mut Command) {
         }
     } else if let Some(home) = dirs_home() {
         cmd.env("HOME", &home);
-        if std::env::var_os("USERPROFILE").is_none() {
-            cmd.env("USERPROFILE", &home);
-        }
-        if std::env::var_os("USER").is_none() {
-            if let Ok(username) = std::env::var("USERNAME") {
-                cmd.env("USER", username);
-            }
-        }
     }
     if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
         cmd.env("LANG", "en_US.UTF-8");
@@ -2307,17 +2103,6 @@ fn login_shell_env(name: &str) -> Option<String> {
 }
 
 fn load_login_shell_env() -> HashMap<String, String> {
-    #[cfg(windows)]
-    {
-        LOGIN_SHELL_KEYS
-            .into_iter()
-            .filter_map(|key| {
-                let value = std::env::var(key).ok()?;
-                (!value.is_empty()).then(|| (key.to_string(), value))
-            })
-            .collect()
-    }
-    #[cfg(not(windows))]
     load_unix_login_shell_env()
 }
 
@@ -2327,15 +2112,8 @@ fn load_login_shell_env() -> HashMap<String, String> {
 /// version managers (nvm, fnm, mise, volta) all initialize from there. A
 /// login-but-not-interactive shell sees `.zshenv`/`.zprofile` only, so every
 /// nvm-managed CLI looks uninstalled.
-#[cfg(not(windows))]
 fn load_unix_login_shell_env() -> HashMap<String, String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| {
-        if cfg!(target_os = "macos") {
-            "/bin/zsh".into()
-        } else {
-            "/bin/bash".into()
-        }
-    });
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
     // The login shell (and its PATH) lives on the host when sandboxed.
     let mut cmd = crate::host::command(&shell);
     cmd.args(["-lic", "printenv"])
@@ -2727,7 +2505,6 @@ mod tests {
         assert_eq!(parts[0], "/custom/gh-dir");
         assert!(parts.contains(&"/tmp/home/.local/bin"));
         assert!(parts.contains(&"/tmp/home/.grok/bin"));
-        assert!(parts.contains(&"/opt/homebrew/bin"));
         assert!(parts.contains(&"/usr/local/bin"));
         assert_eq!(*parts.last().unwrap(), "/bin");
     }

@@ -99,12 +99,7 @@ describe("AgentMarkdown file link context menu", () => {
     await pick("Open in Default App");
     expect(actions.openPath).toHaveBeenCalledWith("/repo/docs/guide.md");
 
-    const revealLabel = /Mac/.test(navigator.platform)
-      ? "Reveal in Finder"
-      : /Win/i.test(navigator.platform)
-        ? "Reveal in File Explorer"
-        : "Open Containing Folder";
-    await pick(revealLabel);
+    await pick("Open Containing Folder");
     expect(actions.revealPath).toHaveBeenCalledWith("/repo/docs/guide.md");
 
     await pick("Copy Path");

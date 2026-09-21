@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- File clipboard on Linux: `clipboard_file_paths` and
+  `copy_file_to_clipboard` now talk to the desktop environment through
+  `wl-clipboard` (Wayland) or `xclip` (X11) using `text/uri-list`, so
+  pasting files copied in Nautilus/Dolphin into the file tree and copying
+  originals out of the image viewer work natively.
+
+### Removed
+
+- Leftover macOS and Windows code paths from the Linux-only fork:
+  `macos.rs` (traffic lights, WindowServer blur, dock badge/menu),
+  `windows.rs` (Job Objects), `tray.rs`, the macOS-only native menu in
+  `menu.rs`, the macOS pasteboard backend, and the vendored
+  `portable-pty` (ConPTY) crate. `pty.rs`, `harness.rs`,
+  `external_editor.rs`, `rate_limits.rs`, `notifications.rs`,
+  `skills.rs`, `fs/write.rs`, and `lib.rs` keep only their Linux paths;
+  the no-op commands `set_traffic_lights_visible`,
+  `set_window_background_blur`, `set_dock_badge`, and
+  `set_window_glass_enabled` are gone along with the dead `.icns`/`.ico`
+  icons and `src-tauri/macos` assets.
+- Frontend platform branches: `platform.ts` is now the fixed Linux
+  contract (`Ctrl+`, `Alt+`, `Shift+`), `IS_MAC`/`IS_WIN`/
+  `HAS_NATIVE_GLASS` and the `is-mac`/`has-native-glass` CSS hooks are
+  gone, traffic-light spacers are removed, `Reveal` labels are the file
+  manager wording, and the Windows-only close-to-tray setting and tray
+  behavior are deleted.
+
 ## [0.2.10] - 2026-09-21
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,

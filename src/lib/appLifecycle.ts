@@ -327,22 +327,8 @@ export function bindResumedSessions(sessions: Session[]): void {
   }
 }
 
-export async function hideCurrentWindow(): Promise<void> {
-  await invoke("hide_window");
-}
-
 export async function closeCurrentWindow(): Promise<void> {
   await invoke("destroy_window");
-}
-
-export async function persistLiveTranscripts(
-  sessions: Session[],
-): Promise<void> {
-  await Promise.all(
-    sessions
-      .filter(shouldPersistSession)
-      .map((session) => upsertSession(session).catch(() => null)),
-  );
 }
 
 export async function persistQuitState(

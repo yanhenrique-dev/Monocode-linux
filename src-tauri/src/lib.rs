@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod chat_background;
 mod checkpoint;
+mod clipboard;
 mod composer_draft;
 mod control;
 pub mod control_cli;
@@ -15,12 +16,8 @@ mod host;
 mod inbox_media;
 mod linear;
 mod link_preview;
-#[cfg(target_os = "macos")]
-mod macos;
-mod menu;
 mod notes;
 mod notifications;
-mod pasteboard;
 mod project_logo;
 mod pty;
 mod rate_limits;
@@ -28,12 +25,8 @@ mod reminders;
 mod search;
 mod session_store;
 mod skills;
-#[cfg(target_os = "windows")]
-mod tray;
 mod window;
 mod window_transfer;
-#[cfg(windows)]
-mod windows;
 mod worktree_lifecycle;
 mod worktrees;
 
@@ -65,11 +58,7 @@ pub(crate) struct PasswdIdentity {
 }
 
 pub(crate) fn dirs_home() -> Option<String> {
-    #[cfg(windows)]
-    let keys = ["USERPROFILE", "HOME"];
-    #[cfg(not(windows))]
-    let keys = ["HOME", "USERPROFILE"];
-    for key in keys {
+    for key in ["HOME"] {
         if let Some(home) = std::env::var_os(key) {
             let home = home.to_string_lossy().into_owned();
             if !home.is_empty() {
@@ -77,44 +66,7 @@ pub(crate) fn dirs_home() -> Option<String> {
             }
         }
     }
-    match (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
-        (Ok(drive), Ok(path)) if !drive.is_empty() && !path.is_empty() => {
-            Some(format!("{drive}{path}"))
-        }
-        _ => passwd_identity().map(|id| id.home),
-    }
-}
-
-/// Hide the console window that Windows allocates for GUI-spawned children.
-pub(crate) fn hide_window_console(cmd: &mut std::process::Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(WINDOWS_BACKGROUND_CREATION_FLAGS);
-    }
-    let _ = cmd;
-}
-
-#[cfg(windows)]
-const WINDOWS_BACKGROUND_CREATION_FLAGS: u32 = 0x0800_0000; // CREATE_NO_WINDOW
-
-#[cfg(all(test, windows))]
-mod background_command_tests {
-    use super::*;
-
-    #[test]
-    fn background_commands_keep_piped_output_and_exit_status() {
-        assert_eq!(WINDOWS_BACKGROUND_CREATION_FLAGS, 0x0800_0000);
-
-        let mut cmd = std::process::Command::new("cmd.exe");
-        cmd.args(["/D", "/C", "(echo stdout)&(echo stderr 1>&2)&exit /b 7"]);
-        hide_window_console(&mut cmd);
-
-        let output = cmd.output().expect("background command should run");
-        assert_eq!(output.status.code(), Some(7));
-        assert!(String::from_utf8_lossy(&output.stdout).contains("stdout"));
-        assert!(String::from_utf8_lossy(&output.stderr).contains("stderr"));
-    }
+    passwd_identity().map(|id| id.home)
 }
 
 /// Finder-launched .app bundles often omit HOME/USER/SHELL. Fall back to the
@@ -161,41 +113,12 @@ pub(crate) fn passwd_identity() -> Option<PasswdIdentity> {
 }
 
 #[tauri::command]
-fn set_traffic_lights_visible(
-    #[allow(unused_variables)] window: tauri::WebviewWindow,
-    #[allow(unused_variables)] visible: bool,
-) {
-    #[cfg(target_os = "macos")]
-    macos::set_visible(&window, visible);
-}
-
-#[tauri::command]
-fn set_window_background_blur(
-    #[allow(unused_variables)] window: tauri::WebviewWindow,
-    #[allow(unused_variables)] radius: u8,
-) {
-    #[cfg(target_os = "macos")]
-    macos::set_background_blur_radius(&window, radius);
-}
-
-#[tauri::command]
-fn set_dock_badge(
-    #[allow(unused_variables)] window: tauri::WebviewWindow,
-    #[allow(unused_variables)] count: u32,
-) {
-    #[cfg(target_os = "macos")]
-    macos::set_window_badge(&window, count);
-}
-
-#[tauri::command]
 fn open_new_window(app: tauri::AppHandle) -> Result<(), String> {
     window::open_new_window(&app)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(windows)]
-    windows::initialize().expect("Failed to initialize Windows process safety");
     // Flathub forbids self-updaters: the sandbox build skips the updater
     // plugin entirely (the frontend also hides its update UI — see
     // `flatpak_sandboxed`). Native AppImage builds keep it.
@@ -218,27 +141,11 @@ pub fn run() {
             control::init(app.handle())?;
             reminders::init(app.handle());
             checkpoint::init(app.handle())?;
-            menu::install(app.handle())?;
-            #[cfg(target_os = "windows")]
-            tray::install(app.handle())?;
-            #[cfg(target_os = "macos")]
-            {
-                macos::install_dock_menu(app.handle());
-                if let Some(window) = app.get_webview_window("main") {
-                    macos::install(&window);
-                }
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_decorations(false);
-                    let _ = window.set_shadow(true);
-                }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+                let _ = window.set_shadow(true);
             }
             Ok(())
-        })
-        .on_menu_event(|app, event| {
-            menu::dispatch(app, event.id().as_ref());
         })
         .invoke_handler(tauri::generate_handler![
             control::control_enable,
@@ -337,8 +244,8 @@ pub fn run() {
             fs::write::copy_path,
             fs::write::move_path,
             fs::write::reveal_path,
-            pasteboard::clipboard_file_paths,
-            pasteboard::copy_file_to_clipboard,
+            clipboard::clipboard_file_paths,
+            clipboard::copy_file_to_clipboard,
             fs::write::clone_repo,
             fs::read::read_file_preview,
             fs::read::stat_files,
@@ -411,16 +318,13 @@ pub fn run() {
             checkpoint::session_checkpoint_file_diff,
             checkpoint::session_checkpoint_undo,
             checkpoint::session_checkpoint_keep,
-            set_traffic_lights_visible,
-            set_window_background_blur,
-            set_dock_badge,
+            clipboard::clipboard_file_paths,
+            clipboard::copy_file_to_clipboard,
             open_new_window,
-            window::hide_window,
             window::destroy_window,
             window::quit_poll_reply,
             window::quit_decision,
             window::quit_ready,
-            window::set_window_glass_enabled,
             window_transfer::stage_window_transfer,
             window_transfer::take_window_transfer,
             chat_background::save_chat_background,
@@ -435,21 +339,7 @@ pub fn run() {
         .expect("error while building MonoCode");
 
     app.run(|handle, event| match event {
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen {
-            has_visible_windows: false,
-            ..
-        } => {
-            let _ = window::show_hidden_or_open_new(handle);
-        }
         tauri::RunEvent::Ready => {
-            #[cfg(target_os = "macos")]
-            {
-                macos::request_badge_authorization();
-                notifications::install_delegate(handle);
-                #[cfg(debug_assertions)]
-                macos::prefer_bundle_dock_icon();
-            }
             window::ensure_launch_window_visible(handle);
         }
         tauri::RunEvent::WindowEvent {
@@ -469,15 +359,10 @@ pub fn run() {
                 return;
             }
             api.prevent_exit();
-            // Last window destroyed (red button). Stay in the dock on macOS;
-            // ⌘Q is a separate menu handler and arrives with an exit code.
-            // Windows has no dock, so the last close is a quit.
+            // Last window destroyed (red button).
             if code.is_none() {
-                #[cfg(target_os = "windows")]
                 window::request_quit(handle);
-                return;
             }
-            window::request_quit(handle);
         }
         tauri::RunEvent::Exit => {
             reap_harness_children(handle);
@@ -493,9 +378,4 @@ fn reap_harness_children(handle: &tauri::AppHandle) {
     if let Some(host) = handle.try_state::<pty::PtyHost>() {
         host.kill_all();
     }
-}
-
-#[cfg(all(debug_assertions, target_os = "macos"))]
-pub fn ensure_macos_dev_bundle() {
-    macos::ensure_dev_bundle();
 }

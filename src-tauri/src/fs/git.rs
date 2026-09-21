@@ -1288,9 +1288,7 @@ pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, S
 pub(crate) fn git_cmd() -> Command {
     // Central git constructor: sandboxed repos live under the shared home,
     // git itself runs on the host so hooks, ssh and user config keep working.
-    let mut cmd = crate::host::command("git");
-    crate::hide_window_console(&mut cmd);
-    cmd
+    crate::host::command("git")
 }
 
 pub(crate) fn git_checked(root: &Path, args: &[&str]) -> Result<(), String> {
