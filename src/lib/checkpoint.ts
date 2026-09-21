@@ -8,6 +8,8 @@ export type CheckpointFile = {
   deletions: number;
   /** False when changes between this session's edits prevent an exact diff. */
   exact: boolean;
+  /** True when claimed from shell-made changes without a tool-start snapshot. */
+  adopted: boolean;
   /** False when restoring could overwrite a change made outside this session. */
   undoable: boolean;
   /** Other live session ids in the same project claiming this path. */

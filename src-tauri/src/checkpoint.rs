@@ -105,8 +105,12 @@ impl CheckpointStore {
             // session. The first tool-start event owns the safe undo boundary.
             if manifest.touched.contains(&relative) && manifest.prepared.contains(&relative) {
                 if !after_matches_worktree(&dir, &root, &manifest, &relative)
-                    && manifest.diverged.insert(relative)
+                    && manifest.diverged.insert(relative.clone())
                 {
+                    eprintln!(
+                        "monocode: checkpoint diverged for session {session_id}: {relative} \
+                         changed outside the session's edit flow; review shows it as inexact"
+                    );
                     dirty = true;
                 }
                 continue;
@@ -518,6 +522,9 @@ pub struct CheckpointFile {
     /// False when the file changed between this session's own edit snapshots,
     /// so its net line ownership cannot be reconstructed exactly.
     pub exact: bool,
+    /// True when claimed from shell-made changes without a tool-start
+    /// snapshot. Tells the review UI which inexact reason to label.
+    pub adopted: bool,
     pub undoable: bool,
     /// Other live session ids in the same project claiming this path.
     #[serde(default)]
@@ -745,15 +752,16 @@ fn diff_from_manifest_with(
             // gated on `exact`.
             (stats.status.clone(), stats.additions, stats.deletions)
         });
-        files.push(describe_change(
+        files.push(describe_change(ChangeDescription {
             root,
             relative,
-            by_relative.get(relative.as_str()).copied(),
+            git: by_relative.get(relative.as_str()).copied(),
             exact,
+            adopted,
             undoable,
-            foreign.to_vec(),
+            foreign_claimants: foreign.to_vec(),
             session_change,
-        ));
+        }));
     }
 
     files.sort_by(|a, b| a.relative.cmp(&b.relative));
@@ -832,15 +840,28 @@ fn worktree_line_count(path: &std::path::Path) -> i64 {
     lines
 }
 
-fn describe_change(
-    root: &Path,
-    relative: &str,
-    git: Option<&GitChangedFile>,
+struct ChangeDescription<'a> {
+    root: &'a Path,
+    relative: &'a str,
+    git: Option<&'a GitChangedFile>,
     exact: bool,
+    adopted: bool,
     undoable: bool,
     foreign_claimants: Vec<String>,
     session_change: Option<(String, i64, i64)>,
-) -> CheckpointFile {
+}
+
+fn describe_change(desc: ChangeDescription) -> CheckpointFile {
+    let ChangeDescription {
+        root,
+        relative,
+        git,
+        exact,
+        adopted,
+        undoable,
+        foreign_claimants,
+        session_change,
+    } = desc;
     if let Some((status, additions, deletions)) = session_change {
         return CheckpointFile {
             path: path_to_js(&root.join(relative)),
@@ -849,6 +870,7 @@ fn describe_change(
             additions,
             deletions,
             exact,
+            adopted,
             undoable,
             foreign_claimants,
         };
@@ -861,6 +883,7 @@ fn describe_change(
             additions: file.additions,
             deletions: file.deletions,
             exact,
+            adopted,
             undoable,
             foreign_claimants,
         };
@@ -881,6 +904,7 @@ fn describe_change(
         additions,
         deletions: 0,
         exact,
+        adopted,
         undoable,
         foreign_claimants,
     }
@@ -1938,7 +1962,30 @@ mod tests {
         assert_eq!(status.files.len(), 1);
         let file = &status.files[0];
         assert!(!file.exact);
+        assert!(!file.adopted);
         assert_eq!((file.additions, file.deletions), (1, 1));
+    }
+
+    #[test]
+    fn adopted_files_report_their_reason_for_review() {
+        let repo = tmp("adopted-reason");
+        if !init_git_commit(&repo.0, &[("app.ts", "head\n")]) {
+            return;
+        }
+        let cwd = repo.0.to_string_lossy().into_owned();
+        let (_root, store) = store();
+        store.ensure("s1", &cwd).unwrap();
+
+        // Changed through the shell, never through a structured edit: the
+        // adopt heuristic claims it for review, but it stays inexact and
+        // carries the adopted flag so the UI can label the reason.
+        std::fs::write(repo.0.join("app.ts"), "shell\n").unwrap();
+        let status = store.adopt("s1", &cwd).unwrap();
+        assert_eq!(status.files.len(), 1);
+        let file = &status.files[0];
+        assert!(!file.exact);
+        assert!(file.adopted);
+        assert!(!file.undoable);
     }
 
     #[test]
@@ -1954,20 +2001,65 @@ mod tests {
         // No snapshot stats and no git row (e.g. legacy manifests): a
         // worktree file unknown to HEAD still reports its new lines instead
         // of 0/0, which the file list would hide entirely.
-        let added = describe_change(&repo.0, "new.txt", None, true, true, Vec::new(), None);
+        let added = describe_change(ChangeDescription {
+            root: &repo.0,
+            relative: "new.txt",
+            git: None,
+            exact: true,
+            adopted: false,
+            undoable: true,
+            foreign_claimants: Vec::new(),
+            session_change: None,
+        });
         assert_eq!(added.status, "modified");
         assert_eq!((added.additions, added.deletions), (3, 0));
 
-        let empty = describe_change(&repo.0, "empty.txt", None, true, true, Vec::new(), None);
+        let empty = describe_change(ChangeDescription {
+            root: &repo.0,
+            relative: "empty.txt",
+            git: None,
+            exact: true,
+            adopted: false,
+            undoable: true,
+            foreign_claimants: Vec::new(),
+            session_change: None,
+        });
         assert_eq!((empty.additions, empty.deletions), (0, 0));
 
-        let binary = describe_change(&repo.0, "blob.bin", None, true, true, Vec::new(), None);
+        let binary = describe_change(ChangeDescription {
+            root: &repo.0,
+            relative: "blob.bin",
+            git: None,
+            exact: true,
+            adopted: false,
+            undoable: true,
+            foreign_claimants: Vec::new(),
+            session_change: None,
+        });
         assert_eq!((binary.additions, binary.deletions), (0, 0));
 
-        let tracked = describe_change(&repo.0, "a.txt", None, true, true, Vec::new(), None);
+        let tracked = describe_change(ChangeDescription {
+            root: &repo.0,
+            relative: "a.txt",
+            git: None,
+            exact: true,
+            adopted: false,
+            undoable: true,
+            foreign_claimants: Vec::new(),
+            session_change: None,
+        });
         assert_eq!((tracked.additions, tracked.deletions), (0, 0));
 
-        let missing = describe_change(&repo.0, "gone.txt", None, true, true, Vec::new(), None);
+        let missing = describe_change(ChangeDescription {
+            root: &repo.0,
+            relative: "gone.txt",
+            git: None,
+            exact: true,
+            adopted: false,
+            undoable: true,
+            foreign_claimants: Vec::new(),
+            session_change: None,
+        });
         assert_eq!(missing.status, "deleted");
         assert_eq!((missing.additions, missing.deletions), (0, 0));
     }

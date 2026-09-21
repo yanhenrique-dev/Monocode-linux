@@ -287,10 +287,21 @@ function FileRow({
 }
 
 function DiffCounts({ file }: { file: CheckpointFile }) {
+  const { t } = useLocale();
   if (!file.exact) {
+    const adopted = file.adopted;
     return (
-      <span className="shrink-0 text-[11px] font-medium text-amber-300/80">
-        Mixed changes
+      <span
+        className="shrink-0 text-[11px] font-medium text-amber-300/80"
+        title={
+          adopted
+            ? t("session.review.inexact.adopted_hint")
+            : t("session.review.inexact.diverged_hint")
+        }
+      >
+        {adopted
+          ? t("session.review.inexact.adopted")
+          : t("session.review.inexact.diverged")}
       </span>
     );
   }

@@ -812,6 +812,12 @@ const en = {
   "settings.inbox.mute.picker_confirm": "Mute until then",
   "session.review.shared_heading": "Shared with another session",
   "session.review.shared_by": "Also changed by {sessions}",
+  "session.review.inexact.adopted": "Shell changes",
+  "session.review.inexact.diverged": "Changed outside session",
+  "session.review.inexact.adopted_hint":
+    "Changed outside the session's edits, pulled in for review. Undo is unavailable; Keep dismisses this card.",
+  "session.review.inexact.diverged_hint":
+    "Changed again after the session's edit, so the diff mixes both. Undo is unavailable; Keep dismisses this card.",
 };
 
 export type LocaleKey = keyof typeof en;
@@ -1543,6 +1549,12 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.inbox.mute.picker_confirm": "Silenciar até lá",
   "session.review.shared_heading": "Compartilhado com outra sessão",
   "session.review.shared_by": "Também alterado por {sessions}",
+  "session.review.inexact.adopted": "Alterações do shell",
+  "session.review.inexact.diverged": "Alterado fora da sessão",
+  "session.review.inexact.adopted_hint":
+    "Alterado fora das edições da sessão, incluído para revisão. Desfazer indisponível; Manter dispensa este cartão.",
+  "session.review.inexact.diverged_hint":
+    "Alterado de novo após a edição da sessão, então o diff mistura os dois. Desfazer indisponível; Manter dispensa este cartão.",
 };
 
 export const STRINGS: Record<Locale, Record<LocaleKey, string>> = {
