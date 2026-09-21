@@ -79,6 +79,7 @@
   --theme-saturation: 0%;
   --theme-dark-lightness: 9%;
   --sidebar-opacity: 0.85;
+  --sidebar-blur: 24px;
   --chat-background-empty-opacity: 0.24;
   --chat-background-session-opacity: 0.24;
   --selection-subtle-strength: 8%;
@@ -215,6 +216,8 @@ html ::-webkit-scrollbar-corner {
 
 .sidebar-glass {
   background: color-mix(in srgb, var(--color-background-base) 90%, black);
+  backdrop-filter: blur(var(--sidebar-blur, 24px));
+  -webkit-backdrop-filter: blur(var(--sidebar-blur, 24px));
 }
 
 html.theme-light .sidebar-glass {

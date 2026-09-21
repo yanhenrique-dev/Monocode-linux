@@ -213,6 +213,28 @@ describe("useComposer.onSubmit guard clauses", () => {
     expect(result).toBe("steered");
   });
 
+  it("queues a busy-session follow-up when behavior is queue", () => {
+    const session = makeSession({ busy: true });
+    const { deps } = makeDeps([session]);
+    const api = renderApi(deps);
+
+    let result: unknown;
+    act(() => {
+      result = api.current!.onSubmit("s1", "wait for me", [], {
+        followUpBehavior: "queue",
+      });
+    });
+
+    expect(result).toBe(true);
+    const updater = vi.mocked(deps.setSessions).mock.calls[0][0] as (
+      prev: Session[],
+    ) => Session[];
+    const next = updater([session]);
+    expect(next[0].queuedMessages).toHaveLength(1);
+    expect(next[0].queuedMessages![0].text).toBe("wait for me");
+    expect(next[0].queueStatus).toBe("active");
+  });
+
   it("refuses an orchestrate intent while a run is active", () => {
     forSession.mockReturnValue({ status: "active" } as never);
     const { deps, events, flushed } = makeDeps([makeSession()]);
