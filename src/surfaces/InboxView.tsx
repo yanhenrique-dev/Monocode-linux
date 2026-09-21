@@ -28,6 +28,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -716,7 +717,11 @@ export function InboxView({
   const shownItems = visibleItems.slice(0, shownItemCount);
   const hasMoreItems = shownItemCount < visibleItems.length;
   const itemsRef = useRef(items);
-  itemsRef.current = items;
+  // Commit-phase sync: readers (handleSelectCard) always see the committed
+  // list, never a torn render snapshot.
+  useLayoutEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const handleSelectCard = useCallback((key: string, updatedAt: string) => {
     // The card may render a stale snapshot while a poll is in flight: resolve
     // the freshest known updatedAt so the next forced poll cannot resurrect
