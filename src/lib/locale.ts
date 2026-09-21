@@ -162,6 +162,8 @@ const en = {
   "settings.general.sounds.custom.pick": "Custom file…",
   "settings.general.sounds.custom.file": "Custom file",
   "settings.general.sounds.test": "Test",
+  "settings.general.sounds.preview_ignores_mute":
+    "Preview plays even while muted",
   "settings.general.sounds.reset": "Reset",
   "settings.general.sounds.error.missing": "File not found — pick it again",
   "settings.general.sounds.error.decode":
@@ -881,6 +883,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.sounds.custom.pick": "Arquivo personalizado…",
   "settings.general.sounds.custom.file": "Arquivo personalizado",
   "settings.general.sounds.test": "Testar",
+  "settings.general.sounds.preview_ignores_mute":
+    "A prévia toca mesmo com o som desligado",
   "settings.general.sounds.reset": "Redefinir",
   "settings.general.sounds.error.missing": "Arquivo não encontrado — selecione novamente",
   "settings.general.sounds.error.decode":

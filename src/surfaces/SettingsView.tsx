@@ -3293,7 +3293,7 @@ const SoundCueRow = memo(function SoundCueRow({
       <button
         type="button"
         aria-label={t("settings.general.sounds.test")}
-        title={t("settings.general.sounds.test")}
+        title={`${t("settings.general.sounds.test")} — ${t("settings.general.sounds.preview_ignores_mute")}`}
         disabled={testing}
         onClick={() => void runTest()}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-content/15 text-content/60 hover:text-content disabled:opacity-50"

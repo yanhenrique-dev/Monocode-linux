@@ -16,6 +16,7 @@ import {
   loadSoundPrefs,
   loadSoundsEnabled,
   playCue,
+  previewCue,
   resetSoundCues,
   resetSoundPref,
   saveSoundPrefs,
@@ -113,6 +114,13 @@ describe("sounds", () => {
     play.mockClear();
     playCue("turnFinished", { projectId: "work", category: "agentFinished" });
     expect(play).not.toHaveBeenCalled();
+  });
+
+  it("previews on explicit demand even while muted", () => {
+    saveSoundsEnabled(false);
+    play.mockClear();
+    previewCue("turnFinished");
+    expect(play).toHaveBeenCalledWith("success");
   });
 
   it("plays a custom file instead of the preset when one is set", () => {
