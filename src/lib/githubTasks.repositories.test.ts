@@ -101,6 +101,36 @@ describe("GitHub fork repositories", () => {
     ).toHaveLength(2);
   });
 
+  it("queries the checkout's own repo before its parent", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      const input = args as Record<string, unknown> | undefined;
+      if (command === "git_github_repositories") {
+        return ["maya/web", "acme/web"] as never;
+      }
+      if (command === "git_github_work_items") {
+        return [] as never;
+      }
+      if (command === "linear_status" || command === "gitlab_status") {
+        return { connected: false } as never;
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    await listInboxItems([{ path: "/tmp/fork-a" }], {
+      assignedToMe: false,
+      state: "open",
+      search: "",
+    });
+
+    const listCalls = vi
+      .mocked(invoke)
+      .mock.calls.filter(([command]) => command === "git_github_work_items");
+    expect(listCalls.length).toBeGreaterThan(0);
+    expect(
+      String((listCalls[0]![1] as Record<string, unknown>).repo),
+    ).toBe("maya/web");
+  });
+
   it("reports an error when repository discovery fails", async () => {
     vi.mocked(invoke).mockImplementation(async (command) => {
       if (command === "git_github_repositories") {

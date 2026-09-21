@@ -407,16 +407,28 @@ export type SettingsSearchResult = {
   label: string;
 };
 
+/** Strips combining marks so "desfoque" matches "desfóque" and vice versa. */
+function foldAccents(value: string): string {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+}
+
 /** Ranks a label/keyword pair against a lowercased needle; `null` means no match. */
 function matchScore(
   needle: string,
   label: string,
   keywords?: string,
 ): number | null {
-  const lower = label.toLowerCase();
-  if (lower.startsWith(needle)) return 0;
-  if (lower.includes(needle)) return 1;
-  if (keywords?.toLowerCase().includes(needle)) return 2;
+  const foldedNeedle = foldAccents(needle);
+  const lower = foldAccents(label.toLowerCase());
+  if (lower.startsWith(foldedNeedle)) return 0;
+  if (lower.includes(foldedNeedle)) return 1;
+  if (
+    keywords &&
+    foldAccents(keywords.toLowerCase()).includes(foldedNeedle)
+  ) {
+    return 2;
+  }
   return null;
 }
 
@@ -1012,15 +1024,17 @@ export function filterKeybindings(
   query: string,
   locale: Locale = loadLocale(),
 ): KeybindingRow[] {
-  const needle = query.trim().toLowerCase();
+  const needle = foldAccents(query.trim().toLowerCase());
   if (!needle) return rows;
   return rows.filter((row) => {
-    const command = t(locale, row.command).toLowerCase();
+    const command = foldAccents(t(locale, row.command).toLowerCase());
     return (
       command.includes(needle) ||
       row.keys.toLowerCase().includes(needle) ||
-      row.when.toLowerCase().includes(needle) ||
-      keybindingWhenLabel(row.when, locale).toLowerCase().includes(needle)
+      foldAccents(row.when.toLowerCase()).includes(needle) ||
+      foldAccents(keybindingWhenLabel(row.when, locale).toLowerCase()).includes(
+        needle,
+      )
     );
   });
 }

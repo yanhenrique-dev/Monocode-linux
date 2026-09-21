@@ -8,6 +8,7 @@ import {
   isInboxEntryUnseen,
   markInboxItemSeen,
   markInboxItemsSeen,
+  resolveSeenMark,
   seedInboxSeenIfNeeded,
 } from "./inboxSeen";
 
@@ -142,6 +143,37 @@ describe("inbox seen items", () => {
     markInboxItemsSeen(knownInboxEntries(["/repos/new"]));
     expect(isInboxEntryUnseen(current)).toBe(false);
     expect(isInboxEntryUnseen({ ...current, updatedAt: "2026-08-27T12:00:00Z" })).toBe(true);
+  });
+
+  it("marks with the freshest list stamp so a stale click survives the next poll", () => {
+    const now = Date.parse("2026-08-27T10:30:00Z");
+    // Card rendered T10:00, list already knows T11:00: the mark must hold T11:00.
+    const marked = resolveSeenMark(
+      "2026-08-27T10:00:00Z",
+      "2026-08-27T11:00:00Z",
+      now,
+    );
+    expect(Date.parse(marked)).toBe(Date.parse("2026-08-27T11:00:00Z"));
+    // A poll replaying T11:00 afterwards must not resurrect the dot.
+    seedInboxSeenIfNeeded([entry("linear:ENG-1", "2026-08-27T10:00:00Z")]);
+    markInboxItemSeen({ key: "linear:ENG-1", updatedAt: marked });
+    expect(
+      isInboxEntryUnseen(entry("linear:ENG-1", "2026-08-27T11:00:00Z")),
+    ).toBe(false);
+    // Genuinely newer remote activity still marks the item unseen again.
+    expect(
+      isInboxEntryUnseen(entry("linear:ENG-1", "2026-08-27T12:00:01Z")),
+    ).toBe(true);
+  });
+
+  it("floors a stale mark at the click time when nothing fresher is known", () => {
+    const now = Date.parse("2026-08-27T12:00:00Z");
+    expect(
+      Date.parse(resolveSeenMark("2026-08-27T10:00:00Z", undefined, now)),
+    ).toBe(now);
+    expect(
+      Date.parse(resolveSeenMark("not-a-date", undefined, now)),
+    ).toBe(now);
   });
 
   it("treats a new item with an unreadable timestamp as unseen", () => {

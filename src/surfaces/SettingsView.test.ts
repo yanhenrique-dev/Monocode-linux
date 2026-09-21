@@ -116,6 +116,17 @@ describe("appearance draft revert", () => {
     expect(localStorage.getItem("monocode.themeHue")).toBe("100");
   });
 });
+describe("settings search reveal", () => {
+  it("moves focus to the revealed row and announces it", async () => {
+    await render("general", { anchor: "update" });
+    const target = container.querySelector<HTMLElement>(
+      '[data-setting-id="update"]',
+    )!;
+    expect(document.activeElement).toBe(target);
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live?.textContent).toContain("Version");
+  });
+});
 
 describe("settings pages", () => {
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
@@ -498,5 +509,6 @@ describe("UpdateRow busy feedback", () => {
     // Settings renders the result inline: no native dialog for this surface.
     expect(message).not.toHaveBeenCalled();
     expect(container.textContent).toContain("You're on the latest version.");
+    expect(container.textContent).toContain("Last checked");
   });
 });
