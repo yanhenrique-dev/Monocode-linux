@@ -5,7 +5,10 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.17] - 2026-09-21
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
 
 ### Added
 
@@ -14,6 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `wl-clipboard` (Wayland) or `xclip` (X11) using `text/uri-list`, so
   pasting files copied in Nautilus/Dolphin into the file tree and copying
   originals out of the image viewer work natively.
+- GitHub inbox refresh: background polling with incremental `since`
+  snapshots, unread badges, read-mark rollback on storage failure, and
+  smooth enter/exit animations behind the experimental flag.
+- Follow-up queue evidence: busy follow-ups with behavior Queue land a
+  visible card above the input, and steered follow-ups keep their notice
+  until the running turn ends.
+
+### Fixed
+
+- Clipboard correctness: helper order follows the active session
+  (`WAYLAND_DISPLAY`/`XDG_SESSION_TYPE`) with fallback across helpers;
+  URI parsing no longer pre-decodes (`a#b.txt` stays `a#b.txt`).
+- Reveal-in-file-manager via `FileManager1.ShowItems` (`gio open` has
+  no `--select` flag); `gh` subprocesses get piped stdio; PTY slave
+  name uses `libc::c_char`; session database uses atomic `create_new`
+  with `0600` only on fresh files; inbox media locks are evicted.
+- Window controls always render in the title bar (decorations off left
+  rail-open projects without min/max/close); sidebar blur slider drives
+  `--sidebar-blur` again; exit animations run `onExit` exactly once;
+  background polls honor backoff; invalidated list snapshots never
+  overwrite fresh data and merged lists keep `updatedAt` order.
 
 ### Removed
 
