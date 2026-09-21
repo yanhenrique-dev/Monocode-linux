@@ -1404,6 +1404,15 @@ fn slug_from_github_remote_url_rejects_non_github_and_malformed_urls() {
         slug_from_github_remote_url("git@gitlab.com:acme/web.git"),
         None
     );
+    // An embedded github.com path on another host must not produce a slug.
+    assert_eq!(
+        slug_from_github_remote_url("https://gitlab.example/github.com/acme/web.git"),
+        None
+    );
+    assert_eq!(
+        slug_from_github_remote_url("git@gitlab.example:github.com/acme/web.git"),
+        None
+    );
     assert_eq!(slug_from_github_remote_url(""), None);
     assert_eq!(
         slug_from_github_remote_url("https://github.com/only-owner"),
