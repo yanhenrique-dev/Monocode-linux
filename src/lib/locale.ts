@@ -549,6 +549,7 @@ const en = {
   "settings.appearance.interface_scale.description":
     "Zoom the whole interface. You can also use Ctrl+=, Ctrl+-, and Ctrl+0 (Cmd on macOS).",
   "settings.appearance.interface_scale.slider": "Interface scale",
+  "settings.appearance.interface_blur.open_performance": "Go to Performance",
   "settings.appearance.chat_background.title": "Chat background",
   "settings.appearance.chat_background.description":
     "An image behind your chat panes. It stays on this device.",
@@ -650,7 +651,9 @@ const en = {
     "Run the hooks configured in your settings.json files — PreToolUse command rewrites, blocks, notifications, and the rest — just as the Claude Code CLI would. Turn this off if a hook is misbehaving and you need the session back. Takes effect on the next turn.",
   "settings.providers.claude_hooks.toggle": "Claude Code hooks",
   "settings.providers.row.badge_default": "Default",
-  "settings.providers.row.models_available": "{count} model(s) available.",
+  "settings.providers.row.models_available_one": "1 model available.",
+  "settings.providers.row.models_available_other":
+    "{count} models available.",
   "settings.providers.row.model_selector": "{harness} model",
   "settings.providers.row.default_active": "Default",
   "settings.providers.row.use_default": "Use by default",
@@ -1258,6 +1261,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.interface_scale.description":
     "Amplia toda a interface. Use também Ctrl+=, Ctrl+- e Ctrl+0 (Cmd no macOS).",
   "settings.appearance.interface_scale.slider": "Escala da interface",
+  "settings.appearance.interface_blur.open_performance": "Ir para Performance",
   "settings.appearance.chat_background.title": "Fundo do chat",
   "settings.appearance.chat_background.description":
     "Uma imagem atrás dos painéis de chat. Fica só neste dispositivo.",
@@ -1361,8 +1365,9 @@ const ptBR: Record<LocaleKey, string> = {
     "Executa os hooks dos seus settings.json — reescritas PreToolUse, bloqueios, notificações etc. — como a CLI do Claude Code. Desligue se um hook falhar e você precisar retomar a sessão. Vale a partir do próximo turno.",
   "settings.providers.claude_hooks.toggle": "Hooks do Claude Code",
   "settings.providers.row.badge_default": "Padrão",
-  "settings.providers.row.models_available":
-    "{count} modelo(s) disponível(is).",
+  "settings.providers.row.models_available_one": "1 modelo disponível.",
+  "settings.providers.row.models_available_other":
+    "{count} modelos disponíveis.",
   "settings.providers.row.model_selector": "Modelo de {harness}",
   "settings.providers.row.default_active": "Padrão",
   "settings.providers.row.use_default": "Usar como padrão",
