@@ -493,7 +493,10 @@ export function SettingsView({
               ) : null}
               {section === "performance" ? <PerformancePage /> : null}
               {section === "appearance" ? (
-                <AppearancePage onRestoreReady={onRestoreAppearanceReady} />
+                <AppearancePage
+                  onRestoreReady={onRestoreAppearanceReady}
+                  onOpenSection={onSelectSection}
+                />
               ) : null}
               {section === "chat" ? <ChatPage /> : null}
               {section === "keybindings" ? <KeybindingsPage /> : null}
@@ -867,8 +870,12 @@ function NotificationsPage({
           ) : null}
           <Toggle
             label={t("settings.general.notifications.toggle")}
-            on={notificationsEnabled}
+            on={
+              notificationsEnabled &&
+              notificationPermission !== "unsupported"
+            }
             onChange={onNotificationsEnabled}
+            disabled={notificationPermission === "unsupported"}
           />
         </Row>
       </Group>
@@ -944,7 +951,7 @@ function PerformancePage() {
         >
           <Toggle
             label={t("settings.general.terminal_gpu.toggle")}
-            on={terminalGpu && hardwareAcceleration}
+            on={terminalGpu}
             onChange={onTerminalGpu}
             disabled={!hardwareAcceleration}
           />
@@ -2039,8 +2046,10 @@ function useAppearanceSettings() {
 
 function AppearancePage({
   onRestoreReady,
+  onOpenSection,
 }: {
   onRestoreReady?: (restore: () => void) => void;
+  onOpenSection?: (section: SettingsSectionId) => void;
 }) {
   const appearance = useAppearanceSettings();
   const { restoreDefaults } = appearance;
@@ -2218,9 +2227,20 @@ function AppearancePage({
           id="interface-blur"
           label={t("settings.appearance.interface_blur.label")}
           description={
-            hardwareOn
-              ? t("settings.appearance.interface_blur.description")
-              : t("settings.appearance.interface_blur.description_disabled")
+            hardwareOn ? (
+              t("settings.appearance.interface_blur.description")
+            ) : (
+              <>
+                {t("settings.appearance.interface_blur.description_disabled")}{" "}
+                <button
+                  type="button"
+                  onClick={() => onOpenSection?.("performance")}
+                  className="underline underline-offset-2 hover:text-content"
+                >
+                  {t("settings.appearance.interface_blur.open_performance")}
+                </button>
+              </>
+            )
           }
         >
           <Toggle
@@ -2664,9 +2684,11 @@ function ProviderRow({
       }
       description={
         available
-          ? t("settings.providers.row.models_available", {
-              count: models.length,
-            })
+          ? models.length === 1
+            ? t("settings.providers.row.models_available_one")
+            : t("settings.providers.row.models_available_other", {
+                count: models.length,
+              })
           : harnessUnavailableHint(harness, locale)
       }
     >
@@ -2993,7 +3015,7 @@ function Row({
   /** Matches a `SETTINGS_INDEX` id so search can scroll here. */
   id?: string;
   label: ReactNode;
-  description?: string;
+  description?: ReactNode;
   children?: ReactNode;
 }) {
   const revealed = useContext(RevealedSetting);
