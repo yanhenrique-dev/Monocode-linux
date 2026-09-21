@@ -132,6 +132,26 @@ function entryIsUnseen(entry: InboxSeenEntry, items: SeenMap): boolean {
   return inboxUpdatedAt(entry) > was;
 }
 
+/**
+ * Freshest stamp worth remembering for a read mark. The clicked card may
+ * render a stale snapshot while a poll is in flight, so the freshest known
+ * list entry wins; the click time itself is the floor, so a stale snapshot
+ * can never resurrect the unread dot on the next poll. Genuinely newer
+ * remote activity (timestamp above now) still marks the item unseen again.
+ */
+export function resolveSeenMark(
+  clickUpdatedAt: string,
+  freshUpdatedAt: string | undefined,
+  now: number = Date.now(),
+): string {
+  const stamp = Math.max(
+    inboxUpdatedAt({ updatedAt: clickUpdatedAt }),
+    freshUpdatedAt ? inboxUpdatedAt({ updatedAt: freshUpdatedAt }) : 0,
+    now,
+  );
+  return new Date(stamp).toISOString();
+}
+
 export function inboxSeenIsSeeded(): boolean {
   return loadInboxSeenStore().seeded;
 }

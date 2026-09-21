@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_SESSION_SIDEBAR_FILTERS,
   filterSessionsByHarness,
   filterSessionsByStatus,
   filterSessionsByTime,
   hasActiveSessionFilters,
+  saveSessionSidebarFilters,
+  subscribeSessionSidebarFilters,
   timeFilterStart,
 } from "./sessionFilters";
 import type { SessionSummary } from "./sessionStore";
@@ -111,5 +113,83 @@ describe("timeFilterStart", () => {
     expect(timeFilterStart("today", now)).toBe(
       new Date("2026-08-25T00:00:00").getTime(),
     );
+  });
+});
+
+describe("session filters change event", () => {
+  function mockWindowEvents() {
+    const listeners = new Map<string, Set<(event: { key?: string }) => void>>();
+    vi.stubGlobal("window", {
+      addEventListener: (type: string, fn: (event: unknown) => void) => {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type)!.add(fn as (event: { key?: string }) => void);
+      },
+      removeEventListener: (type: string, fn: (event: unknown) => void) => {
+        listeners.get(type)?.delete(fn as (event: { key?: string }) => void);
+      },
+      dispatchEvent: (event: { type: string }) => {
+        listeners.get(event.type)?.forEach((fn) => fn(event));
+        return true;
+      },
+    });
+    return listeners;
+  }
+
+  function mockLocalStorage(failing = false) {
+    const data = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (failing) throw new Error("denied");
+        data.set(key, value);
+      },
+      removeItem: (key: string) => {
+        data.delete(key);
+      },
+    });
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("notifies subscribers on save and on matching storage events", () => {
+    const listeners = mockWindowEvents();
+    mockLocalStorage();
+    let count = 0;
+    const stop = subscribeSessionSidebarFilters(() => {
+      count += 1;
+    });
+    saveSessionSidebarFilters({
+      ...DEFAULT_SESSION_SIDEBAR_FILTERS,
+      showArchived: true,
+    });
+    expect(count).toBe(1);
+    listeners
+      .get("storage")!
+      .forEach((fn) => fn({ key: "monocode.sessionSidebarFilters" }));
+    expect(count).toBe(2);
+    listeners.get("storage")!.forEach((fn) => fn({ key: "something-else" }));
+    expect(count).toBe(2);
+    stop();
+    saveSessionSidebarFilters(DEFAULT_SESSION_SIDEBAR_FILTERS);
+    expect(count).toBe(2);
+  });
+
+  it("stays silent when persistence fails", () => {
+    mockWindowEvents();
+    // Private mode / quota: the store still holds the old value, so
+    // subscribers re-reading it must not be woken.
+    mockLocalStorage(true);
+    let count = 0;
+    const stop = subscribeSessionSidebarFilters(() => {
+      count += 1;
+    });
+    saveSessionSidebarFilters({
+      ...DEFAULT_SESSION_SIDEBAR_FILTERS,
+      showArchived: true,
+    });
+    stop();
+    expect(count).toBe(0);
   });
 });

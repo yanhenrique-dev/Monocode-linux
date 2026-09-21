@@ -72,7 +72,7 @@ export function SkillPicker({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={onStartCreate}
-            className="flex w-full items-center gap-2 border-t border-stroke px-2.5 py-2 text-left text-[12px] text-content/70 hover:bg-content/10 hover:text-content"
+            className="flex w-full items-center gap-2 border-t border-stroke px-2 py-2 text-left text-[12px] text-content/70 hover:bg-content/10 hover:text-content"
           >
             <Plus className="size-3.5 shrink-0" strokeWidth={1.75} />
             New skill
@@ -232,9 +232,9 @@ export function CreateSkillForm({
         e.preventDefault();
         onCancel();
       }}
-      className="px-2.5 py-2"
+      className="px-2 py-2"
     >
-      <p className="mb-2 text-[11px] text-content/50">
+      <p className="mb-2 text-xs text-content/60">
         {t("settings.skills.form.hint")}
       </p>
       <input
@@ -245,7 +245,7 @@ export function CreateSkillForm({
         aria-label={t("settings.skills.form.name_label")}
         disabled={busy}
         onChange={(e) => setName(e.target.value)}
-        className={`mb-2 w-full rounded-md bg-content/10 px-2 py-1.5 text-[13px] text-content outline-none placeholder:text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
+        className={`mb-2 w-full rounded-md bg-content/10 px-2 py-2 text-sm text-content outline-none placeholder:text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
       />
       <div className="mb-2 flex gap-1">
         <ScopeButton
@@ -268,7 +268,7 @@ export function CreateSkillForm({
       {error ? (
         <p className="mb-2 text-[12px] text-content/70">{error}</p>
       ) : !name.trim() || valid ? null : (
-        <p className="mb-2 text-[12px] text-content/50">
+        <p className="mb-2 text-xs text-content/60">
           {t("settings.skills.form.name_hint")}
         </p>
       )}
@@ -315,7 +315,7 @@ function ScopeButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`flex min-w-0 flex-1 flex-col rounded-md px-2 py-1.5 text-left ${
+      className={`flex min-w-0 flex-1 flex-col rounded-md px-2 py-2 text-left ${
         selected
           ? "bg-selection-emphasis text-content"
           : "bg-selection text-content/70"
@@ -323,7 +323,7 @@ function ScopeButton({
     >
       <span className="text-[12px]">{label}</span>
       <span
-        className={`truncate text-[10px] text-content/40 ${monospace ? "font-mono" : "font-sans"}`}
+        className={`truncate text-xs text-content/60 ${monospace ? "font-mono" : "font-sans"}`}
       >
         {hint}
       </span>

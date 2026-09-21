@@ -162,6 +162,8 @@ const en = {
   "settings.general.sounds.custom.pick": "Custom file…",
   "settings.general.sounds.custom.file": "Custom file",
   "settings.general.sounds.test": "Test",
+  "settings.general.sounds.preview_ignores_mute":
+    "Preview plays even while muted",
   "settings.general.sounds.reset": "Reset",
   "settings.general.sounds.error.missing": "File not found — pick it again",
   "settings.general.sounds.error.decode":
@@ -209,6 +211,8 @@ const en = {
   "settings.general.terminal_gpu.description":
     "Render terminals with the GPU (WebGL2) when available, falling back to software rendering otherwise. Only applies while hardware acceleration is on.",
   "settings.general.terminal_gpu.toggle": "Terminal GPU rendering",
+  "settings.general.terminal_gpu.requires_master":
+    "Requires the Hardware acceleration master switch above.",
   "settings.general.about.title": "About",
   "settings.general.language.label": "Language",
   "settings.general.language.description":
@@ -222,6 +226,8 @@ const en = {
   "settings.general.update.checking": "Checking for updates…",
   "settings.general.update.current": "You're on the latest version.",
   "settings.general.update.failed": "Update check failed.",
+  "settings.general.update.failed_detail": "Couldn't check for updates: {error}",
+  "settings.general.update.last_checked": "Last checked {time}",
   "settings.general.update.idle":
     "MonoCode updates itself from the release feed.",
   "settings.general.update.flatpak":
@@ -549,6 +555,7 @@ const en = {
   "settings.appearance.interface_scale.description":
     "Zoom the whole interface. You can also use Ctrl+=, Ctrl+-, and Ctrl+0 (Cmd on macOS).",
   "settings.appearance.interface_scale.slider": "Interface scale",
+  "settings.appearance.interface_blur.open_performance": "Go to Performance",
   "settings.appearance.chat_background.title": "Chat background",
   "settings.appearance.chat_background.description":
     "An image behind your chat panes. It stays on this device.",
@@ -652,7 +659,9 @@ const en = {
     "Run the hooks configured in your settings.json files — PreToolUse command rewrites, blocks, notifications, and the rest — just as the Claude Code CLI would. Turn this off if a hook is misbehaving and you need the session back. Takes effect on the next turn.",
   "settings.providers.claude_hooks.toggle": "Claude Code hooks",
   "settings.providers.row.badge_default": "Default",
-  "settings.providers.row.models_available": "{count} model(s) available.",
+  "settings.providers.row.models_available_one": "1 model available.",
+  "settings.providers.row.models_available_other":
+    "{count} models available.",
   "settings.providers.row.model_selector": "{harness} model",
   "settings.providers.row.default_active": "Default",
   "settings.providers.row.use_default": "Use by default",
@@ -709,7 +718,7 @@ const en = {
   "settings.skills.form.creating": "Creating…",
   "settings.archive.projects.title": "Archived projects",
   "settings.archive.projects.description":
-    "Archive a project from the rail to keep its chats without listing it in the sidebar.",
+    "Archive a project from the rail to keep its conversations without listing it in the sidebar.",
   "settings.archive.projects.empty": "No archived projects.",
   "settings.archive.projects.restore": "Restore",
   "settings.archive.projects.delete": "Delete",
@@ -724,6 +733,9 @@ const en = {
   "settings.archive.sessions.empty": "No archived conversations in this project.",
   "settings.archive.sessions.unarchive": "Unarchive",
   "settings.archive.sessions.delete": "Delete",
+  "settings.archive.sessions.filter_placeholder": "Filter conversations",
+  "settings.archive.sessions.filter_aria": "Filter archived conversations",
+  "settings.archive.sessions.empty_no_match": "No matching conversations",
   "settings.archive.dialog.aria_delete": "Delete {name}",
   "settings.archive.dialog.title": "Delete “{name}”?",
   "settings.archive.dialog.body":
@@ -873,6 +885,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.sounds.custom.pick": "Arquivo personalizado…",
   "settings.general.sounds.custom.file": "Arquivo personalizado",
   "settings.general.sounds.test": "Testar",
+  "settings.general.sounds.preview_ignores_mute":
+    "A prévia toca mesmo com o som desligado",
   "settings.general.sounds.reset": "Redefinir",
   "settings.general.sounds.error.missing": "Arquivo não encontrado — selecione novamente",
   "settings.general.sounds.error.decode":
@@ -920,6 +934,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.terminal_gpu.description":
     "Renderiza terminais com a GPU (WebGL2) quando disponível, com retorno para software caso contrário. Vale apenas com a aceleração de hardware ativada.",
   "settings.general.terminal_gpu.toggle": "Renderização do terminal via GPU",
+  "settings.general.terminal_gpu.requires_master":
+    "Requer a chave principal Aceleração de hardware acima.",
   "settings.general.about.title": "Sobre",
   "settings.general.language.label": "Idioma",
   "settings.general.language.description":
@@ -933,6 +949,9 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.update.checking": "Verificando atualizações…",
   "settings.general.update.current": "Você está na versão mais recente.",
   "settings.general.update.failed": "Falha ao verificar atualizações.",
+  "settings.general.update.failed_detail":
+    "Não foi possível verificar atualizações: {error}",
+  "settings.general.update.last_checked": "Última verificação: {time}",
   "settings.general.update.idle":
     "O MonoCode se atualiza pelo feed de lançamentos.",
   "settings.general.update.flatpak":
@@ -1260,6 +1279,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.interface_scale.description":
     "Amplia toda a interface. Use também Ctrl+=, Ctrl+- e Ctrl+0 (Cmd no macOS).",
   "settings.appearance.interface_scale.slider": "Escala da interface",
+  "settings.appearance.interface_blur.open_performance": "Ir para Performance",
   "settings.appearance.chat_background.title": "Fundo do chat",
   "settings.appearance.chat_background.description":
     "Uma imagem atrás dos painéis de chat. Fica só neste dispositivo.",
@@ -1365,8 +1385,9 @@ const ptBR: Record<LocaleKey, string> = {
     "Executa os hooks dos seus settings.json — reescritas PreToolUse, bloqueios, notificações etc. — como a CLI do Claude Code. Desligue se um hook falhar e você precisar retomar a sessão. Vale a partir do próximo turno.",
   "settings.providers.claude_hooks.toggle": "Hooks do Claude Code",
   "settings.providers.row.badge_default": "Padrão",
-  "settings.providers.row.models_available":
-    "{count} modelo(s) disponível(is).",
+  "settings.providers.row.models_available_one": "1 modelo disponível.",
+  "settings.providers.row.models_available_other":
+    "{count} modelos disponíveis.",
   "settings.providers.row.model_selector": "Modelo de {harness}",
   "settings.providers.row.default_active": "Padrão",
   "settings.providers.row.use_default": "Usar como padrão",
@@ -1424,7 +1445,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.skills.form.creating": "Criando…",
   "settings.archive.projects.title": "Projetos arquivados",
   "settings.archive.projects.description":
-    "Arquive um projeto pela barra para guardar os chats sem listá-lo na barra lateral.",
+    "Arquive um projeto pela barra para guardar as conversas sem listá-lo na barra lateral.",
   "settings.archive.projects.empty": "Nenhum projeto arquivado.",
   "settings.archive.projects.restore": "Restaurar",
   "settings.archive.projects.delete": "Excluir",
@@ -1440,6 +1461,9 @@ const ptBR: Record<LocaleKey, string> = {
     "Nenhuma conversa arquivada neste projeto.",
   "settings.archive.sessions.unarchive": "Desarquivar",
   "settings.archive.sessions.delete": "Excluir",
+  "settings.archive.sessions.filter_placeholder": "Filtrar conversas",
+  "settings.archive.sessions.filter_aria": "Filtrar conversas arquivadas",
+  "settings.archive.sessions.empty_no_match": "Nenhuma conversa correspondente",
   "settings.archive.dialog.aria_delete": "Excluir {name}",
   "settings.archive.dialog.title": "Excluir “{name}”?",
   "settings.archive.dialog.body":

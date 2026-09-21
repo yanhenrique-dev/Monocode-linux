@@ -120,17 +120,17 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
   };
 
   return (
-    <div className="border-b border-content/5 px-4 py-3.5 last:border-b-0">
-      <div className="text-[13px] font-medium text-content">{t("settings.appearance.pets.add_title")}</div>
-      <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+    <div className="border-b border-content/10 px-4 py-4 last:border-b-0">
+      <div className="text-sm font-medium text-content">{t("settings.appearance.pets.add_title")}</div>
+      <p className="mt-1 text-[12px] leading-relaxed text-content/60">
         {t("settings.appearance.pets.add_description")}
       </p>
-      <div className="mt-3 flex flex-wrap items-start gap-4">
+      <div className="mt-4 flex flex-wrap items-start gap-4">
         <PixelEditor
           frame={frame === "rest" ? rest : talk}
           onChange={frame === "rest" ? setRest : setTalk}
         />
-        <div className="flex min-w-44 flex-1 flex-col gap-2">
+        <div className="flex min-w-48 flex-1 flex-col gap-2">
           <div className="flex gap-1" role="group" aria-label={t("settings.appearance.pets.frame_group")}>
             {(["rest", "talk"] as const).map((value) => (
               <button
@@ -156,7 +156,7 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
             rows={frame === "rest" ? rest : talk}
             className="size-12 text-content/80"
           />
-          <label className="flex h-7 w-52 max-w-full items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
+          <label className="flex h-8 w-48 max-w-full items-center rounded-md border border-content/15 px-2 focus-within:border-content/20">
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -217,31 +217,31 @@ export function PetsSettings() {
 
   return (
     <>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 border-b border-content/5 p-4 last:border-b-0">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-4 border-b border-content/10 p-4 last:border-b-0">
         {pets.map((pet) => {
           const custom = customNames.has(pet.name);
           const confirming = confirmDelete === pet.name;
           return (
             <div
               key={pet.name}
-              className="flex flex-col items-center gap-1 rounded-lg border border-content/10 px-2 py-2.5"
+              className="flex flex-col items-center gap-1 rounded-lg border border-content/15 px-2 py-4"
             >
               <ProjectMascot
                 project=""
                 name={pet.name}
                 className="size-8 text-content/80"
               />
-              <span className="max-w-full truncate text-[11px] text-content/60">
+              <span className="max-w-full truncate text-xs font-medium text-content/60">
                 {pet.name}
               </span>
               {custom ? (
                 <button
                   type="button"
                   onClick={() => onDelete(pet.name)}
-                  className={`rounded px-1.5 py-0.5 text-[11px] ${
+                  className={`rounded px-2 py-1 text-xs ${
                     confirming
                       ? "bg-red-500/20 text-red-300"
-                      : "text-content/40 hover:bg-content/10 hover:text-content"
+                      : "text-content/60 hover:bg-content/10 hover:text-content"
                   }`}
                 >
                   {confirming ? t("settings.appearance.pets.confirm") : t("settings.appearance.pets.delete")}
@@ -250,7 +250,7 @@ export function PetsSettings() {
                 <button
                   type="button"
                   onClick={() => setPetHidden(pet.name, true)}
-                  className="rounded px-1.5 py-0.5 text-[11px] text-content/40 hover:bg-content/10 hover:text-content"
+                  className="rounded px-2 py-1 text-xs text-content/60 hover:bg-content/10 hover:text-content"
                 >
                   {t("settings.appearance.pets.hide")}
                 </button>
@@ -260,9 +260,9 @@ export function PetsSettings() {
         })}
       </div>
       {hidden.length ? (
-        <div className="border-b border-content/5 px-4 py-3.5 last:border-b-0">
+        <div className="border-b border-content/10 px-4 py-4 last:border-b-0">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[13px] font-medium text-content">
+            <div className="text-sm font-medium text-content">
               {t("settings.appearance.pets.hidden_title", {
                 count: hidden.length,
               })}
@@ -278,7 +278,7 @@ export function PetsSettings() {
                 type="button"
                 onClick={() => setPetHidden(name, false)}
                 title={t("settings.appearance.pets.show_title", { name })}
-                className="flex items-center gap-1.5 rounded-md border border-content/10 px-2 py-1 text-[11px] text-content/50 opacity-60 hover:opacity-100"
+                className="flex items-center gap-2 rounded-md border border-content/15 px-2 py-1 text-xs text-content/60 opacity-60 hover:opacity-100"
               >
                 <ProjectMascot
                   project=""

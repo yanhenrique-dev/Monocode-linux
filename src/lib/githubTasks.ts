@@ -478,6 +478,82 @@ export async function githubWorkItemComment(
   return url;
 }
 
+/** Viewer permission and merge state for one pull request. Every field is
+ * optional: unknown means the UI stays optimistic instead of hiding actions. */
+export type GithubPrMergeInfo = {
+  viewerPermission?: string;
+  mergeable?: string;
+  mergeStateStatus?: string;
+};
+
+const mergeInfoByKey = new Map<string, GithubPrMergeInfo>();
+const mergeInfoInflight = new Map<string, Promise<GithubPrMergeInfo>>();
+
+function mergeInfoKey(repo: string, number: number): string {
+  return `${repo.trim().toLowerCase()}:pr:${number}`;
+}
+
+/** Fetch (and cache) who may merge this PR and whether it is mergeable.
+ * Never throws: on any failure it resolves to `{}` so callers keep the
+ * current optimistic behavior. */
+export async function githubPrMergeInfo(
+  cwd: string,
+  repo: string,
+  number: number,
+): Promise<GithubPrMergeInfo> {
+  const key = mergeInfoKey(repo, number);
+  const cached = mergeInfoByKey.get(key);
+  if (cached) return cached;
+  const inflight = mergeInfoInflight.get(key);
+  if (inflight) return inflight;
+  const pending = (async (): Promise<GithubPrMergeInfo> => {
+    try {
+      const info = await invoke<GithubPrMergeInfo>("git_github_pr_merge_info", {
+        cwd,
+        repo,
+        number,
+      });
+      const resolved = info ?? {};
+      mergeInfoByKey.set(key, resolved);
+      return resolved;
+    } catch {
+      // Offline, old `gh`, or no Tauri backend: stay optimistic.
+      const unknown: GithubPrMergeInfo = {};
+      mergeInfoByKey.set(key, unknown);
+      return unknown;
+    } finally {
+      mergeInfoInflight.delete(key);
+    }
+  })();
+  mergeInfoInflight.set(key, pending);
+  return pending;
+}
+
+/** True when the viewer may push/merge, false when they may not, `null`
+ * when unknown (older `gh`, offline) — callers must treat `null` as allowed. */
+export function githubViewerCanWrite(
+  info: GithubPrMergeInfo | null | undefined,
+): boolean | null {
+  const permission = info?.viewerPermission?.trim().toUpperCase();
+  if (!permission) return null;
+  if (
+    permission === "ADMIN" ||
+    permission === "MAINTAIN" ||
+    permission === "WRITE"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** True only when GitHub reports the PR as conflicting. `UNKNOWN` (GitHub
+ * computes mergeability asynchronously) and missing data count as allowed. */
+export function githubPrMergeConflicting(
+  info: GithubPrMergeInfo | null | undefined,
+): boolean {
+  return info?.mergeable?.trim().toUpperCase() === "CONFLICTING";
+}
+
 /** Run a state-changing pull request action and return GitHub's fresh PR state. */
 export async function githubPrAction(
   cwd: string,
