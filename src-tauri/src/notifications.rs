@@ -75,7 +75,14 @@ pub async fn show_notification(
     subtitle: String,
     body: String,
     sound: bool,
-) -> Result<ShowOutcome, String> {
+    const { osSound } = await invoke<{ osSound: boolean }>("show_notification", {
+      sessionId: session.id,
+      title,
+      subtitle,
+      body,
+      sound: loadSoundsEnabled(),
+    });
+    return osSound;
     platform::show(&app, &session_id, &title, &subtitle, &body, sound).await
 }
 
