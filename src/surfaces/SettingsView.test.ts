@@ -84,6 +84,12 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("providers default hint", () => {
+  it("tells new sessions follow the Default badge", async () => {
+    await render("providers");
+    expect(container.textContent).toContain("marked Default");
+  });
+});
 describe("performance honest toggles", () => {
   it("shows the stored terminal value dimmed while the master is off", async () => {
     localStorage.setItem("monocode.hardwareAcceleration", "0");
