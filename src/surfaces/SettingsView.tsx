@@ -102,6 +102,7 @@ import {
   saveTranscriptAnchor,
   saveTasksPill,
   saveUiBlur,
+  subscribeAppearance,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
   SIDEBAR_BLUR_DEFAULT,
   SIDEBAR_BLUR_MAX,
@@ -1929,6 +1930,49 @@ function useAppearanceSettings() {
     setUiScale(next);
     void applyUiScale(next);
   }, []);
+
+  // Re-reads every owned value from the store without persisting. Shared
+  // with the drag-abort path (fix/appearance-draft-revert adds the same
+  // helper there; keep the bodies identical so the rebase drops one).
+  const syncAppearanceFromStore = useCallback(() => {
+    cancelSidebarBlurPreview();
+    const tint = applyThemeTint(loadThemeHue(), loadThemeSaturation());
+    setThemeHue(tint.hue);
+    setThemeSaturation(tint.saturation);
+    const darkLightness = applyThemeDarkLightness(loadThemeDarkLightness());
+    setThemeDarkLightness(darkLightness);
+    const nextOpacity = applySidebarOpacity(loadSidebarOpacity());
+    setOpacity(nextOpacity);
+    const nextBlur = applySidebarBlur(loadSidebarBlur());
+    setBlur(nextBlur);
+    const nextAccent = applyAccentColor(loadAccentColor());
+    setAccentColor(nextAccent);
+    const empty = applyChatBackgroundEmptyOpacity(
+      loadChatBackgroundEmptyOpacity(),
+    );
+    setChatBackgroundEmptyOpacity(empty);
+    const session = applyChatBackgroundSessionOpacity(
+      loadChatBackgroundSessionOpacity(),
+    );
+    setChatBackgroundSessionOpacity(session);
+    const bgBlur = applyChatBackgroundBlur(loadChatBackgroundBlur());
+    setChatBackgroundBlur(bgBlur);
+    const scale = loadUiScale();
+    setUiScale(scale);
+    void applyUiScale(scale);
+  }, []);
+
+  // A persisted change from anywhere else in this window (another Settings
+  // surface) re-reads the store, so two editors never show different looks.
+  const syncRef = useRef(syncAppearanceFromStore);
+  syncRef.current = syncAppearanceFromStore;
+  useEffect(
+    () =>
+      subscribeAppearance(() => {
+        syncRef.current();
+      }),
+    [],
+  );
 
   const restoreDefaults = useCallback(() => {
     onThemePreference(THEME_PREFERENCE_DEFAULT);

@@ -47,6 +47,25 @@ export const ACCENT_COLOR_DEFAULT = null;
 /** Fired on `window` whenever the color scheme flips (detail: ColorScheme). */
 export const SCHEME_CHANGE_EVENT = "monocode:schemechange";
 
+/**
+ * Fired on `window` whenever any persisted appearance value changes.
+ * Same-window only: Tauri webviews do not share DOM events, so a second
+ * window still needs its own reload or a Tauri event to stay in sync.
+ */
+export const APPEARANCE_CHANGE_EVENT = "monocode:appearance-change";
+
+export function notifyAppearanceChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(APPEARANCE_CHANGE_EVENT));
+}
+
+export function subscribeAppearance(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(APPEARANCE_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(APPEARANCE_CHANGE_EVENT, onStoreChange);
+}
+
 export const TRANSCRIPT_LAYOUT_DEFAULT: TranscriptLayout = "full";
 
 export const CHANGES_VIEW_DEFAULT: ChangesView = "list";
@@ -194,6 +213,7 @@ export function saveAccentColor(value: string | null) {
   } catch {
     // private mode / quota
   }
+  notifyAppearanceChanged();
 }
 
 export function applyAccentColor(value: string | null) {
@@ -227,6 +247,7 @@ export function saveThemeHue(value: number) {
     THEME_HUE_KEY,
     Math.round(clamp(value, THEME_HUE_MIN, THEME_HUE_MAX)),
   );
+  notifyAppearanceChanged();
 }
 
 export function loadThemeSaturation(): number {
@@ -244,6 +265,7 @@ export function saveThemeSaturation(value: number) {
     THEME_SATURATION_KEY,
     Math.round(clamp(value, THEME_SATURATION_MIN, THEME_SATURATION_MAX)),
   );
+  notifyAppearanceChanged();
 }
 
 export function loadThemeDarkLightness(): number {
@@ -263,6 +285,7 @@ export function saveThemeDarkLightness(value: number) {
       clamp(value, THEME_DARK_LIGHTNESS_MIN, THEME_DARK_LIGHTNESS_MAX),
     ),
   );
+  notifyAppearanceChanged();
 }
 
 export function applyThemeDarkLightness(value: number) {
@@ -331,6 +354,7 @@ export function saveThemePreference(value: ThemePreference) {
   } catch {
     // private mode / quota
   }
+  notifyAppearanceChanged();
 }
 
 function systemQuery(): MediaQueryList | null {
@@ -393,6 +417,7 @@ export function saveSidebarOpacity(value: number) {
     OPACITY_KEY,
     clamp(value, SIDEBAR_OPACITY_MIN, SIDEBAR_OPACITY_MAX),
   );
+  notifyAppearanceChanged();
 }
 
 export function applySidebarOpacity(value: number) {
@@ -416,6 +441,7 @@ export function saveSidebarBlur(value: number) {
     BLUR_KEY,
     Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX)),
   );
+  notifyAppearanceChanged();
 }
 
 export function applySidebarBlur(value: number) {
@@ -465,6 +491,7 @@ export function loadBodyGlass(): boolean {
 
 export function saveBodyGlass(value: boolean) {
   writeFlag(BODY_KEY, value);
+  notifyAppearanceChanged();
 }
 
 export function applyBodyGlass(value: boolean) {
@@ -484,6 +511,7 @@ export function loadUiBlur(): boolean {
 
 export function saveUiBlur(value: boolean) {
   writeFlag(UI_BLUR_KEY, value);
+  notifyAppearanceChanged();
 }
 
 export function applyUiBlur(value: boolean) {
@@ -508,6 +536,7 @@ export function saveChatBackgroundPath(value: string | null) {
   }
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(CHAT_BACKGROUND_PATH_CHANGE_EVENT));
+  notifyAppearanceChanged();
 }
 
 export function subscribeChatBackgroundPath(onStoreChange: () => void) {
@@ -595,6 +624,7 @@ export function loadChatBackgroundEmptyOpacity(): number {
 
 export function saveChatBackgroundEmptyOpacity(value: number) {
   saveChatBackgroundOpacityValue(CHAT_BACKGROUND_EMPTY_OPACITY_KEY, value);
+  notifyAppearanceChanged();
 }
 
 export function applyChatBackgroundEmptyOpacity(value: number) {
@@ -610,6 +640,7 @@ export function loadChatBackgroundSessionOpacity(): number {
 
 export function saveChatBackgroundSessionOpacity(value: number) {
   saveChatBackgroundOpacityValue(CHAT_BACKGROUND_SESSION_OPACITY_KEY, value);
+  notifyAppearanceChanged();
 }
 
 export function applyChatBackgroundSessionOpacity(value: number) {
@@ -640,6 +671,7 @@ export function saveChatBackgroundBlur(value: number) {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(CHAT_BACKGROUND_BLUR_CHANGE_EVENT));
   }
+  notifyAppearanceChanged();
   return next;
 }
 
@@ -680,6 +712,7 @@ export function saveChatBackgroundScope(value: ChatBackgroundScope) {
   } catch {
     // private mode / quota
   }
+  notifyAppearanceChanged();
 }
 
 export function applyChatBackgroundScope(value: ChatBackgroundScope) {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACCENT_COLOR_DEFAULT,
   CHAT_BACKGROUND_BLUR_DEFAULT,
@@ -31,6 +31,11 @@ import {
   loadThemeDarkLightness,
   saveThemeDarkLightness,
   saveThemePreference,
+  saveThemeHue,
+  saveBodyGlass,
+  saveChatBackgroundScope,
+  subscribeAppearance,
+  APPEARANCE_CHANGE_EVENT,
   resolveColorScheme,
   THEME_PREFERENCE_DEFAULT,
   THEME_DARK_LIGHTNESS_DEFAULT,
@@ -323,5 +328,56 @@ describe("interface blur setting", () => {
     expect(
       document.documentElement.classList.contains(UI_BLUR_OFF_CLASS),
     ).toBe(false);
+  });
+});
+
+describe("appearance change event", () => {
+  function mockWindowEvents() {
+    const listeners = new Map<string, Set<() => void>>();
+    vi.stubGlobal("window", {
+      addEventListener: (type: string, fn: () => void) => {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type)!.add(fn);
+      },
+      removeEventListener: (type: string, fn: () => void) => {
+        listeners.get(type)?.delete(fn);
+      },
+      dispatchEvent: (event: { type: string }) => {
+        listeners.get(event.type)?.forEach((fn) => fn());
+        return true;
+      },
+    });
+  }
+
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("notifies subscribers when a persisted value changes", () => {
+    mockWindowEvents();
+    const seen: string[] = [];
+    const stop = subscribeAppearance(() => seen.push("changed"));
+    saveThemeHue(120);
+    saveBodyGlass(false);
+    saveChatBackgroundScope("empty");
+    stop();
+    saveThemeHue(130);
+    expect(seen).toEqual(["changed", "changed", "changed"]);
+  });
+
+  it("stops notifying after unsubscribe", () => {
+    mockWindowEvents();
+    let count = 0;
+    const stop = subscribeAppearance(() => {
+      count += 1;
+    });
+    stop();
+    saveThemeHue(120);
+    expect(count).toBe(0);
+  });
+
+  it("exposes the documented event name", () => {
+    expect(APPEARANCE_CHANGE_EVENT).toBe("monocode:appearance-change");
   });
 });

@@ -1,4 +1,5 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { notifyAppearanceChanged } from "./appearance";
 
 const UI_SCALE_KEY = "monocode.uiScale";
 
@@ -43,6 +44,7 @@ export function saveUiScale(value: number) {
   } catch {
     // private mode / quota
   }
+  notifyAppearanceChanged();
   return next;
 }
 
