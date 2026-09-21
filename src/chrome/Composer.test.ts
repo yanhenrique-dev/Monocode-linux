@@ -274,6 +274,33 @@ describe("Composer worktree drafts", () => {
     });
   });
 
+  it("notes when a follow-up goes straight into the running turn", async () => {
+    const onSubmit = vi.fn(() => "steered" as const);
+    const props = {
+      harness: "claude" as const,
+      model: "claude-sonnet",
+      runtimeMode: "supervised" as const,
+      cwd: "/repo",
+      executionCwd: "/repo",
+      hideProjectPicker: true,
+      initialDraft: "Nudge it",
+      onFocus: vi.fn(),
+      onCwdChange: vi.fn(),
+      onModelChange: vi.fn(),
+      onRuntimeModeChange: vi.fn(),
+      onSubmit,
+    };
+    await act(async () => root.render(createElement(Composer, props)));
+    const send = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Send"]',
+    )!;
+    await act(async () => send.click());
+    const statuses = [...container.querySelectorAll('[role="status"]')].map(
+      (el) => el.textContent ?? "",
+    );
+    expect(statuses.some((text) => text.includes("running turn"))).toBe(true);
+  });
+
   it("locks a started session to its worktree while keeping its branch editable", async () => {
     await act(async () =>
       root.render(

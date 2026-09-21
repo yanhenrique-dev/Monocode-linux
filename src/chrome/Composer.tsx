@@ -211,7 +211,7 @@ type Props = {
     text: string,
     attachments: Attachment[],
     options?: ComposerTurnOptions,
-  ) => boolean | void;
+  ) => boolean | "steered" | void;
   onStop?: () => void;
   onCompactContext?: () => boolean;
   onPlaceInFolder?: (target: SessionFolderTarget) => void;
@@ -688,6 +688,29 @@ export function Composer({
     () => () => {
       if (attachNoticeTimer.current != null) {
         window.clearTimeout(attachNoticeTimer.current);
+      }
+    },
+    [],
+  );
+
+  // Transient, self-clearing note for a follow-up steered into the running
+  // turn: without it the only evidence is the missing queue card.
+  const [submitNotice, setSubmitNotice] = useState<string | null>(null);
+  const submitNoticeTimer = useRef<number | null>(null);
+  const showSubmitNotice = useCallback((message: string) => {
+    if (submitNoticeTimer.current != null) {
+      window.clearTimeout(submitNoticeTimer.current);
+    }
+    setSubmitNotice(message);
+    submitNoticeTimer.current = window.setTimeout(() => {
+      submitNoticeTimer.current = null;
+      setSubmitNotice(null);
+    }, 2000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (submitNoticeTimer.current != null) {
+        window.clearTimeout(submitNoticeTimer.current);
       }
     },
     [],
@@ -1285,6 +1308,11 @@ export function Composer({
     // orchestration is paused). Keep the user's text, files and selected mode
     // intact so resolving the blocker never destroys their work.
     if (accepted === false) return;
+    if (accepted === "steered") {
+      showSubmitNotice(
+        "Sent straight into the running turn. Queue follow-ups instead from Settings > Chat > Follow-up behavior.",
+      );
+    }
     if (!ref.current) return;
     ref.current.value = "";
     ref.current.style.height = "auto";
@@ -1776,6 +1804,15 @@ export function Composer({
               className="px-3 pt-2 text-[12px] leading-snug text-content/60"
             >
               {attachNotice}
+            </div>
+          ) : null}
+
+          {submitNotice ? (
+            <div
+              role="status"
+              className="px-3 pt-2 text-[12px] leading-snug text-content/60"
+            >
+              {submitNotice}
             </div>
           ) : null}
 

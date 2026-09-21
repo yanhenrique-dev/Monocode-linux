@@ -103,7 +103,7 @@ type Props = {
     text: string,
     attachments: Attachment[],
     options?: ComposerTurnOptions,
-  ) => boolean | void;
+  ) => boolean | "steered" | void;
   onStop: (sessionId: string) => Promise<void>;
   onCompactContext: (sessionId: string) => boolean;
   onPlaceSessionInFolder: (

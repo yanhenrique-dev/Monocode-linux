@@ -14,6 +14,16 @@ vi.mock("../lib/orchestration", () => ({
   },
 }));
 
+vi.mock("../lib/harness", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../lib/harness")>();
+  return {
+    ...actual,
+    isLiveHarness: () => true,
+    canSteerHarness: () => true,
+  };
+});
+
 import { orchestrator } from "../lib/orchestration";
 import type { HarnessEvent } from "../lib/harness";
 import type { Session } from "../lib/session";
@@ -186,6 +196,21 @@ describe("useComposer.onSubmit guard clauses", () => {
       text: "",
       error: "Session is unavailable or already running",
     });
+  });
+
+  it("reports steered when a busy-session follow-up goes into the live turn", () => {
+    const session = makeSession({ busy: true });
+    const { deps } = makeDeps([session]);
+    const api = renderApi(deps);
+
+    let result: unknown;
+    act(() => {
+      result = api.current!.onSubmit("s1", "nudge it", [], {
+        followUpBehavior: "steer",
+      });
+    });
+
+    expect(result).toBe("steered");
   });
 
   it("refuses an orchestrate intent while a run is active", () => {

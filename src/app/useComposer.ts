@@ -499,7 +499,10 @@ export function useComposer(deps: ComposerDeps) {
             flushHarnessEvents();
           }
         })();
-        return true;
+        // Reports back as steered (not merely accepted) so the composer can
+        // tell the user the message went straight into the running turn
+        // instead of waiting as a queued card.
+        return "steered";
       }
 
       if (options?.resendEdited && canRewindHarnessLastTurn(current.harness)) {
