@@ -169,10 +169,10 @@ Pré-requisitos no host:
 Diagnóstico rápido:
 
 ```bash
-# Daemon presente?
-dbus-send --print-reply --dest=org.freedesktop.Notifications \
-  /org/freedesktop/Notifications org.freedesktop.DBus.Properties.Get \
-  string:org.freedesktop.Notifications string:ServerInformation
+# Daemon presente? (esperado: vendor, name, version, spec)
+dbus-send --session --print-reply --dest=org.freedesktop.Notifications \
+  /org/freedesktop/Notifications \
+  org.freedesktop.Notifications.GetServerInformation
 notify-send "MonoCode" "teste"
 
 # Tema de som tem o nome pedido?

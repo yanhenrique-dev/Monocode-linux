@@ -533,6 +533,7 @@ mod platform {
         false
     }
 
+    /// Icon theme roots searched for the banner icon, user scope first.
     fn icon_dirs() -> Vec<std::path::PathBuf> {
         let mut dirs = Vec::new();
         if let Some(data_home) = std::env::var_os("XDG_DATA_HOME")
