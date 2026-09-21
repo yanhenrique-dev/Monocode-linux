@@ -31,14 +31,19 @@ type StartedSource = { buffer: AudioBuffer | null };
 function installAudio(options?: {
   decodeError?: unknown;
   playError?: unknown;
+  suspendedFirst?: boolean;
+  resumeStuck?: boolean;
 }) {
   const started: StartedSource[] = [];
   const elements: { src: string; volume: number }[] = [];
 
   class FakeContext {
-    state = "running";
+    state = options?.suspendedFirst ? "suspended" : "running";
     destination = {};
-    resume = vi.fn().mockResolvedValue(undefined);
+    resume = vi.fn(() => {
+      if (!options?.resumeStuck) this.state = "running";
+      return Promise.resolve(undefined);
+    });
     decodeAudioData = vi.fn(() =>
       options?.decodeError
         ? Promise.reject(options.decodeError)
@@ -163,6 +168,26 @@ describe("soundFiles", () => {
       expect(mocks.readBinaryFile).toHaveBeenCalledTimes(2);
     });
 
+    it("waits for resume before starting on a suspended context", async () => {
+      const { started, elements } = installAudio({ suspendedFirst: true });
+      mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1]));
+      const result = await playSoundFile(SOUND_PATH);
+      expect(result).toEqual({ ok: true });
+      expect(started).toHaveLength(1);
+      expect(elements).toHaveLength(0);
+    });
+
+    it("falls back to the audio element when resume stays suspended", async () => {
+      const { started, elements } = installAudio({
+        suspendedFirst: true,
+        resumeStuck: true,
+      });
+      mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1]));
+      const result = await playSoundFile(SOUND_PATH);
+      expect(result).toEqual({ ok: true });
+      expect(started).toHaveLength(0);
+      expect(elements).toHaveLength(1);
+    });
     it("falls back to the audio element when decoding fails", async () => {
       const { started, elements } = installAudio({ decodeError: "nope" });
       mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1]));

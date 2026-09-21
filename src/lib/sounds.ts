@@ -6,7 +6,7 @@ import {
   type NotificationSubject,
 } from "./notificationPreferences";
 import { inboxNotificationProject } from "./notificationProjects";
-import { playSoundFile, setSoundFileVolume } from "./soundFiles";
+import { playSoundFile, setSoundFileVolume, unlockAudio } from "./soundFiles";
 
 const KEY = "monocode.sounds";
 const ENABLED_AT_KEY = "monocode.soundsEnabledAt";
@@ -166,6 +166,29 @@ function applySoundEngine() {
 /** Apply the stored mute/volume before the first cue. */
 export function initSounds() {
   applySoundEngine();
+  unlockAudioOnGesture();
+}
+
+/**
+ * Webviews start the AudioContext suspended until a user gesture. Warm it on
+ * the first interaction so later cues start instantly instead of racing a
+ * resume. Note the preset engine (cuelume) additionally drops playback while
+ * `navigator.userActivation.hasBeenActive === false`, so cues fired before
+ * any interaction (e.g. background activity restored at boot) stay silent
+ * there by design; custom files go through our context above.
+ */
+let gestureUnlockInstalled = false;
+
+function unlockAudioOnGesture() {
+  if (gestureUnlockInstalled || typeof window === "undefined") return;
+  gestureUnlockInstalled = true;
+  const unlock = () => {
+    unlockAudio();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock);
+  window.addEventListener("keydown", unlock);
 }
 
 type ProjectSoundCue = "turnFinished" | "inboxUnseen" | "linkedActivity";

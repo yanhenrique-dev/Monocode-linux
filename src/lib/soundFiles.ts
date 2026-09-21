@@ -80,6 +80,34 @@ function audioContext(): AudioContext | null {
   }
 }
 
+/**
+ * Resume the shared context and wait until it can actually render.
+ * Starting a source on a suspended context schedules silence: callers must
+ * await this and fall back when it resolves false.
+ */
+async function runningContext(timeoutMs = 500): Promise<AudioContext | null> {
+  const ctx = audioContext();
+  if (!ctx) return null;
+  if (ctx.state === "running") return ctx;
+  try {
+    await Promise.race([
+      ctx.resume().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  } catch {
+    return null;
+  }
+  // Read into a plain string: comparing ctx.state directly re-triggers the
+  // narrowing from the early return above and fails type-checking.
+  const state: string = ctx.state;
+  return state === "running" ? ctx : null;
+}
+
+/** Warm the shared context, e.g. on first user gesture (autoplay policy). */
+export function unlockAudio(): void {
+  void runningContext().catch(() => undefined);
+}
+
 async function mtimeOf(path: string): Promise<number | null> {
   try {
     const [stat] = await statFiles([path]);
@@ -136,7 +164,10 @@ export async function playSoundFile(path: string): Promise<SoundFileResult> {
       return { ok: false, reason };
     }
     if (decoded.buffer) {
-      const ctx = audioContext();
+      // Never start on a suspended context: the cue would be scheduled as
+      // silence (or delayed until an unrelated resume). Fall through to the
+      // media-element fallback, which queues under its own autoplay policy.
+      const ctx = await runningContext();
       if (ctx) {
         const source = ctx.createBufferSource();
         const gain = ctx.createGain();
