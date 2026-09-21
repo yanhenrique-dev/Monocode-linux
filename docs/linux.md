@@ -155,6 +155,17 @@ não abrir, teste no terminal:
 
 e confira o navegador padrão com `xdg-settings get default-web-browser`.
 
+## Interface borrada ou apagada
+
+Ordem de checagem:
+
+1. Escala da interface diferente de 100% (Ctrl+=, Ctrl+-, Ctrl+0): zoom
+   fracionário borra botões e ícones. Em Configurações → Aparência a
+   linha da escala mostra botão de reset quando não está em 100%.
+2. Escala fracionária do Wayland (125%/150%): o WebKitGTK renderiza em
+   resolução não inteira e tudo amacia. Se o passo 1 não resolveu e o
+   sistema usa fração, teste 100% ou 200% para confirmar a origem.
+
 ## Verificação
 
 ```bash

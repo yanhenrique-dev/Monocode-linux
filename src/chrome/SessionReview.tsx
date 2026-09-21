@@ -164,7 +164,7 @@ export function SessionReview({
               }
               disabled={disabled || !canUndoAll}
               onClick={() => run("undo")}
-              className="h-7 rounded-md px-2.5 text-[11px] text-content/50 hover:bg-content/8 hover:text-content disabled:opacity-35"
+              className="h-7 rounded-md px-2.5 text-[11px] text-content/65 hover:bg-content/8 hover:text-content disabled:opacity-35"
             >
               Undo
             </button>
@@ -173,7 +173,7 @@ export function SessionReview({
               title="Keep all session changes and dismiss this card"
               disabled={disabled}
               onClick={() => run("keep")}
-              className="h-7 rounded-md px-2.5 text-[11px] text-content/50 hover:bg-content/8 hover:text-content disabled:opacity-35"
+              className="h-7 rounded-md px-2.5 text-[11px] text-content/65 hover:bg-content/8 hover:text-content disabled:opacity-35"
             >
               Keep
             </button>
