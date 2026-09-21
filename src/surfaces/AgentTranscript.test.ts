@@ -561,6 +561,25 @@ describe("AgentTranscript collapsed work", () => {
   });
 });
 
+describe("live trailing status", () => {
+  const blocks: Block[] = [
+    { id: "user", role: "user", text: "Compact it" },
+    { id: "st", role: "system", text: "Compacting context…" },
+  ];
+
+  it("shimmers the in-progress status instead of leaving it bare", () => {
+    expect(render(blocks, true)).toMatch(
+      /shimmer-text[^>]*>Compacting context…</,
+    );
+  });
+
+  it("settles the status once the turn is done", () => {
+    expect(render(blocks, false)).not.toMatch(
+      /shimmer-text[^>]*>Compacting context…</,
+    );
+  });
+});
+
 describe("worker assignment prompts", () => {
   it("hides the assignment envelope and keeps the task text", () => {
     const markup = renderToStaticMarkup(
