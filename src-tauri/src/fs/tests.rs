@@ -1392,6 +1392,11 @@ fn slug_from_github_remote_url_accepts_https_ssh_and_bare_forms() {
             .as_deref(),
         Some("yanhenrique-dev/monocode-linux")
     );
+    // An explicit :443 is still github.com.
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com:443/acme/web.git").as_deref(),
+        Some("acme/web")
+    );
 }
 
 #[test]

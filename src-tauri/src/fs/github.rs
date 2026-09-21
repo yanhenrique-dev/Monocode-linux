@@ -1520,13 +1520,19 @@ fn normalize_github_remote_url(url: &str) -> String {
     if let Some(path) = lower.strip_prefix("github.com/") {
         return format!("github.com/{path}");
     }
-    // scheme://[userinfo@]host/path — accept only an exact github.com host.
+    // scheme://[userinfo@]host[:port]/path — accept only an exact
+    // github.com host, ignoring an explicit port such as :443.
     if let Some((_, rest)) = lower.split_once("://") {
         let (authority, path) = match rest.split_once('/') {
             Some((authority, path)) => (authority, path),
             None => return String::new(),
         };
         let host = authority.split('@').next_back().unwrap_or("");
+        let host = match host.split_once(':') {
+            Some((bare, port)) if port.chars().all(|c| c.is_ascii_digit()) => bare,
+            Some(_) => return String::new(),
+            None => host,
+        };
         if host != "github.com" {
             return String::new();
         }
