@@ -1,7 +1,11 @@
 import { X } from "./icons";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import {
+  useExitAnimation,
+  useExperimentalAnimations,
+} from "../hooks/useExitAnimation";
 import { LAYER } from "../lib/layers";
 import { useLocale } from "../lib/locale";
 import { GlassBackdrop } from "./GlassBackdrop";
@@ -28,6 +32,12 @@ type Props = {
   /** Extra classes on the panel (fixed height, etc). */
   className?: string;
   children: ReactNode;
+  /** Replaces the enter animation with the outro; internal to Modal. */
+  panelClassName?: string;
+  onPanelAnimationEnd?: (event: {
+    target: unknown;
+    currentTarget: unknown;
+  }) => void;
 };
 
 export function ModalPanel({
@@ -38,6 +48,8 @@ export function ModalPanel({
   minimalHeader = false,
   className,
   children,
+  panelClassName,
+  onPanelAnimationEnd,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
@@ -80,7 +92,12 @@ export function ModalPanel({
         className={`relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
       >
         <GlassBackdrop className="popover-backdrop bg-background-base/55" />
-        <div className="modal-panel relative z-[1] flex min-h-0 flex-1 flex-col">
+        <div
+          onAnimationEnd={onPanelAnimationEnd}
+          className={`${
+            panelClassName ?? "modal-panel"
+          } relative z-[1] flex min-h-0 flex-1 flex-col`}
+        >
           <header
             className={
               minimalHeader
@@ -129,13 +146,29 @@ export function ModalPanel({
 }
 
 export function Modal(props: Props) {
+  const animationsEnabled = useExperimentalAnimations();
+  const { closing, requestClose, handleAnimationEnd } = useExitAnimation({
+    enabled: animationsEnabled,
+    durationMs: 200,
+    onExit: props.onClose,
+  });
+  const requestModalClose = useCallback(() => {
+    requestClose();
+  }, [requestClose]);
   return createPortal(
     <div className="fixed inset-0" style={{ zIndex: LAYER.dialog }}>
       <div
-        className="modal-backdrop absolute inset-0 bg-black/40"
-        onMouseDown={props.onClose}
+        className={`modal-backdrop absolute inset-0 bg-black/40${
+          closing ? " modal-backdrop-closing" : ""
+        }`}
+        onMouseDown={requestModalClose}
       />
-      <ModalPanel {...props} />
+      <ModalPanel
+        {...props}
+        onClose={requestModalClose}
+        panelClassName={closing ? "modal-panel-closing" : undefined}
+        onPanelAnimationEnd={closing ? handleAnimationEnd : undefined}
+      />
     </div>,
     document.body,
   );

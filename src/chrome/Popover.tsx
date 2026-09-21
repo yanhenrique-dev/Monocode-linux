@@ -12,6 +12,10 @@ import { createPortal } from "react-dom";
 import { GlassBackdrop } from "./GlassBackdrop";
 import { LAYER } from "../lib/layers";
 import {
+  useExitAnimation,
+  useExperimentalAnimations,
+} from "../hooks/useExitAnimation";
+import {
   placePopover,
   type AnchorRect,
   type PopoverAlign,
@@ -193,6 +197,29 @@ export function Popover({
     if (autoFocus) surface.current?.focus();
   }, [autoFocus]);
 
+  const animationsEnabled = useExperimentalAnimations();
+  const pendingReason = useRef<PopoverDismissReason | null>(null);
+  const { closing, requestClose, handleAnimationEnd } = useExitAnimation({
+    enabled: animationsEnabled,
+    durationMs: 200,
+    onExit: () => {
+      const reason = pendingReason.current;
+      pendingReason.current = null;
+      if (reason) dismissRef.current?.(reason);
+    },
+  });
+  const dismiss = useCallback(
+    (reason: PopoverDismissReason) => {
+      if (!animationsEnabled) {
+        dismissRef.current?.(reason);
+        return;
+      }
+      pendingReason.current = reason;
+      requestClose();
+    },
+    [animationsEnabled, requestClose],
+  );
+
   useEffect(() => {
     if (!onDismiss) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -203,13 +230,13 @@ export function Popover({
       const el =
         target instanceof Element ? target : (target.parentElement ?? null);
       if (ignore && el?.closest(ignore)) return;
-      dismissRef.current?.("outside");
+      dismiss("outside");
     };
     const onKey = (event: KeyboardEvent) => {
       if (!dismissOnEscape || event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      dismissRef.current?.("escape");
+      dismiss("escape");
     };
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("keydown", onKey, true);
@@ -217,7 +244,7 @@ export function Popover({
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [onDismiss, dismissOnEscape, ignore]);
+  }, [onDismiss, dismissOnEscape, ignore, dismiss]);
 
   // The first pass measures the surface off to the side; the layout effect
   // lands it before the browser paints.
@@ -274,7 +301,8 @@ export function Popover({
           transformOrigin: origin(position?.side ?? side, align),
           ...style,
         }}
-        className={`${position ? "popover-open " : ""}relative z-[1] outline-none ${className ?? ""}`}
+        onAnimationEnd={closing ? handleAnimationEnd : undefined}
+        className={`${position && !closing ? "popover-open " : ""}${closing ? "popover-closing " : ""}relative z-[1] outline-none ${className ?? ""}`}
       >
         {children}
       </div>
