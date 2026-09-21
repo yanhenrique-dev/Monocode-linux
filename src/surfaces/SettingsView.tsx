@@ -1980,6 +1980,37 @@ function useAppearanceSettings() {
     void applyUiScale(next);
   }, []);
 
+  // Restore the persisted look after an abandoned drag preview or an
+  // unmount mid-preview (popover closed, page left). Nothing here persists:
+  // every value comes from the stored settings.
+  const revertAppearanceDrafts = useCallback(() => {
+    cancelSidebarBlurPreview();
+    const tint = applyThemeTint(loadThemeHue(), loadThemeSaturation());
+    setThemeHue(tint.hue);
+    setThemeSaturation(tint.saturation);
+    const darkLightness = applyThemeDarkLightness(loadThemeDarkLightness());
+    setThemeDarkLightness(darkLightness);
+    const nextOpacity = applySidebarOpacity(loadSidebarOpacity());
+    setOpacity(nextOpacity);
+    const nextBlur = applySidebarBlur(loadSidebarBlur());
+    setBlur(nextBlur);
+    const nextAccent = applyAccentColor(loadAccentColor());
+    setAccentColor(nextAccent);
+    const empty = applyChatBackgroundEmptyOpacity(
+      loadChatBackgroundEmptyOpacity(),
+    );
+    setChatBackgroundEmptyOpacity(empty);
+    const session = applyChatBackgroundSessionOpacity(
+      loadChatBackgroundSessionOpacity(),
+    );
+    setChatBackgroundSessionOpacity(session);
+    const bgBlur = applyChatBackgroundBlur(loadChatBackgroundBlur());
+    setChatBackgroundBlur(bgBlur);
+    const scale = loadUiScale();
+    setUiScale(scale);
+    void applyUiScale(scale);
+  }, []);
+
   const restoreDefaults = useCallback(() => {
     onThemePreference(THEME_PREFERENCE_DEFAULT);
     onAccentColor(ACCENT_COLOR_DEFAULT);
@@ -2051,6 +2082,7 @@ function useAppearanceSettings() {
     onChatBackgroundScope,
     onUiScale,
     restoreDefaults,
+    revertAppearanceDrafts,
     previewAccentColor,
     previewTint,
     previewDarkLightness,
@@ -2071,7 +2103,10 @@ function AppearancePage({
   onOpenSection?: (section: SettingsSectionId) => void;
 }) {
   const appearance = useAppearanceSettings();
-  const { restoreDefaults } = appearance;
+  const { restoreDefaults, revertAppearanceDrafts } = appearance;
+  // A drag preview paints without persisting: leaving the page must not
+  // keep the abandoned look.
+  useEffect(() => () => revertAppearanceDrafts(), [revertAppearanceDrafts]);
   // The master hardware switch overrides every blur control: while it is
   // off, `html.hw-reduced` kills the sampling the toggle below would flip.
   const [hardwareOn, setHardwareOn] = useState(loadHardwareAcceleration);
@@ -2142,6 +2177,7 @@ function AppearancePage({
             value={appearance.accentColor}
             onPreview={appearance.previewAccentColor}
             onChange={appearance.onAccentColor}
+            onCancel={appearance.revertAppearanceDrafts}
           />
         </Row>
       </Group>
@@ -2163,6 +2199,7 @@ function AppearancePage({
             max={THEME_HUE_MAX}
             onPreview={onHuePreview}
             onCommit={onHueCommit}
+            onCancel={appearance.revertAppearanceDrafts}
           />
         </Row>
         <Row
@@ -2178,6 +2215,7 @@ function AppearancePage({
             max={THEME_SATURATION_MAX}
             onPreview={onSaturationPreview}
             onCommit={onSaturationCommit}
+            onCancel={appearance.revertAppearanceDrafts}
           />
         </Row>
         <Row
@@ -2197,6 +2235,7 @@ function AppearancePage({
             max={THEME_DARK_LIGHTNESS_MAX}
             onPreview={appearance.previewDarkLightness}
             onCommit={appearance.onDarkLightness}
+            onCancel={appearance.revertAppearanceDrafts}
             disabled={glassDisabled}
           />
         </Row>
@@ -2223,6 +2262,7 @@ function AppearancePage({
             max={Math.round(SIDEBAR_OPACITY_MAX * 100)}
             onPreview={appearance.previewOpacity}
             onCommit={appearance.onOpacity}
+            onCancel={appearance.revertAppearanceDrafts}
             disabled={glassDisabled}
           />
         </Row>
@@ -2239,6 +2279,7 @@ function AppearancePage({
             max={SIDEBAR_BLUR_MAX}
             onPreview={appearance.previewBlur}
             onCommit={appearance.onBlur}
+            onCancel={appearance.revertAppearanceDrafts}
             disabled={glassDisabled}
           />
         </Row>
@@ -2308,6 +2349,7 @@ function AppearancePage({
             step={10}
             onPreview={appearance.previewUiScale}
             onCommit={appearance.onUiScale}
+            onCancel={appearance.revertAppearanceDrafts}
           />
         </Row>
       </Group>
@@ -2464,6 +2506,7 @@ function ChatBackgroundCard({
               max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
               onPreview={appearance.previewChatBackgroundEmptyOpacity}
               onCommit={appearance.onChatBackgroundEmptyOpacity}
+            onCancel={appearance.revertAppearanceDrafts}
             />
           </Row>
           <Row
@@ -2484,6 +2527,7 @@ function ChatBackgroundCard({
               max={Math.round(CHAT_BACKGROUND_OPACITY_MAX * 100)}
               onPreview={appearance.previewChatBackgroundSessionOpacity}
               onCommit={appearance.onChatBackgroundSessionOpacity}
+            onCancel={appearance.revertAppearanceDrafts}
             />
           </Row>
           <Row
@@ -2502,6 +2546,7 @@ function ChatBackgroundCard({
               max={CHAT_BACKGROUND_BLUR_MAX}
               onPreview={appearance.previewChatBackgroundBlur}
               onCommit={appearance.onChatBackgroundBlur}
+            onCancel={appearance.revertAppearanceDrafts}
             />
           </Row>
         </>
@@ -3286,6 +3331,7 @@ const Slider = memo(function Slider({
   step = 1,
   onPreview,
   onCommit,
+  onCancel,
   disabled = false,
 }: {
   label: string;
@@ -3298,6 +3344,8 @@ const Slider = memo(function Slider({
   onPreview?: (value: number) => void;
   /** Discrete commit: track click, arrow key, and drag release. */
   onCommit: (value: number) => void;
+  /** Aborted drag (pointer cancel): restore persisted values instead. */
+  onCancel?: () => void;
   disabled?: boolean;
 }) {
   // Semi-controlled thumb: while dragging, the thumb follows local state so
@@ -3307,6 +3355,8 @@ const Slider = memo(function Slider({
   const dragging = useRef(false);
   const previewRaf = useRef(0);
   const latest = useRef(value);
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
   useEffect(
     () => () => {
       if (previewRaf.current) cancelAnimationFrame(previewRaf.current);
@@ -3337,6 +3387,7 @@ const Slider = memo(function Slider({
     const finalValue = latest.current;
     setDragValue(null);
     if (commit) onCommit(finalValue);
+    else onCancelRef.current?.();
   };
 
   return (
@@ -3393,10 +3444,12 @@ function AccentColorPicker({
   value,
   onPreview,
   onChange,
+  onCancel,
 }: {
   value: string | null;
   onPreview?: (value: string | null) => void;
   onChange: (value: string | null) => void;
+  onCancel?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -3448,6 +3501,7 @@ function AccentColorPicker({
             onChange={onChange}
             onPreview={onPreview ? (hex) => onPreview(hex) : undefined}
             onCommit={onChange}
+            onCancel={onCancel}
           />
         </Popover>
       ) : null}
