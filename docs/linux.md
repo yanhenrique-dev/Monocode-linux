@@ -139,6 +139,51 @@ libwayland do host. Se ainda assim abrir preto numa versão antiga:
 ./squashfs-root/AppRun
 ```
 
+## Sons e notificações (runtime)
+
+O app toca o som in-app mesmo quando o banner do sistema aparece: no
+Linux o banner carrega só uma dica de som (`message-new-instant`) que o
+servidor pode ignorar, então o cue interno é a garantia audível.
+
+Pré-requisitos no host:
+
+- Um daemon de notificações no barramento da sessão
+  (`org.freedesktop.Notifications`). Sem ele, o banner falha e o app
+  registra o motivo no console (`[notifications] show_notification
+  rejected`) enquanto o cue in-app assume.
+- Banners com janela focada e sessão visível não disparam por desenho:
+  o som in-app toca, sem banner duplicado.
+- Sons embutidos são sintetizados via Web Audio (sem codec). Arquivos
+  customizados `.ogg`/`.wav` decodificam em mais sistemas;
+  `.mp3`/`.m4a`/`.opus` dependem dos plugins GStreamer do WebKitGTK do
+  host. Falha de decodificação aparece nas Configurações com o motivo
+  (`missing`/`decode`/`unavailable`).
+- O Web Audio começa suspenso até o primeiro clique/tecla. Se o primeiro
+  turno terminar antes de qualquer gesto, o cue pode sair mudo uma vez;
+  depois do primeiro gesto, normaliza.
+- Ícone do banner: o app procura `com.monocode.desktop` e depois
+  `monocode` no tema de ícones. Com integração desktop instalada
+  (`scripts/install-linux-desktop.sh` ou pacote nativo), o banner usa o
+  ícone correto; sem ela, o banner aparece sem ícone, mas aparece.
+
+Diagnóstico rápido:
+
+```bash
+# Daemon presente?
+dbus-send --print-reply --dest=org.freedesktop.Notifications \
+  /org/freedesktop/Notifications org.freedesktop.DBus.Properties.Get \
+  string:org.freedesktop.Notifications string:ServerInformation
+notify-send "MonoCode" "teste"
+
+# Tema de som tem o nome pedido?
+find /usr/share/sounds /usr/local/share/sounds ~/.local/share/sounds \
+  -name 'message-new-instant*' 2>/dev/null
+```
+
+Nas Configurações, "Sons" liga/desliga os cues e "Notificações" pede o
+banner do sistema. Reativar os sons não repete atividade antiga: eventos
+anteriores ao religamento são ignorados de propósito.
+
 ## Links não abrem no navegador
 
 O empacotador incluía o `xdg-open` do Ubuntu 22.04, que não conhece os
