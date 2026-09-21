@@ -1604,14 +1604,19 @@ html.is-resizing .glass-blur {
   display: grid;
 }
 
-.zen-fold-item[data-fold-state="opening"] {
-  animation: zen-fold-open 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+/* Fold motion lives behind the experimental-animations flag (see
+   data-fold-animated): with it off the fold snaps open/shut. */
+.zen-fold-item[data-fold-animated="true"][data-fold-state="opening"] {
+  animation: zen-fold-open 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .zen-fold-item[data-fold-state="closing"] {
   pointer-events: none;
   user-select: none;
-  animation: zen-fold-close 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.zen-fold-item[data-fold-animated="true"][data-fold-state="closing"] {
+  animation: zen-fold-close 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .zen-fold-item:is([data-fold-state="opening"], [data-fold-state="closing"]) > *,
