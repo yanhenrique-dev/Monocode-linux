@@ -19,6 +19,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -102,6 +103,7 @@ import {
   saveTranscriptAnchor,
   saveTasksPill,
   saveUiBlur,
+  subscribeAppearance,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
   SIDEBAR_BLUR_DEFAULT,
   SIDEBAR_BLUR_MAX,
@@ -1797,6 +1799,14 @@ function useAppearanceSettings() {
   const [chatBackgroundPath, setChatBackgroundPath] = useState(
     loadChatBackgroundPath,
   );
+  // Mirror for syncAppearanceFromStore: applyChatBackground bumps the image
+  // revision on every call, so the sync paints only on a real path change.
+  // Layout-phase sync: a synchronous appearance notification between commit
+  // and a passive effect would otherwise read a stale ref.
+  const chatBackgroundPathRef = useRef<string | null>(chatBackgroundPath);
+  useLayoutEffect(() => {
+    chatBackgroundPathRef.current = chatBackgroundPath;
+  }, [chatBackgroundPath]);
   const [chatBackgroundEmptyOpacity, setChatBackgroundEmptyOpacity] = useState(
     loadChatBackgroundEmptyOpacity,
   );
@@ -1980,14 +1990,17 @@ function useAppearanceSettings() {
     void applyUiScale(next);
   }, []);
 
-  // Restore the persisted look after an abandoned drag preview or an
-  // unmount mid-preview (popover closed, page left). Nothing here persists:
-  // every value comes from the stored settings.
-  const revertAppearanceDrafts = useCallback(() => {
+  // Re-reads every owned value from the store without persisting. Also
+  // serves the drag-abort and unmount paths (as revertAppearanceDrafts
+  // below): one body, two names, so the two call sites never drift apart.
+  const syncAppearanceFromStore = useCallback(() => {
     cancelSidebarBlurPreview();
+    setThemePreference(applyThemePreference(loadThemePreference()));
     const tint = applyThemeTint(loadThemeHue(), loadThemeSaturation());
     setThemeHue(tint.hue);
     setThemeSaturation(tint.saturation);
+    setBodyGlass(applyBodyGlass(loadBodyGlass()));
+    setUiBlur(applyUiBlur(loadUiBlur()));
     const darkLightness = applyThemeDarkLightness(loadThemeDarkLightness());
     setThemeDarkLightness(darkLightness);
     const nextOpacity = applySidebarOpacity(loadSidebarOpacity());
@@ -2006,10 +2019,38 @@ function useAppearanceSettings() {
     setChatBackgroundSessionOpacity(session);
     const bgBlur = applyChatBackgroundBlur(loadChatBackgroundBlur());
     setChatBackgroundBlur(bgBlur);
+    setChatBackgroundScope(
+      applyChatBackgroundScope(loadChatBackgroundScope()),
+    );
+    // State drives the background section visibility; paint only on a real
+    // change — applyChatBackground bumps the image revision every call.
+    const bgPath = loadChatBackgroundPath();
+    if (bgPath !== chatBackgroundPathRef.current) {
+      chatBackgroundPathRef.current = bgPath;
+      applyChatBackground(bgPath);
+    }
+    setChatBackgroundPath(bgPath);
     const scale = loadUiScale();
     setUiScale(scale);
     void applyUiScale(scale);
   }, []);
+
+  // Restore the persisted look after an abandoned drag preview or an
+  // unmount mid-preview (popover closed, page left). Same body as the sync
+  // above by construction.
+  const revertAppearanceDrafts = syncAppearanceFromStore;
+
+  // A persisted change from anywhere else in this window (another Settings
+  // surface) re-reads the store, so two editors never show different looks.
+  const syncRef = useRef(syncAppearanceFromStore);
+  syncRef.current = syncAppearanceFromStore;
+  useEffect(
+    () =>
+      subscribeAppearance(() => {
+        syncRef.current();
+      }),
+    [],
+  );
 
   const restoreDefaults = useCallback(() => {
     onThemePreference(THEME_PREFERENCE_DEFAULT);
