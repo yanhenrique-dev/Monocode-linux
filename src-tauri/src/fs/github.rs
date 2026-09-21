@@ -145,8 +145,14 @@ fn rate_limit_state() -> &'static std::sync::Mutex<Option<std::time::Instant>> {
 }
 
 fn note_rate_limit() {
+    note_rate_limit_until(std::time::Instant::now() + Duration::from_secs(60));
+}
+
+/// Test seam: pin the backoff deadline so expiry is checkable without
+/// waiting out the 60s window.
+fn note_rate_limit_until(until: std::time::Instant) {
     if let Ok(mut state) = rate_limit_state().lock() {
-        *state = Some(std::time::Instant::now() + Duration::from_secs(60));
+        *state = Some(until);
     }
 }
 
@@ -2006,6 +2012,12 @@ fn run_with_timeout(
     mut cmd: std::process::Command,
     timeout: Duration,
 ) -> std::io::Result<std::process::Output> {
+    // wait_with_output only sees what it can read: without pipes a
+    // successful `gh` call comes back with empty stdout/stderr and reads
+    // as "gh returned no output".
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null());
     let child = cmd.spawn()?;
     let pid = child.id();
     let (tx, rx) = std::sync::mpsc::channel();
@@ -2107,5 +2119,9 @@ mod tests {
         let (limited, secs) = rate_limit_remaining();
         assert!(limited);
         assert!((1..=60).contains(&secs));
+        note_rate_limit_until(
+            std::time::Instant::now() - Duration::from_secs(1),
+        );
+        assert_eq!(rate_limit_remaining(), (false, 0));
     }
 }

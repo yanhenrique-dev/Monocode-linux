@@ -167,6 +167,9 @@ type InboxListCache = InboxListResult & {
 /** Per-query list cache: filter/source switches keep their own entry. */
 const inboxListCaches = new Map<string, InboxListCache>();
 const inboxListInflight = new Map<string, Promise<InboxListResult>>();
+/** Bumped on every invalidation: in-flight fetches from before the bump
+ * must not overwrite the snapshot with pre-mutation data. */
+let inboxListGeneration = 0;
 const repoByPath = new Map<string, string>();
 const repositoriesByPath = new Map<string, string[]>();
 const workItemByKey = new Map<string, GithubWorkItem>();
@@ -484,6 +487,7 @@ export function invalidateGithubItemCaches(
     mergeInfoByKey.delete(mergeInfoKey(repo, number));
   }
   // The mutation moves updatedAt/state: every list snapshot is stale.
+  inboxListGeneration += 1;
   inboxListCaches.clear();
   inboxListInflight.clear();
 }
@@ -732,7 +736,9 @@ function mergeInboxListItems(
   if (delta.length === 0) return previous;
   const byKey = new Map(previous.map((item) => [inboxItemKey(item), item]));
   for (const item of delta) byKey.set(inboxItemKey(item), item);
-  return [...byKey.values()];
+  // Map order is insertion order: re-sort so merged snapshots keep the
+  // updatedAt-descending contract (InboxView slices the first page).
+  return sortInboxItems([...byKey.values()]);
 }
 
 export async function listInboxItems(
@@ -760,8 +766,12 @@ export async function listInboxItems(
     Date.now() - prev.fetchedAt < INCREMENTAL_FULL_REFRESH_MS
       ? options.since
       : undefined;
+  const generation = inboxListGeneration;
   const promise = fetchInboxItems(projects, { ...query, updatedSince: since })
     .then((result) => {
+      // A mutation invalidated mid-flight: drop this pre-mutation snapshot
+      // instead of painting stale state until the next poll.
+      if (generation !== inboxListGeneration) return peekInboxList(projects, query) ?? result;
       const items =
         since && prev ? mergeInboxListItems(prev.items, result.items) : result.items;
       const merged = { items, errors: result.errors };

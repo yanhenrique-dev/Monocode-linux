@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT,
   loadExperimentalAnimations,
@@ -51,8 +51,14 @@ export function useExitAnimation({
 } {
   const [closing, setClosing] = useState(false);
   const onExitRef = useRef(onExit);
-  onExitRef.current = onExit;
+  // Written in an effect, not during render: a discarded concurrent render
+  // must never swap the callback the committed tree's timer will run.
+  useLayoutEffect(() => {
+    onExitRef.current = onExit;
+  }, [onExit]);
   const timer = useRef<number | undefined>(undefined);
+  // Guards re-entrant closes and late animationend against double onExit.
+  const finished = useRef(false);
 
   const clearTimer = useCallback(() => {
     if (timer.current !== undefined) {
@@ -62,26 +68,28 @@ export function useExitAnimation({
   }, []);
 
   const finish = useCallback(() => {
+    if (finished.current) return;
+    finished.current = true;
     clearTimer();
+    setClosing(false);
     onExitRef.current();
   }, [clearTimer]);
 
   const requestClose = useCallback(() => {
     if (!enabled) {
-      onExitRef.current();
+      finish();
       return;
     }
-    setClosing((was) => {
-      if (was) return was;
-      timer.current = window.setTimeout(() => {
-        onExitRef.current();
-      }, durationMs);
-      return true;
-    });
-  }, [enabled, durationMs]);
+    // Side effects stay out of the state updater (React may run it twice):
+    // the live timer is the re-entrancy guard.
+    if (timer.current !== undefined) return;
+    setClosing(true);
+    timer.current = window.setTimeout(finish, durationMs);
+  }, [enabled, durationMs, finish]);
 
   const cancelClose = useCallback(() => {
     clearTimer();
+    finished.current = false;
     setClosing(false);
   }, [clearTimer]);
 

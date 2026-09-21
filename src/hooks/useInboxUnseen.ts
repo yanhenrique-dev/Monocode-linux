@@ -354,10 +354,13 @@ export function useInboxActivity(
     const stopSelfActivity = subscribeInboxSelfActivity(() => void pull(true));
     const timer = window.setInterval(() => {
       if (document.hidden) return;
-      void pull(true);
+      // Unforced: honors backoffUntil and the incremental `since` path, so
+      // rate limits and dead backends actually quiet the poll. Forced pulls
+      // stay reserved for explicit user refreshes.
+      void pull(false);
     }, POLL_MS);
     const onVis = () => {
-      if (!document.hidden) void pull(true);
+      if (!document.hidden) void pull(false);
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {

@@ -94,6 +94,22 @@ fn fetch_inbox_media_sync(url: &str) -> Result<Vec<u8>, String> {
             .or_insert_with(|| std::sync::Arc::new(std::sync::Mutex::new(())))
             .clone()
     });
+    // The locks map would grow one entry per distinct URL forever: drop this
+    // call's entry once nobody else holds it.
+    struct LockCleanup<'a>(&'a str);
+    impl Drop for LockCleanup<'_> {
+        fn drop(&mut self) {
+            if let Ok(mut locks) = media_locks().lock() {
+                if let Some(entry) = locks.get(self.0) {
+                    // 2 = the map's own reference plus this call's clone.
+                    if std::sync::Arc::strong_count(entry) <= 2 {
+                        locks.remove(self.0);
+                    }
+                }
+            }
+        }
+    }
+    let _cleanup = LockCleanup(url);
     let _guard = lock.as_ref().map(|lock| lock.lock());
     if let Some(bytes) = media_cache_get(url) {
         return Ok(bytes);

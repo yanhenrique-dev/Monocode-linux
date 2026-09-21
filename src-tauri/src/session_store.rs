@@ -45,13 +45,19 @@ impl SessionStore {
                 .map_err(|e| e.to_string())?;
         }
         // `Connection::open` creates the file with umask permissions; clamp
-        // it before any row is written. Pre-existing installs keep whatever
-        // mode they already have.
-        if !path.exists() {
-            std::fs::File::create(&path).map_err(|e| e.to_string())?;
-        }
-        #[cfg(unix)]
+        // a fresh database before any row is written. Pre-existing installs
+        // keep whatever mode they already have.
+        let created = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
         {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
+            Err(error) => return Err(error.to_string()),
+        };
+        #[cfg(unix)]
+        if created {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
                 .map_err(|e| e.to_string())?;
