@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { CreateWorktreeDialog } from "../chrome/CreateWorktreeDialog";
 import { DeleteWorktreeDialog } from "../chrome/DeleteWorktreeDialog";
 import { SearchableProjectPicker } from "../chrome/SearchableProjectPicker";
+import { SecondaryButton } from "../chrome/SecondaryButton";
+import { Group } from "./SettingsView";
 import {
   FolderOpen,
   FolderTree,
@@ -72,78 +74,86 @@ export function WorktreesPage({
       id="setting-project-worktrees"
       className="flex flex-col gap-4"
     >
-      <div className="flex flex-wrap items-center gap-1">
-        <SearchableProjectPicker
-          cwd={project || "~"}
-          recents={projects}
-          className="w-fit max-w-full shrink-0"
-          buttonClassName="h-7.5 max-w-full gap-2 bg-content/5 px-2.5 text-[13px] hover:bg-content/12 active:scale-[0.98]"
-          onSelectProject={(path) => {
-            setProject(path);
-            setError(undefined);
-            setDeleting(undefined);
-          }}
-        />
-        <button
-          type="button"
-          disabled={!data}
-          onClick={() => setCreating(true)}
-          className="flex h-7.5 items-center gap-1.5 rounded-md px-2 text-[11px] hover:bg-content/12 disabled:opacity-40 active:scale-[0.97]"
-        >
-          <Plus className="size-3" />
-          {t("settings.worktrees.create")}
-        </button>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 flex-1 text-[12px] text-content/50">
-          {t("settings.worktrees.intro")}
-        </p>
-        <button
-          type="button"
-          title={
-            loadError
-              ? t("settings.worktrees.refresh_failed", {
-                  error: loadError,
-                })
-              : t("settings.worktrees.refresh_aria")
-          }
-          aria-label={t("settings.worktrees.refresh_aria")}
-          disabled={!project}
-          onClick={refresh}
-          className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-content/8 px-2 text-[11px] hover:bg-content/12 disabled:opacity-40 active:scale-[0.97] ${loadError ? "text-red-400" : "text-content/65"}`}
-        >
-          <RefreshCw className="size-3.5" />
-          <span>{t("settings.worktrees.refresh")}</span>
-        </button>
-      </div>
-      {error && (
-        <p role="alert" className="break-words text-[12px] text-red-400">
-          {error}
-        </p>
-      )}
-      {!project ? (
-        <p className="text-[12px] text-content/50">
-          {t("settings.worktrees.add_project")}
-        </p>
-      ) : !data && loadError ? (
-        <p role="alert" className="break-words text-[12px] text-red-400">
-          {loadError}
-        </p>
-      ) : !data ? (
-        <p className="flex items-center gap-2 text-[12px] text-content/50">
-          <LoaderCircle className="size-4 animate-spin" />
-          {t("settings.worktrees.loading")}
-        </p>
-      ) : !worktrees.length ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-stroke px-4 py-8 text-center">
-          <FolderTree className="size-5 text-content/35" />
-          <p className="text-[13px] font-medium">{t("settings.worktrees.empty_title")}</p>
-          <p className="text-[12px] text-content/50">
-            {t("settings.worktrees.empty_body")}
-          </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-stroke overflow-hidden rounded-xl border border-stroke">
+      <Group
+        title={t("settings.worktrees.project.label")}
+        description={t("settings.worktrees.intro")}
+      >
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchableProjectPicker
+              cwd={project || "~"}
+              recents={projects}
+              className="w-fit max-w-full shrink-0"
+              buttonClassName="h-8 max-w-full gap-2 bg-content/5 px-2 text-sm hover:bg-content/10 active:scale-[0.98]"
+              onSelectProject={(path) => {
+                setProject(path);
+                setError(undefined);
+                setDeleting(undefined);
+              }}
+            />
+            <button
+              type="button"
+              disabled={!data}
+              onClick={() => setCreating(true)}
+              className="flex h-8 items-center gap-2 rounded-md px-2 text-xs hover:bg-content/10 disabled:opacity-40 active:scale-[0.97]"
+            >
+              <Plus className="size-3" />
+              {t("settings.worktrees.create")}
+            </button>
+            <button
+              type="button"
+              title={
+                loadError
+                  ? t("settings.worktrees.refresh_failed", {
+                      error: loadError,
+                    })
+                  : t("settings.worktrees.refresh_aria")
+              }
+              aria-label={t("settings.worktrees.refresh_aria")}
+              disabled={!project}
+              onClick={refresh}
+              className={`ml-auto flex h-8 shrink-0 items-center gap-2 rounded-md bg-content/10 px-2 text-xs hover:bg-content/10 disabled:opacity-40 active:scale-[0.97] ${loadError ? "text-red-400" : "text-content/65"}`}
+            >
+              <RefreshCw className="size-3.5" />
+              <span>{t("settings.worktrees.refresh")}</span>
+            </button>
+          </div>
+          {error && (
+            <p role="alert" className="break-words text-[12px] text-red-400">
+              {error}
+            </p>
+          )}
+          {!project ? (
+            <p className="text-[12px] text-content/60">
+              {t("settings.worktrees.add_project")}
+            </p>
+          ) : !data && loadError ? (
+            <p role="alert" className="break-words text-[12px] text-red-400">
+              {loadError}
+            </p>
+          ) : !data ? (
+            <p
+              role="status"
+              className="flex items-center gap-2 text-[12px] text-content/60"
+            >
+              <LoaderCircle className="size-4 animate-spin" />
+              {t("settings.worktrees.loading")}
+            </p>
+          ) : !worktrees.length ? (
+            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+              <FolderTree className="size-6 text-content/60" />
+              <p className="text-sm font-medium">
+                {t("settings.worktrees.empty_title")}
+              </p>
+              <p className="text-[12px] text-content/60">
+                {t("settings.worktrees.empty_body")}
+              </p>
+              <SecondaryButton onClick={() => setCreating(true)}>
+                {t("settings.worktrees.create")}
+              </SecondaryButton>
+            </div>
+          ) : (
+        <div className="divide-y divide-content/10 overflow-hidden">
           {worktrees.map((tree) => {
             const count = worktreeSessionIds(tree, liveSessions).length;
             const blocked = tree.locked
@@ -152,23 +162,23 @@ export function WorktreesPage({
                 ? t("settings.worktrees.branch_first")
                 : undefined;
             return (
-              <div key={tree.path} className="flex items-start gap-3 p-4">
-                <FolderTree className="mt-0.5 size-4 shrink-0 text-content/45" />
+              <div key={tree.path} className="flex items-start gap-4 p-4">
+                <FolderTree className="mt-0.5 size-4 shrink-0 text-content/60" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium">
+                    <span className="text-sm font-medium">
                       {projectName(tree.path)}
                     </span>
                     {pathKey(tree.path) === pathKey(project) && (
-                      <span className="text-[10px] text-content/40">
+                      <span className="text-xs text-content/60">
                         {t("settings.worktrees.selected_folder")}
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 break-all text-[11px] text-content/40">
+                  <p className="mt-1 break-all text-xs text-content/60">
                     {prettyCwd(tree.path)}
                   </p>
-                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-content/55">
+                  <p className="mt-2 flex items-center gap-2 text-xs text-content/55">
                     <GitBranch className="size-3 shrink-0" />
                     <span className="min-w-0 break-all">
                       {tree.branch
@@ -180,7 +190,7 @@ export function WorktreesPage({
                           })}
                     </span>
                   </p>
-                  <p className="mt-2 flex flex-wrap gap-x-3 text-[11px] text-content/55">
+                  <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-content/55">
                     <span>
                       {t(
                         count === 1
@@ -223,7 +233,7 @@ export function WorktreesPage({
                   onClick={() =>
                     void revealPath(tree.path).catch((e) => setError(String(e)))
                   }
-                  className="rounded-md p-1.5 text-content/40 hover:bg-content/8 hover:text-content disabled:opacity-30"
+                  className="rounded-md p-2 text-content/60 hover:bg-content/10 hover:text-content disabled:opacity-30"
                 >
                   <FolderOpen className="size-4" />
                 </button>
@@ -238,7 +248,7 @@ export function WorktreesPage({
                     setError(undefined);
                     setDeleting(tree);
                   }}
-                  className="rounded-md p-1.5 text-content/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-25"
+                  className="rounded-md p-2 text-content/60 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-25"
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -248,12 +258,14 @@ export function WorktreesPage({
         </div>
       )}
       {data && (
-        <p className="break-all text-[11px] text-content/40">
+        <p className="break-all text-xs text-content/60">
           {t("settings.worktrees.created_in", {
             path: prettyCwd(data.defaultRoot),
           })}
         </p>
       )}
+        </div>
+      </Group>
       {creating && (
         <CreateWorktreeDialog
           cwd={project}

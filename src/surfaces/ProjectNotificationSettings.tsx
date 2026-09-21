@@ -115,17 +115,17 @@ export function ProjectNotificationSettings({
       aria-label={t("settings.inbox.project_notifications.title")}
       className="@container/notifications pt-8"
     >
-      <div className="flex flex-wrap items-end gap-4 pb-2.5">
+      <div className="flex flex-wrap items-end gap-4 pb-4">
         <div className="min-w-[min(100%,240px)] flex-1">
-          <h2 className="text-[13px] font-semibold text-content">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-content">
             {t("settings.inbox.project_notifications.title")}
           </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+          <p className="mt-1 text-[12px] leading-relaxed text-content/60">
             {t("settings.inbox.project_notifications.description")}
           </p>
         </div>
         {projects.length ? (
-          <div className="shrink-0 pb-0.5">
+          <div className="shrink-0 pb-1">
             <SecondaryButton
               type="button"
               aria-pressed={selecting}
@@ -147,14 +147,14 @@ export function ProjectNotificationSettings({
         }`}
       >
         {error ? (
-          <p role="alert" className="px-4 py-3.5 text-[12px] text-red-400">
+          <p role="alert" className="px-4 py-4 text-[12px] text-red-400">
             {error}
           </p>
         ) : null}
         {projects.length === 0 ? (
           <p
             role="status"
-            className="px-4 py-3.5 text-[12px] leading-relaxed text-content/45"
+            className="px-4 py-4 text-[12px] leading-relaxed text-content/60"
           >
             {t("settings.inbox.project_notifications.empty")}
           </p>
@@ -162,8 +162,8 @@ export function ProjectNotificationSettings({
         {projects.length ? (
           <>
             {selecting ? (
-              <div className="flex min-h-9 flex-wrap items-center justify-between gap-3 border-b border-content/5 px-4 py-3.5">
-                <label className="flex cursor-pointer items-center gap-2.5 text-[12px] text-content/55 hover:text-content/80">
+              <div className="flex min-h-8 flex-wrap items-center justify-between gap-4 border-b border-content/10 px-4 py-4">
+                <label className="flex cursor-pointer items-center gap-2 text-[12px] text-content/55 hover:text-content/80">
                   <ProjectSelection
                     label={t(
                       "settings.inbox.project_notifications.select_all",
@@ -238,11 +238,11 @@ export function ProjectNotificationSettings({
                     key={project.id}
                     ref={project.id === targetId ? targetCard : undefined}
                     tabIndex={-1}
-                    className="min-w-0 border-b border-content/5 outline-none last:border-b-0 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
+                    className="min-w-0 border-b border-content/10 outline-none last:border-b-0 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
                   >
                     <legend className="sr-only">{project.name}</legend>
-                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3.5">
-                      <div className="flex min-w-[min(100%,200px)] flex-1 items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 px-4 py-4">
+                      <div className="flex min-w-[min(100%,200px)] flex-1 items-center gap-4">
                         {selecting ? (
                           <ProjectSelection
                             label={t(
@@ -270,7 +270,7 @@ export function ProjectNotificationSettings({
                           onClick={() =>
                             setExpanded(isExpanded ? null : project.id)
                           }
-                          className="group flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                          className="group flex min-w-0 flex-1 items-center gap-4 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
                         >
                           <span className="grid size-4 shrink-0 place-items-center">
                             {logoPath ? (
@@ -293,19 +293,19 @@ export function ProjectNotificationSettings({
                               />
                             ) : (
                               <Folder
-                                className="size-4 text-content/40"
+                                className="size-4 text-content/60"
                                 aria-hidden="true"
                               />
                             )}
                           </span>
                           <div className="min-w-0 flex-1">
                             <p
-                              className="truncate text-[13px] font-medium text-content group-hover:text-content/75"
+                              className="truncate text-sm font-medium text-content group-hover:text-content/75"
                               title={`${project.name} (${project.detail})`}
                             >
                               {project.name}
                             </p>
-                            <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+                            <p className="mt-1 text-[12px] leading-relaxed text-content/60">
                               {project.kind === "local"
                                 ? t(
                                     "settings.inbox.project_notifications.local",
@@ -329,7 +329,7 @@ export function ProjectNotificationSettings({
                             </p>
                           </div>
                           <ChevronRight
-                            className={`size-3.5 shrink-0 text-content/40 ${isExpanded ? "rotate-90" : ""}`}
+                            className={`size-3.5 shrink-0 text-content/60 ${isExpanded ? "rotate-90" : ""}`}
                             aria-hidden="true"
                           />
                         </button>
@@ -341,20 +341,20 @@ export function ProjectNotificationSettings({
                     <div
                       id={panelId}
                       hidden={!isExpanded}
-                      className="border-t border-content/5 px-4"
+                      className="border-t border-content/10 px-4"
                     >
                       <div
                         className={
                           selecting
-                            ? "@[400px]/notifications:pl-14"
-                            : "@[400px]/notifications:pl-7"
+                            ? "@[400px]/notifications:pl-12"
+                            : "@[400px]/notifications:pl-6"
                         }
                       >
                         {muted ? (
                           <p
                             id={muteHintId}
                             role="status"
-                            className="pt-3.5 text-[12px] leading-relaxed text-content/45"
+                            className="pt-4 text-[12px] leading-relaxed text-content/60"
                           >
                             {t(
                               "settings.inbox.project_notifications.mute_hint",
@@ -364,7 +364,7 @@ export function ProjectNotificationSettings({
                         {categories.map((category) => (
                           <label
                             key={category.id}
-                            className="flex min-h-11 cursor-pointer items-center justify-between gap-6 border-b border-content/5 py-3.5 text-[13px] text-content last:border-b-0 hover:text-content/75"
+                            className="flex min-h-12 cursor-pointer items-center justify-between gap-6 border-b border-content/10 py-4 text-sm text-content last:border-b-0 hover:text-content/75"
                           >
                             <span>{t(category.label)}</span>
                             <span className="relative flex shrink-0">

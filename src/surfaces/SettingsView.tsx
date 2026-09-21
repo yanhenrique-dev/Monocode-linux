@@ -411,8 +411,8 @@ export function SettingsView({
         data-tauri-drag-region="deep"
       >
         {IS_MAC && !besideRail ? <div className="w-[78px] shrink-0" /> : null}
-        <div className="flex min-w-0 flex-1 items-center gap-2 px-3 text-[13px]">
-          <span className="shrink-0 text-content/45">{t("settings.header.breadcrumb")}</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-2 text-sm">
+          <span className="shrink-0 text-content/60">{t("settings.header.breadcrumb")}</span>
           <span aria-hidden className="shrink-0 text-content/25">
             /
           </span>
@@ -421,14 +421,14 @@ export function SettingsView({
           </span>
         </div>
         <div
-          className="flex shrink-0 items-center gap-1.5 pr-2"
+          className="flex shrink-0 items-center gap-2 pr-2"
           data-tauri-drag-region="false"
         >
           {section === "appearance" ? (
             <button
               type="button"
               onClick={() => setConfirmingRestore(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-content/50 hover:bg-content/10 hover:text-content"
+              className="flex shrink-0 items-center gap-2 rounded-md px-2 py-1 text-[12px] text-content/60 hover:bg-content/10 hover:text-content"
             >
               <RotateCcw className="size-3.5" strokeWidth={1.75} />
               {t("settings.header.restore_defaults")}
@@ -574,7 +574,7 @@ function SettingsSearch({
 
   return (
     <div ref={root} className="relative shrink-0">
-      <label className="flex h-7 w-48 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
+      <label className="flex h-8 w-48 items-center gap-2 rounded-md border border-content/15 px-2 text-content/60 focus-within:border-content/20">
         <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
         <input
           ref={input}
@@ -599,7 +599,7 @@ function SettingsSearch({
               setQuery("");
               input.current?.focus();
             }}
-            className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
+            className="grid size-4 shrink-0 place-items-center rounded text-content/60 hover:text-content"
           >
             <X className="size-3" strokeWidth={2} />
           </button>
@@ -622,7 +622,7 @@ function SettingsSearch({
           className="overflow-y-auto overscroll-contain p-1"
         >
           {results.length === 0 ? (
-            <p className="px-2 py-1.5 text-[12px] text-content/45">
+            <p className="px-2 py-2 text-[12px] text-content/60">
               {t("settings.search.empty")}
             </p>
           ) : (
@@ -635,14 +635,14 @@ function SettingsSearch({
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => go(result)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[12px] ${
                   index === active
                     ? "bg-selection text-content"
                     : "text-content hover:bg-content/5"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{result.label}</span>
-                <span className="shrink-0 text-[11px] text-content/40">
+                <span className="shrink-0 text-xs text-content/60">
                   {result.settingId
                     ? result.sectionLabel
                     : t("settings.search.page_badge")}
@@ -861,7 +861,7 @@ function NotificationsPage({
             <NotificationsBlocked />
           ) : null}
           {notificationsEnabled && notificationPermission === "unsupported" ? (
-            <span className="text-[12px] text-content/45">
+            <span className="text-[12px] text-content/60">
               {t("settings.general.notifications.unsupported")}
             </span>
           ) : null}
@@ -1292,7 +1292,7 @@ function GithubSettings() {
       {error ? (
         <p
           role="alert"
-          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+          className="border-b border-content/10 px-4 pb-4 text-[12px] text-red-400/90 last:border-b-0"
         >
           {error}
         </p>
@@ -1380,7 +1380,7 @@ function GitlabSettings() {
           </div>
         ) : (
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-            <label className="flex h-7 w-52 max-w-full shrink-0 items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
+            <label className="flex h-8 w-48 max-w-full shrink-0 items-center rounded-md border border-content/15 px-2 focus-within:border-content/20">
               <input
                 type="url"
                 value={url}
@@ -1394,7 +1394,7 @@ function GitlabSettings() {
                 className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
               />
             </label>
-            <label className="flex h-7 w-52 max-w-full shrink-0 items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
+            <label className="flex h-7 w-48 max-w-full shrink-0 items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
               <input
                 type="password"
                 value={token}
@@ -1425,7 +1425,7 @@ function GitlabSettings() {
       {error ? (
         <p
           role="alert"
-          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+          className="border-b border-content/10 px-4 pb-4 text-[12px] text-red-400/90 last:border-b-0"
         >
           {error}
         </p>
@@ -1533,7 +1533,7 @@ function LinearSettings() {
           </SecondaryButton>
         ) : (
           <div className="flex max-w-full flex-wrap items-center gap-2">
-            <label className="flex h-7 w-52 max-w-full shrink-0 items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
+            <label className="flex h-7 w-48 max-w-full shrink-0 items-center rounded-md border border-content/10 px-2 focus-within:border-content/20">
               <input
                 type="password"
                 value={token}
@@ -1562,20 +1562,20 @@ function LinearSettings() {
       {error ? (
         <p
           role="alert"
-          className="border-b border-content/5 px-4 pb-3 text-[12px] text-red-400/90 last:border-b-0"
+          className="border-b border-content/10 px-4 pb-4 text-[12px] text-red-400/90 last:border-b-0"
         >
           {error}
         </p>
       ) : null}
       {connected && teams.length > 0 ? (
-        <div className="border-b border-content/5 px-4 py-3.5 last:border-b-0">
-          <div className="text-[13px] font-medium text-content">
+        <div className="border-b border-content/10 px-4 py-4 last:border-b-0">
+          <div className="text-sm font-medium text-content">
             {t("settings.inbox.linear.teams.title")}
           </div>
-          <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+          <p className="mt-1 text-[12px] leading-relaxed text-content/60">
             {t("settings.inbox.linear.teams.description")}
           </p>
-          <div className="-mx-2 mt-2 flex flex-col gap-0.5">
+          <div className="-mx-2 mt-2 flex flex-col gap-1">
             {teams.map((team) => {
               const checked = !hiddenTeamIds.includes(team.id);
               return (
@@ -1585,15 +1585,15 @@ function LinearSettings() {
                   role="switch"
                   aria-checked={checked}
                   onClick={() => toggleTeam(team.id)}
-                  className="flex h-7 items-center gap-2 rounded-md px-2 text-left text-[13px] text-content hover:bg-content/5"
+                  className="flex h-8 items-center gap-2 rounded-md px-2 text-left text-sm text-content hover:bg-content/5"
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {team.name}
                     {team.key ? (
-                      <span className="ml-1.5 text-content/40">{team.key}</span>
+                      <span className="ml-1.5 text-content/60">{team.key}</span>
                     ) : null}
                   </span>
-                  <span className="shrink-0 text-[11px] text-content/40">
+                  <span className="shrink-0 text-xs text-content/60">
                     {checked
                       ? t("settings.inbox.linear.teams.shown")
                       : t("settings.inbox.linear.teams.hidden")}
@@ -1696,7 +1696,7 @@ function UpdateRow({
       label={
         <span className="flex items-baseline gap-2">
           {t("settings.general.update.label")}
-          <span className="font-mono text-[12px] text-content/45">
+          <span className="font-mono text-[12px] text-content/60">
             {snapshot.currentVersion}
           </span>
         </span>
@@ -2293,7 +2293,7 @@ function ChatBackgroundCard({
           }}
         />
       ) : null}
-      <div className="border-b border-content/5 p-4 last:border-b-0">
+      <div className="border-b border-content/10 p-4 last:border-b-0">
         <div className="overflow-hidden rounded-lg border border-content/10">
           {hasImage ? (
             <div className="relative h-36">
@@ -2307,7 +2307,7 @@ function ChatBackgroundCard({
                   filter: `blur(${appearance.chatBackgroundBlur}px)`,
                 }}
               />
-              <span className="pointer-events-none absolute bottom-2 left-2 text-[11px] text-content/40">
+              <span className="pointer-events-none absolute bottom-2 left-2 text-xs text-content/60">
                 {t("settings.appearance.chat_background.preview", {
                   value: emptyVisibility,
                 })}
@@ -2318,7 +2318,7 @@ function ChatBackgroundCard({
               type="button"
               onClick={() => void appearance.onChooseChatBackground()}
               disabled={busy}
-              className="flex h-36 w-full flex-col items-center justify-center gap-2 text-content/40 hover:bg-content/5 hover:text-content/70 disabled:cursor-default disabled:opacity-40"
+              className="flex h-36 w-full flex-col items-center justify-center gap-2 text-content/60 hover:bg-content/5 hover:text-content/70 disabled:cursor-default disabled:opacity-40"
             >
               {busy ? (
                 <LoaderCircle className="size-5 animate-spin" aria-hidden />
@@ -2332,7 +2332,7 @@ function ChatBackgroundCard({
           )}
         </div>
         {hasImage ? (
-          <div className="mt-3 flex items-center justify-end gap-2">
+          <div className="mt-4 flex items-center justify-end gap-2">
             <SecondaryButton
               onClick={() => void appearance.onChooseChatBackground()}
               disabled={busy}
@@ -2460,14 +2460,14 @@ function KeybindingsPage() {
       title={t("settings.keybindings.group.title")}
       description={t("settings.keybindings.group.description")}
       action={
-        <div className="flex items-center gap-3">
-          <span className="shrink-0 text-[12px] text-content/40 tabular-nums">
+        <div className="flex items-center gap-4">
+          <span className="shrink-0 text-[12px] text-content/60 tabular-nums">
             {rows.length}{" "}
             {rows.length === 1
               ? t("settings.keybindings.count.singular")
               : t("settings.keybindings.count.plural")}
           </span>
-          <label className="flex h-7 w-44 shrink-0 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
+          <label className="flex h-8 w-48 shrink-0 items-center gap-2 rounded-md border border-content/15 px-2 text-content/60 focus-within:border-content/20">
             <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
             <input
               value={query}
@@ -2482,32 +2482,32 @@ function KeybindingsPage() {
         </div>
       }
     >
-      <div className="flex items-center border-b border-stroke bg-content/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-content/40">
+      <div className="flex items-center border-b border-stroke bg-content/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-content/60">
         <span className="min-w-0 flex-1">
           {t("settings.keybindings.table.command")}
         </span>
-        <span className="w-40 shrink-0">
+        <span className="w-48 shrink-0">
           {t("settings.keybindings.table.keybinding")}
         </span>
-        <span className="w-28 shrink-0">
+        <span className="w-32 shrink-0">
           {t("settings.keybindings.table.when")}
         </span>
       </div>
       {rows.length === 0 ? (
-        <p className="px-4 py-3 text-[12px] text-content/45">
+        <p className="px-4 py-4 text-[12px] text-content/60">
           {t("settings.keybindings.list.empty")}
         </p>
       ) : (
         rows.map((row) => (
           <div
             key={`${row.command}-${row.keys}`}
-            className="flex items-center border-b border-content/5 px-4 py-2 text-[12px] last:border-b-0"
+            className="flex items-center border-b border-content/10 px-4 py-2 text-[12px] last:border-b-0"
           >
             <span className="min-w-0 flex-1 truncate">{t(row.command)}</span>
-            <span className="w-40 shrink-0 font-mono text-[12px] text-content/80">
+            <span className="w-48 shrink-0 font-mono text-[12px] text-content/80">
               {row.keys}
             </span>
-            <span className="w-28 shrink-0 font-mono text-[11px] text-content/40">
+            <span className="w-32 shrink-0 font-mono text-xs text-content/60">
               {keybindingWhenLabel(row.when, locale)}
             </span>
           </div>
@@ -2632,7 +2632,7 @@ function ProviderRow({
           <HarnessIcon harness={harness} className="size-4 shrink-0" />
           {HARNESS_TITLE[harness]}
           {isDefault ? (
-            <span className="rounded-full bg-content/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-content/60">
+            <span className="rounded-full bg-content/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-content/60">
               {t("settings.providers.row.badge_default")}
             </span>
           ) : null}
@@ -2747,20 +2747,20 @@ function ArchivePage({
         description={t("settings.archive.projects.description")}
       >
         {archivedProjects.length === 0 ? (
-          <p className="px-4 py-3.5 text-[12px] text-content/45">
+          <p className="px-4 py-4 text-[12px] text-content/60">
             {t("settings.archive.projects.empty")}
           </p>
         ) : (
           archivedProjects.map((project) => (
             <div
               key={project.path}
-              className="flex items-center gap-3 border-b border-content/5 px-4 py-2.5 last:border-b-0"
+              className="flex items-center gap-4 border-b border-content/10 px-4 py-2 last:border-b-0"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px]">
+                <div className="truncate text-sm">
                   {archivedProjectLabel(project.path)}
                 </div>
-                <div className="truncate text-[11px] text-content/40">
+                <div className="truncate text-xs text-content/60">
                   {prettyCwd(project.path)}
                 </div>
               </div>
@@ -2800,18 +2800,18 @@ function ArchivePage({
           />
         </Row>
         {!looksLikeProject(cwd) ? (
-          <p className="px-4 py-3.5 text-[12px] text-content/45">
+          <p className="px-4 py-4 text-[12px] text-content/60">
             {t("settings.archive.sessions.empty_no_project")}
           </p>
         ) : archived.length === 0 ? (
-          <p className="px-4 py-3.5 text-[12px] text-content/45">
+          <p className="px-4 py-4 text-[12px] text-content/60">
             {t("settings.archive.sessions.empty")}
           </p>
         ) : (
           archived.map((session) => (
             <div
               key={session.id}
-              className="flex items-center gap-3 border-b border-content/5 px-4 py-2.5 last:border-b-0"
+              className="flex items-center gap-4 border-b border-content/10 px-4 py-2 last:border-b-0"
             >
               <HarnessIcon
                 harness={session.harness}
@@ -2820,11 +2820,11 @@ function ArchivePage({
               <button
                 type="button"
                 onClick={() => onOpenSession(session.id)}
-                className="min-w-0 flex-1 truncate text-left text-[13px] hover:text-content"
+                className="min-w-0 flex-1 truncate text-left text-sm hover:text-content"
               >
                 {sessionDisplayTitle(session.title, session.harness)}
               </button>
-              <span className="shrink-0 text-[11px] text-content/35 tabular-nums">
+              <span className="shrink-0 text-xs text-content/60 tabular-nums">
                 {formatDate(session.updatedAt)}
               </span>
               <SecondaryButton
@@ -2903,7 +2903,7 @@ function PageHeader({
         {title}
       </h1>
       {description ? (
-        <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-content/45">
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-content/60">
           {description}
         </p>
       ) : null}
@@ -2915,7 +2915,7 @@ function PageHeader({
  * A titled card of related settings. Everything on a page lives in one, so a
  * page reads as a handful of topics instead of one long list of switches.
  */
-function Group({
+export function Group({
   id,
   title,
   description,
@@ -2938,20 +2938,22 @@ function Group({
       data-setting-id={id}
       className="pt-8"
     >
-      <div className="flex items-end gap-4 pb-2.5">
+      <div className="flex items-end gap-4 pb-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[13px] font-semibold text-content">{title}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-content">
+            {title}
+          </h2>
           {description ? (
-            <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+            <p className="mt-1 text-[12px] leading-relaxed text-content/60">
               {description}
             </p>
           ) : null}
         </div>
-        {action ? <div className="shrink-0 pb-0.5">{action}</div> : null}
+        {action ? <div className="shrink-0 pb-1">{action}</div> : null}
       </div>
       <div
         className={`overflow-hidden rounded-xl border bg-content/3 transition-colors ${
-          flash ? "border-accent/60" : "border-content/10"
+          flash ? "border-accent/60" : "border-content/15"
         }`}
       >
         {children}
@@ -2979,14 +2981,14 @@ function Row({
     <div
       id={id ? settingDomId(id) : undefined}
       data-setting-id={id}
-      className={`settings-row flex items-start gap-6 border-b border-content/5 px-4 py-3.5 transition-colors last:border-b-0 ${
+      className={`settings-row flex items-start gap-6 border-b border-content/10 px-4 py-4 transition-colors last:border-b-0 ${
         flash ? "bg-accent/10" : ""
       }`}
     >
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-content">{label}</div>
+        <div className="text-sm font-medium text-content">{label}</div>
         {description ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-content/45">
+          <p className="mt-1 text-[12px] leading-relaxed text-content/60">
             {description}
           </p>
         ) : null}
@@ -3061,7 +3063,7 @@ const SoundCueRow = memo(function SoundCueRow({
         title={t("settings.general.sounds.test")}
         disabled={testing}
         onClick={() => void runTest()}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-content/10 text-content/60 hover:text-content disabled:opacity-50"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-content/15 text-content/60 hover:text-content disabled:opacity-50"
       >
         <PlayIcon className="h-3.5 w-3.5" />
       </button>
@@ -3069,14 +3071,14 @@ const SoundCueRow = memo(function SoundCueRow({
         type="button"
         onClick={() => void pick()}
         title={custom ? pref : undefined}
-        className={`flex h-7 min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[12px] ${
+        className={`flex h-8 min-w-0 shrink-0 items-center gap-2 rounded-md border px-2 text-[12px] ${
           custom
             ? "border-accent/40 bg-accent/10 text-content"
             : "border-content/10 text-content/60 hover:text-content"
         }`}
       >
         <FileIcon className="h-3.5 w-3.5 shrink-0" />
-        <span className="max-w-44 truncate">
+        <span className="max-w-48 truncate">
           {custom
             ? t("settings.general.sounds.custom.file")
             : t("settings.general.sounds.custom.pick")}
@@ -3088,7 +3090,7 @@ const SoundCueRow = memo(function SoundCueRow({
           aria-label={t("settings.general.sounds.reset")}
           title={t("settings.general.sounds.reset")}
           onClick={reset}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-content/10 text-content/60 hover:text-content"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-content/15 text-content/60 hover:text-content"
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </button>
@@ -3120,7 +3122,7 @@ function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-grid max-w-full shrink-0 gap-0.5 rounded-md border border-content/10 p-0.5 text-[12px]"
+      className="inline-grid max-w-full shrink-0 gap-1 rounded-md border border-content/15 p-1 text-[12px]"
       style={{
         gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
       }}
@@ -3132,7 +3134,7 @@ function Segmented<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
-          className={`min-w-0 rounded-[5px] px-2.5 py-1 ${
+          className={`min-w-0 rounded-md px-2 py-1 ${
             value === option.value
               ? "bg-selection text-content"
               : "text-content/50 hover:text-content"
@@ -3209,7 +3211,7 @@ const Slider = memo(function Slider({
 
   return (
     <div
-      className={`flex w-56 max-w-full items-center gap-3 ${disabled ? "opacity-40" : ""}`}
+      className={`flex w-56 max-w-full items-center gap-4 ${disabled ? "opacity-40" : ""}`}
     >
       <input
         type="range"
@@ -3327,7 +3329,7 @@ function AccentColorPicker({
 function NotificationsBlocked() {
   const { t } = useLocale();
   return (
-    <span className="flex flex-wrap items-center gap-2 text-[12px] text-content/45">
+    <span className="flex flex-wrap items-center gap-2 text-[12px] text-content/60">
       {t("settings.general.notifications.permission_needed")}
       {IS_MAC || IS_WIN ? (
         <button
@@ -3467,7 +3469,7 @@ function Select({
   };
 
   return (
-    <div ref={root} className="relative max-w-52">
+    <div ref={root} className="relative max-w-48">
       <button
         type="button"
         ref={trigger}
@@ -3519,7 +3521,7 @@ function Select({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => pick(option.value)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[12px] ${
                   highlighted || isSelected
                     ? "bg-selection text-content"
                     : "text-content hover:bg-content/5"
