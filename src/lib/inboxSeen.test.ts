@@ -218,14 +218,17 @@ describe("inbox seen items", () => {
     ).toBe(true);
   });
 
-  it("holds read marks in memory when the store write fails", () => {
+  it("leaves read marks unseen when the store write fails", () => {
     seedInboxSeenIfNeeded([entry("github:acme/web:issue:1", "2026-08-27T10:00:00Z")]);
+    // Reads keep working while writes fail (quota): snapshot first, since
+    // delegating getItem to the throwing mock would recurse into itself.
+    const snapshot = localStorage.getItem(KEY);
     const throwing = {
-      getItem: (key: string) => localStorage.getItem(key),
+      getItem: (key: string) => (key === KEY ? snapshot : null),
       setItem: () => {
         throw new Error("quota");
       },
-      removeItem: (key: string) => localStorage.removeItem(key),
+      removeItem: () => {},
       clear: () => {},
       key: () => null,
       length: 0,
@@ -238,9 +241,11 @@ describe("inbox seen items", () => {
       expect(
         markInboxItemsSeen([entry("github:acme/web:issue:2", "2026-08-27T11:00:00Z")]),
       ).toBe(false);
+      // The rejected mark must not stick: the item stays unseen so the
+      // error surfaces and retry can still land it.
       expect(
         inboxHasUnseenItems([entry("github:acme/web:issue:2", "2026-08-27T11:00:00Z")]),
-      ).toBe(false);
+      ).toBe(true);
     } finally {
       mockLocalStorage();
     }
