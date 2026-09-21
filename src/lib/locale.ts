@@ -222,6 +222,8 @@ const en = {
   "settings.general.update.checking": "Checking for updates…",
   "settings.general.update.current": "You're on the latest version.",
   "settings.general.update.failed": "Update check failed.",
+  "settings.general.update.failed_detail": "Couldn't check for updates: {error}",
+  "settings.general.update.last_checked": "Last checked {time}",
   "settings.general.update.idle":
     "MonoCode updates itself from the release feed.",
   "settings.general.update.flatpak":
@@ -931,6 +933,9 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.update.checking": "Verificando atualizações…",
   "settings.general.update.current": "Você está na versão mais recente.",
   "settings.general.update.failed": "Falha ao verificar atualizações.",
+  "settings.general.update.failed_detail":
+    "Não foi possível verificar atualizações: {error}",
+  "settings.general.update.last_checked": "Última verificação: {time}",
   "settings.general.update.idle":
     "O MonoCode se atualiza pelo feed de lançamentos.",
   "settings.general.update.flatpak":

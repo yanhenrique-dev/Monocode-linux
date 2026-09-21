@@ -465,5 +465,6 @@ describe("UpdateRow busy feedback", () => {
     // Settings renders the result inline: no native dialog for this surface.
     expect(message).not.toHaveBeenCalled();
     expect(container.textContent).toContain("You're on the latest version.");
+    expect(container.textContent).toContain("Last checked");
   });
 });
