@@ -104,6 +104,9 @@ export function TasksPill({
     <div
       className="tasks-strip-body mx-1.5"
       data-open={open}
+      // A folded strip stays mounted for the transition: keep its button
+      // out of tab order and off the screen reader until it opens.
+      inert={!open}
       {...(open ? { "data-tasks-strip": "" } : {})}
     >
       <div className="min-h-0 overflow-hidden">

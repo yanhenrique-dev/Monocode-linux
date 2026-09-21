@@ -149,6 +149,19 @@ describe("TasksPill", () => {
     }
   });
 
+  it("keeps the folded strip out of tab order when animated", () => {
+    const { root } = renderPill({ animationsEnabled: true });
+    try {
+      setIntersecting(true);
+      const frame = container.querySelector(".tasks-strip-body")!;
+      expect(frame.hasAttribute("inert")).toBe(true);
+      setIntersecting(false);
+      expect(frame.hasAttribute("inert")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
   it("folds the settled strip instead of pinning it when animated", () => {
     const done = taskBlock("t1");
     done.taskList = {
