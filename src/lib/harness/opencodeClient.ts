@@ -101,14 +101,21 @@ export interface OpenCodeClient {
   closeEvents(sessionId: string): Promise<void>;
 }
 
+export type OpenCodeClientOptions = {
+  /** Per-process `server password` printed by `opencode serve` (V2 requires
+   * HTTP Basic auth on every request; V1 servers have no password). */
+  password?: string;
+};
+
 export function createOpenCodeClient(
   baseUrl: string,
   directory: string,
   protocol: OpenCodeProtocol,
+  options?: OpenCodeClientOptions,
 ): OpenCodeClient {
   return protocol === "v2"
-    ? new OpenCodeClientV2(baseUrl, directory)
-    : new OpenCodeClientV1(baseUrl, directory);
+    ? new OpenCodeClientV2(baseUrl, directory, options?.password)
+    : new OpenCodeClientV1(baseUrl, directory, options?.password);
 }
 
 class OpenCodeClientBase {
@@ -120,6 +127,7 @@ class OpenCodeClientBase {
   constructor(
     readonly baseUrl: string,
     readonly directory: string,
+    readonly password?: string,
   ) {}
 
   protected async request<T>(
@@ -186,11 +194,33 @@ class OpenCodeClientBase {
   }
 
   protected headers(json = false): Record<string, string> {
+    const password = this.password?.trim();
     return {
       ...(json ? { "Content-Type": "application/json" } : {}),
       "x-opencode-directory": encodeURIComponent(this.directory),
+      ...(password ? { Authorization: openCodeBasicAuth(password) } : {}),
     };
   }
+}
+
+export function openCodeBasicAuth(password: string): string {
+  return `Basic ${toBase64(`opencode:${password}`)}`;
+}
+
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const globalScope = globalThis as Record<string, unknown>;
+  const btoaFn = globalScope.btoa;
+  if (typeof btoaFn === "function") {
+    return (btoaFn as (input: string) => string)(binary);
+  }
+  const bufferCtor = globalScope.Buffer as
+    | { from(input: string, encoding: string): { toString(encoding: string): string } }
+    | undefined;
+  if (bufferCtor) return bufferCtor.from(value, "utf8").toString("base64");
+  throw new Error("No base64 encoder available for OpenCode auth");
 }
 
 /** V1 transport: routes and envelopes exactly as before. */

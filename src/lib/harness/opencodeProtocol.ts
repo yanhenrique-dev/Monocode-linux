@@ -188,6 +188,16 @@ export function parseOpenCodeModelSlug(
   };
 }
 
+export const OPENCODE_SERVER_PASSWORD_PREFIX = "server password";
+
+export function parseServerPasswordFromOutput(output: string): string | null {
+  for (const line of output.split("\n")) {
+    const match = line.match(/server password\s+(\S+)/i);
+    if (match?.[1]) return match[1].replace(/[.,;]+$/, "");
+  }
+  return null;
+}
+
 export function parseServerUrlFromOutput(output: string): string | null {
   for (const line of output.split("\n")) {
     const trimmed = line.trim();
