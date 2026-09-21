@@ -26,14 +26,17 @@ export function prettyCwd(cwd: string): string {
   if (trimmed === "~") return "~";
 
   const parts = trimmed.split("/").filter(Boolean);
-  if (parts.length >= 2 && (parts[0] === "Users" || parts[0] === "home")) {
+  if (
+    parts.length >= 2 &&
+    (parts[0]?.toLowerCase() === "users" || parts[0]?.toLowerCase() === "home")
+  ) {
     const rest = parts.slice(2).join("/");
     return rest ? `~/${rest}` : "~";
   }
   if (
     parts.length >= 3 &&
     /^[A-Za-z]:$/.test(parts[0]) &&
-    parts[1] === "Users"
+    parts[1]?.toLowerCase() === "users"
   ) {
     const rest = parts.slice(3).join("/");
     return rest ? `~/${rest}` : "~";

@@ -29,8 +29,9 @@ const mock = vi.hoisted(() => {
 vi.mock("../fs", () => ({ homeDir: async () => "/home/test" }));
 vi.mock("./child", () => ({
   resolveAntigravityBinary: async () => {
-    if (mock.resolveGates) {
-      await new Promise<void>((resolve) => mock.resolveGates.push(resolve));
+    const gates = mock.resolveGates;
+    if (gates) {
+      await new Promise<void>((resolve) => gates.push(resolve));
     }
     return { path: "/fake/agy_acp_server.par", args: ["--uid="] };
   },
@@ -808,7 +809,7 @@ describe.each(providers)("$id offline ACP transport", (provider) => {
     const release = () => {
       const gates = mock.resolveGates;
       mock.resolveGates = null;
-      gates.forEach((open) => open());
+      gates?.forEach((open) => open());
     };
     // Forget while resolve is suspended: the abandoned startup must not reach
     // spawnChild at all.

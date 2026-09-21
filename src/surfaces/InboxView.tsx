@@ -2617,9 +2617,7 @@ export function InboxDetail({
           }
         >
           <div
-            className={`mx-auto flex w-full flex-col ${
-              tab === "code" ? "max-w-[1600px]" : "max-w-5xl"
-            } ${panel ? "gap-4 px-4 py-4" : "gap-5 px-8 py-5"}`}
+            className={`mx-auto flex w-full flex-col max-w-[1600px] ${panel ? "gap-4 px-4 py-4" : "gap-5 px-8 py-5"}`}
           >
             {item.labels.length > 0 ? (
               <div className="flex flex-wrap gap-1">

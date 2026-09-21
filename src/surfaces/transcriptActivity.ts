@@ -289,15 +289,17 @@ export function resolveToolCallDisplay(
   // matches the path the row displays.
   const filePath = resolveWorkspacePath(target, cwd);
   // A write preview's own path can still disagree with `target` (e.g. two
-  // files sharing a SKILL.md name). When it does, the preview would render a
-  // diff for a file other than the one the row opens, so callers must not
-  // show it as this row's diff.
+  // files sharing a SKILL.md name, or a label like "Edit dependency versions"
+  // that is not a file at all). When filePath is missing but a preview path
+  // exists, treat as mismatch so callers fall back to plain control rather
+  // than a diff for the wrong file.
   const previewPath =
     preview?.kind === "write" && preview.path
       ? resolveWorkspacePath(displayPath(preview.path, cwd), cwd)
       : undefined;
-  const previewMatchesFile =
-    !previewPath || !filePath || pathKey(previewPath) === pathKey(filePath);
+  const previewMatchesFile = previewPath
+    ? !!filePath && pathKey(previewPath) === pathKey(filePath)
+    : true;
   return { action, target, fileName, filePath, isFile, previewMatchesFile };
 }
 

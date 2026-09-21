@@ -1382,7 +1382,6 @@ function UserMessageBlock({
             : "rounded-lg border border-content/10"
         }`}
         style={{ zIndex: stickyIndex }}
-        onClick={overflows ? toggle : undefined}
       >
         {onEdit ? (
           <button
