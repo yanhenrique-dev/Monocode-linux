@@ -1373,6 +1373,85 @@ fn parse_github_repositories_includes_a_forks_parent() {
 }
 
 #[test]
+fn slug_from_github_remote_url_accepts_https_ssh_and_bare_forms() {
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com/yanhenrique-dev/Monocode-linux.git")
+            .as_deref(),
+        Some("yanhenrique-dev/monocode-linux")
+    );
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com/yanhenrique-dev/Monocode-linux").as_deref(),
+        Some("yanhenrique-dev/monocode-linux")
+    );
+    assert_eq!(
+        slug_from_github_remote_url("git@github.com:yanhenrique-dev/Monocode-linux.git").as_deref(),
+        Some("yanhenrique-dev/monocode-linux")
+    );
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com/yanhenrique-dev/Monocode-linux/")
+            .as_deref(),
+        Some("yanhenrique-dev/monocode-linux")
+    );
+    // An explicit :443 is still github.com.
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com:443/acme/web.git").as_deref(),
+        Some("acme/web")
+    );
+}
+
+#[test]
+fn slug_from_github_remote_url_rejects_non_github_and_malformed_urls() {
+    assert_eq!(
+        slug_from_github_remote_url("https://gitlab.com/acme/web.git"),
+        None
+    );
+    assert_eq!(
+        slug_from_github_remote_url("git@gitlab.com:acme/web.git"),
+        None
+    );
+    // An embedded github.com path on another host must not produce a slug.
+    assert_eq!(
+        slug_from_github_remote_url("https://gitlab.example/github.com/acme/web.git"),
+        None
+    );
+    assert_eq!(
+        slug_from_github_remote_url("git@gitlab.example:github.com/acme/web.git"),
+        None
+    );
+    assert_eq!(slug_from_github_remote_url(""), None);
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com/only-owner"),
+        None
+    );
+    assert_eq!(
+        slug_from_github_remote_url("https://github.com/a/b/c"),
+        None
+    );
+    assert_eq!(slug_from_github_remote_url("not a url at all"), None);
+}
+
+#[test]
+fn repo_view_args_pins_the_origin_slug_when_known() {
+    assert_eq!(
+        repo_view_args(
+            &Some("yanhenrique-dev/Monocode-linux".to_string()),
+            "nameWithOwner,parent"
+        ),
+        vec![
+            "repo",
+            "view",
+            "yanhenrique-dev/Monocode-linux",
+            "--json",
+            "nameWithOwner,parent"
+        ]
+    );
+    assert_eq!(
+        repo_view_args(&None, "nameWithOwner"),
+        vec!["repo", "view", "--json", "nameWithOwner"]
+    );
+}
+
+#[test]
 fn parse_github_repositories_keeps_a_normal_repo_single() {
     let json = r#"{
             "nameWithOwner": "yanhenrique-dev/Monocode-linux",
@@ -1742,6 +1821,56 @@ fn parse_github_review_reply_url_reads_graphql() {
     )
     .unwrap_err();
     assert!(error.contains("Could not resolve to a node"));
+}
+
+#[test]
+fn parse_github_pr_merge_info_reads_permission_and_merge_state() {
+    let json = r#"{
+            "data": {
+                "repository": {
+                    "viewerPermission": "WRITE",
+                    "pullRequest": {
+                        "mergeable": "MERGEABLE",
+                        "mergeStateStatus": "CLEAN"
+                    }
+                }
+            }
+        }"#;
+    assert_eq!(
+        parse_github_pr_merge_info(json).unwrap(),
+        GitHubPrMergeInfo {
+            viewer_permission: Some("WRITE".into()),
+            mergeable: Some("MERGEABLE".into()),
+            merge_state_status: Some("CLEAN".into()),
+        }
+    );
+}
+
+#[test]
+fn parse_github_pr_merge_info_tolerates_partial_responses() {
+    // Older `gh` or a missing PR: unknown fields stay unknown so the UI
+    // keeps actions enabled instead of hiding them.
+    let json = r#"{
+            "data": {
+                "repository": {
+                    "viewerPermission": "READ",
+                    "pullRequest": null
+                }
+            }
+        }"#;
+    assert_eq!(
+        parse_github_pr_merge_info(json).unwrap(),
+        GitHubPrMergeInfo {
+            viewer_permission: Some("READ".into()),
+            mergeable: None,
+            merge_state_status: None,
+        }
+    );
+    let error = parse_github_pr_merge_info(
+        r#"{"data":null,"errors":[{"message":"Could not resolve to a Repository"}]}"#,
+    )
+    .unwrap_err();
+    assert!(error.contains("Could not resolve to a Repository"));
 }
 
 #[test]

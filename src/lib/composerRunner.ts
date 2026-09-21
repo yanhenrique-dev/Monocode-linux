@@ -375,6 +375,19 @@ export type RunnerTrack = {
   width: number;
 };
 
+/**
+ * Ledge priority for the runner track. The tasks strip fuses visually with
+ * the composer box, so when it is present the sprite must run on its top
+ * edge — otherwise the 16px sprite lands inside the pill.
+ */
+export function selectRunnerLedge(
+  tasks: Rect | null,
+  review: Rect | null,
+  queue: Rect | null,
+): Rect | null {
+  return tasks ?? review ?? queue;
+}
+
 /** Prefer the top edge of a control stacked on the composer. */
 export function runnerTrack(box: Rect, ledge: Rect | null): RunnerTrack {
   const ledgeWidth = ledge

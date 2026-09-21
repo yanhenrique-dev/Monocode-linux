@@ -50,11 +50,11 @@ export function SettingsNav({ section, onSelect, onClose }: Props) {
       <div
         ref={lockOverscroll}
         aria-label={t("settings.header.region_aria")}
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-none px-2 py-3"
+        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-none px-2 py-4"
       >
         {settingsSectionsByGroup().map((group) => (
-          <div key={group.id} className="flex flex-col gap-px">
-            <div className="px-2 pb-1 text-xs font-semibold text-content/35">
+          <div key={group.id} className="flex flex-col gap-1">
+            <div className="px-2 pb-1 text-xs font-semibold text-content/50">
               {t(group.label)}
             </div>
             {group.sections.map((item) => (
@@ -69,7 +69,7 @@ export function SettingsNav({ section, onSelect, onClose }: Props) {
           </div>
         ))}
       </div>
-      <div className="flex shrink-0 flex-col gap-px p-2">
+      <div className="flex shrink-0 flex-col gap-1 p-2">
         <NavRow
           label={t("settings.header.back")}
           icon={ArrowLeft}
@@ -96,7 +96,7 @@ function NavRow({
       type="button"
       onClick={onClick}
       aria-current={active ? "true" : undefined}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left ${
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left ${
         active
           ? "bg-selection text-content"
           : "text-content/50 hover:bg-content/5 hover:text-content"
