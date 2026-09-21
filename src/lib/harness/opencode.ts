@@ -13,6 +13,9 @@ import {
 import {
   createOpenCodeClient,
   OpenCodeHttpError,
+  messageCreated,
+  messageId,
+  messageRole,
   type OpenCodeClient,
   type OpenCodeMessage,
 } from "./opencodeClient";
@@ -217,18 +220,14 @@ export async function rewindOpenCodeLastTurn(
 async function latestOpenCodeUserMessageId(live: Live): Promise<string> {
   const messages = await live.client.getMessages(live.openCodeSessionId);
   const candidates = messages.flatMap((message) => {
-    const info = asRecord(message.info);
-    if (stringField(info, "role") !== "user") return [];
-    const id = stringField(info, "id");
+    if (messageRole(message) !== "user") return [];
+    const id = messageId(message);
     if (!id) return [];
-    const created = asRecord(info?.time)?.created;
+    const created = messageCreated(message);
     return [
       {
         id,
-        created:
-          typeof created === "number" && Number.isFinite(created)
-            ? created
-            : undefined,
+        created,
       },
     ];
   });
@@ -583,6 +582,18 @@ async function runTurn(live: Live, input: SendTurnInput): Promise<void> {
   settlePendingTurn(live);
 
   try {
+    // V2 keeps model/agent on the session (the prompt route takes neither),
+    // so bind this turn's selection first. V1 carries both per prompt and
+    // leaves these unimplemented.
+    await live.client.setModel?.(
+      live.openCodeSessionId,
+      parsed,
+      input.modelSettings?.variant,
+    );
+    const turnAgent = openCodeAgentForTurn(input);
+    if (turnAgent) {
+      await live.client.setAgent?.(live.openCodeSessionId, turnAgent);
+    }
     await live.client.promptAsync({
       sessionID: live.openCodeSessionId,
       model: parsed,

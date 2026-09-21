@@ -98,7 +98,7 @@ describe("createOpenCodeClient", () => {
 });
 
 describe("OpenCodeClientV2", () => {
-  it("admits prompts durably with an idempotency id", async () => {
+  it("admits prompts with a msg_-prefixed id, plain text, and no model", async () => {
     const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
 
     await client.promptAsync({
@@ -114,16 +114,100 @@ describe("OpenCodeClientV2", () => {
       }),
     );
     const body = JSON.parse(mocks.harnessHttp.mock.calls[0][0].body);
-    expect(body).toMatchObject({
-      model: { providerID: "openai", modelID: "gpt-5.4" },
-      parts: [{ type: "text", text: "hi" }],
-      resume: true,
-    });
-    expect(typeof body.id).toBe("string");
-    expect(body.id.length).toBeGreaterThan(0);
+    expect(body.id).toMatch(/^msg_/);
+    expect(body).toMatchObject({ text: "hi", resume: true });
+    expect(body).not.toHaveProperty("model");
+    expect(body).not.toHaveProperty("parts");
   });
 
-  it("replies to permissions under the session route", async () => {
+  it("sends file parts as V2 file refs", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+
+    await client.promptAsync({
+      sessionID: "session/a",
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      parts: [
+        { type: "text", text: "review" },
+        {
+          type: "file",
+          mime: "text/plain",
+          filename: "a.ts",
+          url: "file:///repo/a.ts",
+        },
+      ],
+    });
+
+    const body = JSON.parse(mocks.harnessHttp.mock.calls[0][0].body);
+    expect(body).toMatchObject({
+      text: "review",
+      files: [{ uri: "file:///repo/a.ts", name: "a.ts" }],
+    });
+  });
+
+  it("binds model and agent on the session", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+
+    await client.setModel?.("session/a", {
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    });
+    await client.setAgent?.("session/a", "build");
+
+    expect(mocks.harnessHttp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "http://127.0.0.1:4096/api/session/session%2Fa/model?directory=%2Frepo",
+        method: "POST",
+      }),
+    );
+    expect(JSON.parse(mocks.harnessHttp.mock.calls[0][0].body)).toEqual({
+      model: { id: "gpt-5.4", providerID: "openai" },
+    });
+    expect(mocks.harnessHttp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "http://127.0.0.1:4096/api/session/session%2Fa/agent?directory=%2Frepo",
+        method: "POST",
+      }),
+    );
+  });
+
+  it("creates sessions with the permissions ruleset key", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+
+    await client.createSession({
+      permission: [{ action: "*", resource: "*", effect: "allow" }],
+    });
+
+    const body = JSON.parse(mocks.harnessHttp.mock.calls[0][0].body);
+    expect(body.permissions).toEqual([
+      { action: "*", resource: "*", effect: "allow" },
+    ]);
+    expect(body).not.toHaveProperty("permission");
+  });
+
+  it("cancels turns via interrupt and compacts via compact", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+
+    await client.abortSession("session/a");
+    await client.summarizeSession("session/a", {
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    });
+
+    expect(mocks.harnessHttp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "http://127.0.0.1:4096/api/session/session%2Fa/interrupt?directory=%2Frepo",
+        method: "POST",
+      }),
+    );
+    expect(mocks.harnessHttp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "http://127.0.0.1:4096/api/session/session%2Fa/compact?directory=%2Frepo",
+        method: "POST",
+      }),
+    );
+  });
+
+  it("replies to permissions with the decision field", async () => {
     const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
 
     await client.replyPermission("session/a", "req-1", "once");
@@ -134,18 +218,22 @@ describe("OpenCodeClientV2", () => {
         method: "POST",
       }),
     );
+    expect(JSON.parse(mocks.harnessHttp.mock.calls[0][0].body)).toEqual({
+      decision: "once",
+    });
   });
 
-  it("replies to questions under the session route", async () => {
+  it("fails loudly on V2 question and rewind routes without equivalents", async () => {
     const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
 
-    await client.replyQuestion("session/a", "req-1", [["yes"]]);
-
-    expect(mocks.harnessHttp).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: "http://127.0.0.1:4096/api/session/session%2Fa/question/request/req-1/reply?directory=%2Frepo",
-        method: "POST",
-      }),
+    await expect(client.replyQuestion("session/a", "req-1", [["yes"]])).rejects.toThrow(
+      /not supported on OpenCode V2/,
+    );
+    await expect(client.rejectQuestion("session/a", "req-1")).rejects.toThrow(
+      /not supported on OpenCode V2/,
+    );
+    await expect(client.revertSession("session/a", "msg_1")).rejects.toThrow(
+      /not supported on OpenCode V2/,
     );
   });
 

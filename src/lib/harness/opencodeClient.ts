@@ -8,6 +8,7 @@ import {
   asRecord,
   buildOpenCodePermissionRules,
   buildOpenCodePermissionRulesV2,
+  stringField,
 } from "./opencodeProtocol";
 import type { OpenCodeProtocol } from "./opencodeProtocol";
 import type { RuntimeMode } from "../session";
@@ -93,6 +94,17 @@ export interface OpenCodeClient {
     answers: string[][],
   ): Promise<void>;
   rejectQuestion(sessionID: string, requestID: string): Promise<void>;
+  /**
+   * V2-only: the prompt route carries no model/agent (they live on the
+   * session). V1 carries both per prompt, so it leaves these unimplemented
+   * and callers must use optional chaining.
+   */
+  setModel?(
+    sessionID: string,
+    model: OpenCodeModelRef,
+    variant?: string,
+  ): Promise<void>;
+  setAgent?(sessionID: string, agent: string): Promise<void>;
   subscribeEvents(
     sessionId: string,
     onEvent: (event: Record<string, unknown>) => void,
@@ -444,13 +456,18 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
   async createSession(input: {
     title?: string;
     permission?: unknown;
+    model?: OpenCodeModelRef;
+    agent?: string;
   }): Promise<OpenCodeSession> {
-    // VERIFY: permission passthrough shape on V2 (Fase 4 migrates the rules).
+    // V2 names the ruleset `permissions` (not `permission`) and accepts the
+    // session model/agent up front. Shapes match the live /openapi.json.
     return this.request<OpenCodeSession>("POST", "/session", {
       body: {
         ...(input.title ? { title: input.title } : {}),
         location: { directory: this.directory },
-        ...(input.permission ? { permission: input.permission } : {}),
+        ...(input.permission ? { permissions: input.permission } : {}),
+        ...(input.model ? { model: toModelRef(input.model) } : {}),
+        ...(input.agent ? { agent: input.agent } : {}),
       },
     });
   }
@@ -490,30 +507,62 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
   }
 
   async abortSession(sessionID: string): Promise<void> {
-    // VERIFY: abort route carried under the prefix.
-    await this.request<unknown>("POST", `/session/${enc(sessionID)}/abort`, {
-      body: {},
-    }).catch(() => undefined);
+    // V2 has no /abort route; cancellation is POST .../interrupt.
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/interrupt`,
+      {
+        body: {},
+      },
+    ).catch(() => undefined);
   }
 
   async revertSession(sessionID: string, messageID: string): Promise<void> {
-    // VERIFY: revert shape carried under the prefix.
-    await this.request<unknown>("POST", `/session/${enc(sessionID)}/revert`, {
-      body: { messageID },
-    });
+    // V2 only exposes DELETE .../revert (session.revert.clear) with no
+    // per-message target, so rewinding to a message cannot be mapped.
+    // Throw loudly instead of 404ing so the UI explains the limitation.
+    void sessionID;
+    void messageID;
+    throw new Error("Rewinding a turn is not supported on OpenCode V2 yet.");
   }
 
   async summarizeSession(
     sessionID: string,
     model: OpenCodeModelRef,
   ): Promise<void> {
-    // VERIFY: summarize body carried under the prefix.
+    // V2 compaction is POST .../compact and takes no model: the session
+    // keeps whatever model was set via POST .../model.
+    void model;
     await this.request<unknown>(
       "POST",
-      `/session/${enc(sessionID)}/summarize`,
+      `/session/${enc(sessionID)}/compact`,
       {
-        body: model,
+        body: {},
         timeoutMs: 30 * 60_000,
+      },
+    );
+  }
+
+  async setModel(
+    sessionID: string,
+    model: OpenCodeModelRef,
+    variant?: string,
+  ): Promise<void> {
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/model`,
+      {
+        body: { model: toModelRef(model, variant) },
+      },
+    );
+  }
+
+  async setAgent(sessionID: string, agent: string): Promise<void> {
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/agent`,
+      {
+        body: { agent },
       },
     );
   }
@@ -525,19 +574,22 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     variant?: string;
     parts: OpenCodePromptPart[];
   }): Promise<void> {
-    // Durable admission: the id makes retries safe, resume schedules the run.
-    // `delivery` is left to the server default (immediate); steer/queue
-    // overrides arrive with the follow-up work.
+    // V2 admits {id, text, files, ...}: the message id must match ^msg_,
+    // the text is a plain string (required), and there is no per-prompt
+    // model/agent/variant — those live on the session (see setModel/setAgent,
+    // called per turn by the harness). Verified against /openapi.json.
+    void input.model;
+    void input.agent;
+    void input.variant;
+    const { text, files } = toPromptInput(input.parts);
     await this.request<unknown>(
       "POST",
       `/session/${enc(input.sessionID)}/prompt`,
       {
         body: {
-          id: crypto.randomUUID(),
-          model: input.model,
-          ...(input.agent ? { agent: input.agent } : {}),
-          ...(input.variant ? { variant: input.variant } : {}),
-          parts: input.parts,
+          id: newPromptMessageId(),
+          text,
+          ...(files.length > 0 ? { files } : {}),
           resume: true,
         },
       },
@@ -552,23 +604,26 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     parts: OpenCodePromptPart[];
     timeoutMs?: number;
   }): Promise<{ info?: Record<string, unknown>; parts?: unknown[] }> {
-    // V1 answers inline; V2 admits and runs async, so admit, wait for idle,
-    // then read the fresh messages.
+    // V1 answers inline; V2 admits and runs async, so admit, wait for idle
+    // on the experimental wait route, then read the fresh messages.
     await this.promptAsync(input);
     await this.request<unknown>(
       "POST",
-      `/session/${enc(input.sessionID)}/wait`,
+      `/experimental/session/${enc(input.sessionID)}/wait`,
       {
         body: {},
         timeoutMs: input.timeoutMs,
       },
     );
     const messages = await this.getMessages(input.sessionID);
-    const last = [...messages]
-      .reverse()
-      .find((message) => (message.parts as unknown[])?.length);
-    if (!last) throw new Error("OpenCode V2 returned no message parts");
-    return last;
+    // V2 messages are flat (no V1 {info, parts} envelope): synthesize the
+    // shape the text pipeline expects from the latest assistant message.
+    const last = [...messages].reverse().find(isAssistantMessage);
+    if (!last) throw new Error("OpenCode V2 returned no assistant message");
+    return {
+      info: { id: messageId(last), error: messageError(last) },
+      parts: assistantTextParts(last),
+    };
   }
 
   async replyPermission(
@@ -576,11 +631,12 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     requestID: string,
     reply: "once" | "always" | "reject",
   ): Promise<void> {
+    // V2 names the field `decision`; the values match Permission.Reply.
     await this.request<unknown>(
       "POST",
       `/session/${enc(sessionID)}/permission/${enc(requestID)}/reply`,
       {
-        body: { reply },
+        body: { decision: reply },
       },
     );
   }
@@ -590,27 +646,22 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     requestID: string,
     answers: string[][],
   ): Promise<void> {
-    // VERIFY: V2 ordered-answers shape against the QuestionV2 route.
-    await this.request<unknown>(
-      "POST",
-      `/session/${enc(sessionID)}/question/request/${enc(requestID)}/reply`,
-      {
-        body: { answers },
-      },
-    );
+    // V2 replaced questions with forms (POST .../form/{formID}/reply with a
+    // Form.Answer body) and its event shapes are still unverified live.
+    // Throw loudly instead of 404ing so the UI explains the limitation.
+    void sessionID;
+    void requestID;
+    void answers;
+    throw new Error("Answering questions is not supported on OpenCode V2 yet.");
   }
 
   async rejectQuestion(
     sessionID: string,
     requestID: string,
   ): Promise<void> {
-    await this.request<unknown>(
-      "POST",
-      `/session/${enc(sessionID)}/question/request/${enc(requestID)}/reject`,
-      {
-        body: {},
-      },
-    );
+    void sessionID;
+    void requestID;
+    throw new Error("Answering questions is not supported on OpenCode V2 yet.");
   }
 
   async subscribeEvents(
@@ -639,6 +690,99 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
 
 function enc(value: string): string {
   return encodeURIComponent(value);
+}
+
+/** V2 Model.Ref names the model `id` (not `modelID`). */
+export function toModelRef(
+  model: OpenCodeModelRef,
+  variant?: string,
+): { id: string; providerID: string; variant?: string } {
+  return {
+    id: model.modelID,
+    providerID: model.providerID,
+    ...(variant ? { variant } : {}),
+  };
+}
+
+/** V2 prompt ids must match ^msg_ (see /openapi.json). */
+export function newPromptMessageId(): string {
+  return `msg_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+/** Split harness parts into the V2 prompt input: plain text plus file refs. */
+export function toPromptInput(parts: OpenCodePromptPart[]): {
+  text: string;
+  files: Array<{ uri: string; name: string }>;
+} {
+  const text = parts
+    .filter((part) => part.type === "text")
+    .map((part) => (part as { text: string }).text)
+    .join("\n\n");
+  const files = parts
+    .filter((part) => part.type === "file")
+    .map((part) => part as { url: string; filename: string })
+    .filter((part) => typeof part.url === "string" && part.url.length > 0)
+    .map((part) => ({ uri: part.url, name: part.filename ?? "file" }));
+  return { text, files };
+}
+
+/**
+ * Message readers tolerant to both generations: V1 nests everything under
+ * `info`/`parts`, V2 messages are flat ({id, type, time, text/content}).
+ */
+export function messageId(message: OpenCodeMessage): string | undefined {
+  const info = asRecord(message.info);
+  const direct = (message as Record<string, unknown>).id;
+  const id = stringField(info, "id") ?? (typeof direct === "string" ? direct : undefined);
+  return id?.trim() ? id : undefined;
+}
+
+export function messageRole(message: OpenCodeMessage): string | undefined {
+  const info = asRecord(message.info);
+  const direct = (message as Record<string, unknown>).type;
+  return (
+    stringField(info, "role") ?? (typeof direct === "string" ? direct : undefined)
+  );
+}
+
+export function messageCreated(message: OpenCodeMessage): number | undefined {
+  const infoTime = asRecord(asRecord(message.info)?.time);
+  const flatTime = asRecord((message as Record<string, unknown>).time);
+  for (const rec of [infoTime, flatTime]) {
+    const created = rec?.created;
+    if (typeof created === "number" && Number.isFinite(created)) return created;
+  }
+  return undefined;
+}
+
+export function messageError(message: OpenCodeMessage): unknown {
+  const info = asRecord(message.info);
+  return info?.error ?? (message as Record<string, unknown>).error;
+}
+
+export function isAssistantMessage(message: OpenCodeMessage): boolean {
+  return messageRole(message) === "assistant";
+}
+
+/** Assistant text content as V1-ish text parts for the shared pipelines. */
+export function assistantTextParts(message: OpenCodeMessage): unknown[] {
+  if (Array.isArray(message.parts)) {
+    return message.parts.filter(
+      (part) => asRecord(part)?.type === "text",
+    );
+  }
+  const content = (message as Record<string, unknown>).content;
+  if (!Array.isArray(content)) return [];
+  const out: unknown[] = [];
+  for (const item of content) {
+    const rec = asRecord(item);
+    if (!rec || typeof rec.text !== "string") continue;
+    if (rec.type === "text") out.push({ type: "text", text: rec.text });
+    else if (rec.type === "reasoning") {
+      out.push({ type: "reasoning", text: rec.text });
+    }
+  }
+  return out;
 }
 
 function parseJson(raw: string): unknown {

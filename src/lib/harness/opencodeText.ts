@@ -69,6 +69,8 @@ async function promptOnLive(input: {
 }): Promise<string> {
   const session = await ensureLive(input.cwd);
   try {
+    // V2 binds the model on the session; V1 carries it per prompt.
+    await session.client.setModel?.(session.sessionId, session.model);
     const result = await session.client.prompt({
       sessionID: session.sessionId,
       model: session.model,
