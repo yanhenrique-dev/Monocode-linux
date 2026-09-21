@@ -120,6 +120,9 @@ describe("workspace file references", () => {
     expect(
       resolveWorkspacePath("~/skills/SKILL.md", "C:/Users/dev/project"),
     ).toBe("C:/Users/dev/skills/SKILL.md");
+    expect(
+      resolveWorkspacePath("~/skills/SKILL.md", "/USERS/dev/project"),
+    ).toBe("/USERS/dev/skills/SKILL.md");
   });
 
   it("leaves a ~/ reference unresolved when cwd has no recognisable home directory", () => {

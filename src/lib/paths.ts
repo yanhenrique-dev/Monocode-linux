@@ -98,13 +98,14 @@ function homeDirFromCwd(cwd: string): string | undefined {
   const trimmed = trimSlash(cwd);
   if (trimmed === "~") return undefined;
   const parts = trimmed.split("/").filter(Boolean);
-  if (parts.length >= 2 && (parts[0] === "Users" || parts[0] === "home")) {
+  const head = parts[0]?.toLowerCase();
+  if (parts.length >= 2 && (head === "users" || head === "home")) {
     return `/${parts[0]}/${parts[1]}`;
   }
   if (
     parts.length >= 3 &&
     /^[A-Za-z]:$/.test(parts[0]) &&
-    parts[1] === "Users"
+    parts[1]?.toLowerCase() === "users"
   ) {
     return `${parts[0]}/${parts[1]}/${parts[2]}`;
   }

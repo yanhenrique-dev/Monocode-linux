@@ -86,10 +86,10 @@ fi
 # remain a single executable name in freedesktop launchers.
 # shellcheck disable=SC2016 # backticks are literals in this sed expression
 desktop_exec="$(printf '%s' "$installed_binary" | sed \
-  -e 's/\\/\\\\\\\\/g' \
+  -e 's/\\/\\\\/g' \
   -e 's/"/\\"/g' \
   -e 's/`/\\`/g' \
-  -e 's/\$/\\\\$/g' \
+  -e 's/\$/\\$/g' \
   -e 's/%/%%/g')"
 desktop_try_exec="$(printf '%s' "$installed_binary" | sed -e 's/\\/\\\\/g')"
 
