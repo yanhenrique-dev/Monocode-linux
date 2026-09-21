@@ -66,12 +66,30 @@ export function loadSessionSidebarFilters(): SessionSidebarFilters {
   }
 }
 
+/** Fired on `window` whenever the sidebar session filters change. */
+export const SESSION_FILTERS_CHANGE_EVENT = "monocode:session-filters-change";
+
 export function saveSessionSidebarFilters(filters: SessionSidebarFilters) {
   try {
     localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
   } catch {
     // private mode / quota
   }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_FILTERS_CHANGE_EVENT));
+}
+
+export function subscribeSessionSidebarFilters(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === FILTERS_KEY) onStoreChange();
+  };
+  window.addEventListener(SESSION_FILTERS_CHANGE_EVENT, onStoreChange);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(SESSION_FILTERS_CHANGE_EVENT, onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function hasActiveSessionFilters(
