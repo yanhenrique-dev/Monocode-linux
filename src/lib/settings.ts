@@ -325,6 +325,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "tasks todo pill near chat composer fixar tarefas",
   },
   {
+    id: "experimental-animations",
+    section: "chat",
+    label: "settings.chat.experimental_animations.label",
+    keywords:
+      "experimental animations motion transition enter exit composer strip animacoes movimento transicao",
+  },
+  {
     id: "follow-up",
     section: "chat",
     label: "settings.chat.follow_up.label",

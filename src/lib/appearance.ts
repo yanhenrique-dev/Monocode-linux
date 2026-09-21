@@ -18,6 +18,7 @@ const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
 const TASKS_PILL_KEY = "monocode.tasksPill";
+const EXPERIMENTAL_ANIMATIONS_KEY = "monocode.experimentalAnimations";
 const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
 const CHAT_BACKGROUND_EMPTY_OPACITY_KEY = "monocode.chatBackgroundEmptyOpacity";
@@ -76,6 +77,12 @@ export const TASKS_PILL_DEFAULT = true;
 
 /** Fired on `window` whenever the tasks pill flips (detail: boolean). */
 export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
+
+export const EXPERIMENTAL_ANIMATIONS_DEFAULT = false;
+
+/** Fired on `window` whenever experimental animations flip (detail: boolean). */
+export const EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT =
+  "monocode:experimentalanimationschange";
 
 /** Fired on `window` whenever prompt-to-top anchoring flips (detail: boolean). */
 export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
@@ -891,6 +898,20 @@ export function saveTasksPill(value: boolean) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent<boolean>(TASKS_PILL_CHANGE_EVENT, {
+      detail: value,
+    }),
+  );
+}
+
+export function loadExperimentalAnimations(): boolean {
+  return readFlag(EXPERIMENTAL_ANIMATIONS_KEY) ?? EXPERIMENTAL_ANIMATIONS_DEFAULT;
+}
+
+export function saveExperimentalAnimations(value: boolean) {
+  writeFlag(EXPERIMENTAL_ANIMATIONS_KEY, value);
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<boolean>(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, {
       detail: value,
     }),
   );

@@ -263,6 +263,10 @@ const en = {
   "settings.chat.tasks_pill.description":
     "Pin a compact task summary above the composer while the task list is scrolled out of view. Clicking it jumps back to the full list.",
   "settings.chat.tasks_pill.toggle": "Tasks near chat",
+  "settings.chat.experimental_animations.label": "Experimental animations",
+  "settings.chat.experimental_animations.description":
+    "Animate the tasks strip sliding in and out above the composer. Off keeps the instant show and hide.",
+  "settings.chat.experimental_animations.toggle": "Experimental animations",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "What the composer does with what you type.",
@@ -987,6 +991,10 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.tasks_pill.description":
     "Fixa um resumo compacto das tarefas acima do composer enquanto a lista está fora da visão. Clicar volta para a lista completa.",
   "settings.chat.tasks_pill.toggle": "Tarefas perto do chat",
+  "settings.chat.experimental_animations.label": "Animações experimentais",
+  "settings.chat.experimental_animations.description":
+    "Anima a barra de tarefas entrando e saindo acima do composer. Desligado mantém mostrar e esconder na hora.",
+  "settings.chat.experimental_animations.toggle": "Animações experimentais",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "O que o composer faz com o que você digita.",

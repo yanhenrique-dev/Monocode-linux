@@ -21,7 +21,9 @@ import { SessionReview } from "../chrome/SessionReview";
 import { PromptOutline } from "../chrome/PromptOutline";
 import { TasksPill } from "../chrome/TasksPill";
 import {
+  loadExperimentalAnimations,
   loadTasksPill,
+  EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT,
   TASKS_PILL_CHANGE_EVENT,
 } from "../lib/appearance";
 import {
@@ -338,6 +340,20 @@ const SessionPaneContent = memo(function SessionPaneContent({
     window.addEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
     return () => {
       window.removeEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
+    };
+  }, []);
+  const [animationsEnabled, setAnimationsEnabled] = useState(
+    loadExperimentalAnimations,
+  );
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setAnimationsEnabled(
+        (event as CustomEvent<boolean>).detail ?? loadExperimentalAnimations(),
+      );
+    };
+    window.addEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
     };
   }, []);
   const astraWelcomeSequence = useRef(0);
@@ -742,6 +758,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
               scope={transcriptScope}
               visible={visible}
               enabled={tasksPillEnabled}
+              animationsEnabled={animationsEnabled}
               revealBlock={revealBlock}
             />
             {composer}
