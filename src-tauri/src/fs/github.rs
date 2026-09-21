@@ -716,14 +716,7 @@ fn git_github_work_items_for(
         args.push("--search".into());
         args.push(combined.clone());
     }
-    let key = work_items_cache_key(
-        &repo,
-        kind,
-        assigned_to_me,
-        state,
-        &combined,
-        limit_num,
-    );
+    let key = work_items_cache_key(&repo, kind, assigned_to_me, state, &combined, limit_num);
     if let Ok(cache) = work_items_cache().lock() {
         if let Some((at, items)) = cache.get(&key) {
             if at.elapsed() < WORK_ITEMS_TTL {
@@ -2119,9 +2112,7 @@ mod tests {
         let (limited, secs) = rate_limit_remaining();
         assert!(limited);
         assert!((1..=60).contains(&secs));
-        note_rate_limit_until(
-            std::time::Instant::now() - Duration::from_secs(1),
-        );
+        note_rate_limit_until(std::time::Instant::now() - Duration::from_secs(1));
         assert_eq!(rate_limit_remaining(), (false, 0));
     }
 }

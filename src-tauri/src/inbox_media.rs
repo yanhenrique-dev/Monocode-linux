@@ -35,9 +35,7 @@ fn media_locks() -> &'static std::sync::Mutex<
     std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>,
 > {
     static LOCKS: std::sync::OnceLock<
-        std::sync::Mutex<
-            std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>,
-        >,
+        std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<std::sync::Mutex<()>>>>,
     > = std::sync::OnceLock::new();
     LOCKS.get_or_init(Default::default)
 }
