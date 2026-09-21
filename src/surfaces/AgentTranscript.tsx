@@ -1735,6 +1735,7 @@ function ActivityPhaseGroup({
             block={phase.steps[0]}
             cwd={cwd}
             live={active}
+            liveTail={active}
             onApproval={onApproval}
             onOpenFile={onOpenFile}
             onOpenDiff={onOpenDiff}
@@ -1816,7 +1817,7 @@ function ActivityPhaseGroup({
                   />
                 </div>
               ) : null}
-              {steps.map((block) => (
+              {steps.map((block, index) => (
                 <div
                   key={block.id}
                   className={`zen-phase-step${active ? " zen-step-in" : ""}`}
@@ -1825,6 +1826,7 @@ function ActivityPhaseGroup({
                     block={block}
                     cwd={cwd}
                     live={active}
+                    liveTail={active && index === steps.length - 1}
                     onApproval={onApproval}
                     onOpenFile={onOpenFile}
                     onOpenDiff={onOpenDiff}
@@ -2166,6 +2168,7 @@ function ActivityRow({
   block,
   cwd,
   live = false,
+  liveTail = false,
   onApproval,
   onOpenFile,
   onOpenDiff,
@@ -2173,6 +2176,8 @@ function ActivityRow({
   block: Block;
   cwd?: string;
   live?: boolean;
+  /** This row is the newest step of the running phase. */
+  liveTail?: boolean;
   onApproval?: (requestId: number, decision: ApprovalDecision) => void;
   onOpenFile?: (path: string) => void;
   onOpenDiff?: (path: string) => void;
@@ -2192,7 +2197,7 @@ function ActivityRow({
     return <ActivityInterjectionRow block={block} />;
   }
   if (block.role === "system") {
-    return <ActivityStatusRow block={block} />;
+    return <ActivityStatusRow block={block} liveTail={liveTail} />;
   }
   if (isProseBlock(block)) {
     return (
@@ -2233,14 +2238,21 @@ function ActivityRow({
 }
 
 /** A status row folded into the trail: one muted line, nothing to open. */
-function ActivityStatusRow({ block }: { block: Block }) {
+function ActivityStatusRow({
+  block,
+  liveTail = false,
+}: {
+  block: Block;
+  liveTail?: boolean;
+}) {
+  const text = block.text.trim();
   return (
     <div className="flex min-w-0 items-center gap-1.5 py-1">
       <span
         title={block.text}
         className="min-w-0 flex-1 truncate font-sans text-sm text-content/50"
       >
-        {block.text.trim()}
+        {liveTail ? <Shimmer duration={1}>{text}</Shimmer> : text}
       </span>
     </div>
   );
