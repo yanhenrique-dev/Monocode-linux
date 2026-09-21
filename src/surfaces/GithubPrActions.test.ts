@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/githubTasks", async (original) => ({
   ...(await original<typeof import("../lib/githubTasks")>()),
   githubPrAction: vi.fn(),
+  githubPrMergeInfo: vi.fn(),
 }));
 
 import {
   githubPrAction,
+  githubPrMergeInfo,
   type GithubWorkItem,
   type InboxItem,
 } from "../lib/githubTasks";
@@ -46,6 +48,8 @@ beforeEach(() => {
     },
   );
   vi.mocked(githubPrAction).mockReset();
+  vi.mocked(githubPrMergeInfo).mockReset();
+  vi.mocked(githubPrMergeInfo).mockResolvedValue({});
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -128,6 +132,82 @@ describe("GitHub pull request actions", () => {
       projectPath: "/tmp/web",
       provider: "github",
     });
+  });
+
+  it("disables merge and lifecycle actions without push access", async () => {
+    vi.mocked(githubPrMergeInfo).mockResolvedValue({
+      viewerPermission: "READ",
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+    });
+    await act(async () =>
+      root.render(
+        createElement(GithubPrActions, {
+          item: pr(),
+          baseRef: "main",
+          headRef: "feature/inbox",
+        }),
+      ),
+    );
+
+    const buttons = [...container.querySelectorAll("button")];
+    const merge = buttons.find(
+      (button) => button.textContent?.trim() === "Merge pull request",
+    )!;
+    expect(merge.disabled).toBe(true);
+    expect(merge.title).toContain("push access");
+    const close = buttons.find(
+      (button) => button.textContent?.trim() === "Close pull request",
+    )!;
+    expect(close.disabled).toBe(true);
+  });
+
+  it("keeps merge enabled when mergeability is still unknown", async () => {
+    vi.mocked(githubPrMergeInfo).mockResolvedValue({
+      viewerPermission: "WRITE",
+      mergeable: "UNKNOWN",
+    });
+    await act(async () =>
+      root.render(
+        createElement(GithubPrActions, {
+          item: pr(),
+          baseRef: "main",
+          headRef: "feature/inbox",
+        }),
+      ),
+    );
+
+    const merge = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "Merge pull request",
+    )!;
+    expect(merge.disabled).toBe(false);
+  });
+
+  it("disables merge on conflicts but leaves close enabled", async () => {
+    vi.mocked(githubPrMergeInfo).mockResolvedValue({
+      viewerPermission: "WRITE",
+      mergeable: "CONFLICTING",
+    });
+    await act(async () =>
+      root.render(
+        createElement(GithubPrActions, {
+          item: pr(),
+          baseRef: "main",
+          headRef: "feature/inbox",
+        }),
+      ),
+    );
+
+    const buttons = [...container.querySelectorAll("button")];
+    const merge = buttons.find(
+      (button) => button.textContent?.trim() === "Merge pull request",
+    )!;
+    expect(merge.disabled).toBe(true);
+    expect(merge.title).toContain("conflict");
+    const close = buttons.find(
+      (button) => button.textContent?.trim() === "Close pull request",
+    )!;
+    expect(close.disabled).toBe(false);
   });
 
   it("keeps a failed close action open with GitHub's error", async () => {

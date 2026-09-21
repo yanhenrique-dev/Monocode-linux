@@ -1745,6 +1745,56 @@ fn parse_github_review_reply_url_reads_graphql() {
 }
 
 #[test]
+fn parse_github_pr_merge_info_reads_permission_and_merge_state() {
+    let json = r#"{
+            "data": {
+                "repository": {
+                    "viewerPermission": "WRITE",
+                    "pullRequest": {
+                        "mergeable": "MERGEABLE",
+                        "mergeStateStatus": "CLEAN"
+                    }
+                }
+            }
+        }"#;
+    assert_eq!(
+        parse_github_pr_merge_info(json).unwrap(),
+        GitHubPrMergeInfo {
+            viewer_permission: Some("WRITE".into()),
+            mergeable: Some("MERGEABLE".into()),
+            merge_state_status: Some("CLEAN".into()),
+        }
+    );
+}
+
+#[test]
+fn parse_github_pr_merge_info_tolerates_partial_responses() {
+    // Older `gh` or a missing PR: unknown fields stay unknown so the UI
+    // keeps actions enabled instead of hiding them.
+    let json = r#"{
+            "data": {
+                "repository": {
+                    "viewerPermission": "READ",
+                    "pullRequest": null
+                }
+            }
+        }"#;
+    assert_eq!(
+        parse_github_pr_merge_info(json).unwrap(),
+        GitHubPrMergeInfo {
+            viewer_permission: Some("READ".into()),
+            mergeable: None,
+            merge_state_status: None,
+        }
+    );
+    let error = parse_github_pr_merge_info(
+        r#"{"data":null,"errors":[{"message":"Could not resolve to a Repository"}]}"#,
+    )
+    .unwrap_err();
+    assert!(error.contains("Could not resolve to a Repository"));
+}
+
+#[test]
 fn parse_github_work_item_thread_reads_graphql_errors() {
     let json = r#"{
             "data": {"repository": null},

@@ -51,7 +51,10 @@ import {
   githubStatus,
   githubPrDiff,
   githubPrAction,
+  githubPrMergeConflicting,
+  githubPrMergeInfo,
   githubReviewDecisionLabel,
+  githubViewerCanWrite,
   githubWorkItem,
   githubWorkItemComment,
   githubWorkItemDetails,
@@ -73,6 +76,7 @@ import {
   type GithubLabel,
   type GithubPrAction,
   type GithubPrDiff,
+  type GithubPrMergeInfo,
   type GithubWorkItemDetails,
   type GithubWorkItemThread,
   type InboxItem,
@@ -1567,7 +1571,31 @@ export function GithubPrActions({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mergeInfo, setMergeInfo] = useState<GithubPrMergeInfo | null>(null);
   const state = item.state.trim().toLowerCase();
+  // Merge/permission state loads lazily and degrades to unknown: while it is
+  // unknown the buttons stay enabled and failures surface after the click.
+  useEffect(() => {
+    let cancelled = false;
+    setMergeInfo(null);
+    void githubPrMergeInfo(item.projectPath, item.repo, item.number).then(
+      (info) => {
+        if (!cancelled) setMergeInfo(info);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [item.projectPath, item.repo, item.number]);
+  const canWrite = githubViewerCanWrite(mergeInfo);
+  const mergeConflicting = githubPrMergeConflicting(mergeInfo);
+  const writeBlockedReason =
+    canWrite === false
+      ? "You don't have push access to this repository"
+      : null;
+  const mergeBlockedReason =
+    writeBlockedReason ??
+    (mergeConflicting ? "This pull request has merge conflicts" : null);
   const selectedMerge =
     GITHUB_PR_MERGE_OPTIONS.find((option) => option.action === mergeAction) ??
     GITHUB_PR_MERGE_OPTIONS[0];
@@ -1633,7 +1661,8 @@ export function GithubPrActions({
         >
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || mergeBlockedReason != null}
+            title={mergeBlockedReason ?? undefined}
             onClick={(event) => askToRun(mergeAction, event.currentTarget)}
             className={`inline-flex items-center gap-1.5 px-3 text-[12px] font-medium hover:bg-background-base/10 disabled:cursor-default disabled:opacity-40 ${PR_ACTION_PRESS}`}
           >
@@ -1644,11 +1673,11 @@ export function GithubPrActions({
           </button>
           <button
             type="button"
-            title="Merge options"
+            title={mergeBlockedReason ?? "Merge options"}
             aria-label="Merge options"
             aria-haspopup="menu"
             aria-expanded={mergeMenuOpen}
-            disabled={busy}
+            disabled={busy || mergeBlockedReason != null}
             onClick={() => setMergeMenuOpen((open) => !open)}
             className={`grid w-7 place-items-center border-l border-background-base/20 hover:bg-background-base/10 disabled:cursor-default disabled:opacity-40 ${PR_ACTION_PRESS}`}
           >
@@ -1659,7 +1688,8 @@ export function GithubPrActions({
       {state === "open" && item.draft ? (
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || writeBlockedReason != null}
+          title={writeBlockedReason ?? undefined}
           onClick={(event) => askToRun("ready", event.currentTarget)}
           className={stateButton}
         >
@@ -1670,7 +1700,8 @@ export function GithubPrActions({
       {state === "open" && !item.draft ? (
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || writeBlockedReason != null}
+          title={writeBlockedReason ?? undefined}
           onClick={(event) => askToRun("draft", event.currentTarget)}
           className={stateButton}
         >
@@ -1681,7 +1712,8 @@ export function GithubPrActions({
       {state === "open" ? (
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || writeBlockedReason != null}
+          title={writeBlockedReason ?? undefined}
           onClick={(event) => askToRun("close", event.currentTarget)}
           className={`${stateButton} hover:text-rose-400`}
         >
@@ -1692,7 +1724,8 @@ export function GithubPrActions({
       {state === "closed" ? (
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || writeBlockedReason != null}
+          title={writeBlockedReason ?? undefined}
           onClick={(event) => askToRun("reopen", event.currentTarget)}
           className={stateButton}
         >
