@@ -91,12 +91,13 @@ describe("finish announcement sound fallback", () => {
   it("reports banner delivery without the cue for input requests", async () => {
     invokeMock.mockResolvedValue({ osSound: false });
     const session = finishedSession();
-    await expect(notifySession(session, "finished", false)).resolves.toBe(
-      true,
-    );
+    await expect(
+      notifySession(session, { kind: "approval", requestId: 1 }, false),
+    ).resolves.toBe(true);
+    expect(playCueMock).not.toHaveBeenCalled();
     invokeMock.mockRejectedValue(new Error("daemon unavailable"));
-    await expect(notifySession(session, "finished", false)).resolves.toBe(
-      false,
-    );
+    await expect(
+      notifySession(session, { kind: "approval", requestId: 1 }, false),
+    ).resolves.toBe(false);
   });
 });
