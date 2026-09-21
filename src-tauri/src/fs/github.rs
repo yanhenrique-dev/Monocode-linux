@@ -291,6 +291,93 @@ pub async fn git_github_work_item_comment(
     .map_err(|e| e.to_string())?
 }
 
+/// Viewer permission and merge state for a pull request, so the UI can
+/// disable actions the viewer is not allowed to run instead of failing
+/// after the click. Every field is optional: an older `gh`, a partial
+/// response, or a missing PR degrades to "unknown" and the UI stays
+/// optimistic rather than hiding actions.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrMergeInfo {
+    pub viewer_permission: Option<String>,
+    pub mergeable: Option<String>,
+    pub merge_state_status: Option<String>,
+}
+
+/// Merge and permission state for a GitHub pull request, via `gh`.
+#[tauri::command]
+pub async fn git_github_pr_merge_info(
+    cwd: String,
+    repo: String,
+    number: i64,
+) -> Result<GitHubPrMergeInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_github_pr_merge_info_for(&expand_home(&cwd), &repo, number)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn git_github_pr_merge_info_for(
+    root: &Path,
+    repo: &str,
+    number: i64,
+) -> Result<GitHubPrMergeInfo, String> {
+    if number <= 0 {
+        return Err("GitHub pull request number must be positive".into());
+    }
+    let (owner, name) = split_github_repo(repo)?;
+    let owner_field = format!("owner={owner}");
+    let name_field = format!("name={name}");
+    let number_field = format!("number={number}");
+    let json = gh_checked(
+        root,
+        &[
+            "api",
+            "graphql",
+            "-f",
+            &format!("query={GITHUB_PR_MERGE_INFO_QUERY}"),
+            "-F",
+            &owner_field,
+            "-F",
+            &name_field,
+            "-F",
+            &number_field,
+        ],
+    )?;
+    parse_github_pr_merge_info(&json)
+}
+
+pub(crate) fn parse_github_pr_merge_info(json: &str) -> Result<GitHubPrMergeInfo, String> {
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|error| error.to_string())?;
+    if let Some(message) = value
+        .get("errors")
+        .and_then(|errors| errors.as_array())
+        .and_then(|errors| errors.first())
+        .and_then(|error| error.get("message"))
+        .and_then(|message| message.as_str())
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+    {
+        return Err(message.to_string());
+    }
+    let repository = value.pointer("/data/repository");
+    let pull_request = repository.and_then(|repository| repository.get("pullRequest"));
+    let text = |parent: Option<&serde_json::Value>, key: &str| {
+        parent
+            .and_then(|parent| parent.get(key))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned)
+    };
+    Ok(GitHubPrMergeInfo {
+        viewer_permission: text(repository, "viewerPermission"),
+        mergeable: text(pull_request, "mergeable"),
+        merge_state_status: text(pull_request, "mergeStateStatus"),
+    })
+}
+
 /// Merge or change the lifecycle state of a GitHub pull request via `gh`.
 #[tauri::command]
 pub async fn git_github_pr_action(
@@ -726,6 +813,18 @@ query InboxPullRequestThread($owner: String!, $name: String!, $number: Int!) {
           }
         }
       }
+    }
+  }
+}
+"#;
+
+const GITHUB_PR_MERGE_INFO_QUERY: &str = r#"
+query InboxPullRequestMergeInfo($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    viewerPermission
+    pullRequest(number: $number) {
+      mergeable
+      mergeStateStatus
     }
   }
 }
