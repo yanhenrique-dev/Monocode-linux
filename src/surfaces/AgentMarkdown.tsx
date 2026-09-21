@@ -44,7 +44,6 @@ import { copyText } from "../lib/clipboard";
 import { revealPath } from "../lib/fs";
 import { INBOX_MEDIA_PREFIXES, isInboxMediaUrl } from "../lib/inboxMedia";
 import { isNoteImagePath } from "../lib/noteImages";
-import { IS_MAC, IS_WIN } from "../lib/platform";
 import { InboxMedia } from "./InboxMedia";
 
 const MERMAID_BASE_CONFIG = {
@@ -112,11 +111,7 @@ const FileOpenContext = createContext<{
 
 const RemoteMediaContext = createContext(false);
 
-const REVEAL_LABEL = IS_MAC
-  ? "Reveal in Finder"
-  : IS_WIN
-    ? "Reveal in File Explorer"
-    : "Open Containing Folder";
+const REVEAL_LABEL = "Open Containing Folder";
 
 function fileLinkMenuItems(
   canOpenInMonoCode: boolean,

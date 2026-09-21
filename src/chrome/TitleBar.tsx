@@ -36,7 +36,7 @@ import { HarnessIcon } from "./HarnessIcon";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TerminalSpinner } from "./TerminalSpinner";
 import { WindowControls } from "./WindowControls";
-import { IS_MAC, MOD } from "../lib/platform";
+import { MOD } from "../lib/platform";
 import type { RecentProject } from "../lib/recents";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import {
@@ -770,7 +770,7 @@ function TitleBarComponent({
       railClosed &&
       Boolean(onOpenInbox || onOpenNotes || onOpenSettings)) ||
     (railClosed && !projectless);
-  const trailingControls = showTrailingActions || !IS_MAC ? (
+  const trailingControls = showTrailingActions ? (
     <div className="flex h-full shrink-0 items-stretch">
       {showTrailingActions ? (
         <div className="flex items-center gap-0.5 px-2">
@@ -801,7 +801,7 @@ function TitleBarComponent({
           ) : null}
         </div>
       ) : null}
-      {!IS_MAC ? <WindowControls /> : null}
+      <WindowControls />
     </div>
   ) : null;
 

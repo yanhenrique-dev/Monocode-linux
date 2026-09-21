@@ -3,11 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
-#[cfg(target_os = "macos")]
-use sha2::{Digest, Sha256};
 use tauri::AppHandle;
-#[cfg(target_os = "macos")]
-use unicode_normalization::UnicodeNormalization;
 
 use crate::dirs_home;
 
@@ -15,13 +11,6 @@ const OAUTH_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA: &str = "oauth-2025-04-20";
 const USER_AGENT: &str = "claude-code/2.1.0";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
-
-#[cfg(target_os = "macos")]
-const KEYCHAIN_TIMEOUT: Duration = Duration::from_secs(5);
-#[cfg(target_os = "macos")]
-const LEGACY_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
-#[cfg(target_os = "macos")]
-const KEYCHAIN_FALLBACK_USER: &str = "claude-code-user";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,9 +128,7 @@ fn opencode_data_dir() -> Option<PathBuf> {
     if let Some(xdg) = env_var("XDG_DATA_HOME") {
         return Some(PathBuf::from(xdg).join(app));
     }
-    let home = dirs_home().or_else(|| {
-        std::env::var_os("USERPROFILE").map(|value| value.to_string_lossy().into_owned())
-    })?;
+    let home = dirs_home()?;
     Some(PathBuf::from(home).join(".local/share").join(app))
 }
 
@@ -476,13 +463,6 @@ fn usage_error(status: u16) -> ClaudeUsageFetch {
 }
 
 fn read_claude_credentials(config_dir: Option<&std::path::Path>) -> Option<ClaudeCredentials> {
-    #[cfg(target_os = "macos")]
-    {
-        let service = claude_keychain_service(config_dir);
-        if let Some(creds) = read_macos_keychain_credentials(&service) {
-            return Some(creds);
-        }
-    }
     read_credentials_file(config_dir)
 }
 
@@ -496,9 +476,7 @@ fn claude_credentials_path(config_dir: Option<&std::path::Path>) -> Option<PathB
     if let Some(dir) = config_dir {
         return Some(dir.join(".credentials.json"));
     }
-    let home = dirs_home().or_else(|| {
-        std::env::var_os("USERPROFILE").map(|value| value.to_string_lossy().into_owned())
-    })?;
+    let home = dirs_home()?;
     Some(PathBuf::from(home).join(".claude/.credentials.json"))
 }
 
@@ -558,117 +536,6 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or(0)
-}
-
-#[cfg(target_os = "macos")]
-fn read_macos_keychain_credentials(service: &str) -> Option<ClaudeCredentials> {
-    let candidates = [
-        {
-            let mut args = keychain_find_args(service);
-            args.push("-w".into());
-            args
-        },
-        {
-            let mut args = keychain_find_args(service);
-            args.extend(["-a".into(), keychain_user(), "-w".into()]);
-            args
-        },
-        {
-            let mut args = keychain_find_args(service);
-            args.extend(["-a".into(), KEYCHAIN_FALLBACK_USER.into(), "-w".into()]);
-            args
-        },
-    ];
-    for args in candidates {
-        if let Some(secret) = security_output(&args) {
-            if let Some(creds) = credentials_from_blob(&secret) {
-                return Some(creds);
-            }
-        }
-    }
-    None
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_find_args(service: &str) -> Vec<String> {
-    vec!["find-generic-password".into(), "-s".into(), service.into()]
-}
-
-#[cfg(target_os = "macos")]
-fn claude_keychain_service(config_dir: Option<&std::path::Path>) -> String {
-    let Some(config_dir) = config_dir else {
-        return LEGACY_KEYCHAIN_SERVICE.into();
-    };
-    // Claude Code hashes the exact, NFC-normalized selector string and uses
-    // the first eight lowercase hex characters as its Keychain service suffix.
-    let selector: String = config_dir.to_string_lossy().nfc().collect();
-    let digest = Sha256::digest(selector.as_bytes());
-    let suffix = format!("{digest:x}");
-    format!("{LEGACY_KEYCHAIN_SERVICE}-{}", &suffix[..8])
-}
-
-#[cfg(target_os = "macos")]
-fn keychain_user() -> String {
-    let user = std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .unwrap_or_default();
-    if user
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
-        && !user.is_empty()
-    {
-        user
-    } else {
-        KEYCHAIN_FALLBACK_USER.into()
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn security_output(args: &[String]) -> Option<String> {
-    security_run(args)
-}
-
-#[cfg(target_os = "macos")]
-fn security_run(args: &[String]) -> Option<String> {
-    use std::process::{Command, Stdio};
-    let mut cmd = Command::new("security");
-    cmd.args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    run_with_timeout(&mut cmd, KEYCHAIN_TIMEOUT)
-}
-
-#[cfg(target_os = "macos")]
-fn run_with_timeout(cmd: &mut std::process::Command, timeout: Duration) -> Option<String> {
-    use std::io::Read;
-    use std::time::Instant;
-    let mut child = cmd.spawn().ok()?;
-    let started = Instant::now();
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    return None;
-                }
-                let mut stdout = child.stdout.take()?;
-                let mut out = String::new();
-                stdout.read_to_string(&mut out).ok()?;
-                let trimmed = out.trim();
-                if trimmed.is_empty() {
-                    return None;
-                }
-                return Some(trimmed.to_string());
-            }
-            Ok(None) if started.elapsed() > timeout => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(40)),
-            Err(_) => return None,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -812,15 +679,5 @@ mod tests {
         assert!(token_expired(Some(now), now));
         assert!(token_expired(Some(now - 1), now));
         assert!(!token_expired(None, now));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn custom_config_dir_selects_claudes_hashed_keychain_service() {
-        assert_eq!(
-            claude_keychain_service(Some(std::path::Path::new("/tmp/profile"))),
-            "Claude Code-credentials-902e721c"
-        );
-        assert_eq!(claude_keychain_service(None), "Claude Code-credentials");
     }
 }

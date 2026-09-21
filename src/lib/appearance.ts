@@ -1,6 +1,5 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { isHexColor } from "./colorUtils";
-import { HAS_NATIVE_GLASS, IS_MAC } from "./platform";
 import { applyUiScale, loadUiScale } from "./uiScale";
 
 const ACCENT_COLOR_KEY = "monocode.accentColor";
@@ -28,7 +27,6 @@ const CHAT_BACKGROUND_SCOPE_KEY = "monocode.chatBackgroundScope";
 const CHAT_BACKGROUND_BLUR_KEY = "monocode.chatBackgroundBlur";
 const CHANGES_VIEW_KEY = "monocode.changesView";
 let chatBackgroundRevision = Date.now();
-let nativeGlassReady = false;
 
 export const CHAT_BACKGROUND_PATH_CHANGE_EVENT =
   "monocode:chat-background-path-change";
@@ -335,11 +333,6 @@ export function applyThemeTint(hue: number, saturation: number) {
 }
 
 export function initAppearance() {
-  document.documentElement.classList.toggle("is-mac", IS_MAC);
-  document.documentElement.classList.toggle(
-    "has-native-glass",
-    HAS_NATIVE_GLASS,
-  );
   applyAccentColor(loadAccentColor());
   applyThemeTint(loadThemeHue(), loadThemeSaturation());
   applyThemeDarkLightness(loadThemeDarkLightness());
@@ -400,22 +393,14 @@ export function isLightScheme(): boolean {
 export function applyThemePreference(value: ThemePreference): ColorScheme {
   const next = resolveColorScheme(value);
   document.documentElement.classList.toggle("theme-light", next === "light");
-  if (nativeGlassReady) syncNativeGlass(next);
   window.dispatchEvent(
     new CustomEvent<ColorScheme>(SCHEME_CHANGE_EVENT, { detail: next }),
   );
   return next;
 }
 
-function syncNativeGlass(scheme: ColorScheme) {
-  void invoke("set_window_glass_enabled", { enabled: scheme === "dark" });
-}
-
-/** Applies native transparency once the opaque launch cover can be removed. */
-export function activateWindowAppearance() {
-  nativeGlassReady = true;
-  syncNativeGlass(isLightScheme() ? "light" : "dark");
-}
+/** Kept for the launch sequence: no native glass exists on Linux. */
+export function activateWindowAppearance() {}
 
 /** Keeps the "system" preference in sync when the OS flips appearance. */
 export function watchSystemColorScheme() {
@@ -474,45 +459,15 @@ export function saveSidebarBlur(value: number) {
 }
 
 export function applySidebarBlur(value: number) {
-  const next = Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
-  void invoke("set_window_background_blur", { radius: next });
-  return next;
+  return Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
 }
-
-// Drag preview path for the blur slider: the native IPC re-composites the
-// whole window, so it is throttled to ~7Hz while dragging and the exact
-// value is committed on release (see commit via applySidebarBlur).
-const BLUR_PREVIEW_MIN_INTERVAL_MS = 150;
-let blurPreviewAt = 0;
-let blurPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function previewSidebarBlur(value: number): number {
-  const next = Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
-  if (blurPreviewTimer != null) {
-    clearTimeout(blurPreviewTimer);
-    blurPreviewTimer = null;
-  }
-  const now = Date.now();
-  const wait = BLUR_PREVIEW_MIN_INTERVAL_MS - (now - blurPreviewAt);
-  if (wait <= 0) {
-    blurPreviewAt = now;
-    void invoke("set_window_background_blur", { radius: next });
-  } else {
-    blurPreviewTimer = setTimeout(() => {
-      blurPreviewTimer = null;
-      blurPreviewAt = Date.now();
-      void invoke("set_window_background_blur", { radius: next });
-    }, wait);
-  }
-  return next;
+  return Math.round(clamp(value, SIDEBAR_BLUR_MIN, SIDEBAR_BLUR_MAX));
 }
 
-export function cancelSidebarBlurPreview() {
-  if (blurPreviewTimer != null) {
-    clearTimeout(blurPreviewTimer);
-    blurPreviewTimer = null;
-  }
-}
+/** No native blur preview is in flight on Linux; kept for the slider API. */
+export function cancelSidebarBlurPreview() {}
 
 export function loadBodyGlass(): boolean {
   return readFlag(BODY_KEY) ?? BODY_GLASS_DEFAULT;

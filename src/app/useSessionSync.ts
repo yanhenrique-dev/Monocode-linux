@@ -101,7 +101,6 @@ import {
 import { syncDockBadge } from "../lib/dockBadge";
 import { orchestrator } from "../lib/orchestration";
 import { warmNativeSkills } from "../lib/skills";
-import { IS_MAC } from "../lib/platform";
 import { loadCloseToTray } from "../lib/settings";
 import { DEFAULT_PROVIDER_ACCOUNT_ID } from "../lib/providerAccounts";
 import { reconcileRestoredModel } from "../lib/restoredModel";
@@ -708,7 +707,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
           }
           if (hasInFlightSessions(sessionsRef.current)) {
             flushHarnessEvents();
-            if (!toTray && !IS_MAC) {
+            if (!toTray) {
               void closeBusyWindow();
               return;
             }

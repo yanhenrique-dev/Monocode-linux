@@ -39,7 +39,7 @@ import {
   type ExternalEditor,
   type GitDiffStats,
 } from "../lib/fs";
-import { IS_MAC, IS_WIN, MOD } from "../lib/platform";
+import { MOD } from "../lib/platform";
 import { pathKey, projectKey, projectName } from "../lib/paths";
 import {
   collectRailProjects,
@@ -106,11 +106,7 @@ import { useNotificationProjects } from "../hooks/useNotificationProjects";
 import { updateNotificationPreferences } from "../lib/notificationPreferences";
 import type { ExplorerMenuItem } from "./ExplorerMenu";
 
-const REVEAL_LABEL = IS_MAC
-  ? "Reveal in Finder"
-  : IS_WIN
-    ? "Reveal in File Explorer"
-    : "Open Containing Folder";
+const REVEAL_LABEL = "Open Containing Folder";
 
 function projectMenuExtraItems(
   pinned: boolean,
@@ -652,7 +648,6 @@ export function ProjectRail({
         className="flex h-10 shrink-0 select-none items-center pr-1.5"
         data-tauri-drag-region="deep"
       >
-        {IS_MAC ? <div className="w-[78px] shrink-0" /> : null}
         <DevModeSlot />
         <TabVisitNav
           canGoBack={canGoBack}

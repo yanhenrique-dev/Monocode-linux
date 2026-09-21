@@ -161,7 +161,6 @@ import {
   subscribeModels,
 } from "../lib/models";
 import { prettyCwd, projectKey, projectName } from "../lib/paths";
-import { IS_MAC, IS_WIN } from "../lib/platform";
 import {
   loadArchivedProjects,
   looksLikeProject,
@@ -216,7 +215,6 @@ import {
   KEYBINDINGS,
   keybindingWhenLabel,
   loadClaudeHooks,
-  loadCloseToTray,
   loadComposerRunner,
   loadDiffViewer,
   loadFollowUpBehavior,
@@ -227,7 +225,6 @@ import {
   loadReviewAdoptShell,
   loadTerminalGpu,
   saveClaudeHooks,
-  saveCloseToTray,
   saveComposerRunner,
   saveDiffViewer,
   saveFollowUpBehavior,
@@ -274,7 +271,6 @@ import {
 import {
   cachedNotificationPermission,
   loadNotificationsEnabled,
-  openNotificationSettings,
   probeNotificationPermission,
   requestNotificationPermission,
   saveNotificationsEnabled,
@@ -323,7 +319,6 @@ type Props = {
   onDeleteWorktreeSessions?: (
     sessionIds: readonly string[],
   ) => Promise<boolean>;
-  besideRail?: boolean;
   onClose: () => void;
   /** Lets search jump to a setting that lives on another page. */
   onSelectSection?: (section: SettingsSectionId) => void;
@@ -347,7 +342,6 @@ export function SettingsView({
   onRemoveWorktree = removeWorktree,
   onCheckWorktreeRemoval,
   onDeleteWorktreeSessions,
-  besideRail = false,
   onClose,
   onSelectSection,
   onOpenSession,
@@ -429,7 +423,6 @@ export function SettingsView({
         className="flex h-10 shrink-0 select-none items-center border-b border-stroke"
         data-tauri-drag-region="deep"
       >
-        {IS_MAC && !besideRail ? <div className="w-[78px] shrink-0" /> : null}
         <div className="flex min-w-0 flex-1 items-center gap-2 px-2 text-sm">
           <span className="shrink-0 text-content/60">{t("settings.header.breadcrumb")}</span>
           <span aria-hidden className="shrink-0 text-content/25">
@@ -455,7 +448,7 @@ export function SettingsView({
           ) : null}
           <SettingsSearch onReveal={onReveal} />
         </div>
-        {IS_MAC ? null : <WindowControls />}
+        <WindowControls />
       </div>
 
       <div aria-live="polite" className="sr-only">
@@ -694,7 +687,6 @@ function GeneralPage({
   const [liveAgentsEnabled, setLiveAgentsEnabled] = useState(
     loadLiveAgentsEnabled,
   );
-  const [closeToTray, setCloseToTray] = useState(loadCloseToTray);
   const { locale, t } = useLocale();
 
   const onNotesEnabled = (next: boolean) => {
@@ -710,11 +702,6 @@ function GeneralPage({
   const onLiveAgentsEnabled = (next: boolean) => {
     saveLiveAgentsEnabled(next);
     setLiveAgentsEnabled(next);
-  };
-
-  const onCloseToTray = (next: boolean) => {
-    saveCloseToTray(next);
-    setCloseToTray(next);
   };
 
   const onLanguage = (value: string) => {
@@ -762,19 +749,6 @@ function GeneralPage({
             onChange={onReviewAdoptShell}
           />
         </Row>
-        {IS_WIN && (
-          <Row
-            id="close-to-tray"
-            label={t("settings.general.close_to_tray.label")}
-            description={t("settings.general.close_to_tray.description")}
-          >
-            <Toggle
-              label={t("settings.general.close_to_tray.toggle")}
-              on={closeToTray}
-              onChange={onCloseToTray}
-            />
-          </Row>
-        )}
       </Group>
 
       <Group title={t("settings.general.about.title")}>
@@ -3609,27 +3583,14 @@ function AccentColorPicker({
   );
 }
 
-/** macOS keeps the decision after the first prompt; only System Settings can flip it. Windows toasts are governed by Settings > Notifications. */
 function NotificationsBlocked() {
   const { t } = useLocale();
   return (
     <span className="flex flex-wrap items-center gap-2 text-[12px] text-content/60">
       {t("settings.general.notifications.permission_needed")}
-      {IS_MAC || IS_WIN ? (
-        <button
-          type="button"
-          onClick={() => {
-            void openNotificationSettings().catch(() => {});
-          }}
-          className="rounded-md border border-content/10 px-2 py-1 text-content/70 hover:bg-content/10 hover:text-content"
-        >
-          {t("settings.general.notifications.open_system_settings")}
-        </button>
-      ) : (
-        <span className="basis-full">
-          {t("settings.general.notifications.linux_denied_hint")}
-        </span>
-      )}
+      <span className="basis-full">
+        {t("settings.general.notifications.linux_denied_hint")}
+      </span>
     </span>
   );
 }

@@ -32,7 +32,6 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     // Sandboxed worktrees live under the shared home; git itself runs on
     // the host so hooks, ssh and user config keep working.
     let mut command = crate::host::command("git");
-    crate::hide_window_console(&mut command);
     let output = command
         .arg("-C")
         .arg(root)

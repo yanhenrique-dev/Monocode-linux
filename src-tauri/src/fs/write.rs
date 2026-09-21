@@ -503,31 +503,6 @@ pub fn reveal_path(path: String) -> Result<(), String> {
     if !path.exists() {
         return Err(format!("{}: No such file or directory", path.display()));
     }
-    #[cfg(target_os = "macos")]
-    {
-        let path_str = path.to_str().ok_or_else(|| "Invalid path".to_string())?;
-        let status = Command::new("open")
-            .args(["-R", path_str])
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err("Could not reveal in Finder.".into());
-        }
-        Ok(())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        // explorer.exe returns 1 even when it opened the folder.
-        let path_str = path.to_string_lossy().replace('/', "\\");
-        Command::new("explorer")
-            .arg(format!("/select,{path_str}"))
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let parent = path
             .parent()

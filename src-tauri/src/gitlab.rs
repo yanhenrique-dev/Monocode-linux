@@ -930,7 +930,6 @@ fn encode_path_component(value: &str) -> String {
 
 fn gitlab_repo_for(root: &Path, gitlab_url: &str) -> Result<String, String> {
     let mut cmd = crate::host::command("git");
-    crate::hide_window_console(&mut cmd);
     let output = cmd
         .args(["config", "--get-regexp", r"^remote\..*\.url$"])
         .current_dir(root)

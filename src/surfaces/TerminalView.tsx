@@ -21,7 +21,6 @@ import {
   resetGridStretch,
   type TerminalFitMode,
 } from "../lib/terminalLayout";
-import { IS_MAC } from "../lib/platform";
 import { subscribeTerminalGpu } from "../lib/settings";
 import {
   loadEffectiveTerminalGpu,
@@ -167,7 +166,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       allowTransparency: false,
       smoothScrollDuration: 0,
       theme: terminalTheme(isLightScheme()),
-      macOptionIsMeta: IS_MAC,
+      macOptionIsMeta: false,
     });
     term.open(host);
     termRef.current = term;

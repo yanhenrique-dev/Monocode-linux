@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { orchestrator } from "./lib/orchestration";
 import { DEFAULT_PROVIDER_ACCOUNT_ID } from "./lib/providerAccounts";
 import type { RateLimitProvider } from "./lib/rateLimits";
@@ -26,7 +25,6 @@ import {
   loadSidebarTabOrder,
   type SidebarTabId,
 } from "./lib/appearance";
-import { HAS_NATIVE_GLASS, IS_MAC } from "./lib/platform";
 import {
   applyUiScale,
   loadUiScale,
@@ -41,13 +39,10 @@ import {
   newTab,
   type WorkspaceTab,
 } from "./lib/layout";
-import {
-  applyDockGridStyle,
-  findProjectTerminal,
-} from "./lib/projectTerminal";
+import { applyDockGridStyle, findProjectTerminal } from "./lib/projectTerminal";
 import { type WindowTransferPayload } from "./lib/windowTransfer";
 import { supportsHarnessLogin } from "./lib/harness/authSupport";
-import { type EditorNavigationTarget, } from "./lib/search";
+import { type EditorNavigationTarget } from "./lib/search";
 import {
   lastProjectPath,
   loadRecents,
@@ -65,9 +60,7 @@ import {
 } from "./lib/session";
 import { useProjectBranches } from "./hooks/useProjectBranches";
 
-import {
-  type SessionSummary,
-} from "./lib/sessionStore";
+import { type SessionSummary } from "./lib/sessionStore";
 import { ReminderNotices } from "./chrome/ReminderNotices";
 
 import { PaneTree } from "./surfaces/PaneTree";
@@ -89,15 +82,10 @@ import {
   type SettingsSectionId,
 } from "./lib/settings";
 import type { InstalledUpdate } from "./lib/updateNotice";
-import {
-  type ResumedWorkspace,
-} from "./lib/appLifecycle";
+import { type ResumedWorkspace } from "./lib/appLifecycle";
 
 import { useProjectTerminals } from "./app/useProjectTerminals";
-import {
-  useAppViews,
-  type LinkedWorkItemPanelState,
-} from "./app/useAppViews";
+import { useAppViews, type LinkedWorkItemPanelState } from "./app/useAppViews";
 import { useWorkspaceTabs } from "./app/useWorkspaceTabs";
 import { useSessions } from "./app/useSessions";
 import { useHistory } from "./app/useHistory";
@@ -213,7 +201,7 @@ export default function App({
     [projectOfTab],
   );
 
-const onSelectProviderAccount = useCallback(
+  const onSelectProviderAccount = useCallback(
     (provider: RateLimitProvider, accountId: string) => {
       if (!active || active.harness !== provider) return;
       const currentId = active.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
@@ -310,8 +298,11 @@ const onSelectProviderAccount = useCallback(
   const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | null>(
     null,
   );
-  const [notificationProjectPath, setNotificationProjectPath] = useState<string | null>(null);
-  const [notificationSettingsRequest, setNotificationSettingsRequest] = useState(0);
+  const [notificationProjectPath, setNotificationProjectPath] = useState<
+    string | null
+  >(null);
+  const [notificationSettingsRequest, setNotificationSettingsRequest] =
+    useState(0);
   const [editorNavigation, setEditorNavigation] =
     useState<EditorNavigationTarget | null>(null);
   const editorNavigationToken = useRef(0);
@@ -838,17 +829,21 @@ const onSelectProviderAccount = useCallback(
     setProjectTerminals,
     onSelectHistorySession,
   });
-  const { onModelChange, onModelSettingsChange, onRuntimeModeChange, onSubmit } =
-    useComposer({
-      sessionsRef,
-      activeSessionIdRef,
-      turnGen,
-      removingSessionIds,
-      setSessions,
-      enqueueHarnessEvent,
-      flushHarnessEvents,
-      dismissNoticesForContinuedSession,
-    });
+  const {
+    onModelChange,
+    onModelSettingsChange,
+    onRuntimeModeChange,
+    onSubmit,
+  } = useComposer({
+    sessionsRef,
+    activeSessionIdRef,
+    turnGen,
+    removingSessionIds,
+    setSessions,
+    enqueueHarnessEvent,
+    flushHarnessEvents,
+    dismissNoticesForContinuedSession,
+  });
   const {
     confirmingOrchestration,
     onUpdatePlan,
@@ -1010,57 +1005,51 @@ const onSelectProviderAccount = useCallback(
     return paths;
   }, [tabs]);
 
-  useEffect(() => {
-    void invoke("set_traffic_lights_visible", { visible: true }).catch(
-      () => {},
-    );
-  }, []);
-
   const { onSessionNavigationOrder } = useAppShortcuts({
-      tabs,
-      tabsRef,
-      sessionsRef,
-      activeTabIdRef,
-      projectCwdRef,
-      filePickerOpenRef,
-      searchViewOpenRef,
-      inboxViewOpenRef,
-      notesViewOpenRef,
-      settingsOpenRef,
-      whatsNewVersionRef,
-      sessionNavigationIdsRef,
-      setSidebarTab,
-      onSelectHistorySession,
-      onSelectProject,
-      actions: {
-        onNew,
-        onArchiveFocusedSession,
-        onCloseOtherTabs,
-        onCloseAllTabs,
-        onClosePane,
-        onNext,
-        onPrev,
-        onVisitBack,
-        onVisitForward,
-        onActivate,
-        onSplit,
-        onFocusDir,
-    onToggleSidebar,
-    onGoToFile,
-    onOpenCommandPalette,
-    onReload,
-        onFindInProject,
-        onOpenSearch,
-        onOpenInbox,
-        onOpenNotes,
-        pickProject,
-        onNewTerminal,
-        onNewTerminalTab,
-        onToggleProjectTerminal,
-        onOpenApprovalSession,
-        openSettings,
-      },
-    });
+    tabs,
+    tabsRef,
+    sessionsRef,
+    activeTabIdRef,
+    projectCwdRef,
+    filePickerOpenRef,
+    searchViewOpenRef,
+    inboxViewOpenRef,
+    notesViewOpenRef,
+    settingsOpenRef,
+    whatsNewVersionRef,
+    sessionNavigationIdsRef,
+    setSidebarTab,
+    onSelectHistorySession,
+    onSelectProject,
+    actions: {
+      onNew,
+      onArchiveFocusedSession,
+      onCloseOtherTabs,
+      onCloseAllTabs,
+      onClosePane,
+      onNext,
+      onPrev,
+      onVisitBack,
+      onVisitForward,
+      onActivate,
+      onSplit,
+      onFocusDir,
+      onToggleSidebar,
+      onGoToFile,
+      onOpenCommandPalette,
+      onReload,
+      onFindInProject,
+      onOpenSearch,
+      onOpenInbox,
+      onOpenNotes,
+      pickProject,
+      onNewTerminal,
+      onNewTerminalTab,
+      onToggleProjectTerminal,
+      onOpenApprovalSession,
+      openSettings,
+    },
+  });
   const dockGridRef = useRef<HTMLDivElement>(null);
   const dockDragSize = useRef<number | null>(null);
   const paintDockSize = useCallback((size: number) => {
@@ -1136,11 +1125,7 @@ const onSelectProviderAccount = useCallback(
   return (
     <OrchestrationActions.Provider value={orchestrationActions}>
       <OrchestrationWorkers.Provider value={orchestrationWorkers}>
-        <div
-          className={`flex h-full text-content ${
-            HAS_NATIVE_GLASS ? "bg-background-base/40" : "bg-background-base"
-          }`}
-        >
+        <div className="flex h-full text-content bg-background-base">
           <Sidebar
             cwd={sidebarCwd}
             gitCwd={gitCwd}
@@ -1255,40 +1240,38 @@ const onSelectProviderAccount = useCallback(
                 undefined
               }
             >
-              {!IS_MAC ? (
-                <MenuBar
-                  onNew={onNew}
-                  onNewTerminal={onNewTerminal}
-                  onToggleTerminal={onToggleProjectTerminal}
-                  onGoToFile={onGoToFile}
-                  onOpenCommandPalette={onOpenCommandPalette}
-                  onReload={onReload}
-                  onToggleSidebar={onToggleSidebar}
-                  onShowSourceControl={onToggleChanges}
-                  onCloseCurrentTab={
-                    activeTabId ? () => onCloseTab(activeTabId) : undefined
-                  }
-                  onCloseOtherTabs={onCloseOtherTabs}
-                  onCloseAllTabs={onCloseAllTabs}
-                  onPickProject={pickProject}
-                  onFindInProject={onFindInProject}
-                  onSearch={onOpenSearch}
-                  onOpenInbox={onOpenInbox}
-                  onOpenNotes={notesEnabled ? onOpenNotes : undefined}
-                  onZoomIn={() => {
-                    const next = saveUiScale(zoomInUiScale(loadUiScale()));
-                    void applyUiScale(next);
-                  }}
-                  onZoomOut={() => {
-                    const next = saveUiScale(zoomOutUiScale(loadUiScale()));
-                    void applyUiScale(next);
-                  }}
-                  onZoomReset={() => {
-                    saveUiScale(UI_SCALE_DEFAULT);
-                    void applyUiScale(UI_SCALE_DEFAULT);
-                  }}
-                />
-              ) : null}
+              <MenuBar
+                onNew={onNew}
+                onNewTerminal={onNewTerminal}
+                onToggleTerminal={onToggleProjectTerminal}
+                onGoToFile={onGoToFile}
+                onOpenCommandPalette={onOpenCommandPalette}
+                onReload={onReload}
+                onToggleSidebar={onToggleSidebar}
+                onShowSourceControl={onToggleChanges}
+                onCloseCurrentTab={
+                  activeTabId ? () => onCloseTab(activeTabId) : undefined
+                }
+                onCloseOtherTabs={onCloseOtherTabs}
+                onCloseAllTabs={onCloseAllTabs}
+                onPickProject={pickProject}
+                onFindInProject={onFindInProject}
+                onSearch={onOpenSearch}
+                onOpenInbox={onOpenInbox}
+                onOpenNotes={notesEnabled ? onOpenNotes : undefined}
+                onZoomIn={() => {
+                  const next = saveUiScale(zoomInUiScale(loadUiScale()));
+                  void applyUiScale(next);
+                }}
+                onZoomOut={() => {
+                  const next = saveUiScale(zoomOutUiScale(loadUiScale()));
+                  void applyUiScale(next);
+                }}
+                onZoomReset={() => {
+                  saveUiScale(UI_SCALE_DEFAULT);
+                  void applyUiScale(UI_SCALE_DEFAULT);
+                }}
+              />
               <TitleBar
                 tabs={titleTabs}
                 activeId={activeTabId}
@@ -1510,7 +1493,6 @@ const onSelectProviderAccount = useCallback(
                 onRemoveWorktree={worktree.onRemoveWorktree}
                 onCheckWorktreeRemoval={worktree.onCheckWorktreeRemoval}
                 onDeleteWorktreeSessions={worktree.onDeleteWorktreeSessions}
-                besideRail
                 onClose={onCloseSettings}
                 onSelectSection={onSelectSettingsSection}
                 onOpenSession={onOpenArchivedSession}
@@ -1581,7 +1563,9 @@ const onSelectProviderAccount = useCallback(
             onSnooze={sessionReminders.schedule}
             onDismiss={sessionReminders.cancel}
             onRetry={sessionReminders.refresh}
-            onOpenSettings={() => openSettings("notifications", "notifications")}
+            onOpenSettings={() =>
+              openSettings("notifications", "notifications")
+            }
             onHeightChange={setReminderNoticesHeight}
           />
           {whatsNewVersion ? (

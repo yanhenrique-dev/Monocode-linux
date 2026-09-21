@@ -37,7 +37,7 @@ import {
   type SidebarTabId,
 } from "../lib/appearance";
 import { type GitFileDiffKind, type GitHistoryCommit } from "../lib/fs";
-import { IS_MAC, MOD } from "../lib/platform";
+import { MOD } from "../lib/platform";
 import { getIntlLocale } from "../lib/locale";
 import { resolveModel } from "../lib/models";
 import type { OpenFileFn } from "../lib/search";
@@ -1207,7 +1207,6 @@ function SidebarComponent({
             className="flex h-10 shrink-0 select-none items-center border-b border-stroke pr-1.5"
             data-tauri-drag-region="deep"
           >
-            {IS_MAC ? <div className="w-[78px] shrink-0" /> : null}
             <DevModeSlot />
             <TabVisitNav
               canGoBack={canGoBack}

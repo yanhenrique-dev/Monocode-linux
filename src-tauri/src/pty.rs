@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
-#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-#[cfg(unix)]
 use std::time::Instant;
 
 use serde::Serialize;
@@ -20,7 +18,6 @@ const READ_CHUNK: usize = 32 * 1024;
 /// Cap how often a busy PTY hops the webview. Each `emit` is a JS eval; a
 /// flood of small reads was thousands per second and froze input.
 const PTY_COALESCE: Duration = Duration::from_millis(8);
-#[cfg(unix)]
 const KILL_ESCALATE: Duration = Duration::from_secs(1);
 
 #[derive(Serialize, Clone)]
@@ -40,10 +37,7 @@ struct PtyExit {
 struct LivePty {
     cwd: std::path::PathBuf,
     writer: Mutex<Box<dyn Write + Send>>,
-    #[cfg(unix)]
     master_fd: i32,
-    #[cfg(windows)]
-    master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
     pid: u32,
 }
 
@@ -103,13 +97,8 @@ impl PtyHost {
         };
         let pids: Vec<u32> = kids.iter().map(|live| live.pid).collect();
         for live in kids {
-            #[cfg(unix)]
-            {
-                hangup(live.pid);
-                close_fd(live.master_fd);
-            }
-            #[cfg(not(unix))]
-            drop(live);
+            hangup(live.pid);
+            close_fd(live.master_fd);
         }
         // Quit and `Drop` both exit the process, so the SIGKILL has to land
         // before this returns. `terminate`'s detached escalate thread never gets
@@ -135,25 +124,10 @@ pub fn pty_spawn(
 ) -> Result<(), String> {
     if let Some(prev) = host.remove(&id) {
         terminate(prev.pid);
-        #[cfg(unix)]
         close_fd(prev.master_fd);
     }
 
-    #[cfg(unix)]
-    {
-        spawn_unix(app, host, id, cwd, cols.max(2), rows.max(2))
-    }
-
-    #[cfg(windows)]
-    {
-        spawn_windows(app, host, id, cwd, cols.max(2), rows.max(2))
-    }
-
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = (app, cwd, cols, rows);
-        Err("Terminals are not supported on this platform.".into())
-    }
+    spawn_unix(app, host, id, cwd, cols.max(2), rows.max(2))
 }
 
 #[tauri::command]
@@ -173,27 +147,7 @@ pub fn pty_resize(host: State<PtyHost>, id: String, cols: u16, rows: u16) -> Res
     let live = host
         .get(&id)
         .ok_or_else(|| "Terminal is not running".to_string())?;
-    #[cfg(unix)]
-    {
-        resize_fd(live.master_fd, cols.max(2), rows.max(2))
-    }
-    #[cfg(windows)]
-    {
-        let master = live.master.lock().unwrap_or_else(|e| e.into_inner());
-        master
-            .resize(portable_pty::PtySize {
-                rows: rows.max(2),
-                cols: cols.max(2),
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|err| format!("Failed to resize terminal: {err}"))
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = (live, cols, rows);
-        Err("Terminals are not supported on this platform.".into())
-    }
+    resize_fd(live.master_fd, cols.max(2), rows.max(2))
 }
 
 #[derive(Serialize, Clone)]
@@ -209,23 +163,14 @@ pub fn pty_status(host: State<'_, PtyHost>, id: String) -> Result<PtyStatus, Str
     let live = host
         .get(&id)
         .ok_or_else(|| "Terminal is not running".to_string())?;
-    #[cfg(unix)]
-    {
-        let foreground = foreground_label(live.master_fd, live.pid);
-        Ok(PtyStatus { foreground })
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = live;
-        Ok(PtyStatus { foreground: None })
-    }
+    let foreground = foreground_label(live.master_fd, live.pid);
+    Ok(PtyStatus { foreground })
 }
 
 #[tauri::command]
 pub fn pty_kill(host: State<PtyHost>, id: String) -> Result<(), String> {
     if let Some(live) = host.remove(&id) {
         terminate(live.pid);
-        #[cfg(unix)]
         close_fd(live.master_fd);
     }
     Ok(())
@@ -239,7 +184,6 @@ pub fn pty_kill_all(host: State<'_, PtyHost>) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(unix)]
 fn spawn_unix(
     app: AppHandle,
     host: State<PtyHost>,
@@ -370,98 +314,6 @@ fn spawn_unix(
     Ok(())
 }
 
-#[cfg(windows)]
-fn spawn_windows(
-    app: AppHandle,
-    host: State<PtyHost>,
-    id: String,
-    cwd: String,
-    cols: u16,
-    rows: u16,
-) -> Result<(), String> {
-    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-
-    let workdir = working_dir(&cwd);
-    let (shell, args) = default_shell();
-    let pty_system = native_pty_system();
-    let pair = pty_system
-        .openpty(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|err| format!("Failed to open terminal: {err}"))?;
-
-    let mut cmd = CommandBuilder::new(&shell);
-    cmd.args(&args);
-    cmd.cwd(&workdir);
-    cmd.env("TERM", "xterm-256color");
-    cmd.env("COLORTERM", "truecolor");
-    cmd.env("COLORFGBG", "15;0");
-    cmd.env("TERM_PROGRAM", "MonoCode");
-    cmd.env("PATH", crate::harness::gui_search_path());
-    if let Some(home) = dirs_home() {
-        cmd.env("HOME", &home);
-        cmd.env("USERPROFILE", &home);
-    }
-    cmd.env("PWD", workdir.to_string_lossy().as_ref());
-
-    let mut child = crate::windows::spawn_pty(pair.slave.as_ref(), cmd)
-        .map_err(|err| format!("Failed to start {shell}: {err}"))?;
-    let pid = child.process_id().unwrap_or(0);
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|err| format!("Failed to read terminal: {err}"))?;
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|err| format!("Failed to write to terminal: {err}"))?;
-
-    let live = Arc::new(LivePty {
-        cwd: workdir.clone(),
-        writer: Mutex::new(Box::new(writer)),
-        master: Mutex::new(pair.master),
-        pid,
-    });
-    host.insert(id.clone(), live);
-
-    let data_app = app.clone();
-    let data_id = id.clone();
-    thread::spawn(move || {
-        let mut buf = vec![0_u8; READ_CHUNK];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    // ponytail: caps bridge traffic at 125 emits/s; use a timed
-                    // drain only if sustained PTY throughput becomes limiting.
-                    thread::sleep(PTY_COALESCE);
-                    emit_pty_data(&data_app, &data_id, &buf[..n]);
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let wait_app = app;
-    let wait_id = id;
-    thread::spawn(move || {
-        let code = child.wait().ok().map(|status| status.exit_code() as i32);
-        let emit = if let Some(host) = wait_app.try_state::<PtyHost>() {
-            host.remove_if_pid(&wait_id, pid).is_some()
-        } else {
-            false
-        };
-        if emit {
-            let _ = wait_app.emit(EXIT_EVENT, PtyExit { id: wait_id, code });
-        }
-    });
-
-    Ok(())
-}
-
 fn working_dir(cwd: &str) -> std::path::PathBuf {
     let path = expand_home(cwd);
     if path.is_dir() {
@@ -471,36 +323,17 @@ fn working_dir(cwd: &str) -> std::path::PathBuf {
 }
 
 fn default_shell() -> (String, Vec<String>) {
-    #[cfg(windows)]
-    {
-        if let Ok(comspec) = std::env::var("COMSPEC") {
-            if !comspec.is_empty() {
-                return (comspec, Vec::new());
-            }
-        }
-        ("powershell.exe".into(), vec!["-NoLogo".into()])
-    }
-    #[cfg(not(windows))]
-    {
-        let shell = std::env::var("SHELL")
-            .ok()
-            .filter(|shell| !shell.is_empty())
-            .unwrap_or_else(|| {
-                if cfg!(target_os = "macos") {
-                    "/bin/zsh".into()
-                } else {
-                    "/bin/bash".into()
-                }
-            });
-        let args = login_args(&shell)
-            .iter()
-            .map(|arg| (*arg).to_string())
-            .collect();
-        (shell, args)
-    }
+    let shell = std::env::var("SHELL")
+        .ok()
+        .filter(|shell| !shell.is_empty())
+        .unwrap_or_else(|| "/bin/bash".into());
+    let args = login_args(&shell)
+        .iter()
+        .map(|arg| (*arg).to_string())
+        .collect();
+    (shell, args)
 }
 
-#[cfg(not(windows))]
 fn login_args(shell: &str) -> &'static [&'static str] {
     match std::path::Path::new(shell)
         .file_stem()
@@ -513,7 +346,6 @@ fn login_args(shell: &str) -> &'static [&'static str] {
 }
 
 /// The hangup a closing shell expects, without `terminate`'s escalation.
-#[cfg(unix)]
 fn hangup(pid: u32) {
     if pid == 0 || pid == 1 {
         return;
@@ -537,54 +369,36 @@ fn terminate(pid: u32) {
     if pid == 0 || pid == 1 {
         return;
     }
-    #[cfg(unix)]
-    {
-        // See hangup(): sandboxed shells live on the host.
-        if crate::host::in_flatpak() {
-            crate::host::signal_host(pid, false, "HUP");
-            crate::host::signal_host(pid, true, "HUP");
-            crate::host::signal_host(pid, false, "TERM");
-            crate::host::signal_host(pid, true, "TERM");
-            let escalate_pid = pid;
-            thread::spawn(move || {
-                thread::sleep(KILL_ESCALATE);
-                crate::host::signal_host(escalate_pid, false, "KILL");
-                crate::host::signal_host(escalate_pid, true, "KILL");
-            });
-            return;
-        }
-        let ipid = pid as i32;
-        unsafe {
-            libc::kill(ipid, libc::SIGHUP);
-            libc::kill(-ipid, libc::SIGHUP);
-            libc::kill(ipid, libc::SIGTERM);
-            libc::kill(-ipid, libc::SIGTERM);
-        }
+    // See hangup(): sandboxed shells live on the host.
+    if crate::host::in_flatpak() {
+        crate::host::signal_host(pid, false, "HUP");
+        crate::host::signal_host(pid, true, "HUP");
+        crate::host::signal_host(pid, false, "TERM");
+        crate::host::signal_host(pid, true, "TERM");
+        let escalate_pid = pid;
         thread::spawn(move || {
             thread::sleep(KILL_ESCALATE);
-            unsafe {
-                libc::kill(ipid, libc::SIGKILL);
-                libc::kill(-ipid, libc::SIGKILL);
-            }
+            crate::host::signal_host(escalate_pid, false, "KILL");
+            crate::host::signal_host(escalate_pid, true, "KILL");
         });
+        return;
     }
-    #[cfg(windows)]
-    {
-        let mut cmd = std::process::Command::new("taskkill");
-        crate::hide_window_console(&mut cmd);
-        let _ = cmd
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
+    let ipid = pid as i32;
+    unsafe {
+        libc::kill(ipid, libc::SIGHUP);
+        libc::kill(-ipid, libc::SIGHUP);
+        libc::kill(ipid, libc::SIGTERM);
+        libc::kill(-ipid, libc::SIGTERM);
     }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = pid;
-    }
+    thread::spawn(move || {
+        thread::sleep(KILL_ESCALATE);
+        unsafe {
+            libc::kill(ipid, libc::SIGKILL);
+            libc::kill(-ipid, libc::SIGKILL);
+        }
+    });
 }
 
-#[cfg(unix)]
 fn open_pty(cols: u16, rows: u16) -> Result<(i32, i32), String> {
     let master = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
     if master < 0 {
@@ -610,31 +424,17 @@ fn open_pty(cols: u16, rows: u16) -> Result<(i32, i32), String> {
     Ok((master, slave))
 }
 
-#[cfg(unix)]
 fn slave_name(master: i32) -> Result<std::ffi::CString, String> {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        let mut buf = vec![0_i8; 64];
-        let ret = unsafe { libc::ptsname_r(master, buf.as_mut_ptr(), buf.len()) };
-        if ret != 0 {
-            return Err(os_err("Failed to resolve terminal name"));
-        }
-        let last = buf.len() - 1;
-        buf[last] = 0;
-        Ok(unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_owned())
+    let mut buf = vec![0_i8; 64];
+    let ret = unsafe { libc::ptsname_r(master, buf.as_mut_ptr(), buf.len()) };
+    if ret != 0 {
+        return Err(os_err("Failed to resolve terminal name"));
     }
-
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    {
-        let ptr = unsafe { libc::ptsname(master) };
-        if ptr.is_null() {
-            return Err(os_err("Failed to resolve terminal name"));
-        }
-        Ok(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_owned())
-    }
+    let last = buf.len() - 1;
+    buf[last] = 0;
+    Ok(unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }.to_owned())
 }
 
-#[cfg(unix)]
 fn resize_fd(fd: i32, cols: u16, rows: u16) -> Result<(), String> {
     let size = libc::winsize {
         ws_row: rows,
@@ -648,7 +448,6 @@ fn resize_fd(fd: i32, cols: u16, rows: u16) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(unix)]
 fn dup_fd(fd: i32) -> Result<i32, String> {
     let next = unsafe { libc::dup(fd) };
     if next < 0 {
@@ -657,14 +456,12 @@ fn dup_fd(fd: i32) -> Result<i32, String> {
     Ok(next)
 }
 
-#[cfg(unix)]
 fn dup_stdio(fd: i32) -> Result<std::process::Stdio, String> {
     use std::os::unix::io::FromRawFd;
     let next = dup_fd(fd)?;
     Ok(unsafe { std::process::Stdio::from_raw_fd(next) })
 }
 
-#[cfg(unix)]
 fn set_cloexec(fd: i32) {
     unsafe {
         let flags = libc::fcntl(fd, libc::F_GETFD);
@@ -674,7 +471,6 @@ fn set_cloexec(fd: i32) {
     }
 }
 
-#[cfg(unix)]
 fn close_fd(fd: i32) {
     if fd >= 0 {
         unsafe {
@@ -683,7 +479,6 @@ fn close_fd(fd: i32) {
     }
 }
 
-#[cfg(unix)]
 fn os_err(ctx: &str) -> String {
     format!("{ctx}: {}", std::io::Error::last_os_error())
 }
@@ -702,12 +497,10 @@ fn emit_pty_data(app: &AppHandle, id: &str, bytes: &[u8]) {
     );
 }
 
-#[cfg(unix)]
 fn pty_should_flush(buffered: usize, since: Duration) -> bool {
     buffered >= READ_CHUNK || since >= PTY_COALESCE
 }
 
-#[cfg(unix)]
 fn wait_readable(fd: i32, timeout: Duration) -> bool {
     if timeout.is_zero() {
         return false;
@@ -721,7 +514,6 @@ fn wait_readable(fd: i32, timeout: Duration) -> bool {
     unsafe { libc::poll(&mut pollfd, 1, ms) > 0 }
 }
 
-#[cfg(unix)]
 fn foreground_label(master_fd: i32, shell_pid: u32) -> Option<String> {
     // The sandbox pty only ever sees the flatpak-spawn proxy: the real
     // foreground process runs on the host in another pid namespace, so
@@ -747,7 +539,6 @@ fn foreground_label(master_fd: i32, shell_pid: u32) -> Option<String> {
     Some(label)
 }
 
-#[cfg(unix)]
 fn process_label(pid: i32) -> Option<String> {
     use std::process::Command;
     let output = Command::new("ps")
@@ -765,7 +556,6 @@ fn process_label(pid: i32) -> Option<String> {
     command_label(args)
 }
 
-#[cfg(unix)]
 fn command_label(args: &str) -> Option<String> {
     let parts: Vec<&str> = args.split_whitespace().collect();
     if parts.is_empty() {
@@ -791,7 +581,6 @@ fn command_label(args: &str) -> Option<String> {
     Some(base.to_string())
 }
 
-#[cfg(unix)]
 fn is_interpreter(name: &str) -> bool {
     matches!(
         name,
@@ -799,7 +588,6 @@ fn is_interpreter(name: &str) -> bool {
     )
 }
 
-#[cfg(unix)]
 fn is_shell_name(name: &str) -> bool {
     matches!(
         name,
@@ -807,7 +595,7 @@ fn is_shell_name(name: &str) -> bool {
     )
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod label_tests {
     use super::*;
 
@@ -827,7 +615,7 @@ mod label_tests {
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

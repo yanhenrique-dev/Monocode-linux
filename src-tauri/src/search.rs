@@ -69,7 +69,6 @@ fn search_project_sync(options: &SearchOptions) -> Result<SearchResult, String> 
 
 fn git_grep(root: &Path, options: &SearchOptions, query: &str) -> Option<SearchResult> {
     let mut cmd = crate::host::command("git");
-    crate::hide_window_console(&mut cmd);
     cmd.arg("-C").arg(root).arg("grep").arg("-z").arg("-n");
     if !options.case_sensitive {
         cmd.arg("-i");

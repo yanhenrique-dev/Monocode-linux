@@ -40,7 +40,6 @@ import {
   type NoteImageAsset,
 } from "../lib/noteImages";
 import { projectKey, projectName } from "../lib/paths";
-import { IS_MAC } from "../lib/platform";
 import { looksLikeProject, type RecentProject } from "../lib/recents";
 import {
   loadTabGroupColors,
@@ -320,7 +319,6 @@ export function NotesView({
         className="flex h-10 shrink-0 select-none items-center border-b border-stroke"
         data-tauri-drag-region="deep"
       >
-        {IS_MAC && !besideRail ? <div className="w-[78px] shrink-0" /> : null}
         {besideRail ? null : (
           <OverlayNav onBack={onClose} onToggleSidebar={onToggleSidebar} />
         )}
@@ -331,7 +329,7 @@ export function NotesView({
           />
           <span className="min-w-0 truncate text-content">Notes</span>
         </div>
-        {IS_MAC ? null : <WindowControls />}
+        <WindowControls />
       </div>
       <div className="flex min-h-0 min-w-0 flex-1">
         {list}

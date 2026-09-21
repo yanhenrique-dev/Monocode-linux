@@ -20,7 +20,6 @@ import {
   revealPath,
 } from "../lib/fs";
 import { displayPath } from "../lib/paths";
-import { IS_MAC } from "../lib/platform";
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 16;
@@ -204,15 +203,11 @@ function ImageView({
             })
           }
           onClick={() => setZoom((value) => (value === "fit" ? 1 : "fit"))}
-          onContextMenu={
-            IS_MAC
-              ? (event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setMenu({ x: event.clientX, y: event.clientY });
-                }
-              : undefined
-          }
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setMenu({ x: event.clientX, y: event.clientY });
+          }}
           className={
             zoom === "fit"
               ? "max-h-full max-w-full object-contain"
@@ -232,18 +227,16 @@ function ImageView({
         <span className="tabular-nums">{formatFileSize(size)}</span>
         <span className="uppercase">{mime.replace(/^image\//, "")}</span>
         <span className="flex-1" />
-        {IS_MAC ? (
-          <ZoomButton
-            label={copied ? "Copied" : "Copy original file"}
-            onClick={copyOriginal}
-          >
-            {copied ? (
-              <Check className="size-3" strokeWidth={2} />
-            ) : (
-              <Copy className="size-3" strokeWidth={1.75} />
-            )}
-          </ZoomButton>
-        ) : null}
+        <ZoomButton
+          label={copied ? "Copied" : "Copy original file"}
+          onClick={copyOriginal}
+        >
+          {copied ? (
+            <Check className="size-3" strokeWidth={2} />
+          ) : (
+            <Copy className="size-3" strokeWidth={1.75} />
+          )}
+        </ZoomButton>
         <ZoomButton
           label="Zoom out"
           onClick={() =>
