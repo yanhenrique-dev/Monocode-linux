@@ -907,6 +907,8 @@ function NotificationsPage({
       <div
         id={settingDomId("project-notifications")}
         data-setting-id="project-notifications"
+        // Focus target for search reveals: programmatic focus only, never Tab.
+        tabIndex={-1}
       >
         <ProjectNotificationSettings
           cwd={cwd}
@@ -2466,6 +2468,7 @@ function ChatBackgroundCard({
 
 function KeybindingsPage() {
   const [query, setQuery] = useState("");
+  const filterRef = useRef<HTMLInputElement>(null);
   const { locale, t } = useLocale();
   const rows = useMemo(
     () => filterKeybindings(KEYBINDINGS, query, locale),
@@ -2490,6 +2493,7 @@ function KeybindingsPage() {
           <label className="flex h-7 w-44 shrink-0 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
             <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
             <input
+              ref={filterRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("settings.keybindings.filter.placeholder")}
@@ -2503,7 +2507,12 @@ function KeybindingsPage() {
                 type="button"
                 aria-label={t("settings.search.clear")}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  // Keyboard activation would otherwise strand focus on a
+                  // button that unmounts with the cleared query.
+                  filterRef.current?.focus();
+                }}
                 className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
               >
                 <X className="size-3" strokeWidth={2} />
