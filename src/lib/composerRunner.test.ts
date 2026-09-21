@@ -27,6 +27,7 @@ import {
   recoilAlong,
   runnerPose,
   runnerTrack,
+  selectRunnerLedge,
   scaleTrackX,
   spriteClipBottom,
   stepAlong,
@@ -235,6 +236,27 @@ describe("composerRunner", () => {
         width: 384,
       }),
     ).toEqual({ left: 108, top: 168, width: 384 });
+  });
+
+  it("prefers the tasks strip over review and queue ledges", () => {
+    const strip = { left: 106, right: 494, top: 168, bottom: 200, width: 388 };
+    const review = { left: 100, right: 500, top: 180, bottom: 200, width: 400 };
+    const queue = { left: 100, right: 500, top: 190, bottom: 200, width: 400 };
+    expect(selectRunnerLedge(strip, review, queue)).toBe(strip);
+    expect(selectRunnerLedge(null, review, queue)).toBe(review);
+    expect(selectRunnerLedge(null, null, queue)).toBe(queue);
+    expect(selectRunnerLedge(null, null, null)).toBeNull();
+  });
+
+  it("runs on top of the tasks strip instead of inside the pill", () => {
+    const strip = { left: 106, right: 494, top: 168, bottom: 200, width: 388 };
+    const track = runnerTrack(BOX, selectRunnerLedge(strip, null, null));
+    expect(track).toEqual({ left: 106, top: 168, width: 388 });
+    // Sprite feet rest on the ledge: its bottom edge meets the strip top,
+    // so the 16px body stays above the pill.
+    const spriteBottom = track.top - 0 + 1;
+    expect(spriteBottom).toBeLessThanOrEqual(strip.top + 1);
+    expect(track.top).toBeLessThan(BOX.top);
   });
 
   it("keeps relative position when the track width changes", () => {
