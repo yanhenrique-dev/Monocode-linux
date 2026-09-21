@@ -209,6 +209,8 @@ const en = {
   "settings.general.terminal_gpu.description":
     "Render terminals with the GPU (WebGL2) when available, falling back to software rendering otherwise. Only applies while hardware acceleration is on.",
   "settings.general.terminal_gpu.toggle": "Terminal GPU rendering",
+  "settings.general.terminal_gpu.requires_master":
+    "Requires the Hardware acceleration master switch above.",
   "settings.general.about.title": "About",
   "settings.general.language.label": "Language",
   "settings.general.language.description":
@@ -918,6 +920,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.general.terminal_gpu.description":
     "Renderiza terminais com a GPU (WebGL2) quando disponível, com retorno para software caso contrário. Vale apenas com a aceleração de hardware ativada.",
   "settings.general.terminal_gpu.toggle": "Renderização do terminal via GPU",
+  "settings.general.terminal_gpu.requires_master":
+    "Requer a chave principal Aceleração de hardware acima.",
   "settings.general.about.title": "Sobre",
   "settings.general.language.label": "Idioma",
   "settings.general.language.description":

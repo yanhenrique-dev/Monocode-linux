@@ -232,6 +232,7 @@ import {
   saveNotesEnabled,
   saveReviewAdoptShell,
   saveTerminalGpu,
+  subscribeTerminalGpu,
   searchSettings,
   settingsSectionDescription,
   settingsSectionLabel,
@@ -909,6 +910,18 @@ function PerformancePage() {
   );
   const [terminalGpu, setTerminalGpu] = useState(loadTerminalGpu);
   const { t } = useLocale();
+  // A change from anywhere else (another surface in this window) re-reads
+  // both switches, so the gated toggle never shows a stale combination.
+  useEffect(() => {
+    const stopHardware = subscribeHardwareAcceleration(
+      setHardwareAcceleration,
+    );
+    const stopTerminal = subscribeTerminalGpu(setTerminalGpu);
+    return () => {
+      stopHardware();
+      stopTerminal();
+    };
+  }, []);
 
   const onHardwareAcceleration = (next: boolean) => {
     saveHardwareAcceleration(next);
@@ -940,11 +953,15 @@ function PerformancePage() {
         <Row
           id="terminal-gpu"
           label={t("settings.general.terminal_gpu.label")}
-          description={t("settings.general.terminal_gpu.description")}
+          description={
+            hardwareAcceleration
+              ? t("settings.general.terminal_gpu.description")
+              : `${t("settings.general.terminal_gpu.description")} ${t("settings.general.terminal_gpu.requires_master")}`
+          }
         >
           <Toggle
             label={t("settings.general.terminal_gpu.toggle")}
-            on={terminalGpu && hardwareAcceleration}
+            on={terminalGpu}
             onChange={onTerminalGpu}
             disabled={!hardwareAcceleration}
           />
