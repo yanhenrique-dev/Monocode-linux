@@ -249,7 +249,7 @@ function AssignmentModel({
             ref={listOverscroll}
             role="listbox"
             aria-label="Assignment models"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-none p-1"
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-none p-1"
           >
             {matches.map((choice, index) => (
               <button

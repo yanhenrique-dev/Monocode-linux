@@ -650,7 +650,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
           ) : null}
           {isEmpty ? (
             session.inboxAsk ? (
-              <div className="scrollbar-none h-full min-h-0 overflow-y-auto">
+              <div className="scrollbar-none h-full min-h-0 overflow-y-auto overflow-x-clip">
                 <DiscussionEmpty message="Explore this item with your agent." />
               </div>
             ) : (

@@ -1396,6 +1396,13 @@ html.is-resizing .glass-blur {
 
 .zen-phase-body[data-open="true"] > .zen-phase-live {
   overflow: auto;
+  /*
+   * Clamp the horizontal axis: rows (long commands, rails, indents) can
+   * overflow by a subpixel and draw a sideways scrollbar for content that
+   * never scrolls. `clip` instead of `hidden` so no scroll container forms
+   * and sticky/focus behavior stays intact.
+   */
+  overflow-x: clip;
   overscroll-behavior: contain;
   overflow-anchor: none;
 }
