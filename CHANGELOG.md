@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-21
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Transparent app icon everywhere: the white tile is gone from the KDE
+  menu, tray, favicon, boot splash, README and all bundles (AppImage,
+  Flatpak, Arch, macOS/Windows artifacts).
+- Live trailing status shimmer: "Compacting context…" animates in the
+  transcript while compaction runs instead of leaving the bottom row bare.
+- Session filters stay in sync: a toggle flipped in Settings → Archive
+  (or another window) now reflects in the open sidebar immediately.
+- Persist-then-broadcast everywhere: appearance, UI scale and session
+  filters only notify other surfaces after the value actually lands in
+  storage, so two editors never disagree.
+- Boot paints the stored accent, blur, chat vars and zoom before the
+  bundle loads, with each storage read guarded and missing keys keeping
+  the CSS defaults.
+- Revalidation before confirmed PR actions: a merge/close dialog opened
+  before mergeability resolves blocks itself when conflicts or missing
+  push access land late.
+
+### Fixed
+
+- Inbox marks read with the freshest stamp so polls stop resurrecting
+  unread dots; `gh repo view` pins the origin repo so upstream never wins.
+- PR actions disable without push access (repo-scoped, verified against
+  the API) and on merge conflicts.
+- Task lists keep their key across keyless snapshots and ignore transient
+  empties; the runner mascot rides the top of the tasks strip.
+- Settings Update row shows last-checked, friendly errors and a stable
+  action with badge; honest performance toggles with master hint and a Go
+  to Performance link; search reveals focus the row with live regions and
+  accent folding; Clear in Keybindings returns focus to the filter.
+- Worktrees empty state offers Create, locked trees name their blocker,
+  archive filter and full dates; P2 design tokens, type scale and contrast.
+- Appearance drag previews revert on abort, picker dismiss and unmount;
+  the color picker rewinds its thumb on cancel and never reverts a
+  committed pick on unmount.
+- Terminal GPU toggle shows the stored value with a master-switch hint;
+  provider rows derive the displayed model from the Default badge;
+  sound previews document that they play even while muted.
+- Context meter hides while compacting (unknown level) and restores on
+  failure; pi's post-compact estimate still lands immediately.
+- Exact `github.com` host matching for remote URLs (embedded impostor
+  hosts and explicit ports handled).
+
 ## [0.1.95] - 2026-09-20
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
