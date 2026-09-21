@@ -1,6 +1,7 @@
 import type { HarnessId } from "../session";
 import { HARNESSES } from "../session";
 import {
+  resolveAntigravityBinary,
   resolveClaudeBinary,
   resolveCodexBinary,
   resolveCursorBinary,
@@ -46,6 +47,7 @@ const CLI: Record<HarnessId, { name: string; install?: string }> = {
     install:
       "Install from https://filecdn.minimax.chat/public/install.sh, then run `mcode login`",
   },
+  antigravity: { name: "Antigravity ACP server (agy_acp_server.par)" },
 };
 
 let availability: HarnessAvailability = {
@@ -59,6 +61,7 @@ let availability: HarnessAvailability = {
   fx: false,
   hermes: false,
   mcode: false,
+  antigravity: false,
 };
 let version = 0;
 let inflight: Promise<void> | null = null;
@@ -66,7 +69,7 @@ let probedAt = 0;
 const listeners = new Set<() => void>();
 
 /**
- * A probe stats ~100 paths across eight resolvers. The model picker and the
+ * A probe stats ~100 paths across the resolvers. The model picker and the
  * providers pane both probe on open, so without a TTL every open pays for it
  * again to learn what it already knows. Installing a CLI mid-session is rare,
  * and `force` covers it.
@@ -191,6 +194,14 @@ export function probeHarnessAvailability(
       if (id === "mcode") {
         try {
           await resolveMcodeBinary();
+          return [id, true] as const;
+        } catch {
+          return [id, false] as const;
+        }
+      }
+      if (id === "antigravity") {
+        try {
+          await resolveAntigravityBinary();
           return [id, true] as const;
         } catch {
           return [id, false] as const;

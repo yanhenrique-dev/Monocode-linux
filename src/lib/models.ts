@@ -179,6 +179,12 @@ export const MODELS: AgentModel[] = [
     name: "Configured model",
     nativeId: "",
   },
+  {
+    id: "antigravity:gemini-3.8-flash-high",
+    harness: "antigravity",
+    name: "Gemini 3.8 Flash (High)",
+    nativeId: "gemini-3.8-flash-high",
+  },
 ];
 
 export const DEFAULT_MODEL_ID: Record<HarnessId, string> = {
@@ -192,6 +198,7 @@ export const DEFAULT_MODEL_ID: Record<HarnessId, string> = {
   fx: "fx:zai/glm-5.2-fast",
   hermes: "hermes:default",
   mcode: "mcode:default",
+  antigravity: "antigravity:gemini-3.8-flash-high",
 };
 
 const FAVORITES_KEY = "monocode.favoriteModels";
@@ -221,6 +228,7 @@ const HARNESS_ORDER: HarnessId[] = [
   "fx",
   "hermes",
   "mcode",
+  "antigravity",
 ];
 
 const EMPTY_MODELS: AgentModel[] = [];

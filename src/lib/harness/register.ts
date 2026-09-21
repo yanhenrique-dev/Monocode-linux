@@ -5,6 +5,7 @@ import { ensureFxRegistered } from "./fxAdapter";
 import { ensureGrokRegistered } from "./grokAdapter";
 import { ensureHermesRegistered } from "./hermesAdapter";
 import { ensureMcodeRegistered } from "./mcodeAdapter";
+import { ensureAntigravityRegistered } from "./antigravityAdapter";
 import { ensureOpenCodeRegistered } from "./opencodeAdapter";
 import { ensureOmpRegistered } from "./ompAdapter";
 import { ensurePiRegistered } from "./piAdapter";
@@ -21,4 +22,5 @@ export function registerBuiltinHarnesses(): void {
   ensureFxRegistered();
   ensureHermesRegistered();
   ensureMcodeRegistered();
+  ensureAntigravityRegistered();
 }
