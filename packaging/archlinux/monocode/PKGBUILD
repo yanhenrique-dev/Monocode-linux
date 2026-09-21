@@ -5,7 +5,7 @@
 # see packaging/aur/monocode-bin instead. The two packages conflict:
 # install one or the other.
 pkgname=monocode
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc="MonoCode Linux — interface desktop para agentes de código (Tauri + React)"
 arch=('x86_64')

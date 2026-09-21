@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-21
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Fixed
+
+- OpenCode sessions failed with `OpenCode HTTP 401`: V2 `opencode serve`
+  prints a per-process `server password` and requires HTTP Basic auth, but
+  the harness sent no credentials. The password is now parsed from the
+  server output and sent on every harness HTTP + SSE request.
+
 ## [0.2.0] - 2026-09-21
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
