@@ -232,13 +232,19 @@ export function ColorPickerPopover({
       dragCleanups.current.delete(handler);
     };
     const onUp = () => {
-      detach(onUp);
+      // Detach the stored onCancelUp reference: the set holds onCancelUp,
+      // so detaching onUp would leave a stale cancel behind that fires on
+      // unmount even after a successful commit.
+      detach(onCancelUp);
       commitHex();
       endPicking();
     };
     const onCancelUp = () => {
       detach(onCancelUp);
       // Abandoned drag: drop the pending preview and restore persisted values.
+      // Previews paint without changing the value prop, so the local thumb
+      // state must be rewound too — otherwise it sticks at the dragged spot.
+      setHsv(hexToHsv(value));
       latestHex.current = null;
       if (previewRaf.current) {
         cancelAnimationFrame(previewRaf.current);
@@ -275,13 +281,19 @@ export function ColorPickerPopover({
       dragCleanups.current.delete(handler);
     };
     const onUp = () => {
-      detach(onUp);
+      // Detach the stored onCancelUp reference: the set holds onCancelUp,
+      // so detaching onUp would leave a stale cancel behind that fires on
+      // unmount even after a successful commit.
+      detach(onCancelUp);
       commitHex();
       endPicking();
     };
     const onCancelUp = () => {
       detach(onCancelUp);
       // Abandoned drag: drop the pending preview and restore persisted values.
+      // Previews paint without changing the value prop, so the local thumb
+      // state must be rewound too — otherwise it sticks at the dragged spot.
+      setHsv(hexToHsv(value));
       latestHex.current = null;
       if (previewRaf.current) {
         cancelAnimationFrame(previewRaf.current);

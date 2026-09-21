@@ -109,6 +109,44 @@ describe("ColorPickerPopover drag cleanup", () => {
     });
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onCommit).not.toHaveBeenCalled();
+    // The thumb rewinds to the persisted color instead of sticking at the
+    // abandoned drag position (red is hue 0; the drag moved it to 10).
+    expect(hue.getAttribute("aria-valuenow")).toBe("0");
+  });
+
+  it("does not cancel on unmount after a committed drag", async () => {
+    const onCancel = vi.fn();
+    const onCommit = vi.fn();
+    await act(async () => {
+      root.render(
+        createElement(ColorPickerPopover, {
+          value: "#ff0000",
+          onChange: () => {},
+          onCommit,
+          onCancel,
+        }),
+      );
+    });
+    const hue = container.querySelector('[aria-label="Hue"]')!;
+    (hue as HTMLElement).setPointerCapture = () => {};
+    (hue as HTMLElement).getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 360, height: 12 }) as DOMRect;
+    act(() => {
+      hue.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: 10,
+        }),
+      );
+    });
+    act(() => {
+      window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    });
+    expect(onCommit).toHaveBeenCalledOnce();
+    await act(async () => root.unmount());
+    // The committed drag detached its cleanup: no stale cancel reverts it.
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it("restores persisted values when dismissed with a preview pending", async () => {
