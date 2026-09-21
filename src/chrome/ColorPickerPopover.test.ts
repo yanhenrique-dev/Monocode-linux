@@ -73,4 +73,69 @@ describe("ColorPickerPopover drag cleanup", () => {
       expect(removed).toContain(entry.fn);
     }
   });
+
+  it("restores persisted values on pointer cancel instead of committing", async () => {
+    const onPreview = vi.fn();
+    const onCommit = vi.fn();
+    const onCancel = vi.fn();
+    await act(async () => {
+      root.render(
+        createElement(ColorPickerPopover, {
+          value: "#ff0000",
+          onChange: () => {},
+          onPreview,
+          onCommit,
+          onCancel,
+        }),
+      );
+    });
+    const hue = container.querySelector('[aria-label="Hue"]')!;
+    (hue as HTMLElement).setPointerCapture = () => {};
+    (hue as HTMLElement).getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 360, height: 12 }) as DOMRect;
+    act(() => {
+      hue.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: 10,
+        }),
+      );
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent("pointercancel", { bubbles: true }),
+      );
+    });
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("restores persisted values when dismissed with a preview pending", async () => {
+    const onCancel = vi.fn();
+    await act(async () => {
+      root.render(
+        createElement(ColorPickerPopover, {
+          value: "#ff0000",
+          onChange: () => {},
+          onCancel,
+        }),
+      );
+    });
+    const hue = container.querySelector('[aria-label="Hue"]')!;
+    (hue as HTMLElement).setPointerCapture = () => {};
+    (hue as HTMLElement).getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 360, height: 12 }) as DOMRect;
+    act(() => {
+      hue.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: 10,
+        }),
+      );
+    });
+    await act(async () => root.unmount());
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
 });

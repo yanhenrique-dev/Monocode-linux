@@ -84,6 +84,39 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("appearance draft revert", () => {
+  it("restores saved values when a slider drag aborts", async () => {
+    localStorage.setItem("monocode.themeHue", "100");
+    await render("appearance");
+    const hue = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Hue"]',
+    )!;
+    const painted = () =>
+      document.documentElement.style.getPropertyValue("--theme-hue");
+
+    act(() => {
+      hue.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    });
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(hue, "200");
+      hue.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(painted()).toBe("200");
+    act(() => {
+      hue.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+    });
+    expect(painted()).toBe("100");
+    expect(localStorage.getItem("monocode.themeHue")).toBe("100");
+  });
+});
+
 describe("settings pages", () => {
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
     vi.useFakeTimers();

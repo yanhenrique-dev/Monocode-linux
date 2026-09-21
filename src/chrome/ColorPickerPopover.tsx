@@ -15,6 +15,8 @@ type Props = {
   onPreview?: (hex: string) => void;
   /** Drag end: persist + parent state. */
   onCommit?: (hex: string) => void;
+  /** Aborted drag or dismiss with a pending preview: restore persisted values. */
+  onCancel?: () => void;
 };
 
 // While a color drag is active, popover backdrop blurs are suspended (see
@@ -126,6 +128,7 @@ export function ColorPickerPopover({
   onChange,
   onPreview,
   onCommit,
+  onCancel,
 }: Props) {
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value));
   const svRef = useRef<HTMLDivElement>(null);
@@ -136,6 +139,8 @@ export function ColorPickerPopover({
   previewRef.current = previewFn;
   const commitRef = useRef(commitFn);
   commitRef.current = commitFn;
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
   const previewRaf = useRef(0);
   const latestHex = useRef<string | null>(null);
   // Drag listeners remove themselves on pointerup/cancel; this covers
@@ -150,6 +155,12 @@ export function ColorPickerPopover({
       if (previewRaf.current) {
         cancelAnimationFrame(previewRaf.current);
         previewRaf.current = 0;
+      }
+      // Dismiss with a preview still pending (never committed): the painted
+      // color was never persisted, so restore the stored one.
+      if (latestHex.current) {
+        latestHex.current = null;
+        cancelRef.current?.();
       }
     };
   }, []);
@@ -214,18 +225,32 @@ export function ColorPickerPopover({
 
     update(event.clientX, event.clientY);
     const onMove = (e: PointerEvent) => update(e.clientX, e.clientY);
-    const onUp = () => {
+    const detach = (handler: () => void) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      dragCleanups.current.delete(onUp);
+      window.removeEventListener("pointercancel", onCancelUp);
+      dragCleanups.current.delete(handler);
+    };
+    const onUp = () => {
+      detach(onUp);
       commitHex();
+      endPicking();
+    };
+    const onCancelUp = () => {
+      detach(onCancelUp);
+      // Abandoned drag: drop the pending preview and restore persisted values.
+      latestHex.current = null;
+      if (previewRaf.current) {
+        cancelAnimationFrame(previewRaf.current);
+        previewRaf.current = 0;
+      }
+      cancelRef.current?.();
       endPicking();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    dragCleanups.current.add(onUp);
+    window.addEventListener("pointercancel", onCancelUp);
+    dragCleanups.current.add(onCancelUp);
   };
 
   const onHuePointer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -243,18 +268,32 @@ export function ColorPickerPopover({
 
     update(event.clientX);
     const onMove = (e: PointerEvent) => update(e.clientX);
-    const onUp = () => {
+    const detach = (handler: () => void) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      dragCleanups.current.delete(onUp);
+      window.removeEventListener("pointercancel", onCancelUp);
+      dragCleanups.current.delete(handler);
+    };
+    const onUp = () => {
+      detach(onUp);
       commitHex();
+      endPicking();
+    };
+    const onCancelUp = () => {
+      detach(onCancelUp);
+      // Abandoned drag: drop the pending preview and restore persisted values.
+      latestHex.current = null;
+      if (previewRaf.current) {
+        cancelAnimationFrame(previewRaf.current);
+        previewRaf.current = 0;
+      }
+      cancelRef.current?.();
       endPicking();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    dragCleanups.current.add(onUp);
+    window.addEventListener("pointercancel", onCancelUp);
+    dragCleanups.current.add(onCancelUp);
   };
 
   const preview = hsvToHex(hsv.h, hsv.s, hsv.v);
