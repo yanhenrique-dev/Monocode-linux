@@ -135,12 +135,27 @@ describe("session filters change event", () => {
     return listeners;
   }
 
+  function mockLocalStorage(failing = false) {
+    const data = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (failing) throw new Error("denied");
+        data.set(key, value);
+      },
+      removeItem: (key: string) => {
+        data.delete(key);
+      },
+    });
+  }
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   it("notifies subscribers on save and on matching storage events", () => {
     const listeners = mockWindowEvents();
+    mockLocalStorage();
     let count = 0;
     const stop = subscribeSessionSidebarFilters(() => {
       count += 1;
@@ -159,5 +174,22 @@ describe("session filters change event", () => {
     stop();
     saveSessionSidebarFilters(DEFAULT_SESSION_SIDEBAR_FILTERS);
     expect(count).toBe(2);
+  });
+
+  it("stays silent when persistence fails", () => {
+    mockWindowEvents();
+    // Private mode / quota: the store still holds the old value, so
+    // subscribers re-reading it must not be woken.
+    mockLocalStorage(true);
+    let count = 0;
+    const stop = subscribeSessionSidebarFilters(() => {
+      count += 1;
+    });
+    saveSessionSidebarFilters({
+      ...DEFAULT_SESSION_SIDEBAR_FILTERS,
+      showArchived: true,
+    });
+    stop();
+    expect(count).toBe(0);
   });
 });

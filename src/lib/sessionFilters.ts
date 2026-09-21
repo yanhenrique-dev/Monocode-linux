@@ -73,7 +73,9 @@ export function saveSessionSidebarFilters(filters: SessionSidebarFilters) {
   try {
     localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
   } catch {
-    // private mode / quota
+    // private mode / quota: keep the persisted state, don't broadcast it —
+    // subscribers re-read the store, which still holds the old value.
+    return;
   }
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(SESSION_FILTERS_CHANGE_EVENT));
