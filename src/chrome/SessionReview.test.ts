@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CheckpointFile } from "../lib/checkpoint";
+import { sessionCheckpointStatus } from "../lib/checkpoint";
 import { SessionReview } from "./SessionReview";
 
 vi.mock("../lib/checkpoint", async (importOriginal) => {
@@ -151,5 +152,44 @@ describe("SessionReview ownership grouping", () => {
     expect(
       container.textContent ?? "",
     ).toContain("Shared with another session");
+  });
+
+  it("keeps the animated frame mounted and folds it with data-open", async () => {
+    vi.mocked(sessionCheckpointStatus).mockResolvedValueOnce({ files: [] });
+    await act(async () => {
+      root.render(
+        createElement(SessionReview, {
+          sessionId: "s1",
+          cwd: "/repo",
+          animationsEnabled: true,
+          onOpenDiff: () => {},
+        }),
+      );
+    });
+    const frame = container.querySelector("[data-review-fold]")!;
+    expect(frame.getAttribute("data-open")).toBe("false");
+    expect(frame.hasAttribute("inert")).toBe(true);
+    // The fold keeps the last card mounted for the exit transition; with
+    // no files it renders no rows.
+    expect(container.querySelectorAll("ul li button")).toHaveLength(0);
+  });
+
+  it("opens the animated frame without inert when files land", async () => {
+    await act(async () => {
+      root.render(
+        createElement(SessionReview, {
+          sessionId: "s1",
+          cwd: "/repo",
+          animationsEnabled: true,
+          onOpenDiff: () => {},
+        }),
+      );
+    });
+    const frame = container.querySelector("[data-review-fold]")!;
+    expect(frame.getAttribute("data-open")).toBe("true");
+    expect(frame.hasAttribute("inert")).toBe(false);
+    expect(
+      container.querySelector("[data-session-review]"),
+    ).not.toBeNull();
   });
 });

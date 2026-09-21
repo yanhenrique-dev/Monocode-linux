@@ -637,11 +637,11 @@ html.is-resizing * {
 }
 
 /*
- * Experimental tasks-strip enter/exit (see TasksPill): the frame stays
+ * Experimental enter/exit folds (tasks strip, review card): the frame stays
  * mounted and folds with a grid transition instead of mounting instantly.
  * Same trick as .zen-phase-body. Reduced motion skips the transition.
  */
-.tasks-strip-body {
+.fold-body {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
@@ -650,18 +650,18 @@ html.is-resizing * {
     opacity 200ms ease;
 }
 
-.tasks-strip-body[data-open="true"] {
+.fold-body[data-open="true"] {
   grid-template-rows: 1fr;
   opacity: 1;
 }
 
-.tasks-strip-body > * {
+.fold-body > * {
   min-height: 0;
   overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tasks-strip-body {
+  .fold-body {
     transition: none;
   }
 }

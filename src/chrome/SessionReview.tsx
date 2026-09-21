@@ -19,6 +19,8 @@ type Props = {
   enabled?: boolean;
   busy?: boolean;
   undoLocked?: boolean;
+  /** Fold the card in and out instead of mounting it instantly. */
+  animationsEnabled?: boolean;
   onOpenDiff: (
     path?: string,
     session?: { sessionId: string; cwd: string },
@@ -31,12 +33,12 @@ export function SessionReview({
   enabled = true,
   busy = false,
   undoLocked = false,
+  animationsEnabled = false,
   onOpenDiff,
 }: Props) {
   const [files, setFiles] = useState<CheckpointFile[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [acting, setActing] = useState<"keep" | "undo" | null>(null);
-  const { t } = useLocale();
   const filesRef = useRef(files);
   filesRef.current = files;
 
@@ -91,28 +93,17 @@ export function SessionReview({
 
   // The card represents the result of a turn. Keep it out of the live turn,
   // then refresh and reveal it once the turn has settled.
-  if (busy || files.length === 0) return null;
+  const show = !busy && files.length > 0;
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Keep the last files around so the fold closes over the card it showed
+  // instead of flashing an empty "Changed 0 files" on the way out.
+  const lastFiles = useRef(files);
+  if (files.length > 0) lastFiles.current = files;
 
   const disabled = acting != null;
-  const canUndoAll = !undoLocked && files.every((file) => file.undoable);
-  // Files also claimed by another live session sort last under their own
-  // heading so ownership is visible instead of silently mixed.
-  const ownFiles = files.filter(
-    (file) => (file.foreignClaimants ?? []).length === 0,
-  );
-  const sharedFiles = files.filter(
-    (file) => (file.foreignClaimants ?? []).length > 0,
-  );
-  const ordered = [...ownFiles, ...sharedFiles];
-  const visibleFiles = expanded ? ordered : ordered.slice(0, 3);
-  const hiddenFileCount = ordered.length - visibleFiles.length;
-  const totals = files.reduce(
-    (sum, file) => ({
-      additions: sum.additions + file.additions,
-      deletions: sum.deletions + file.deletions,
-    }),
-    { additions: 0, deletions: 0 },
-  );
 
   const run = (action: "keep" | "undo") => {
     if (disabled) return;
@@ -133,6 +124,89 @@ export function SessionReview({
       .finally(() => setActing(null));
   };
 
+  if (!animationsEnabled || reduceMotion) {
+    if (!show) return null;
+    return (
+      <ReviewCard
+        files={files}
+        sessionId={sessionId}
+        cwd={cwd}
+        expanded={expanded}
+        setExpanded={setExpanded}
+        run={run}
+        acting={acting}
+        undoLocked={undoLocked}
+        onOpenDiff={onOpenDiff}
+      />
+    );
+  }
+  if (!enabled) return null;
+  // The fusion selectors only see an open strip; same idea here: the fold
+  // wrapper carries no card chrome of its own.
+  return (
+    <div className="fold-body" data-open={show} data-review-fold inert={!show}>
+      <div className="min-h-0 overflow-hidden">
+        <ReviewCard
+          files={show ? files : lastFiles.current}
+          sessionId={sessionId}
+          cwd={cwd}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          run={run}
+          acting={acting}
+          undoLocked={undoLocked}
+          onOpenDiff={onOpenDiff}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ReviewCard({
+  files,
+  sessionId,
+  cwd,
+  expanded,
+  setExpanded,
+  run,
+  acting,
+  undoLocked,
+  onOpenDiff,
+}: {
+  files: CheckpointFile[];
+  sessionId: string;
+  cwd: string;
+  expanded: boolean;
+  setExpanded: (open: boolean | ((open: boolean) => boolean)) => void;
+  run: (action: "keep" | "undo") => void;
+  acting: "keep" | "undo" | null;
+  undoLocked: boolean;
+  onOpenDiff: (
+    path?: string,
+    session?: { sessionId: string; cwd: string },
+  ) => void;
+}) {
+  const { t } = useLocale();
+  const disabled = acting != null;
+  const canUndoAll = !undoLocked && files.every((file) => file.undoable);
+  // Files also claimed by another live session sort last under their own
+  // heading so ownership is visible instead of silently mixed.
+  const ownFiles = files.filter(
+    (file) => (file.foreignClaimants ?? []).length === 0,
+  );
+  const sharedFiles = files.filter(
+    (file) => (file.foreignClaimants ?? []).length > 0,
+  );
+  const ordered = [...ownFiles, ...sharedFiles];
+  const visibleFiles = expanded ? ordered : ordered.slice(0, 3);
+  const hiddenFileCount = ordered.length - visibleFiles.length;
+  const totals = files.reduce(
+    (sum, file) => ({
+      additions: sum.additions + file.additions,
+      deletions: sum.deletions + file.deletions,
+    }),
+    { additions: 0, deletions: 0 },
+  );
   return (
     <div className="px-4 pt-1 pb-2 font-sans" data-session-review-shell>
       <div

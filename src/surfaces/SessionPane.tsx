@@ -294,6 +294,24 @@ const SessionPaneContent = memo(function SessionPaneContent({
     [onHandoff, session.id, session.inboxAsk, session.worktreeRemoved],
   );
   const workCwdForAccessory = sessionWorkCwd(session);
+  const [animationsEnabled, setAnimationsEnabled] = useState(
+    loadExperimentalAnimations,
+  );
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setAnimationsEnabled(
+        (event as CustomEvent<boolean>).detail ?? loadExperimentalAnimations(),
+      );
+    };
+    window.addEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
+    };
+  }, []);
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const latestTurnAccessory = useMemo(
     () =>
       session.inboxAsk || session.worktreeRemoved ? undefined : (
@@ -302,6 +320,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
           cwd={workCwdForAccessory}
           enabled={visible}
           busy={!!session.busy}
+          animationsEnabled={animationsEnabled && !reduceMotion}
           undoLocked={
             reviewUndoLocked ||
             orchestrationRuns.some(
@@ -324,6 +343,8 @@ const SessionPaneContent = memo(function SessionPaneContent({
       reviewUndoLocked,
       orchestrationRuns,
       onOpenDiff,
+      animationsEnabled,
+      reduceMotion,
     ],
   );
   const jumpToBottomRef = useRef<(() => void) | null>(null);
@@ -340,20 +361,6 @@ const SessionPaneContent = memo(function SessionPaneContent({
     window.addEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
     return () => {
       window.removeEventListener(TASKS_PILL_CHANGE_EVENT, onChange);
-    };
-  }, []);
-  const [animationsEnabled, setAnimationsEnabled] = useState(
-    loadExperimentalAnimations,
-  );
-  useEffect(() => {
-    const onChange = (event: Event) => {
-      setAnimationsEnabled(
-        (event as CustomEvent<boolean>).detail ?? loadExperimentalAnimations(),
-      );
-    };
-    window.addEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
-    return () => {
-      window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
     };
   }, []);
   const astraWelcomeSequence = useRef(0);
@@ -733,18 +740,23 @@ const SessionPaneContent = memo(function SessionPaneContent({
                 visible={visible}
                 revealBlock={revealBlock}
               />
-              {showJumpToBottom ? (
+              {animationsEnabled && !reduceMotion ? (
+                <div
+                  className={`pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center transition-opacity duration-200 ${
+                    showJumpToBottom ? "opacity-100" : "opacity-0"
+                  }`}
+                  inert={!showJumpToBottom}
+                  aria-hidden={!showJumpToBottom}
+                >
+                  <JumpToBottomButton
+                    onJump={() => jumpToBottomRef.current?.()}
+                  />
+                </div>
+              ) : showJumpToBottom ? (
                 <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center">
-                  <button
-                    type="button"
-                    title="Jump to latest"
-                    aria-label="Jump to latest"
-                    data-jump-to-bottom
-                    onClick={() => jumpToBottomRef.current?.()}
-                    className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-background-base/95 text-content shadow-md hover:bg-content/5"
-                  >
-                    <ChevronDown className="size-4" strokeWidth={2} />
-                  </button>
+                  <JumpToBottomButton
+                    onJump={() => jumpToBottomRef.current?.()}
+                  />
                 </div>
               ) : null}
             </>
@@ -767,6 +779,21 @@ const SessionPaneContent = memo(function SessionPaneContent({
     </div>
   );
 });
+
+function JumpToBottomButton({ onJump }: { onJump: () => void }) {
+  return (
+    <button
+      type="button"
+      title="Jump to latest"
+      aria-label="Jump to latest"
+      data-jump-to-bottom
+      onClick={onJump}
+      className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-background-base/95 text-content shadow-md hover:bg-content/5"
+    >
+      <ChevronDown className="size-4" strokeWidth={2} />
+    </button>
+  );
+}
 
 export const SessionPane = memo(function SessionPane(props: Props) {
   return (
