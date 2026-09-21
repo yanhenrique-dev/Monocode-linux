@@ -84,6 +84,19 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("performance honest toggles", () => {
+  it("shows the stored terminal value dimmed while the master is off", async () => {
+    localStorage.setItem("monocode.hardwareAcceleration", "0");
+    localStorage.setItem("monocode.terminalGpu", "1");
+    await render("performance");
+    const toggle = container.querySelector<HTMLButtonElement>(
+      '[data-setting-id="terminal-gpu"] button[role="switch"]',
+    )!;
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(toggle.disabled).toBe(true);
+    expect(container.textContent).toContain("Requires the Hardware");
+  });
+});
 describe("appearance draft revert", () => {
   it("restores saved values when a slider drag aborts", async () => {
     localStorage.setItem("monocode.themeHue", "100");
