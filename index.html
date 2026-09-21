@@ -64,7 +64,7 @@
           // each read so one failure never interrupts the other restores.
           var storeGet = function (key) {
             try {
-              return storeGet(key);
+              return localStorage.getItem(key);
             } catch (_) {
               return null;
             }
