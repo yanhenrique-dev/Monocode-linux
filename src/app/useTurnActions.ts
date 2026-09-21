@@ -535,10 +535,15 @@ export function useTurnActions(deps: TurnActionsDeps) {
       const gen = (turnGen.current.get(sessionId) ?? 0) + 1;
       turnGen.current.set(sessionId, gen);
       const workCwd = sessionWorkCwd(current);
+      // The meter reports the last prompt's level, so it would keep showing
+      // the pre-compaction number until the next turn. Hide it while the
+      // level is unknown; harnesses that publish a post-compact estimate
+      // (pi) re-populate it, the rest on the next turn.
+      const previousContext = current.context;
       const started = sessionsRef.current.map((session) =>
         session.id === sessionId
           ? applyHarnessEvent(
-              { ...session, busy: true },
+              { ...session, busy: true, context: undefined },
               { type: "status", text: "Compacting context…" },
             )
           : session,
@@ -573,6 +578,13 @@ export function useTurnActions(deps: TurnActionsDeps) {
           });
         } catch (error: unknown) {
           if (turnGen.current.get(sessionId) !== gen) return;
+          // The attempt hid the meter: put the pre-compaction level back
+          // unless something fresher already landed mid-attempt.
+          sessionsRef.current = sessionsRef.current.map((session) =>
+            session.id === sessionId && session.context == null
+              ? { ...session, context: previousContext }
+              : session,
+          );
           enqueueHarnessEvent(sessionId, {
             type: "session.error",
             message:

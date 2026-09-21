@@ -655,7 +655,9 @@ async function handleEvent(
       }
       // A compaction assistant's usage describes the summarization call, not
       // the rebuilt context. Keep the previous meter value until a real turn
-      // reports the post-compaction window level.
+      // reports the post-compaction window level. (Manual compaction clears
+      // the meter up front in useTurnActions; this keep-previous only governs
+      // provider-side auto-compaction mid-turn.)
       if (role === "assistant" && !hidden) emitContext(live, info);
       break;
     }
