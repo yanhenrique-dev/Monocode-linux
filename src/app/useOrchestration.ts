@@ -26,6 +26,7 @@ import {
   type OrchestrationProposal,
 } from "../lib/orchestrationPlan";
 import { prepareOrchestrationWorkerDetails } from "../lib/orchestrationWorkspace";
+import { reportRejection } from "../lib/reportError";
 import type { OrchestrationWorkerDetail } from "../chrome/OrchestrationActions";
 import { useInboxActivity } from "../hooks/useInboxUnseen";
 import type { Tab as TitleTab } from "../chrome/TitleBar";
@@ -123,7 +124,7 @@ export function useOrchestration(deps: OrchestrationDeps) {
         .then((request) => {
           if (request?.workers.length) setWorkerDetailRequest(request);
         })
-        .catch(console.error);
+        .catch(reportRejection("orchestration-workers"));
     },
     [ensureOpenSession, focusOpenSession, onSelectHistorySession],
   );

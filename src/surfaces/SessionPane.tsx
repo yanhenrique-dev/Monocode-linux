@@ -78,6 +78,7 @@ import {
 } from "../lib/appearance";
 import type { SessionFolderTarget } from "../lib/sessionFolders";
 import { markLinkedSessionUpdateSeen } from "../lib/linkedSessionSeen";
+import { reportRejection } from "../lib/reportError";
 
 type Props = {
   session: Session;
@@ -372,7 +373,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   // Restore a saved run for this lead; its agents render on the sidebar card.
   useEffect(() => {
     if (!session.inboxAsk && !session.worktreeRemoved)
-      void orchestrator.hydrate(session.id).catch(console.error);
+      void orchestrator.hydrate(session.id).catch(reportRejection("orchestration-hydrate"));
   }, [session.id, session.inboxAsk, session.worktreeRemoved]);
   const [quoteRequest, setQuoteRequest] = useState<QuoteRequest>();
   const [editingLastTurn, setEditingLastTurn] = useState(false);
@@ -464,7 +465,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   }, [session.id]);
   useEffect(() => {
     return () => {
-      void flushSessionDraft().catch(console.error);
+      void flushSessionDraft().catch(reportRejection("composer-draft-flush"));
     };
   }, [session.id]);
   const composer = (
@@ -550,7 +551,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onSubmit={(text, attachments, options) =>
         onSubmit(session.id, text, attachments, options)
       }
-      onStop={() => void onStop(session.id).catch(console.error)}
+      onStop={() => void onStop(session.id).catch(reportRejection("turn-stop"))}
       onCompactContext={() => onCompactContext(session.id)}
       onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
       queuedMessages={session.queuedMessages}
