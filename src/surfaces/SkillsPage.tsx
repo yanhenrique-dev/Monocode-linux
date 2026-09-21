@@ -222,9 +222,9 @@ export function SkillsPage({
             className={`mx-auto w-full max-w-5xl py-8 ${previewOpen ? "px-4" : "px-8"}`}
           >
             {header}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="shrink-0 text-[12px] text-content/40 tabular-nums">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4">
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <span className="shrink-0 text-[12px] text-content/60 tabular-nums">
                   {skills == null
                     ? "…"
                     : filtered.length === 1
@@ -233,7 +233,7 @@ export function SkillsPage({
                           count: filtered.length,
                         })}
                 </span>
-                <label className="flex h-7 w-52 min-w-0 flex-1 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
+                <label className="flex h-8 w-48 min-w-0 flex-1 items-center gap-2 rounded-md border border-content/15 px-2 text-content/60 focus-within:border-content/20">
                   <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
                   <input
                     ref={filterInput}
@@ -256,7 +256,7 @@ export function SkillsPage({
                     window.dispatchEvent(new Event(SKILLS_CHANGE_EVENT));
                     setReload((value) => value + 1);
                   }}
-                  className="grid size-6 shrink-0 place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content"
+                  className="grid size-6 shrink-0 place-items-center rounded-md text-content/60 hover:bg-content/10 hover:text-content"
                 >
                   <RefreshCw className="size-3.5" strokeWidth={1.75} />
                 </button>
@@ -271,7 +271,7 @@ export function SkillsPage({
                   }
                   ref={addSkillButton}
                   disabled={busy}
-                  className="rounded-md border border-content/10 px-2.5 py-1 text-[12px] text-content/70 hover:bg-content/10 disabled:opacity-40"
+                  className="rounded-md border border-content/15 px-2 py-1 text-[12px] text-content/70 hover:bg-content/10 disabled:opacity-40"
                   onClick={() => {
                     setAdding((value) => !value);
                     setCreateError(null);
@@ -305,7 +305,7 @@ export function SkillsPage({
             ) : null}
 
             {actionError ? (
-              <p role="alert" className="pb-3 text-[12px] text-red-400">
+              <p role="alert" className="pb-4 text-[12px] text-red-400">
                 {actionError}
               </p>
             ) : null}
@@ -319,9 +319,9 @@ export function SkillsPage({
                 {t("settings.skills.loading")}
               </p>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-content/10">
+              <div className="overflow-hidden rounded-lg border border-content/15">
                 {filtered.length === 0 ? (
-                  <p className="px-3 py-3 text-[12px] text-content/45">
+                  <p className="px-4 py-4 text-[12px] text-content/60">
                     {skills.length === 0
                       ? t("settings.skills.empty.none")
                       : t("settings.skills.empty.no_match")}
@@ -332,14 +332,14 @@ export function SkillsPage({
                     return (
                       <div
                         key={skill.path}
-                        className={`border-b border-content/5 px-3 py-2 last:border-b-0 ${previewSkill?.path === skill.path ? "bg-content/5" : ""} ${
+                        className={`border-b border-content/10 px-4 py-2 last:border-b-0 ${previewSkill?.path === skill.path ? "bg-content/5" : ""} ${
                           disabled ? "opacity-50" : ""
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            className="mr-auto min-w-0 truncate rounded text-left font-sans text-[12px] text-content hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                            className="mr-auto min-w-0 truncate rounded text-left font-sans text-sm font-medium text-content hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                             title={t("settings.skills.preview.name_hint", {
                               name: skill.name,
                             })}
@@ -350,14 +350,14 @@ export function SkillsPage({
                           >
                             {skill.name}
                           </button>
-                          <span className="shrink-0 rounded-full bg-content/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-content/60">
+                          <span className="shrink-0 rounded-full bg-content/10 px-2 py-1 text-xs font-medium uppercase tracking-wide text-content/60">
                             {skill.scope === "user"
                               ? t("settings.skills.scope.personal")
                               : skill.scope === "builtin"
                                 ? "MonoCode"
                                 : t("settings.skills.scope.project")}
                           </span>
-                          <span className="w-20 shrink-0 truncate text-right font-sans text-[11px] text-content/40">
+                          <span className="w-24 shrink-0 truncate text-right font-sans text-xs text-content/60">
                             {skill.source}
                           </span>
                           <button
@@ -377,15 +377,15 @@ export function SkillsPage({
                         </div>
                         {skill.description ? (
                           <p
-                            className="mt-0.5 truncate text-[12px] text-content/55"
+                            className="mt-1 truncate text-xs text-content/60"
                             title={skill.description}
                           >
                             {skill.description}
                           </p>
                         ) : null}
-                        <div className="mt-0.5 flex items-center gap-1">
+                        <div className="mt-1 flex items-center gap-1">
                           <p
-                            className="min-w-0 flex-1 truncate font-sans text-[11px] text-content/35"
+                            className="min-w-0 flex-1 truncate font-sans text-xs text-content/35"
                             title={skill.path}
                           >
                             {skill.path}
@@ -400,7 +400,7 @@ export function SkillsPage({
                             aria-controls={previewOpen ? previewId : undefined}
                             aria-expanded={previewSkill?.path === skill.path}
                             onClick={() => onPreview(skill, "icon")}
-                            className="grid size-5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                            className="grid size-6 shrink-0 place-items-center rounded text-content/60 hover:bg-content/10 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                           >
                             <Eye
                               className="size-3"
@@ -415,7 +415,7 @@ export function SkillsPage({
                             })}
                             title={t("settings.skills.list.copy_action")}
                             onClick={() => onCopyPath(skill.path)}
-                            className="grid size-5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content"
+                            className="grid size-6 shrink-0 place-items-center rounded text-content/60 hover:bg-content/10 hover:text-content"
                           >
                             <Copy className="size-3" strokeWidth={1.75} />
                           </button>
@@ -426,7 +426,7 @@ export function SkillsPage({
                             })}
                             title={t("settings.skills.list.reveal_action")}
                             onClick={() => onReveal(skill.path)}
-                            className="grid size-5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content"
+                            className="grid size-6 shrink-0 place-items-center rounded text-content/60 hover:bg-content/10 hover:text-content"
                           >
                             <FolderOpen className="size-3" strokeWidth={1.75} />
                           </button>
@@ -438,7 +438,7 @@ export function SkillsPage({
               </div>
             )}
 
-            <p className="pt-3 text-[12px] text-content/40">
+            <p className="pt-4 text-[12px] text-content/60">
               {t("settings.skills.footer.lead")}
               <span className="font-sans">.agents/skills</span>
               {t("settings.skills.footer.middle")}
@@ -463,13 +463,13 @@ export function SkillsPage({
                 aria-label={t("settings.skills.preview.close")}
                 title={t("settings.skills.preview.close_hint")}
                 onClick={() => setPreviewSkill(null)}
-                className="grid size-6 shrink-0 place-items-center rounded-md text-content/45 hover:bg-content/10 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="grid size-6 shrink-0 place-items-center rounded-md text-content/60 hover:bg-content/10 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <X className="size-3.5" strokeWidth={1.75} />
               </button>
             </header>
-            <div className="shrink-0 space-y-3 border-b border-stroke px-4 pt-1 pb-3">
-              <p className="select-text break-all text-[11px] text-content/50">
+            <div className="shrink-0 space-y-4 border-b border-stroke px-4 pt-1 pb-4">
+              <p className="select-text break-all text-xs text-content/50">
                 {previewSkill.path}
               </p>
               <div className="flex justify-end">
