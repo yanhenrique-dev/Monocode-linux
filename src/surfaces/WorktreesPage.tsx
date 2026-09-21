@@ -222,6 +222,9 @@ export function WorktreesPage({
                       <span>{t("settings.worktrees.locked")}</span>
                     )}
                   </p>
+                  {blocked ? (
+                    <p className="mt-1 text-[11px] text-content/45">{blocked}</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"

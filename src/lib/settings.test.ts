@@ -428,6 +428,20 @@ describe("settings search", () => {
     });
   });
 
+  it("folds accents so unaccented queries match accented labels", () => {
+    expect(
+      searchSettings("notificacoes", 8, "pt-BR").map((result) => result.label),
+    ).toContain("Notificações");
+    expect(
+      searchSettings("transcricao", 8, "pt-BR").map((result) => result.label),
+    ).toContain("Layout da transcrição");
+    expect(
+      searchSettings("NOTIFICACOES", 8, "pt-BR").map(
+        (result) => result.label,
+      ),
+    ).toContain("Notificações");
+  });
+
   it("searches in Portuguese when pt-BR is active", () => {
     expect(
       searchSettings("desfoque", 8, "pt-BR").map((result) => result.label),

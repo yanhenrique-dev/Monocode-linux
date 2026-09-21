@@ -370,8 +370,46 @@ pub(crate) fn github_pr_head_filter(repo: &str, branch: &str) -> Option<String> 
     Some(format!("{owner}:{branch}"))
 }
 
+/// Owner/repo slug pinned to the fetch remote (origin first), so `gh` never
+/// resolves some other remote (e.g. `upstream`) on its own. Returns `None`
+/// when no remote points at github.com.
+pub(crate) fn slug_from_github_remote_url(url: &str) -> Option<String> {
+    let rest = normalize_github_remote_url(url)
+        .strip_prefix("github.com/")?
+        .to_string();
+    let (owner, name) = rest.split_once('/')?;
+    if owner.is_empty() || name.is_empty() || name.contains('/') {
+        return None;
+    }
+    Some(format!("{owner}/{name}"))
+}
+
+fn origin_github_slug(root: &Path) -> Option<String> {
+    // Origin first: its fetch URL is the checkout's own repo, while a
+    // gh-resolved remote may point at upstream instead of the user's fork.
+    if let Some(url) = git_stdout(root, &["remote", "get-url", "origin"]) {
+        if let Some(slug) = slug_from_github_remote_url(&url) {
+            return Some(slug);
+        }
+    }
+    let remote = github_fetch_remote(root)?;
+    let url = git_stdout(root, &["remote", "get-url", &remote])?;
+    slug_from_github_remote_url(&url)
+}
+
+/// `gh repo view` arguments pinned to the origin repo when it is known.
+/// Without `--repo`, `gh` picks its own base repo, which can be `upstream`
+/// instead of the user's fork.
+pub(crate) fn repo_view_args<'a>(slug: &'a Option<String>, fields: &'a str) -> Vec<&'a str> {
+    match slug {
+        Some(slug) => vec!["repo", "view", slug, "--json", fields],
+        None => vec!["repo", "view", "--json", fields],
+    }
+}
+
 fn git_github_repo_for(root: &Path) -> Result<String, String> {
-    let json = gh_checked(root, &["repo", "view", "--json", "nameWithOwner"])?;
+    let slug = origin_github_slug(root);
+    let json = gh_checked(root, &repo_view_args(&slug, "nameWithOwner"))?;
     #[derive(Deserialize)]
     struct View {
         #[serde(rename = "nameWithOwner")]
@@ -386,7 +424,8 @@ fn git_github_repo_for(root: &Path) -> Result<String, String> {
 }
 
 fn git_github_repositories_for(root: &Path) -> Result<Vec<String>, String> {
-    let json = gh_checked(root, &["repo", "view", "--json", "nameWithOwner,parent"])?;
+    let slug = origin_github_slug(root);
+    let json = gh_checked(root, &repo_view_args(&slug, "nameWithOwner,parent"))?;
     parse_github_repositories(&json)
 }
 
@@ -1453,6 +1492,11 @@ fn gh_repo_view_url(root: &Path) -> Option<String> {
 fn remote_matching_github_url(root: &Path, url: &str) -> Option<String> {
     let remotes = git_stdout(root, &["remote", "-v"])?;
     let wanted = normalize_github_remote_url(url);
+    // Non-github URLs normalize to empty; without this guard two different
+    // non-github remotes would compare equal and match each other.
+    if wanted.is_empty() {
+        return None;
+    }
     for line in remotes.lines() {
         let mut parts = line.split_whitespace();
         let name = parts.next()?;
@@ -1464,21 +1508,48 @@ fn remote_matching_github_url(root: &Path, url: &str) -> Option<String> {
     None
 }
 
+/// Canonical `github.com/owner/repo` form, or an empty string when the URL
+/// is not a github.com remote.
+///
+/// The host must match exactly: a substring search would accept impostors
+/// such as `https://gitlab.example/github.com/acme/web.git`.
 fn normalize_github_remote_url(url: &str) -> String {
     let trimmed = url.trim().trim_end_matches('/').trim_end_matches(".git");
-    if let Some((_, rest)) = trimmed.split_once("github.com:") {
-        return format!(
-            "github.com/{}",
-            rest.trim_start_matches('/').to_ascii_lowercase()
-        );
+    let lower = trimmed.to_ascii_lowercase();
+    // Bare `github.com/owner/repo` (no scheme).
+    if let Some(path) = lower.strip_prefix("github.com/") {
+        return format!("github.com/{path}");
     }
-    if let Some((_, rest)) = trimmed.split_once("github.com/") {
-        return format!(
-            "github.com/{}",
-            rest.trim_start_matches('/').to_ascii_lowercase()
-        );
+    // scheme://[userinfo@]host[:port]/path — accept only an exact
+    // github.com host, ignoring an explicit port such as :443.
+    if let Some((_, rest)) = lower.split_once("://") {
+        let (authority, path) = match rest.split_once('/') {
+            Some((authority, path)) => (authority, path),
+            None => return String::new(),
+        };
+        let host = authority.split('@').next_back().unwrap_or("");
+        let host = match host.split_once(':') {
+            Some((bare, port)) if port.chars().all(|c| c.is_ascii_digit()) => bare,
+            Some(_) => return String::new(),
+            None => host,
+        };
+        if host != "github.com" {
+            return String::new();
+        }
+        return format!("github.com/{}", path.trim_start_matches('/'));
     }
-    trimmed.to_ascii_lowercase()
+    // scp-like SSH: [user@]host:path — accept only an exact github.com host.
+    if let Some((user_host, path)) = lower.split_once(':') {
+        if user_host.contains('/') {
+            return String::new();
+        }
+        let host = user_host.split('@').next_back().unwrap_or("");
+        if host != "github.com" {
+            return String::new();
+        }
+        return format!("github.com/{}", path.trim_start_matches('/'));
+    }
+    String::new()
 }
 
 pub(crate) fn parse_github_pr_diff_meta(json: &str) -> Result<GitHubPrDiff, String> {

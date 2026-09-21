@@ -233,6 +233,7 @@ import {
   saveReviewAdoptShell,
   saveTerminalGpu,
   searchSettings,
+  SETTINGS_INDEX,
   settingsSectionDescription,
   settingsSectionLabel,
   type DiffViewer,
@@ -365,15 +366,27 @@ export function SettingsView({
 
   useEffect(() => setRevealed(anchor), [anchor, notificationSettingsRequest]);
 
+  // Announced when search lands on a setting, so screen readers follow the jump.
+  const revealedEntry = revealed
+    ? SETTINGS_INDEX.find((entry) => entry.id === revealed)
+    : undefined;
+  const revealedAnnouncement = revealedEntry
+    ? t(revealedEntry.label)
+    : revealed
+      ? t(settingsSectionLabel(section))
+      : "";
+
   // Section is a dependency so a search result on another page scrolls once
   // that page has mounted the row.
   useEffect(() => {
     if (!revealed) return;
     // A project quick action lets the project card focus itself after discovery.
     if (!(revealed === "project-notifications" && notificationProjectPath)) {
-      document
-        .getElementById(settingDomId(revealed))
-        ?.scrollIntoView?.({ block: "center" });
+      const target = document.getElementById(settingDomId(revealed));
+      target?.scrollIntoView?.({ block: "center" });
+      // Move focus so keyboard and screen-reader users land on the row.
+      // Group/Row carry tabIndex -1: focusable programmatically, never by Tab.
+      target?.focus?.({ preventScroll: true });
     }
     const timer = window.setTimeout(() => setRevealed(null), 1800);
     return () => window.clearTimeout(timer);
@@ -439,6 +452,10 @@ export function SettingsView({
         {IS_MAC ? null : <WindowControls />}
       </div>
 
+      <div aria-live="polite" className="sr-only">
+        {revealedAnnouncement}
+      </div>
+
       {confirmingRestore ? (
         <ConfirmDialog
           title={t("settings.appearance.restore_defaults.confirm_title")}
@@ -493,7 +510,10 @@ export function SettingsView({
               ) : null}
               {section === "performance" ? <PerformancePage /> : null}
               {section === "appearance" ? (
-                <AppearancePage onRestoreReady={onRestoreAppearanceReady} />
+                <AppearancePage
+                  onRestoreReady={onRestoreAppearanceReady}
+                  onOpenSection={onSelectSection}
+                />
               ) : null}
               {section === "chat" ? <ChatPage /> : null}
               {section === "keybindings" ? <KeybindingsPage /> : null}
@@ -867,8 +887,12 @@ function NotificationsPage({
           ) : null}
           <Toggle
             label={t("settings.general.notifications.toggle")}
-            on={notificationsEnabled}
+            on={
+              notificationsEnabled &&
+              notificationPermission !== "unsupported"
+            }
             onChange={onNotificationsEnabled}
+            disabled={notificationPermission === "unsupported"}
           />
         </Row>
       </Group>
@@ -890,6 +914,8 @@ function NotificationsPage({
       <div
         id={settingDomId("project-notifications")}
         data-setting-id="project-notifications"
+        // Focus target for search reveals: programmatic focus only, never Tab.
+        tabIndex={-1}
       >
         <ProjectNotificationSettings
           cwd={cwd}
@@ -944,7 +970,7 @@ function PerformancePage() {
         >
           <Toggle
             label={t("settings.general.terminal_gpu.toggle")}
-            on={terminalGpu && hardwareAcceleration}
+            on={terminalGpu}
             onChange={onTerminalGpu}
             disabled={!hardwareAcceleration}
           />
@@ -1623,9 +1649,10 @@ function UpdateRow({
     phase: "idle",
     currentVersion: "…",
   });
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [holding, setHolding] = useState(false);
   const [isFlatpak, setIsFlatpak] = useState(false);
+  const [lastChecked, setLastChecked] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1660,6 +1687,7 @@ function UpdateRow({
         return;
       }
       await runUpdateFlow(true, setSnapshot, { showDialog: false });
+      setLastChecked(Date.now());
     } finally {
       const remaining = MIN_BUSY_MS - (Date.now() - startedAt);
       if (remaining > 0) {
@@ -1670,6 +1698,18 @@ function UpdateRow({
   };
 
   // Sandboxed (Flatpak) builds have no self-updater: Flathub owns updates.
+  const checkedSuffix =
+    lastChecked == null ||
+    snapshot.phase === "checking" ||
+    snapshot.phase === "downloading" ||
+    snapshot.phase === "available"
+      ? ""
+      : ` · ${t("settings.general.update.last_checked", {
+          time: new Intl.DateTimeFormat(getIntlLocale(locale), {
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(lastChecked),
+        })}`;
   const status = isFlatpak
     ? t("settings.general.update.flatpak")
     : snapshot.phase === "available"
@@ -1685,10 +1725,13 @@ function UpdateRow({
         : snapshot.phase === "checking"
           ? t("settings.general.update.checking")
           : snapshot.phase === "current"
-            ? t("settings.general.update.current")
+            ? `${t("settings.general.update.current")}${checkedSuffix}`
             : snapshot.phase === "error"
-              ? (snapshot.error ?? t("settings.general.update.failed"))
-              : t("settings.general.update.idle");
+              ? `${t("settings.general.update.failed_detail", {
+                  error:
+                    snapshot.error ?? t("settings.general.update.failed"),
+                })}${checkedSuffix}`
+              : `${t("settings.general.update.idle")}${checkedSuffix}`;
 
   return (
     <Row
@@ -1705,7 +1748,11 @@ function UpdateRow({
     >
       <div className="flex items-center gap-2">
         <SecondaryButton
-          onClick={() => onOpenWhatsNew(snapshot.currentVersion)}
+          onClick={() =>
+            onOpenWhatsNew(
+              snapshot.availableVersion ?? snapshot.currentVersion,
+            )
+          }
           disabled={snapshot.currentVersion === "…"}
         >
           {t("settings.general.update.whats_new")}
@@ -1719,9 +1766,12 @@ function UpdateRow({
             ) : (
               <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
             )}
-            {hasUpdate
-              ? t("settings.general.update.download")
-              : t("settings.general.update.check")}
+            {t("settings.general.update.check")}
+            {hasUpdate && !busy && snapshot.availableVersion ? (
+              <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+                {snapshot.availableVersion}
+              </span>
+            ) : null}
           </SecondaryButton>
         )}
       </div>
@@ -2015,8 +2065,10 @@ function useAppearanceSettings() {
 
 function AppearancePage({
   onRestoreReady,
+  onOpenSection,
 }: {
   onRestoreReady?: (restore: () => void) => void;
+  onOpenSection?: (section: SettingsSectionId) => void;
 }) {
   const appearance = useAppearanceSettings();
   const { restoreDefaults } = appearance;
@@ -2194,9 +2246,20 @@ function AppearancePage({
           id="interface-blur"
           label={t("settings.appearance.interface_blur.label")}
           description={
-            hardwareOn
-              ? t("settings.appearance.interface_blur.description")
-              : t("settings.appearance.interface_blur.description_disabled")
+            hardwareOn ? (
+              t("settings.appearance.interface_blur.description")
+            ) : (
+              <>
+                {t("settings.appearance.interface_blur.description_disabled")}{" "}
+                <button
+                  type="button"
+                  onClick={() => onOpenSection?.("performance")}
+                  className="underline underline-offset-2 hover:text-content"
+                >
+                  {t("settings.appearance.interface_blur.open_performance")}
+                </button>
+              </>
+            )
           }
         >
           <Toggle
@@ -2449,6 +2512,7 @@ function ChatBackgroundCard({
 
 function KeybindingsPage() {
   const [query, setQuery] = useState("");
+  const filterRef = useRef<HTMLInputElement>(null);
   const { locale, t } = useLocale();
   const rows = useMemo(
     () => filterKeybindings(KEYBINDINGS, query, locale),
@@ -2461,7 +2525,10 @@ function KeybindingsPage() {
       description={t("settings.keybindings.group.description")}
       action={
         <div className="flex items-center gap-4">
-          <span className="shrink-0 text-[12px] text-content/60 tabular-nums">
+          <span
+            aria-live="polite"
+            className="shrink-0 text-[12px] text-content/60 tabular-nums"
+          >
             {rows.length}{" "}
             {rows.length === 1
               ? t("settings.keybindings.count.singular")
@@ -2470,6 +2537,7 @@ function KeybindingsPage() {
           <label className="flex h-8 w-48 shrink-0 items-center gap-2 rounded-md border border-content/15 px-2 text-content/60 focus-within:border-content/20">
             <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
             <input
+              ref={filterRef}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("settings.keybindings.filter.placeholder")}
@@ -2478,6 +2546,22 @@ function KeybindingsPage() {
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
             />
+            {query ? (
+              <button
+                type="button"
+                aria-label={t("settings.search.clear")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setQuery("");
+                  // Keyboard activation would otherwise strand focus on a
+                  // button that unmounts with the cleared query.
+                  filterRef.current?.focus();
+                }}
+                className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
+              >
+                <X className="size-3" strokeWidth={2} />
+              </button>
+            ) : null}
           </label>
         </div>
       }
@@ -2640,9 +2724,11 @@ function ProviderRow({
       }
       description={
         available
-          ? t("settings.providers.row.models_available", {
-              count: models.length,
-            })
+          ? models.length === 1
+            ? t("settings.providers.row.models_available_one")
+            : t("settings.providers.row.models_available_other", {
+                count: models.length,
+              })
           : harnessUnavailableHint(harness, locale)
       }
     >
@@ -2732,6 +2818,16 @@ function ArchivePage({
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [sessions],
   );
+  const [sessionQuery, setSessionQuery] = useState("");
+  const visibleArchived = useMemo(() => {
+    const needle = sessionQuery.trim().toLowerCase();
+    if (!needle) return archived;
+    return archived.filter((session) =>
+      sessionDisplayTitle(session.title, session.harness)
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [archived, sessionQuery]);
 
   const onShowArchived = (showArchived: boolean) => {
     const next = { ...filters, showArchived };
@@ -2787,6 +2883,31 @@ function ArchivePage({
               })
             : t("settings.archive.sessions.title")
         }
+        action={
+          <label className="flex h-7 w-44 shrink-0 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
+            <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <input
+              value={sessionQuery}
+              onChange={(event) => setSessionQuery(event.target.value)}
+              placeholder={t("settings.archive.sessions.filter_placeholder")}
+              aria-label={t("settings.archive.sessions.filter_aria")}
+              spellCheck={false}
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
+            />
+            {sessionQuery ? (
+              <button
+                type="button"
+                aria-label={t("settings.search.clear")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setSessionQuery("")}
+                className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
+              >
+                <X className="size-3" strokeWidth={2} />
+              </button>
+            ) : null}
+          </label>
+        }
       >
         <Row
           id="show-archived"
@@ -2807,8 +2928,12 @@ function ArchivePage({
           <p className="px-4 py-4 text-[12px] text-content/60">
             {t("settings.archive.sessions.empty")}
           </p>
+        ) : visibleArchived.length === 0 ? (
+          <p className="px-4 py-3.5 text-[12px] text-content/45">
+            {t("settings.archive.sessions.empty_no_match")}
+          </p>
         ) : (
-          archived.map((session) => (
+          visibleArchived.map((session) => (
             <div
               key={session.id}
               className="flex items-center gap-4 border-b border-content/10 px-4 py-2 last:border-b-0"
@@ -2881,10 +3006,13 @@ function ArchivePage({
 function formatDate(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "";
   try {
+    const date = new Date(value);
+    const sameYear = date.getFullYear() === new Date().getFullYear();
     return new Intl.DateTimeFormat(getIntlLocale(), {
+      ...(sameYear ? {} : { year: "numeric" as const }),
       month: "short",
       day: "numeric",
-    }).format(new Date(value));
+    }).format(date);
   } catch {
     return "";
   }
@@ -2936,7 +3064,8 @@ export function Group({
     <section
       id={id ? settingDomId(id) : undefined}
       data-setting-id={id}
-      className="pt-8"
+      tabIndex={-1}
+      className="pt-8 outline-none"
     >
       <div className="flex items-end gap-4 pb-4">
         <div className="min-w-0 flex-1">
@@ -2971,19 +3100,20 @@ function Row({
   /** Matches a `SETTINGS_INDEX` id so search can scroll here. */
   id?: string;
   label: ReactNode;
-  description?: string;
+  description?: ReactNode;
   children?: ReactNode;
 }) {
   const revealed = useContext(RevealedSetting);
   const flash = id != null && revealed === id;
 
   return (
-    <div
-      id={id ? settingDomId(id) : undefined}
-      data-setting-id={id}
-      className={`settings-row flex items-start gap-6 border-b border-content/10 px-4 py-4 transition-colors last:border-b-0 ${
-        flash ? "bg-accent/10" : ""
-      }`}
+      <div
+        id={id ? settingDomId(id) : undefined}
+        data-setting-id={id}
+        tabIndex={-1}
+        className={`settings-row flex items-start gap-6 border-b border-content/10 px-4 py-4 outline-none transition-colors last:border-b-0 ${
+          flash ? "bg-accent/10" : ""
+        }`}
     >
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-content">{label}</div>
