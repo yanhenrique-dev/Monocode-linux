@@ -1358,7 +1358,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.providers.group.description":
     "Um provedor aparece como instalado quando sua CLI está no PATH. CLIs não instaladas continuam listadas, mas ficam fora do seletor de modelos, assim como as instaladas com Exibir no seletor desligado. O modelo ao lado do provedor inicia novas conversas; Usar como padrão escolhe o provedor.",
   "settings.providers.default_hint":
-    "Novas sessões começam com o modelo do provider marcado como Padrão.",
+    "Novas sessões começam com o modelo do provedor marcado como Padrão.",
   "settings.providers.advanced.title": "Avançado",
   "settings.providers.claude_hooks.label": "Hooks do Claude Code",
   "settings.providers.claude_hooks.description":
