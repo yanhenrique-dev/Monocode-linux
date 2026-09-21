@@ -246,11 +246,15 @@ function AgentTranscriptContent({
   turnsRef.current = turns;
 
   // Virtualize by turn when the scroller has a measurable viewport (real
-  // browser). At zero height (tests, hidden tabs) every turn renders in
-  // normal flow so queries keep finding the latest content.
-  const virtualize =
-    visible && (scrollerEl?.clientHeight ?? 0) > 0;
+  // browser): the engine sizes from offsetWidth/offsetHeight, so the gate
+  // reads the same signal. At zero height (tests, hidden tabs) every turn
+  // renders in normal flow so queries keep finding the latest content.
+  const [hasViewport, setHasViewport] = useState(false);
+  const virtualize = visible && hasViewport;
   const virtualizer = useVirtualizer({
+    // Disabled (fallback path) the virtualizer creates no observers and
+    // takes no measurements, so zero-height environments stay inert.
+    enabled: virtualize,
     count: turns.length,
     getScrollElement: () => scroller.current,
     estimateSize: () => TURN_ESTIMATE_PX,
@@ -267,9 +271,14 @@ function AgentTranscriptContent({
   const virtualItems = virtualize ? virtualizer.getVirtualItems() : [];
 
   // Mount pinned to the latest turn; the chat-anchored virtualizer then
-  // holds the end while streaming grows the last item.
+  // holds the end while streaming grows the last item. The measure pass
+  // matters on the false->true flip: observers attach in the same commit,
+  // so without it the first virtualized render can stay empty until the
+  // next scroll or resize event.
   useLayoutEffect(() => {
-    if (virtualize) virtualizer.scrollToEnd();
+    if (!virtualize) return;
+    virtualizer.measure();
+    virtualizer.scrollToEnd();
     // Run once per mount: identity-stable on options, not on data.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [virtualize]);
@@ -331,6 +340,7 @@ function AgentTranscriptContent({
     (el: HTMLDivElement | null) => {
       scroller.current = el;
       setScrollerEl(el);
+      setHasViewport((el?.offsetHeight ?? 0) > 0);
       lockOverscroll(el);
     },
     [lockOverscroll],
@@ -427,6 +437,7 @@ function AgentTranscriptContent({
     if (!visible || !el || !inner) return;
     const onResize = () => {
       syncTranscriptViewport(el);
+      setHasViewport(el.offsetHeight > 0);
       const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (stickToBottom.current) {
         pinToBottom(el);
