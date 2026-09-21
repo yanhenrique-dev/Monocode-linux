@@ -316,33 +316,3 @@ mod platform {
         }
     }
 }
-
-#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-mod platform {
-    use tauri::AppHandle;
-
-    use super::Permission;
-
-    pub(super) async fn permission(_app: &AppHandle) -> Permission {
-        Permission::Unsupported
-    }
-
-    pub(super) async fn request_permission(_app: &AppHandle) -> Permission {
-        Permission::Unsupported
-    }
-
-    pub(super) async fn show(
-        _app: &AppHandle,
-        _session_id: &str,
-        _title: &str,
-        _subtitle: &str,
-        _body: &str,
-        _sound: bool,
-    ) -> Result<(), String> {
-        Err("notifications are not supported on this platform".into())
-    }
-
-    pub(super) fn open_settings(_app: &AppHandle) -> Result<(), String> {
-        Err("notifications are not supported on this platform".into())
-    }
-}

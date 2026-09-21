@@ -159,12 +159,7 @@ fn read_opencode_go_api_key() -> Option<String> {
     let primary = opencode_data_dir()?.join("auth.json");
     let raw = std::fs::read_to_string(&primary)
         .or_else(|_| {
-            // Legacy macOS location.
             dirs_home()
-                .or_else(|| {
-                    std::env::var_os("USERPROFILE")
-                        .map(|value| value.to_string_lossy().into_owned())
-                })
                 .ok_or_else(|| {
                     std::io::Error::new(std::io::ErrorKind::NotFound, "no home directory")
                 })
@@ -207,9 +202,7 @@ fn opencode_config_paths() -> Vec<PathBuf> {
         paths.push(root.join("opencode.jsonc"));
         paths.push(root.join("opencode.json"));
     }
-    if let Some(home) = dirs_home().or_else(|| {
-        std::env::var_os("USERPROFILE").map(|value| value.to_string_lossy().into_owned())
-    }) {
+    if let Some(home) = dirs_home() {
         let root = PathBuf::from(home).join(".config/opencode");
         paths.push(root.join("opencode.jsonc"));
         paths.push(root.join("opencode.json"));

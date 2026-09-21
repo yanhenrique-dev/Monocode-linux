@@ -321,7 +321,6 @@ pub fn run() {
             clipboard::clipboard_file_paths,
             clipboard::copy_file_to_clipboard,
             open_new_window,
-            window::hide_window,
             window::destroy_window,
             window::quit_poll_reply,
             window::quit_decision,

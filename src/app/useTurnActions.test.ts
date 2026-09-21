@@ -15,7 +15,6 @@ vi.mock("../lib/harness/registry", async (original) => ({
   canCompactHarnessContext: () => true,
   compactHarnessContext: (...args: unknown[]) => mockCompact(...args),
 }));
-vi.mock("../lib/dockBadge", () => ({ syncDockBadge: vi.fn() }));
 
 import type { HarnessEvent } from "../lib/harness";
 import type { Session } from "../lib/session";

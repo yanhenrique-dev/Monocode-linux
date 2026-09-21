@@ -82,12 +82,6 @@ pub fn open_new_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Close with a running chat hides the webview so the harness child keeps going.
-#[tauri::command]
-pub fn hide_window(window: WebviewWindow) -> Result<(), String> {
-    window.hide().map_err(|err| err.to_string())
-}
-
 /// Finish an idle close. `destroy` skips CloseRequested so the JS handler
 /// does not loop; `close` would fire it again.
 #[tauri::command]

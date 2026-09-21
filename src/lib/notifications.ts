@@ -75,10 +75,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return permission;
 }
 
-export function openNotificationSettings(): Promise<void> {
-  return invoke<void>("open_notification_settings");
-}
-
 /**
  * Tracked from Tauri's focus event rather than `document.hasFocus()`, which
  * WKWebView keeps reporting true after the window drops to the background.

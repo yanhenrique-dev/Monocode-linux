@@ -1992,14 +1992,6 @@ pub(crate) fn apply_gui_env(cmd: &mut Command) {
         }
     } else if let Some(home) = dirs_home() {
         cmd.env("HOME", &home);
-        if std::env::var_os("USERPROFILE").is_none() {
-            cmd.env("USERPROFILE", &home);
-        }
-        if std::env::var_os("USER").is_none() {
-            if let Ok(username) = std::env::var("USERNAME") {
-                cmd.env("USER", username);
-            }
-        }
     }
     if std::env::var_os("LANG").is_none() && std::env::var_os("LC_ALL").is_none() {
         cmd.env("LANG", "en_US.UTF-8");

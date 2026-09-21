@@ -84,7 +84,6 @@ import {
   attachOrchestrationWorkers,
   consolidateOrchestrationTabs,
 } from "../lib/orchestrationWorkspace";
-import { syncDockBadge } from "../lib/dockBadge";
 import { CONTINUE_PROMPT, canAutoContinue } from "../lib/inFlight";
 import { isHarnessAvailable } from "../lib/harness/availability";
 import { selectedProviderAccountId } from "../lib/providerAccounts";
@@ -527,7 +526,6 @@ export function useTurnActions(deps: TurnActionsDeps) {
             : session,
         );
         sessionsRef.current = unsupported;
-        syncDockBadge(unsupported);
         setSessions(unsupported);
         return true;
       }
@@ -549,7 +547,6 @@ export function useTurnActions(deps: TurnActionsDeps) {
           : session,
       );
       sessionsRef.current = started;
-      syncDockBadge(started);
       setSessions(started);
 
       void (async () => {
@@ -599,7 +596,6 @@ export function useTurnActions(deps: TurnActionsDeps) {
             session.id === sessionId ? { ...session, busy: false } : session,
           );
           sessionsRef.current = finished;
-          syncDockBadge(finished);
           setSessions(finished);
         }
       })();

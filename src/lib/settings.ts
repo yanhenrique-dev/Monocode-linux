@@ -696,8 +696,6 @@ export function subscribeLiveAgentsEnabled(onStoreChange: () => void) {
     window.removeEventListener(LIVE_AGENTS_ENABLED_CHANGE_EVENT, onStoreChange);
 }
 
-const CLOSE_TO_TRAY_KEY = "monocode.closeToTray";
-
 const REVIEW_ADOPT_SHELL_KEY = "monocode.reviewAdoptShell";
 
 /** Adopt shell-made file changes into session review. Off by default: in a
@@ -738,21 +736,6 @@ export function subscribeReviewAdoptShell(onStoreChange: () => void) {
   window.addEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
   return () =>
     window.removeEventListener(REVIEW_ADOPT_SHELL_CHANGE_EVENT, onStoreChange);
-}
-
-export const CLOSE_TO_TRAY_DEFAULT = true;
-
-export function loadCloseToTray(): boolean {
-  // No tray icon exists on this Linux-only fork; the setting stays off.
-  return false;
-}
-
-export function saveCloseToTray(value: boolean) {
-  try {
-    localStorage.setItem(CLOSE_TO_TRAY_KEY, value ? "1" : "0");
-  } catch {
-    // private mode / quota
-  }
 }
 
 const GRID_ARCADE_ENABLED_KEY = "monocode.gridArcadeEnabled";

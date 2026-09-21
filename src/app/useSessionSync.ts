@@ -26,9 +26,7 @@ import {
   closeBusyWindow,
   closeCurrentWindow,
   hasInFlightSessions,
-  hideCurrentWindow,
   isAppQuitting,
-  persistLiveTranscripts,
   persistQuitState,
   reapWindowRuntime,
   setQuitWorkspace,
@@ -98,10 +96,8 @@ import {
   latestTurnNeedsHarnessLogin,
   supportsHarnessLogin,
 } from "../lib/harness/authSupport";
-import { syncDockBadge } from "../lib/dockBadge";
 import { orchestrator } from "../lib/orchestration";
 import { warmNativeSkills } from "../lib/skills";
-import { loadCloseToTray } from "../lib/settings";
 import { DEFAULT_PROVIDER_ACCOUNT_ID } from "../lib/providerAccounts";
 import { reconcileRestoredModel } from "../lib/restoredModel";
 import { rememberLoadedSession } from "../lib/sessionCache";
@@ -315,7 +311,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
     });
     if (!next.some((session, index) => session !== prev[index])) return;
     sessionsRef.current = next;
-    syncDockBadge(next);
     setSessions(next);
   }, []);
 
@@ -353,7 +348,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
       );
       if (!next.some((session, index) => session !== prev[index])) return;
       sessionsRef.current = next;
-      syncDockBadge(next);
       setSessions(next);
     },
     [],
@@ -637,7 +631,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
   const [reminderNoticesHeight, setReminderNoticesHeight] = useState(0);
 
   useEffect(() => {
-    syncDockBadge(sessions);
   }, [sessions]);
 
   useEffect(() => {
@@ -647,7 +640,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
         setWindowFocused(focused);
         if (focused) {
           flushHarnessEvents();
-          syncDockBadge(sessionsRef.current);
           if (
             document.activeElement === document.body &&
             !projectTerminalFocusedRef.current &&
@@ -693,7 +685,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
         // Listening here makes close our job. Letting the default path run
         // calls JS `window.destroy`, which Tauri denies without a permission.
         event.preventDefault();
-        const toTray = loadCloseToTray();
         void (async () => {
           // Hide/destroy end the JS context before the draft debounce timer
           // would fire, so push any pending composer drafts out first.
@@ -707,13 +698,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
           }
           if (hasInFlightSessions(sessionsRef.current)) {
             flushHarnessEvents();
-            if (!toTray) {
-              void closeBusyWindow();
-              return;
-            }
-            // Not `persistQuitState`: that marks the live turns interrupted.
-            void persistLiveTranscripts(sessionsRef.current);
-            void hideCurrentWindow();
+            void closeBusyWindow();
             return;
           }
           await persistQuitState(
@@ -725,7 +710,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
             "unload",
             projectTerminalsRef.current,
           ).finally(() => {
-            void (toTray ? hideCurrentWindow() : closeCurrentWindow());
+            void closeCurrentWindow();
           });
         })();
       })
