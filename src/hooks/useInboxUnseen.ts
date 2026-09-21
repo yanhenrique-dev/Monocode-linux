@@ -62,6 +62,16 @@ import {
 const POLL_MS = 30_000;
 const FALLBACK_REFRESH_MS = 60_000;
 const MAX_CONCURRENT_LOOKUPS = 3;
+/** Offline/rate-limit backoff ceiling for background polls. */
+const MAX_POLL_BACKOFF_MS = 5 * 60_000;
+
+function isRateLimitMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("rate limit") ||
+    (lower.includes("quota") && lower.includes("exceed"))
+  );
+}
 
 type ProjectSeenEntry = InboxSeenEntry & NotificationSubject;
 
@@ -191,12 +201,16 @@ export function useInboxActivity(
     let cancelled = false;
     let pulling = false;
     let pullAgain = false;
+    let failures = 0;
+    let backoffUntil = 0;
+    let lastFullFetchAt = 0;
 
     const pull = async (force: boolean) => {
       if (pulling) {
         pullAgain ||= force;
         return;
       }
+      if (!force && Date.now() < backoffUntil) return;
       pulling = true;
       const projectPaths = projects.map((project) => project.path);
       const filters = pruneInboxFilters(loadInboxFilters(), projectPaths);
@@ -207,7 +221,18 @@ export function useInboxActivity(
         linearHiddenTeamIds: loadHiddenLinearTeamIds(),
       };
       try {
-        const listed = await listInboxItems(projects, query, { force });
+        // Incremental badge polls ask only what changed since the last full
+        // fetch; the list layer merges the delta into the snapshot.
+        const since =
+          !force && lastFullFetchAt > 0
+            ? new Date(lastFullFetchAt).toISOString()
+            : undefined;
+        const listed = await listInboxItems(projects, query, {
+          force,
+          since,
+        });
+        if (!since) lastFullFetchAt = Date.now();
+        failures = 0;
         if (cancelled) return;
         const visible = applyInboxFilters(listed.items, filters, "");
         rememberNotificationProjects(
@@ -305,8 +330,17 @@ export function useInboxActivity(
             setWorkItems((current) => mergeSnapshots(current, fallback));
           }
         }
+        const githubError = listed.errors.github;
+        if (githubError && isRateLimitMessage(githubError)) {
+          backoffUntil = Date.now() + 60_000;
+        }
       } catch {
-        // Leave the last known badges; a later poll can try again.
+        // Leave the last known badges; back off so a dead backend or
+        // offline machine is not hammered every 30s.
+        failures += 1;
+        backoffUntil =
+          Date.now() +
+          Math.min(POLL_MS * 2 ** failures, MAX_POLL_BACKOFF_MS);
       } finally {
         pulling = false;
         if (!cancelled && pullAgain) {
@@ -320,10 +354,13 @@ export function useInboxActivity(
     const stopSelfActivity = subscribeInboxSelfActivity(() => void pull(true));
     const timer = window.setInterval(() => {
       if (document.hidden) return;
-      void pull(true);
+      // Unforced: honors backoffUntil and the incremental `since` path, so
+      // rate limits and dead backends actually quiet the poll. Forced pulls
+      // stay reserved for explicit user refreshes.
+      void pull(false);
     }, POLL_MS);
     const onVis = () => {
-      if (!document.hidden) void pull(true);
+      if (!document.hidden) void pull(false);
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {

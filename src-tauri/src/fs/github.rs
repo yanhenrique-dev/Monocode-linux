@@ -1,6 +1,6 @@
 use std::io::ErrorKind;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -92,6 +92,10 @@ pub struct GitHubStatus {
     pub connected: bool,
     pub installed: bool,
     pub authenticated: bool,
+    #[serde(default)]
+    pub rate_limited: bool,
+    #[serde(default)]
+    pub retry_after_secs: u64,
 }
 
 /// Whether the GitHub CLI is installed and has an active authenticated account.
@@ -103,11 +107,14 @@ pub async fn git_github_status() -> Result<GitHubStatus, String> {
 }
 
 fn git_github_status_for() -> GitHubStatus {
+    let rate = rate_limit_remaining();
     let Some(program) = crate::harness::resolve_gui_binary("gh") else {
         return GitHubStatus {
             connected: false,
             installed: false,
             authenticated: false,
+            rate_limited: rate.0,
+            retry_after_secs: rate.1,
         };
     };
     let mut cmd = crate::host::command(program);
@@ -117,15 +124,54 @@ fn git_github_status_for() -> GitHubStatus {
         .env("GH_PAGER", "cat")
         .env("GIT_PAGER", "cat");
     crate::harness::apply_gui_env(&mut cmd);
-    let authenticated = cmd
-        .output()
+    let authenticated = run_with_timeout(cmd, GH_TIMEOUT)
         .map(|output| output.status.success())
         .unwrap_or(false);
     GitHubStatus {
         connected: authenticated,
         installed: true,
         authenticated,
+        rate_limited: rate.0,
+        retry_after_secs: rate.1,
     }
+}
+
+/// Best-effort rate-limit backoff shared by all `gh` calls. When the API
+/// answers 403/429 the frontend is told to skip polls until `retry_after`.
+fn rate_limit_state() -> &'static std::sync::Mutex<Option<std::time::Instant>> {
+    static STATE: std::sync::OnceLock<std::sync::Mutex<Option<std::time::Instant>>> =
+        std::sync::OnceLock::new();
+    STATE.get_or_init(Default::default)
+}
+
+fn note_rate_limit() {
+    note_rate_limit_until(std::time::Instant::now() + Duration::from_secs(60));
+}
+
+/// Test seam: pin the backoff deadline so expiry is checkable without
+/// waiting out the 60s window.
+fn note_rate_limit_until(until: std::time::Instant) {
+    if let Ok(mut state) = rate_limit_state().lock() {
+        *state = Some(until);
+    }
+}
+
+fn rate_limit_remaining() -> (bool, u64) {
+    if let Ok(state) = rate_limit_state().lock() {
+        if let Some(until) = *state {
+            if let Some(left) = until.checked_duration_since(std::time::Instant::now()) {
+                return (true, left.as_secs().max(1));
+            }
+        }
+    }
+    (false, 0)
+}
+
+fn is_rate_limit_error(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    lower.contains("rate limit")
+        || lower.contains("secondary rate limit")
+        || (lower.contains("quota") && lower.contains("exceed"))
 }
 
 /// `owner/repo` for the GitHub remote of this working copy, via `gh`.
@@ -145,6 +191,8 @@ pub async fn git_github_repositories(cwd: String) -> Result<Vec<String>, String>
 }
 
 /// Open issues or pull requests for one GitHub repository, via `gh`.
+/// One argument per IPC field; they fold into [`WorkItemsQuery`] inside.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn git_github_work_items(
     cwd: String,
@@ -154,16 +202,20 @@ pub async fn git_github_work_items(
     state: String,
     search: String,
     limit: Option<u32>,
+    updated_since: Option<String>,
 ) -> Result<Vec<GitHubWorkItem>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         git_github_work_items_for(
             &expand_home(&cwd),
-            &repo,
-            &kind,
-            assigned_to_me,
-            &state,
-            &search,
-            limit.unwrap_or(40),
+            WorkItemsQuery {
+                repo: &repo,
+                kind: &kind,
+                assigned_to_me,
+                state: &state,
+                search: &search,
+                limit: limit.unwrap_or(40),
+                updated_since: updated_since.as_deref(),
+            },
         )
     })
     .await
@@ -276,7 +328,8 @@ pub async fn git_github_work_item_comment(
     body: String,
     in_reply_to: String,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let repo_for_cache = repo.clone();
+    let result: Result<String, String> = tauri::async_runtime::spawn_blocking(move || {
         git_github_work_item_comment_for(
             &expand_home(&cwd),
             &repo,
@@ -287,7 +340,13 @@ pub async fn git_github_work_item_comment(
         )
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if result.is_ok() {
+        if let Ok((owner, name)) = split_github_repo(&repo_for_cache) {
+            invalidate_work_items_cache(&format!("{owner}/{name}"));
+        }
+    }
+    result
 }
 
 /// Viewer permission and merge state for a pull request, so the UI can
@@ -385,11 +444,18 @@ pub async fn git_github_pr_action(
     number: i64,
     action: String,
 ) -> Result<GitHubWorkItem, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let repo_for_cache = repo.clone();
+    let result: Result<GitHubWorkItem, String> = tauri::async_runtime::spawn_blocking(move || {
         git_github_pr_action_for(&expand_home(&cwd), &repo, number, &action)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if result.is_ok() {
+        if let Ok((owner, name)) = split_github_repo(&repo_for_cache) {
+            invalidate_work_items_cache(&format!("{owner}/{name}"));
+        }
+    }
+    result
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -547,15 +613,61 @@ pub(crate) fn parse_github_repositories(json: &str) -> Result<Vec<String>, Strin
     Ok(repos)
 }
 
-fn git_github_work_items_for(
-    root: &Path,
+/// Short-lived list cache: badge polling and the Inbox view re-issue the
+/// same queries inside one cycle, and each one is a `gh` subprocess.
+const WORK_ITEMS_TTL: Duration = Duration::from_secs(20);
+const WORK_ITEMS_MAX_ENTRIES: usize = 256;
+
+type WorkItemsSnapshot = (std::time::Instant, Vec<GitHubWorkItem>);
+type WorkItemsCache = std::sync::Mutex<std::collections::HashMap<String, WorkItemsSnapshot>>;
+
+fn work_items_cache() -> &'static WorkItemsCache {
+    static CACHE: std::sync::OnceLock<WorkItemsCache> = std::sync::OnceLock::new();
+    CACHE.get_or_init(Default::default)
+}
+
+fn work_items_cache_key(
     repo: &str,
     kind: &str,
     assigned_to_me: bool,
     state: &str,
     search: &str,
     limit: u32,
+) -> String {
+    format!("{repo}|{kind}|{assigned_to_me}|{state}|{search}|{limit}")
+}
+
+/// Drop cached lists for `repo` after a mutation (comment, merge, close…).
+pub(crate) fn invalidate_work_items_cache(repo: &str) {
+    let prefix = format!("{repo}|");
+    if let Ok(mut cache) = work_items_cache().lock() {
+        cache.retain(|key, _| !key.starts_with(&prefix));
+    }
+}
+
+struct WorkItemsQuery<'a> {
+    repo: &'a str,
+    kind: &'a str,
+    assigned_to_me: bool,
+    state: &'a str,
+    search: &'a str,
+    limit: u32,
+    updated_since: Option<&'a str>,
+}
+
+fn git_github_work_items_for(
+    root: &Path,
+    query: WorkItemsQuery<'_>,
 ) -> Result<Vec<GitHubWorkItem>, String> {
+    let WorkItemsQuery {
+        repo,
+        kind,
+        assigned_to_me,
+        state,
+        search,
+        limit,
+        updated_since,
+    } = query;
     let kind = kind.trim();
     if kind != "issue" && kind != "pr" {
         return Err("Unknown GitHub task kind".into());
@@ -567,7 +679,8 @@ fn git_github_work_items_for(
     } else {
         "open"
     };
-    let limit = limit.clamp(1, 100).to_string();
+    let limit_num = limit.clamp(1, 100);
+    let limit = limit_num.to_string();
     let fields = if kind == "pr" {
         "number,title,url,state,createdAt,updatedAt,labels,assignees,isDraft"
     } else {
@@ -590,13 +703,40 @@ fn git_github_work_items_for(
         args.push("@me".into());
     }
     let search = search.trim();
-    if !search.is_empty() {
+    // Badge polls only need what changed since the last cycle: fold the
+    // bound into the search GitHub already applies server-side.
+    let since = updated_since.map(str::trim).filter(|s| !s.is_empty());
+    let combined = match (search.is_empty(), since) {
+        (false, Some(since)) => format!("{search} updated:>={since}"),
+        (false, None) => search.to_string(),
+        (true, Some(since)) => format!("updated:>={since}"),
+        (true, None) => String::new(),
+    };
+    if !combined.is_empty() {
         args.push("--search".into());
-        args.push(search.to_string());
+        args.push(combined.clone());
+    }
+    let key = work_items_cache_key(&repo, kind, assigned_to_me, state, &combined, limit_num);
+    if let Ok(cache) = work_items_cache().lock() {
+        if let Some((at, items)) = cache.get(&key) {
+            if at.elapsed() < WORK_ITEMS_TTL {
+                return Ok(items.clone());
+            }
+        }
     }
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
     let json = gh_checked(root, &refs)?;
-    parse_github_work_items(&json, kind, &repo)
+    let items = parse_github_work_items(&json, kind, &repo)?;
+    if let Ok(mut cache) = work_items_cache().lock() {
+        if cache.len() >= WORK_ITEMS_MAX_ENTRIES {
+            cache.retain(|_, (at, _)| at.elapsed() < WORK_ITEMS_TTL);
+        }
+        if cache.len() >= WORK_ITEMS_MAX_ENTRIES {
+            cache.clear();
+        }
+        cache.insert(key, (std::time::Instant::now(), items.clone()));
+    }
+    Ok(items)
 }
 
 fn git_github_work_item_for(
@@ -1842,6 +1982,53 @@ fn gh_checked(root: &Path, args: &[&str]) -> Result<String, String> {
     gh_run(root, args, false)
 }
 
+/// A hung `gh` must never wedge a `spawn_blocking` thread forever: inbox
+/// polling re-invokes these commands every cycle.
+const GH_TIMEOUT: Duration = Duration::from_secs(25);
+
+fn kill_pid(pid: u32) {
+    if pid <= 1 {
+        return;
+    }
+    #[cfg(unix)]
+    {
+        // SIGKILL the hung child; the reaper thread then collects it.
+        unsafe {
+            libc::kill(pid as i32, libc::SIGKILL);
+        }
+    }
+}
+
+/// Spawn and reap with a deadline: a hung child is killed instead of
+/// wedging the caller (inbox polling re-invokes `gh` every cycle).
+fn run_with_timeout(
+    mut cmd: std::process::Command,
+    timeout: Duration,
+) -> std::io::Result<std::process::Output> {
+    // wait_with_output only sees what it can read: without pipes a
+    // successful `gh` call comes back with empty stdout/stderr and reads
+    // as "gh returned no output".
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null());
+    let child = cmd.spawn()?;
+    let pid = child.id();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+    match rx.recv_timeout(timeout) {
+        Ok(result) => result,
+        Err(_) => {
+            kill_pid(pid);
+            Err(std::io::Error::new(
+                ErrorKind::TimedOut,
+                "gh timed out after 25s",
+            ))
+        }
+    }
+}
+
 fn gh_run(root: &Path, args: &[&str], allow_empty: bool) -> Result<String, String> {
     let program = crate::harness::resolve_gui_binary("gh")
         .ok_or_else(|| "GitHub CLI (`gh`) is not installed.".to_string())?;
@@ -1853,7 +2040,7 @@ fn gh_run(root: &Path, args: &[&str], allow_empty: bool) -> Result<String, Strin
         .env("GH_PAGER", "cat")
         .env("GIT_PAGER", "cat");
     crate::harness::apply_gui_env(&mut cmd);
-    let output = cmd.output().map_err(|error| {
+    let output = run_with_timeout(cmd, GH_TIMEOUT).map_err(|error| {
         if error.kind() == ErrorKind::NotFound {
             "GitHub CLI (`gh`) is not installed.".to_string()
         } else {
@@ -1879,5 +2066,53 @@ fn gh_run(root: &Path, args: &[&str], allow_empty: bool) -> Result<String, Strin
     } else {
         format!("gh {} failed", args.join(" "))
     };
+    if is_rate_limit_error(&detail) {
+        note_rate_limit();
+        return Err(format!(
+            "GitHub rate limit exceeded, retry in ~60s: {detail}"
+        ));
+    }
     Err(detail)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_with_timeout_collects_fast_commands() {
+        let cmd = std::process::Command::new("/bin/true");
+        let output = run_with_timeout(cmd, Duration::from_secs(5)).unwrap();
+        assert!(output.status.success());
+    }
+
+    #[test]
+    fn run_with_timeout_kills_hung_commands() {
+        let mut cmd = std::process::Command::new("/bin/sleep");
+        cmd.arg("30");
+        let error = run_with_timeout(cmd, Duration::from_millis(200)).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::TimedOut);
+    }
+
+    #[test]
+    fn detects_rate_limit_errors() {
+        assert!(is_rate_limit_error(
+            "HTTP 403: API rate limit exceeded for user ID 1."
+        ));
+        assert!(is_rate_limit_error(
+            "GraphQL: secondary rate limit, please retry"
+        ));
+        assert!(!is_rate_limit_error("Not Found"));
+        assert!(!is_rate_limit_error("gh returned no output"));
+    }
+
+    #[test]
+    fn rate_limit_backoff_expires() {
+        note_rate_limit();
+        let (limited, secs) = rate_limit_remaining();
+        assert!(limited);
+        assert!((1..=60).contains(&secs));
+        note_rate_limit_until(std::time::Instant::now() - Duration::from_secs(1));
+        assert_eq!(rate_limit_remaining(), (false, 0));
+    }
 }

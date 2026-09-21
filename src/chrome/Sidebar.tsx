@@ -38,6 +38,10 @@ import {
 } from "../lib/appearance";
 import { type GitFileDiffKind, type GitHistoryCommit } from "../lib/fs";
 import { MOD } from "../lib/platform";
+import {
+  useExitAnimation,
+  useExperimentalAnimations,
+} from "../hooks/useExitAnimation";
 import { getIntlLocale } from "../lib/locale";
 import { resolveModel } from "../lib/models";
 import type { OpenFileFn } from "../lib/search";
@@ -556,6 +560,33 @@ function SidebarComponent({
     !notesActive &&
     !settingsOpen &&
     inProject;
+  // Smooth enter/exit behind the experimental-animations flag: hold the
+  // panel mounted while the outro plays instead of unmounting instantly.
+  const sidebarAnimations = useExperimentalAnimations();
+  const [sidebarHeld, setSidebarHeld] = useState(sidebarVisible);
+  const {
+    closing: sidebarClosing,
+    requestClose: requestSidebarClose,
+    handleAnimationEnd: handleSidebarAnimationEnd,
+    cancelClose: cancelSidebarClose,
+  } = useExitAnimation({
+    enabled: sidebarAnimations,
+    durationMs: 200,
+    onExit: () => setSidebarHeld(false),
+  });
+  useEffect(() => {
+    if (sidebarVisible) {
+      cancelSidebarClose();
+      setSidebarHeld(true);
+    } else if (sidebarHeld) {
+      requestSidebarClose();
+    }
+  }, [
+    sidebarVisible,
+    sidebarHeld,
+    requestSidebarClose,
+    cancelSidebarClose,
+  ]);
   const gitStatuses = useGitFileStatuses(gitRoot, open && tab === "files");
   const changeStats = useProjectDiffStats(gitRoot, open);
 
@@ -1180,7 +1211,14 @@ function SidebarComponent({
   const sidebarContent = (
     <aside
       ref={resize.setPaneRef}
-      className="body-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-stroke"
+      onAnimationEnd={sidebarClosing ? handleSidebarAnimationEnd : undefined}
+      className={`body-glass relative flex h-full min-h-0 shrink-0 flex-col border-r border-stroke${
+        sidebarAnimations
+          ? sidebarClosing
+            ? " sidebar-anim-out"
+            : " sidebar-anim-in"
+          : ""
+      }`}
     >
       {railVisible ? (
         <>
@@ -1723,7 +1761,7 @@ function SidebarComponent({
           onDismissUpdate={onDismissUpdate}
         />
       ) : null}
-      {sidebarVisible ? sidebarContent : null}
+      {sidebarVisible || sidebarHeld ? sidebarContent : null}
     </div>
   );
 }

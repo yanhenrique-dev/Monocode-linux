@@ -133,6 +133,8 @@ export type GithubWorkItemQuery = {
   assignedToMe: boolean;
   state: "open" | "all";
   search: string;
+  /** ISO bound folded into `updated:>=` server-side; badge polls pass it. */
+  updatedSince?: string;
 };
 
 export type InboxQuery = Omit<GithubWorkItemQuery, "kind"> & {
@@ -162,8 +164,12 @@ type InboxListCache = InboxListResult & {
   fetchedAt: number;
 };
 
-let inboxListCache: InboxListCache | null = null;
+/** Per-query list cache: filter/source switches keep their own entry. */
+const inboxListCaches = new Map<string, InboxListCache>();
 const inboxListInflight = new Map<string, Promise<InboxListResult>>();
+/** Bumped on every invalidation: in-flight fetches from before the bump
+ * must not overwrite the snapshot with pre-mutation data. */
+let inboxListGeneration = 0;
 const repoByPath = new Map<string, string>();
 const repositoriesByPath = new Map<string, string[]>();
 const workItemByKey = new Map<string, GithubWorkItem>();
@@ -176,7 +182,7 @@ const prDiffInflight = new Map<string, Promise<GithubPrDiff>>();
 
 export function clearInboxCache() {
   clearKnownInboxItems();
-  inboxListCache = null;
+  inboxListCaches.clear();
   inboxListInflight.clear();
   repoByPath.clear();
   repositoriesByPath.clear();
@@ -207,8 +213,9 @@ export function peekInboxList(
   query: InboxQuery,
 ): InboxListResult | null {
   const key = inboxListCacheKey(projects, query);
-  if (inboxListCache?.key !== key) return null;
-  return { items: inboxListCache.items, errors: inboxListCache.errors };
+  const cached = inboxListCaches.get(key);
+  if (!cached) return null;
+  return { items: cached.items, errors: cached.errors };
 }
 
 export function peekInboxItems(
@@ -224,10 +231,8 @@ export function inboxListIsFresh(
   now = Date.now(),
 ): boolean {
   const key = inboxListCacheKey(projects, query);
-  return (
-    inboxListCache?.key === key &&
-    now - inboxListCache.fetchedAt < INBOX_CACHE_FRESH_MS
-  );
+  const cached = inboxListCaches.get(key);
+  return cached !== undefined && now - cached.fetchedAt < INBOX_CACHE_FRESH_MS;
 }
 
 export function githubStatus(): Promise<GithubStatus> {
@@ -273,6 +278,7 @@ export function listGithubWorkItems(
     state: query.state,
     search: query.search.trim(),
     limit: query.state === "all" ? INBOX_ALL_LIMIT : undefined,
+    updatedSince: query.updatedSince?.trim() || undefined,
   });
 }
 
@@ -455,6 +461,37 @@ export async function githubWorkItemThread(
   return promise;
 }
 
+/** Fired on `window` after a GitHub mutation so list + detail refetch. */
+export const GITHUB_CHANGE_EVENT = "monocode:github-change";
+
+export function notifyGithubChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(GITHUB_CHANGE_EVENT));
+}
+
+/** Drop every cached read for one item: thread, details, diff, merge state. */
+export function invalidateGithubItemCaches(
+  repo: string,
+  kind: GithubTaskKind,
+  number: number,
+) {
+  const key = detailsCacheKey(repo, kind, number);
+  detailsByKey.delete(key);
+  threadByKey.delete(key);
+  threadInflight.delete(key);
+  workItemByKey.delete(workItemLookupKey(repo, kind, number));
+  workItemInflight.delete(workItemLookupKey(repo, kind, number));
+  if (kind === "pr") {
+    prDiffByKey.delete(prDiffCacheKey(repo, number, false));
+    prDiffByKey.delete(prDiffCacheKey(repo, number, true));
+    mergeInfoByKey.delete(mergeInfoKey(repo, number));
+  }
+  // The mutation moves updatedAt/state: every list snapshot is stale.
+  inboxListGeneration += 1;
+  inboxListCaches.clear();
+  inboxListInflight.clear();
+}
+
 export async function githubWorkItemComment(
   cwd: string,
   repo: string,
@@ -471,10 +508,9 @@ export async function githubWorkItemComment(
     body: body.trim(),
     inReplyTo: options?.inReplyTo?.trim() ?? "",
   });
-  const key = detailsCacheKey(repo, kind, number);
-  threadByKey.delete(key);
-  threadInflight.delete(key);
+  invalidateGithubItemCaches(repo, kind, number);
   recordInboxSelfActivity({ provider: "github", kind, number, repo });
+  notifyGithubChanged();
   return url;
 }
 
@@ -500,8 +536,13 @@ export async function githubPrMergeInfo(
   cwd: string,
   repo: string,
   number: number,
+  options?: { force?: boolean },
 ): Promise<GithubPrMergeInfo> {
   const key = mergeInfoKey(repo, number);
+  if (options?.force) {
+    mergeInfoByKey.delete(key);
+    mergeInfoInflight.delete(key);
+  }
   const cached = mergeInfoByKey.get(key);
   if (cached) return cached;
   const inflight = mergeInfoInflight.get(key);
@@ -569,20 +610,12 @@ export async function githubPrAction(
   });
   const key = workItemLookupKey(repo, "pr", number);
   workItemByKey.set(key, item);
-  if (inboxListCache) {
-    inboxListCache = {
-      ...inboxListCache,
-      items: inboxListCache.items.map((cached) =>
-        cached.provider === "github" &&
-        cached.kind === "pr" &&
-        cached.repo.toLowerCase() === repo.trim().toLowerCase() &&
-        cached.number === number
-          ? { ...cached, ...item }
-          : cached,
-      ),
-    };
-  }
+  // Backend re-views the PR, so this snapshot is fresh — but every cached
+  // read around it (thread, details, diff, merge state, lists) is stale.
+  invalidateGithubItemCaches(repo, "pr", number);
+  workItemByKey.set(key, item);
   recordInboxSelfActivity({ provider: "github", kind: "pr", repo, number });
+  notifyGithubChanged();
   return item;
 }
 
@@ -692,21 +725,58 @@ export async function githubPrDiff(
   return promise;
 }
 
+/** Full refetch cadence for incremental (`since`) polls: closed items only
+ * drop out of server responses, so the merged snapshot refreshes fully here. */
+const INCREMENTAL_FULL_REFRESH_MS = 5 * 60_000;
+
+function mergeInboxListItems(
+  previous: InboxItem[],
+  delta: InboxItem[],
+): InboxItem[] {
+  if (delta.length === 0) return previous;
+  const byKey = new Map(previous.map((item) => [inboxItemKey(item), item]));
+  for (const item of delta) byKey.set(inboxItemKey(item), item);
+  // Map order is insertion order: re-sort so merged snapshots keep the
+  // updatedAt-descending contract (InboxView slices the first page).
+  return sortInboxItems([...byKey.values()]);
+}
+
 export async function listInboxItems(
   projects: readonly { path: string }[],
   query: InboxQuery,
-  options?: { force?: boolean },
+  options?: { force?: boolean; since?: string },
 ): Promise<InboxListResult> {
   const key = inboxListCacheKey(projects, query);
-  if (!options?.force && inboxListIsFresh(projects, query)) {
+  if (
+    !options?.force &&
+    !options?.since &&
+    inboxListIsFresh(projects, query)
+  ) {
     return peekInboxList(projects, query) ?? { items: [], errors: {} };
   }
   const pending = inboxListInflight.get(key);
   if (pending) return pending;
-  const promise = fetchInboxItems(projects, query)
+  const prev = inboxListCaches.get(key);
+  // Incremental polls merge server-side deltas into the snapshot; fall back
+  // to a full fetch when there is nothing to merge into or it is too old.
+  const since =
+    options?.since &&
+    !options?.force &&
+    prev &&
+    Date.now() - prev.fetchedAt < INCREMENTAL_FULL_REFRESH_MS
+      ? options.since
+      : undefined;
+  const generation = inboxListGeneration;
+  const promise = fetchInboxItems(projects, { ...query, updatedSince: since })
     .then((result) => {
-      inboxListCache = { key, ...result, fetchedAt: Date.now() };
-      return result;
+      // A mutation invalidated mid-flight: drop this pre-mutation snapshot
+      // instead of painting stale state until the next poll.
+      if (generation !== inboxListGeneration) return peekInboxList(projects, query) ?? result;
+      const items =
+        since && prev ? mergeInboxListItems(prev.items, result.items) : result.items;
+      const merged = { items, errors: result.errors };
+      inboxListCaches.set(key, { key, ...merged, fetchedAt: Date.now() });
+      return merged;
     })
     .finally(() => {
       if (inboxListInflight.get(key) === promise) inboxListInflight.delete(key);

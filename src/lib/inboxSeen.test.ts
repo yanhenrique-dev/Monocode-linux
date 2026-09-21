@@ -189,6 +189,68 @@ describe("inbox seen items", () => {
     expect(inboxSeenIsSeeded()).toBe(true);
   });
 
+  it("prunes read marks past the cap, keeping the newest stamps", () => {
+    const entries = Array.from({ length: 2100 }, (_, index) =>
+      entry(
+        `github:acme/web:issue:${index}`,
+        new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      ),
+    );
+    seedInboxSeenIfNeeded(entries);
+    const raw = JSON.parse(localStorage.getItem(KEY)!);
+    expect(Object.keys(raw.items)).toHaveLength(2000);
+    // Newest stamps survive; the oldest evicted entry reads unseen again.
+    expect(
+      isInboxEntryUnseen(
+        entry(
+          "github:acme/web:issue:2099",
+          new Date(Date.UTC(2026, 0, 1, 0, 0, 2099)).toISOString(),
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      isInboxEntryUnseen(
+        entry(
+          "github:acme/web:issue:0",
+          new Date(Date.UTC(2026, 0, 1, 0, 0, 0)).toISOString(),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("leaves read marks unseen when the store write fails", () => {
+    seedInboxSeenIfNeeded([entry("github:acme/web:issue:1", "2026-08-27T10:00:00Z")]);
+    // Reads keep working while writes fail (quota): snapshot first, since
+    // delegating getItem to the throwing mock would recurse into itself.
+    const snapshot = localStorage.getItem(KEY);
+    const throwing = {
+      getItem: (key: string) => (key === KEY ? snapshot : null),
+      setItem: () => {
+        throw new Error("quota");
+      },
+      removeItem: () => {},
+      clear: () => {},
+      key: () => null,
+      length: 0,
+    };
+    Object.defineProperty(globalThis, "localStorage", {
+      value: throwing,
+      configurable: true,
+    });
+    try {
+      expect(
+        markInboxItemsSeen([entry("github:acme/web:issue:2", "2026-08-27T11:00:00Z")]),
+      ).toBe(false);
+      // The rejected mark must not stick: the item stays unseen so the
+      // error surfaces and retry can still land it.
+      expect(
+        inboxHasUnseenItems([entry("github:acme/web:issue:2", "2026-08-27T11:00:00Z")]),
+      ).toBe(true);
+    } finally {
+      mockLocalStorage();
+    }
+  });
+
   it("does not treat existing items as new if a card is opened before seed", () => {
     markInboxItemSeen(entry("linear:ENG-2", "2026-08-27T10:01:00Z"));
     expect(inboxSeenIsSeeded()).toBe(false);

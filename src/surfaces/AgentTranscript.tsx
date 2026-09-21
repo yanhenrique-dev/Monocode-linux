@@ -77,6 +77,7 @@ import {
   type TurnMetrics,
 } from "../lib/session";
 import { HarnessIcon } from "../chrome/HarnessIcon";
+import { useExperimentalAnimations } from "../hooks/useExitAnimation";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useTranscriptLayout } from "../hooks/useTranscriptLayout";
 import { useTranscriptAnchor } from "../hooks/useTranscriptAnchor";
@@ -1499,6 +1500,7 @@ function TurnRow({
   folded: boolean;
   children: ReactNode | (() => ReactNode);
 }) {
+  const animated = useExperimentalAnimations();
   const [foldState, setFoldState] = useState<
     "open" | "opening" | "closing" | "closed"
   >(folded ? "closed" : "open");
@@ -1506,20 +1508,23 @@ function TurnRow({
   useLayoutEffect(() => {
     setFoldState((current) => {
       if (folded) {
-        return current === "closed" || current === "closing"
-          ? current
-          : "closing";
+        if (current === "closed") return current;
+        // Without motion the fold snaps shut; no outro to wait out.
+        if (!animated) return "closed";
+        return current === "closing" ? current : "closing";
       }
-      return current === "open" || current === "opening" ? current : "opening";
+      if (current === "open") return current;
+      if (!animated) return "open";
+      return current === "opening" ? current : "opening";
     });
-  }, [folded]);
+  }, [folded, animated]);
 
   useEffect(() => {
     if (foldState !== "opening" && foldState !== "closing") return;
     // Hidden tabs and reduced-motion styles may never fire animationend.
     const timer = window.setTimeout(() => {
       setFoldState(folded ? "closed" : "open");
-    }, 350);
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [foldState, folded]);
 
@@ -1530,6 +1535,7 @@ function TurnRow({
     <div
       className="zen-fold-item"
       data-fold-state={foldState}
+      data-fold-animated={animated ? "true" : "false"}
       inert={folded}
       onAnimationEnd={(event) => {
         if (event.target !== event.currentTarget) return;

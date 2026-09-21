@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { setGrabbing, suppressTextSelection } from "../lib/drag";
 import {
@@ -42,6 +43,7 @@ import {
   type ComposerTurnOptions,
 } from "../lib/session";
 import { FilePane } from "./FilePane";
+import { useExperimentalAnimations } from "../hooks/useExitAnimation";
 import { SessionPane } from "./SessionPane";
 import type { SessionFolderTarget } from "../lib/sessionFolders";
 import type { Worktree } from "../lib/worktrees";
@@ -263,6 +265,57 @@ function PaneTreeComponent({
   const sashes = layoutSashes(tree);
   const inSplit = leaves.length > 1;
 
+  // Smooth file-pane exit: hold a just-closed pane mounted while its outro
+  // plays, then drop it. Keyed by leaf so splits animate independently.
+  const fileAnimations = useExperimentalAnimations();
+  const [heldFilePanes, setHeldFilePanes] = useState<
+    Record<string, EditorPane>
+  >({});
+  const prevEditorPanes = useRef<Map<string, EditorPane>>(new Map());
+  const heldTimers = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const current = new Map(editorPanes.map((pane) => [pane.id, pane]));
+    const leafIds = new Set(leaves.map((leaf) => leaf.id));
+    const disappeared = [...prevEditorPanes.current].filter(
+      ([id]) => !current.has(id) && leafIds.has(id),
+    );
+    prevEditorPanes.current = current;
+    if (!fileAnimations || disappeared.length === 0) return;
+    setHeldFilePanes((prev) => {
+      const next = { ...prev };
+      for (const [id, pane] of disappeared) {
+        if (!current.has(id)) next[id] = pane;
+      }
+      return next;
+    });
+    for (const [id] of disappeared) {
+      window.clearTimeout(heldTimers.current[id]);
+      heldTimers.current[id] = window.setTimeout(() => {
+        setHeldFilePanes((prev) => {
+          if (!prev[id]) return prev;
+          const { [id]: _removed, ...rest } = prev;
+          return rest;
+        });
+      }, 200);
+    }
+  }, [editorPanes, leaves, fileAnimations]);
+  useEffect(
+    () => () => {
+      for (const timer of Object.values(heldTimers.current)) {
+        window.clearTimeout(timer);
+      }
+    },
+    [],
+  );
+  const dropHeldFilePane = useCallback((id: string) => {
+    window.clearTimeout(heldTimers.current[id]);
+    setHeldFilePanes((prev) => {
+      if (!prev[id]) return prev;
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
   const startPaneDrag = useCallback(
     (fromId: string, event: ReactPointerEvent<HTMLElement>) => {
       if (event.button !== 0) return;
@@ -384,27 +437,36 @@ function PaneTreeComponent({
             {drop && drop.overId === leaf.id && drop.fromId !== leaf.id ? (
               <PaneDropHint edge={drop.edge} />
             ) : null}
-            {editorPane ? (
-              <FilePane
-                pane={editorPane}
-                focused={focusedId === editorPane.id}
-                dirtyFileIds={dirtyFileIds}
-                fileErrorCounts={fileErrorCounts}
-                sessions={sessions}
-                onFocus={onFocus}
-                onSelectFile={onSelectFile}
-                onCloseFile={onCloseFile}
-                onCloseOtherFiles={onCloseOtherFiles}
-                onReorderFiles={onReorderFiles}
-                onDirtyChange={onFileDirtyChange}
-                onErrorCountChange={onFileErrorCountChange}
-                onOpenFile={onOpenFile}
-                onUpdatePlan={onUpdatePlan}
-                onBuildPlan={onBuildPlan}
-                editorNavigation={editorNavigation}
-                onPaneDragStart={onPaneDragStart}
-                onTerminalMetaChange={onTerminalMetaChange}
-              />
+            {editorPane ?? heldFilePanes[leaf.id] ? (
+              <FilePanePresence
+                pane={(editorPane ?? heldFilePanes[leaf.id])!}
+                exiting={!editorPane}
+                animating={fileAnimations}
+                onExitEnd={() => dropHeldFilePane(leaf.id)}
+              >
+                {(pane) => (
+                  <FilePane
+                    pane={pane}
+                    focused={focusedId === pane.id}
+                    dirtyFileIds={dirtyFileIds}
+                    fileErrorCounts={fileErrorCounts}
+                    sessions={sessions}
+                    onFocus={onFocus}
+                    onSelectFile={onSelectFile}
+                    onCloseFile={onCloseFile}
+                    onCloseOtherFiles={onCloseOtherFiles}
+                    onReorderFiles={onReorderFiles}
+                    onDirtyChange={onFileDirtyChange}
+                    onErrorCountChange={onFileErrorCountChange}
+                    onOpenFile={onOpenFile}
+                    onUpdatePlan={onUpdatePlan}
+                    onBuildPlan={onBuildPlan}
+                    editorNavigation={editorNavigation}
+                    onPaneDragStart={onPaneDragStart}
+                    onTerminalMetaChange={onTerminalMetaChange}
+                  />
+                )}
+              </FilePanePresence>
             ) : session ? (
               <SessionPane
                 session={session}
@@ -495,6 +557,37 @@ export const PaneTree = memo(
   PaneTreeComponent,
   (previous, next) => !previous.visible && !next.visible,
 );
+
+/** Enter/exit wrapper for the file pane: plays the sidebar language on mount
+ * and holds a just-closed pane through its outro. */
+function FilePanePresence({
+  pane,
+  exiting,
+  animating,
+  onExitEnd,
+  children,
+}: {
+  pane: EditorPane;
+  exiting: boolean;
+  animating: boolean;
+  onExitEnd: () => void;
+  children: (pane: EditorPane) => ReactNode;
+}) {
+  if (!animating) return <>{children(pane)}</>;
+  return (
+    <div
+      className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${
+        exiting ? "sidebar-anim-out" : "sidebar-anim-in"
+      }`}
+      onAnimationEnd={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (exiting) onExitEnd();
+      }}
+    >
+      {children(pane)}
+    </div>
+  );
+}
 
 function PaneDropHint({ edge }: { edge: PaneEdge }) {
   const wash =

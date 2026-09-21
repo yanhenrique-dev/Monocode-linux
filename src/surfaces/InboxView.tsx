@@ -49,6 +49,7 @@ import { useDragResize } from "../hooks/useDragResize";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useTabGroupLogos } from "../hooks/useTabGroupLogos";
 import {
+  GITHUB_CHANGE_EVENT,
   githubStatus,
   githubPrDiff,
   githubPrAction,
@@ -487,6 +488,12 @@ export function InboxView({
     const onChange = () => setRefresh((value) => value + 1);
     window.addEventListener(GITLAB_CHANGE_EVENT, onChange);
     return () => window.removeEventListener(GITLAB_CHANGE_EVENT, onChange);
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => setRefresh((value) => value + 1);
+    window.addEventListener(GITHUB_CHANGE_EVENT, onChange);
+    return () => window.removeEventListener(GITHUB_CHANGE_EVENT, onChange);
   }, []);
 
   // The mount read does the real work: opening Settings unmounts this view, so
@@ -1656,6 +1663,14 @@ export function GithubPrActions({
           ? "Merge queued or auto-merge enabled."
           : null,
       );
+      // Merge state changed server-side: refetch permission/conflict state
+      // instead of showing the pre-action snapshot.
+      setMergeInfo(null);
+      void githubPrMergeInfo(item.projectPath, item.repo, item.number, {
+        force: true,
+      })
+        .then((info) => setMergeInfo(info))
+        .catch(() => {});
       onChange?.({
         ...item,
         ...next,

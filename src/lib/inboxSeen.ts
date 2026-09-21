@@ -20,6 +20,10 @@ type Listener = () => void;
 
 const listeners = new Set<Listener>();
 const knownItems = new Map<string, InboxSeenEntry & { projectPaths: string[] }>();
+/** Cap for the in-memory activity snapshot shared across views. */
+const MAX_KNOWN_ITEMS = 5000;
+/** Cap for persisted read marks; the oldest stamps go first. */
+const MAX_SEEN_ITEMS = 2000;
 
 /** Share fetched activity across the Inbox view, background poll, and rail menu. */
 export function rememberInboxItems(entries: readonly (InboxSeenEntry & { projectPath: string })[]) {
@@ -36,6 +40,11 @@ export function rememberInboxItems(entries: readonly (InboxSeenEntry & { project
       projectPaths: knownPath ? projectPaths : [...projectPaths, entry.projectPath],
     });
     changed = true;
+  }
+  while (knownItems.size > MAX_KNOWN_ITEMS) {
+    const oldest = knownItems.keys().next();
+    if (oldest.done) break;
+    knownItems.delete(oldest.value);
   }
   if (changed) notifyInboxSeen();
 }
@@ -90,13 +99,28 @@ function loadInboxSeenStore(): SeenStore {
   }
 }
 
+/** Drop the oldest read marks past the cap, keeping the newest stamps. */
+function pruneSeenMap(items: SeenMap): SeenMap {
+  const keys = Object.keys(items);
+  if (keys.length <= MAX_SEEN_ITEMS) return items;
+  const ordered = keys.sort((a, b) => (items[a] ?? 0) - (items[b] ?? 0));
+  const next: SeenMap = {};
+  for (const key of ordered.slice(keys.length - MAX_SEEN_ITEMS)) {
+    next[key] = items[key]!;
+  }
+  return next;
+}
+
 function saveInboxSeenStore(store: SeenStore): boolean {
+  const pruned = { ...store, items: pruneSeenMap(store.items) };
   try {
     localStorage.setItem(
       KEY,
-      JSON.stringify({ seeded: store.seeded, items: store.items }),
+      JSON.stringify({ seeded: pruned.seeded, items: pruned.items }),
     );
   } catch {
+    // A rejected write leaves state untouched: the item stays unseen, the
+    // caller reports the error, and retry can still land the mark.
     return false;
   }
   try {

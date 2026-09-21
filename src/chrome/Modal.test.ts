@@ -1,7 +1,9 @@
-import { createElement } from "react";
+// @vitest-environment happy-dom
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-import { ModalPanel } from "./Modal";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Modal, ModalPanel } from "./Modal";
 
 describe("ModalPanel", () => {
   it("names the dialog and close action", () => {
@@ -20,6 +22,84 @@ describe("ModalPanel", () => {
     expect(markup).toContain("A reusable shell");
     expect(markup).toContain("Body");
     expect(markup).toContain('aria-label="Close"');
+  });
+
+  it("plays the panel outro before closing with animations on", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    localStorage.setItem("monocode.experimentalAnimations", "1");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root: Root = createRoot(container);
+    try {
+      const onClose = vi.fn();
+      await act(async () => {
+        root.render(
+          createElement(Modal, {
+            title: "Example",
+            onClose,
+            children: "Body",
+          }),
+        );
+      });
+
+      const closeButton = document.body.querySelector(
+        'button[aria-label="Close"]',
+      ) as HTMLButtonElement;
+      await act(async () => closeButton.click());
+
+      const closing = document.body.querySelector(".modal-panel-closing");
+      expect(closing).not.toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
+
+      act(() => {
+        closing!.dispatchEvent(
+          new AnimationEvent("animationend", { bubbles: true }),
+        );
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+      document.body.innerHTML = "";
+      localStorage.removeItem("monocode.experimentalAnimations");
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("closes immediately with animations off", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    localStorage.setItem("monocode.experimentalAnimations", "0");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root: Root = createRoot(container);
+    try {
+      const onClose = vi.fn();
+      await act(async () => {
+        root.render(
+          createElement(Modal, {
+            title: "Example",
+            onClose,
+            children: "Body",
+          }),
+        );
+      });
+
+      const closeButton = document.body.querySelector(
+        'button[aria-label="Close"]',
+      ) as HTMLButtonElement;
+      await act(async () => closeButton.click());
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(
+        document.body.querySelector(".modal-panel-closing"),
+      ).toBeNull();
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+      document.body.innerHTML = "";
+      localStorage.removeItem("monocode.experimentalAnimations");
+      vi.unstubAllGlobals();
+    }
   });
 
   it("can preserve an accessible title with a minimal visual header", () => {
