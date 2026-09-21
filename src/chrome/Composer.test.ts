@@ -301,6 +301,38 @@ describe("Composer worktree drafts", () => {
     expect(statuses.some((text) => text.includes("running turn"))).toBe(true);
   });
 
+  it("renders the queued-message card above the input when waiting", async () => {
+    const props = {
+      harness: "claude" as const,
+      model: "claude-sonnet",
+      runtimeMode: "supervised" as const,
+      cwd: "/repo",
+      executionCwd: "/repo",
+      hideProjectPicker: true,
+      onFocus: vi.fn(),
+      onCwdChange: vi.fn(),
+      onModelChange: vi.fn(),
+      onRuntimeModeChange: vi.fn(),
+      onSubmit: vi.fn(),
+      busy: true,
+      queuedMessages: [
+        { id: "q1", text: "Wait for me", attachments: [] },
+      ],
+    };
+    await act(async () => root.render(createElement(Composer, props)));
+    const card = container.querySelector("[data-message-queue-card]");
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toContain("Wait for me");
+    // The card must sit above the input, not below it: compare DOM order
+    // against the textarea so a layout regression fails here.
+    const textarea = container.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect(
+      card!.compareDocumentPosition(textarea!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("locks a started session to its worktree while keeping its branch editable", async () => {
     await act(async () =>
       root.render(

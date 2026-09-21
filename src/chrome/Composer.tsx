@@ -694,28 +694,17 @@ export function Composer({
     [],
   );
 
-  // Transient, self-clearing note for a follow-up steered into the running
-  // turn: without it the only evidence is the missing queue card.
+  // Note for a follow-up steered into the running turn: without it the
+  // only evidence is the missing queue card. It stays until the turn ends —
+  // a 2s timeout erased it while the agent was still running, reading as a
+  // vanished message.
   const [submitNotice, setSubmitNotice] = useState<string | null>(null);
-  const submitNoticeTimer = useRef<number | null>(null);
   const showSubmitNotice = useCallback((message: string) => {
-    if (submitNoticeTimer.current != null) {
-      window.clearTimeout(submitNoticeTimer.current);
-    }
     setSubmitNotice(message);
-    submitNoticeTimer.current = window.setTimeout(() => {
-      submitNoticeTimer.current = null;
-      setSubmitNotice(null);
-    }, 2000);
   }, []);
-  useEffect(
-    () => () => {
-      if (submitNoticeTimer.current != null) {
-        window.clearTimeout(submitNoticeTimer.current);
-      }
-    },
-    [],
-  );
+  useEffect(() => {
+    if (!busy) setSubmitNotice(null);
+  }, [busy]);
 
   const addAttachments = useCallback(
     (incoming: Attachment[]) => {
