@@ -555,6 +555,7 @@ const en = {
   "settings.appearance.interface_scale.description":
     "Zoom the whole interface. You can also use Ctrl+=, Ctrl+-, and Ctrl+0 (Cmd on macOS).",
   "settings.appearance.interface_scale.slider": "Interface scale",
+  "settings.appearance.interface_scale.reset": "Reset to 100%",
   "settings.appearance.interface_blur.open_performance": "Go to Performance",
   "settings.appearance.chat_background.title": "Chat background",
   "settings.appearance.chat_background.description":
@@ -1285,6 +1286,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.interface_scale.description":
     "Amplia toda a interface. Use também Ctrl+=, Ctrl+- e Ctrl+0 (Cmd no macOS).",
   "settings.appearance.interface_scale.slider": "Escala da interface",
+  "settings.appearance.interface_scale.reset": "Redefinir para 100%",
   "settings.appearance.interface_blur.open_performance": "Ir para Performance",
   "settings.appearance.chat_background.title": "Fundo do chat",
   "settings.appearance.chat_background.description":

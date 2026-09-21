@@ -2399,17 +2399,29 @@ function AppearancePage({
           label={t("settings.appearance.interface_scale.label")}
           description={t("settings.appearance.interface_scale.description")}
         >
-          <Slider
-            label={t("settings.appearance.interface_scale.slider")}
-            value={Math.round(appearance.uiScale * 100)}
-            display={`${Math.round(appearance.uiScale * 100)}%`}
-            min={Math.round(UI_SCALE_MIN * 100)}
-            max={Math.round(UI_SCALE_MAX * 100)}
-            step={10}
-            onPreview={appearance.previewUiScale}
-            onCommit={appearance.onUiScale}
-            onCancel={appearance.revertAppearanceDrafts}
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Slider
+              label={t("settings.appearance.interface_scale.slider")}
+              value={Math.round(appearance.uiScale * 100)}
+              display={`${Math.round(appearance.uiScale * 100)}%`}
+              min={Math.round(UI_SCALE_MIN * 100)}
+              max={Math.round(UI_SCALE_MAX * 100)}
+              step={10}
+              onPreview={appearance.previewUiScale}
+              onCommit={appearance.onUiScale}
+              onCancel={appearance.revertAppearanceDrafts}
+            />
+            {Math.round(appearance.uiScale * 100) !== 100 ? (
+              <button
+                type="button"
+                title={t("settings.appearance.interface_scale.reset")}
+                onClick={() => appearance.onUiScale(100)}
+                className="h-7 shrink-0 rounded-md border border-content/12 bg-content/8 px-2 text-[11px] text-content/70 hover:bg-content/12 hover:text-content"
+              >
+                {t("settings.appearance.interface_scale.reset")}
+              </button>
+            ) : null}
+          </div>
         </Row>
       </Group>
     </>
