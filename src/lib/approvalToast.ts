@@ -1,4 +1,3 @@
-import { leafIds, type WorkspaceTab } from "./layout";
 import type { Block, Session } from "./session";
 import { toolCallLabel } from "./toolCallLabel";
 
@@ -39,25 +38,16 @@ export function pendingApprovalForSession(
   return null;
 }
 
-/** True when the conversation pane for this session is focused and active. */
-export function isSessionConversationFocused(
-  sessionId: string,
-  activeTabId: string,
-  tabs: WorkspaceTab[],
-  composerFocused: boolean,
-): boolean {
-  const tab = tabs.find((entry) => entry.id === activeTabId);
-  if (!tab) return false;
-  if (!leafIds(tab.layout).includes(sessionId)) return false;
-  if (tab.focusedId !== sessionId) return false;
-  return composerFocused;
-}
-
-export function hiddenApprovalNotices(
+/**
+ * Every session with a pending approval or question, including the focused
+ * one. The toast used to stay hidden while its conversation was focused, on
+ * the assumption the inline Allow/Deny row speaks for itself — but the row
+ * is easy to miss (out of view, subtle), so the request looked like nothing
+ * happened until the user switched sessions. The toast is the prominent
+ * surface everywhere now; it resolves the same request the inline row does.
+ */
+export function approvalNotices(
   sessions: Session[],
-  activeTabId: string,
-  tabs: WorkspaceTab[],
-  composerFocused: boolean,
 ): Array<PendingApprovalNotice & { session: Session }> {
   const notices: Array<PendingApprovalNotice & { session: Session }> = [];
   for (const session of sessions) {
@@ -66,16 +56,6 @@ export function hiddenApprovalNotices(
     if (session.orchestrationLeadId) continue;
     const pending = pendingApprovalForSession(session);
     if (!pending) continue;
-    if (
-      isSessionConversationFocused(
-        session.id,
-        activeTabId,
-        tabs,
-        composerFocused,
-      )
-    ) {
-      continue;
-    }
     notices.push({ ...pending, session });
   }
   return notices;

@@ -13,7 +13,7 @@ import { inFlightRefs, workspaceFromResumed } from "./inFlight";
 
 import { historyWithLiveSessions, summaryFromSession } from "./sessionHistory";
 import { liveAgentsFromSessions } from "./liveAgents";
-import { hiddenApprovalNotices } from "./approvalToast";
+import { approvalNotices } from "./approvalToast";
 
 const context = {
   key: "github:github.com:/acme/app/pull/42",
@@ -96,7 +96,7 @@ describe("inbox sessions", () => {
     expect(liveAgentsFromSessions([session], new Set([session.id]))).toEqual(
       [],
     );
-    expect(hiddenApprovalNotices([session], "", [], true)).toEqual([]);
+    expect(approvalNotices([session])).toEqual([]);
   });
 
   it("omits Ask from workspace snapshots and restart recovery", () => {

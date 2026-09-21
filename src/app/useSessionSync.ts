@@ -104,7 +104,7 @@ import { rememberLoadedSession } from "../lib/sessionCache";
 import { prefetchProjectFiles } from "../lib/fileIndex";
 import { nativeSkillContextForSession } from "../lib/sessionSkills";
 import { nextUnseenFinishedSessions } from "../lib/sessionDone";
-import { hiddenApprovalNotices } from "../lib/approvalToast";
+import { approvalNotices } from "../lib/approvalToast";
 import {
   lastUserBlockId,
   openSessionIds,
@@ -203,7 +203,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
     providerSignInRequest,
     inboxViewOpen,
     inboxAskPortal,
-    composerFocused,
     setComposerFocusToken,
     projectTerminalFocusedRef,
     searchViewOpenRef,
@@ -624,10 +623,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     [liveAgentsEnabled, sessions, unseenFinishedIds],
   );
 
-  const hiddenApprovalToasts = useMemo(
-    () => hiddenApprovalNotices(sessions, activeTabId, tabs, composerFocused),
-    [sessions, activeTabId, tabs, composerFocused],
-  );
+  const approvalToasts = useMemo(() => approvalNotices(sessions), [sessions]);
   const [reminderNoticesHeight, setReminderNoticesHeight] = useState(0);
 
   useEffect(() => {
@@ -1084,7 +1080,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     activeSessionIdRef,
     unseenFinishedIds,
     liveAgents,
-    hiddenApprovalToasts,
+    approvalToasts,
     refreshHistory,
     persistSession,
     activateTab,

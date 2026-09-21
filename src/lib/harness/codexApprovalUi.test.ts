@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QuestionForm } from "../../chrome/QuestionForm";
 import { ApprovalToasts } from "../../chrome/ApprovalToasts";
 import { AgentTranscript } from "../../surfaces/AgentTranscript";
-import { hiddenApprovalNotices } from "../approvalToast";
+import { approvalNotices } from "../approvalToast";
 import { useInputNotifications } from "../../hooks/useInputNotifications";
 import { newSession, type Session } from "../session";
 import {
@@ -73,7 +73,7 @@ describe("Codex requests reach the chat and notifications", () => {
             })
           : null,
         createElement(ApprovalToasts, {
-          notices: hiddenApprovalNotices([session], "other", [], false),
+          notices: approvalNotices([session]),
           onFocusSession: () => undefined,
           onApproval: (sessionId, id, decision) =>
             codexAdapter.respondApproval(sessionId, id, decision),
