@@ -644,6 +644,8 @@ const en = {
   "settings.providers.group.title": "Agent CLIs",
   "settings.providers.group.description":
     "A provider is listed as installed once its CLI is found on your PATH. Uninstalled CLIs stay listed but are left out of the model picker, as are installed ones with Show in picker off. The model beside a provider is what its new conversations start with; Use by default picks the provider itself.",
+  "settings.providers.default_hint":
+    "New sessions start with the model of the provider marked Default.",
   "settings.providers.advanced.title": "Advanced",
   "settings.providers.claude_hooks.label": "Claude Code hooks",
   "settings.providers.claude_hooks.description":
@@ -1355,6 +1357,8 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.providers.group.title": "CLIs de agente",
   "settings.providers.group.description":
     "Um provedor aparece como instalado quando sua CLI está no PATH. CLIs não instaladas continuam listadas, mas ficam fora do seletor de modelos, assim como as instaladas com Exibir no seletor desligado. O modelo ao lado do provedor inicia novas conversas; Usar como padrão escolhe o provedor.",
+  "settings.providers.default_hint":
+    "Novas sessões começam com o modelo do provider marcado como Padrão.",
   "settings.providers.advanced.title": "Avançado",
   "settings.providers.claude_hooks.label": "Hooks do Claude Code",
   "settings.providers.claude_hooks.description":

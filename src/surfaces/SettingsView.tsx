@@ -144,12 +144,12 @@ import {
 } from "../lib/harness/availability";
 import { refreshHarnessCatalogs } from "../lib/harness/registry";
 import {
-  defaultModelId,
   getModelSnapshot,
   isPickerProviderVisible,
   loadDefaultModels,
   loadLastModelChoice,
   modelsFor,
+  preferredModelId,
   resolveModel,
   saveDefaultModel,
   saveLastModelChoice,
@@ -2525,7 +2525,9 @@ function ProvidersPage() {
     getHarnessAvailabilitySnapshot,
   );
   const [choice, setChoice] = useState(loadLastModelChoice);
-  const [defaultModels, setDefaultModels] = useState(loadDefaultModels);
+  // Setter only re-renders; the displayed model always reads the store
+  // through preferredModelId so it can never drift from new sessions.
+  const [, setDefaultModels] = useState(loadDefaultModels);
   const [claudeHooks, setClaudeHooks] = useState(loadClaudeHooks);
   const { t } = useLocale();
 
@@ -2563,18 +2565,18 @@ function ProvidersPage() {
           <ProviderRow
             key={harness}
             harness={harness}
-            selectedModel={
-              defaultModels[harness] ??
-              (choice?.harness === harness
-                ? choice.model
-                : defaultModelId(harness))
-            }
+            // Always the effective default: new sessions resolve the same way.
+            selectedModel={preferredModelId(harness)}
             isDefault={choice?.harness === harness}
             onDefault={onDefault}
             onModelChange={onModelChange}
           />
         ))}
       </Group>
+
+      <p className="px-1 pt-2 text-[12px] text-content/45">
+        {t("settings.providers.default_hint")}
+      </p>
 
       <Group title={t("settings.providers.advanced.title")}>
         <Row

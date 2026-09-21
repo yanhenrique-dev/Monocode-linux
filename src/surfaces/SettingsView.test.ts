@@ -84,6 +84,13 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
+describe("providers default hint", () => {
+  it("tells new sessions follow the Default badge", async () => {
+    await render("providers");
+    expect(container.textContent).toContain("marked Default");
+  });
+});
+
 describe("settings pages", () => {
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
     vi.useFakeTimers();
