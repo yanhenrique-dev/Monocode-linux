@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Trash2,
 } from "../chrome/icons";
+import { SecondaryButton } from "../chrome/SecondaryButton";
 import { revealPath } from "../lib/fs";
 import { useProjectWorktrees } from "../hooks/useProjectWorktrees";
 import { isEqualOrInside, pathKey, prettyCwd, projectName } from "../lib/paths";
@@ -130,7 +131,10 @@ export function WorktreesPage({
           {loadError}
         </p>
       ) : !data ? (
-        <p className="flex items-center gap-2 text-[12px] text-content/50">
+        <p
+          role="status"
+          className="flex items-center gap-2 text-[12px] text-content/50"
+        >
           <LoaderCircle className="size-4 animate-spin" />
           {t("settings.worktrees.loading")}
         </p>
@@ -141,6 +145,9 @@ export function WorktreesPage({
           <p className="text-[12px] text-content/50">
             {t("settings.worktrees.empty_body")}
           </p>
+          <SecondaryButton onClick={() => setCreating(true)}>
+            {t("settings.worktrees.create")}
+          </SecondaryButton>
         </div>
       ) : (
         <div className="divide-y divide-stroke overflow-hidden rounded-xl border border-stroke">
@@ -212,6 +219,9 @@ export function WorktreesPage({
                       <span>{t("settings.worktrees.locked")}</span>
                     )}
                   </p>
+                  {blocked ? (
+                    <p className="mt-1 text-[11px] text-content/45">{blocked}</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"

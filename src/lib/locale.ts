@@ -712,7 +712,7 @@ const en = {
   "settings.skills.form.creating": "Creating…",
   "settings.archive.projects.title": "Archived projects",
   "settings.archive.projects.description":
-    "Archive a project from the rail to keep its chats without listing it in the sidebar.",
+    "Archive a project from the rail to keep its conversations without listing it in the sidebar.",
   "settings.archive.projects.empty": "No archived projects.",
   "settings.archive.projects.restore": "Restore",
   "settings.archive.projects.delete": "Delete",
@@ -727,6 +727,9 @@ const en = {
   "settings.archive.sessions.empty": "No archived conversations in this project.",
   "settings.archive.sessions.unarchive": "Unarchive",
   "settings.archive.sessions.delete": "Delete",
+  "settings.archive.sessions.filter_placeholder": "Filter conversations",
+  "settings.archive.sessions.filter_aria": "Filter archived conversations",
+  "settings.archive.sessions.empty_no_match": "No matching conversations",
   "settings.archive.dialog.aria_delete": "Delete {name}",
   "settings.archive.dialog.title": "Delete “{name}”?",
   "settings.archive.dialog.body":
@@ -1430,7 +1433,7 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.skills.form.creating": "Criando…",
   "settings.archive.projects.title": "Projetos arquivados",
   "settings.archive.projects.description":
-    "Arquive um projeto pela barra para guardar os chats sem listá-lo na barra lateral.",
+    "Arquive um projeto pela barra para guardar as conversas sem listá-lo na barra lateral.",
   "settings.archive.projects.empty": "Nenhum projeto arquivado.",
   "settings.archive.projects.restore": "Restaurar",
   "settings.archive.projects.delete": "Excluir",
@@ -1446,6 +1449,9 @@ const ptBR: Record<LocaleKey, string> = {
     "Nenhuma conversa arquivada neste projeto.",
   "settings.archive.sessions.unarchive": "Desarquivar",
   "settings.archive.sessions.delete": "Excluir",
+  "settings.archive.sessions.filter_placeholder": "Filtrar conversas",
+  "settings.archive.sessions.filter_aria": "Filtrar conversas arquivadas",
+  "settings.archive.sessions.empty_no_match": "Nenhuma conversa correspondente",
   "settings.archive.dialog.aria_delete": "Excluir {name}",
   "settings.archive.dialog.title": "Excluir “{name}”?",
   "settings.archive.dialog.body":

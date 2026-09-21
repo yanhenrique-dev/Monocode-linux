@@ -2818,6 +2818,16 @@ function ArchivePage({
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [sessions],
   );
+  const [sessionQuery, setSessionQuery] = useState("");
+  const visibleArchived = useMemo(() => {
+    const needle = sessionQuery.trim().toLowerCase();
+    if (!needle) return archived;
+    return archived.filter((session) =>
+      sessionDisplayTitle(session.title, session.harness)
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [archived, sessionQuery]);
 
   const onShowArchived = (showArchived: boolean) => {
     const next = { ...filters, showArchived };
@@ -2873,6 +2883,31 @@ function ArchivePage({
               })
             : t("settings.archive.sessions.title")
         }
+        action={
+          <label className="flex h-7 w-44 shrink-0 items-center gap-2 rounded-md border border-content/10 px-2 text-content/45 focus-within:border-content/20">
+            <Search className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <input
+              value={sessionQuery}
+              onChange={(event) => setSessionQuery(event.target.value)}
+              placeholder={t("settings.archive.sessions.filter_placeholder")}
+              aria-label={t("settings.archive.sessions.filter_aria")}
+              spellCheck={false}
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
+            />
+            {sessionQuery ? (
+              <button
+                type="button"
+                aria-label={t("settings.search.clear")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setSessionQuery("")}
+                className="grid size-4 shrink-0 place-items-center rounded text-content/45 hover:text-content"
+              >
+                <X className="size-3" strokeWidth={2} />
+              </button>
+            ) : null}
+          </label>
+        }
       >
         <Row
           id="show-archived"
@@ -2893,8 +2928,12 @@ function ArchivePage({
           <p className="px-4 py-3.5 text-[12px] text-content/45">
             {t("settings.archive.sessions.empty")}
           </p>
+        ) : visibleArchived.length === 0 ? (
+          <p className="px-4 py-3.5 text-[12px] text-content/45">
+            {t("settings.archive.sessions.empty_no_match")}
+          </p>
         ) : (
-          archived.map((session) => (
+          visibleArchived.map((session) => (
             <div
               key={session.id}
               className="flex items-center gap-3 border-b border-content/5 px-4 py-2.5 last:border-b-0"
@@ -2967,10 +3006,13 @@ function ArchivePage({
 function formatDate(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "";
   try {
+    const date = new Date(value);
+    const sameYear = date.getFullYear() === new Date().getFullYear();
     return new Intl.DateTimeFormat(getIntlLocale(), {
+      ...(sameYear ? {} : { year: "numeric" as const }),
       month: "short",
       day: "numeric",
-    }).format(new Date(value));
+    }).format(date);
   } catch {
     return "";
   }
