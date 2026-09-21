@@ -12,6 +12,7 @@ import { createOpenCodeClient, type OpenCodeClient } from "./opencodeClient";
 import {
   assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   type OpenCodeProtocol,
 } from "./opencodeProtocol";
@@ -30,6 +31,7 @@ type LiveText = {
 let live: LiveText | null = null;
 let turns: Promise<void> = Promise.resolve();
 let serverUrl = "";
+let serverPassword = "";
 
 export async function stopOpenCodeTextPrompt(): Promise<void> {
   await dropLive();
@@ -112,11 +114,14 @@ async function startLive(
   }
 
   serverUrl = "";
+  serverPassword = "";
   watchChild(
     TEXT_CHILD_ID,
     (line) => {
       const parsed = parseServerUrlFromOutput(line);
       if (parsed) serverUrl = parsed;
+      const password = parseServerPasswordFromOutput(line);
+      if (password) serverPassword = password;
     },
     () => {
       if (live) live = null;
@@ -124,6 +129,8 @@ async function startLive(
     (line) => {
       const parsed = parseServerUrlFromOutput(line);
       if (parsed) serverUrl = parsed;
+      const password = parseServerPasswordFromOutput(line);
+      if (password) serverPassword = password;
     },
   );
 
@@ -136,8 +143,15 @@ async function startLive(
   );
 
   try {
-    const url = await waitForUrl(() => serverUrl, SERVER_TIMEOUT_MS);
-    const client = createOpenCodeClient(url, cwd, protocol);
+    const endpoint = await waitForEndpoint(
+      () => serverUrl,
+      () => serverPassword,
+      SERVER_TIMEOUT_MS,
+      protocol,
+    );
+    const client = createOpenCodeClient(endpoint.url, cwd, protocol, {
+      ...(endpoint.password ? { password: endpoint.password } : {}),
+    });
     const created = await client.createSession({
       permission: [{ permission: "*", pattern: "*", action: "deny" }],
     });
@@ -190,13 +204,30 @@ export function getOpenCodeTextResponse(parts: unknown[] | undefined): string {
     .trim();
 }
 
-function waitForUrl(read: () => string, timeoutMs: number): Promise<string> {
+function waitForEndpoint(
+  readUrl: () => string,
+  readPassword: () => string,
+  timeoutMs: number,
+  protocol: OpenCodeProtocol,
+): Promise<{ url: string; password: string }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
+    let urlFirstSeen: number | null = null;
     const tick = () => {
-      const url = read();
-      if (url) {
-        resolve(url);
+      const url = readUrl();
+      if (url && urlFirstSeen === null) urlFirstSeen = Date.now();
+      const password = readPassword();
+      if (url && (protocol !== "v2" || password)) {
+        resolve({ url, password });
+        return;
+      }
+      if (
+        url &&
+        protocol === "v2" &&
+        urlFirstSeen !== null &&
+        Date.now() - urlFirstSeen >= 2_000
+      ) {
+        resolve({ url, password });
         return;
       }
       if (Date.now() - started >= timeoutMs) {

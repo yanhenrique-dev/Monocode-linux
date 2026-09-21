@@ -31,6 +31,7 @@ import {
   KNOWN_HIDDEN_AGENTS,
   assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   type OpenCodeProtocol,
   permissionTitle,
@@ -377,6 +378,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
 
   const liveRef: { current: Live | null } = { current: null };
   let serverUrl = "";
+  let serverPassword = "";
   let serverExited: number | null | undefined;
 
   watchChild(
@@ -384,6 +386,8 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     (line) => {
       const parsed = parseServerUrlFromOutput(line);
       if (parsed) serverUrl = parsed;
+      const password = parseServerPasswordFromOutput(line);
+      if (password) serverPassword = password;
     },
     (code) => {
       serverExited = code;
@@ -402,6 +406,8 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
     (line) => {
       const parsed = parseServerUrlFromOutput(line);
       if (parsed) serverUrl = parsed;
+      const password = parseServerPasswordFromOutput(line);
+      if (password) serverPassword = password;
     },
   );
 
@@ -414,12 +420,16 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   );
 
   try {
-    const url = await waitForServerUrl(
+    const endpoint = await waitForServerEndpoint(
       () => serverUrl,
+      () => serverPassword,
       () => serverExited,
       SERVER_TIMEOUT_MS,
+      protocol,
     );
-    const client = createOpenCodeClient(url, input.cwd, protocol);
+    const client = createOpenCodeClient(endpoint.url, input.cwd, protocol, {
+      ...(endpoint.password ? { password: endpoint.password } : {}),
+    });
     const openCodeSession = await resolveSession(client, {
       resume: canResume ? resume : undefined,
       runtimeMode: input.runtimeMode,
@@ -1354,17 +1364,40 @@ async function assertOpenCodeVersion(
   return assertSupportedOpenCodeRelease(output);
 }
 
-function waitForServerUrl(
-  read: () => string,
+/**
+ * V2 `serve` prints a per-process `server password` after the listening URL
+ * and requires HTTP Basic auth on every request (missing credentials surface
+ * as `OpenCode HTTP 401`). V1 servers print no password, so only V2 waits
+ * for it — and only briefly, so an unexpected omission fails visibly instead
+ * of hanging startup.
+ */
+const SERVER_PASSWORD_GRACE_MS = 2_000;
+
+function waitForServerEndpoint(
+  readUrl: () => string,
+  readPassword: () => string,
   exited: () => number | null | undefined,
   timeoutMs: number,
-): Promise<string> {
+  protocol: OpenCodeProtocol,
+): Promise<{ url: string; password: string }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
+    let urlFirstSeen: number | null = null;
     const tick = () => {
-      const url = read();
-      if (url) {
-        resolve(url);
+      const url = readUrl();
+      if (url && urlFirstSeen === null) urlFirstSeen = Date.now();
+      const password = readPassword();
+      if (url && (protocol !== "v2" || password)) {
+        resolve({ url, password });
+        return;
+      }
+      if (
+        url &&
+        protocol === "v2" &&
+        urlFirstSeen !== null &&
+        Date.now() - urlFirstSeen >= SERVER_PASSWORD_GRACE_MS
+      ) {
+        resolve({ url, password });
         return;
       }
       if (exited() !== undefined) {

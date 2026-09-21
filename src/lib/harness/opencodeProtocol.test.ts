@@ -27,6 +27,7 @@ import {
   assertSupportedOpenCodeRelease,
   parseOpenCodeRelease,
   parseOpenCodeVersion,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   sortOpenCodeVariants,
   toOpenCodePermissionReply,
@@ -126,6 +127,16 @@ describe("parseServerUrlFromOutput", () => {
 
   it("ignores non-loopback URLs without the listening marker", () => {
     expect(parseServerUrlFromOutput("See https://opencode.ai for docs")).toBeNull();
+  });
+
+  it("reads the per-process server password", () => {
+    expect(
+      parseServerPasswordFromOutput(
+        "server password rMiM_ctULiUQkayk6bJg96Zi5eSrKx5Cmwy9crwA3Lk",
+      ),
+    ).toBe("rMiM_ctULiUQkayk6bJg96Zi5eSrKx5Cmwy9crwA3Lk");
+    expect(parseServerPasswordFromOutput("server listening on http://127.0.0.1:4096")).toBeNull();
+    expect(parseServerPasswordFromOutput("See https://opencode.ai for docs")).toBeNull();
   });
 });
 

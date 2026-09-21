@@ -13,6 +13,7 @@ vi.mock("./child", () => ({
 
 import {
   createOpenCodeClient,
+  openCodeBasicAuth,
   OpenCodeClientV1,
   OpenCodeClientV2,
 } from "./opencodeClient";
@@ -65,6 +66,34 @@ describe("createOpenCodeClient", () => {
     expect(
       createOpenCodeClient("http://127.0.0.1:4096", "/repo", "v2"),
     ).toBeInstanceOf(OpenCodeClientV2);
+  });
+
+  it("sends the per-process server password as Basic auth", async () => {
+    const client = createOpenCodeClient("http://127.0.0.1:4096", "/repo", "v2", {
+      password: "secret-123",
+    });
+
+    await client.getSession("session_1");
+
+    expect(mocks.harnessHttp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: openCodeBasicAuth("secret-123"),
+        }),
+      }),
+    );
+    expect(openCodeBasicAuth("secret-123")).toBe(
+      `Basic ${Buffer.from("opencode:secret-123", "utf8").toString("base64")}`,
+    );
+  });
+
+  it("omits auth when the server printed no password (V1)", async () => {
+    const client = createOpenCodeClient("http://127.0.0.1:4096", "/repo", "v1");
+
+    await client.getSession("session_1");
+
+    const headers = mocks.harnessHttp.mock.calls[0][0].headers;
+    expect(headers.Authorization).toBeUndefined();
   });
 });
 
