@@ -409,6 +409,12 @@ pub fn harness_spawn(
             workdir.display()
         ));
     }
+    // The frontend only ever spawns resolved provider CLIs; refuse anything
+    // else so a compromised renderer cannot turn this command into arbitrary
+    // code execution (same gate as `harness_exec`).
+    if !is_resolved_harness_binary(&command) {
+        return Err("harness_spawn: not a resolved harness CLI".to_string());
+    }
     // Hold a spawn reservation until the child is registered below: without
     // it, a worktree removal can pass its preflight while this process is
     // still between fork and install_spawn, deleting the dir from under it.
@@ -813,6 +819,8 @@ fn is_resolved_harness_binary(command: &str) -> bool {
         resolve_omp(),
         resolve_fx(),
         resolve_grok(),
+        resolve_hermes(),
+        resolve_mcode(),
         resolve_antigravity(),
     ]
     .into_iter()

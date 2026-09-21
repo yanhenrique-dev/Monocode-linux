@@ -1,6 +1,5 @@
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::constants::{MAX_ATTACHMENT_EMBED_BYTES, MAX_TEXT_FILE_BYTES};
@@ -503,12 +502,25 @@ pub fn reveal_path(path: String) -> Result<(), String> {
     if !path.exists() {
         return Err(format!("{}: No such file or directory", path.display()));
     }
+    // AppImage/Flatpak environments leak their own library paths; system file
+    // managers must not inherit them.
+    // Prefer selecting the file itself; fall back to opening the parent.
+    let select = crate::host::command("gio")
+        .arg("open")
+        .arg("--select")
+        .arg(&path)
+        .env_remove("LD_LIBRARY_PATH")
+        .status();
+    if matches!(select, Ok(status) if status.success()) {
+        return Ok(());
+    }
     {
         let parent = path
             .parent()
             .ok_or_else(|| "File has no parent directory.".to_string())?;
-        let status = Command::new("xdg-open")
+        let status = crate::host::command("xdg-open")
             .arg(parent)
+            .env_remove("LD_LIBRARY_PATH")
             .status()
             .map_err(|e| e.to_string())?;
         if !status.success() {

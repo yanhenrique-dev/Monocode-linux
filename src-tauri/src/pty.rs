@@ -127,6 +127,12 @@ pub fn pty_spawn(
         close_fd(prev.master_fd);
     }
 
+    // Hold a spawn reservation until the shell is registered below: without
+    // it, a worktree removal can pass its preflight while the PTY is still
+    // between fork and insert, deleting the dir from under the new shell
+    // (same race `harness_spawn` already guards against).
+    let _spawn_guard = crate::worktree_lifecycle::reserve_spawn(&working_dir(&cwd))?;
+
     spawn_unix(app, host, id, cwd, cols.max(2), rows.max(2))
 }
 
