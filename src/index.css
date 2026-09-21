@@ -636,6 +636,36 @@ html.is-resizing * {
   border-top-right-radius: 0;
 }
 
+/*
+ * Experimental tasks-strip enter/exit (see TasksPill): the frame stays
+ * mounted and folds with a grid transition instead of mounting instantly.
+ * Same trick as .zen-phase-body. Reduced motion skips the transition.
+ */
+.tasks-strip-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease;
+}
+
+.tasks-strip-body[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.tasks-strip-body > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tasks-strip-body {
+    transition: none;
+  }
+}
+
 html.theme-light [data-composer-box] {
   background: var(--color-background-base);
   box-shadow:

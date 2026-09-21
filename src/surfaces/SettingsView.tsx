@@ -84,6 +84,7 @@ import {
   loadTranscriptLayout,
   loadTranscriptAnchor,
   loadTasksPill,
+  loadExperimentalAnimations,
   loadUiBlur,
   previewSidebarBlur,
   saveBodyGlass,
@@ -102,6 +103,7 @@ import {
   saveTranscriptLayout,
   saveTranscriptAnchor,
   saveTasksPill,
+  saveExperimentalAnimations,
   saveUiBlur,
   subscribeAppearance,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
@@ -1006,6 +1008,9 @@ function ChatPage() {
   const [transcriptAnchor, setTranscriptAnchor] =
     useState(loadTranscriptAnchor);
   const [tasksPill, setTasksPill] = useState(loadTasksPill);
+  const [experimentalAnimations, setExperimentalAnimations] = useState(
+    loadExperimentalAnimations,
+  );
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
   const [modelControls, setModelControls] =
@@ -1040,6 +1045,11 @@ function ChatPage() {
   const onTasksPill = (next: boolean) => {
     saveTasksPill(next);
     setTasksPill(next);
+  };
+
+  const onExperimentalAnimations = (next: boolean) => {
+    saveExperimentalAnimations(next);
+    setExperimentalAnimations(next);
   };
 
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
@@ -1114,6 +1124,17 @@ function ChatPage() {
             label={t("settings.chat.tasks_pill.toggle")}
             on={tasksPill}
             onChange={onTasksPill}
+          />
+        </Row>
+        <Row
+          id="experimental-animations"
+          label={t("settings.chat.experimental_animations.label")}
+          description={t("settings.chat.experimental_animations.description")}
+        >
+          <Toggle
+            label={t("settings.chat.experimental_animations.toggle")}
+            on={experimentalAnimations}
+            onChange={onExperimentalAnimations}
           />
         </Row>
       </Group>

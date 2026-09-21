@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import type { Block } from "../lib/session";
+import type { Block, TaskListItem } from "../lib/session";
 import { lastTaskBlock, taskListProgressLabel } from "../lib/taskList";
 import { ChevronRight, ListEnd } from "./icons";
 
@@ -8,6 +8,8 @@ type Props = {
   scope: RefObject<HTMLElement | null>;
   visible?: boolean;
   enabled: boolean;
+  /** Slide the strip in and out instead of mounting it instantly. */
+  animationsEnabled?: boolean;
   /** Scrolls the block into view. Returns false when the block is unknown. */
   revealBlock?: (blockId: string) => boolean;
 };
@@ -24,6 +26,7 @@ export function TasksPill({
   scope,
   visible = true,
   enabled,
+  animationsEnabled = false,
   revealBlock,
 }: Props) {
   const last = useMemo(() => lastTaskBlock(blocks), [blocks]);
@@ -58,17 +61,21 @@ export function TasksPill({
     return () => observer.disconnect();
   }, [visible, enabled, last, scope, blocks]);
 
-  if (!visible || !enabled || !last || !offscreen) return null;
-  const items = last.taskList?.items ?? [];
+  const items = last?.taskList?.items ?? [];
   // Once every item settled, the pill would only ever read "Complete" —
   // hide it instead of pinning a dead strip above the composer.
-  if (
+  const settled =
+    items.length > 0 &&
     items.every(
       (item) => item.status === "completed" || item.status === "cancelled",
-    )
-  )
-    return null;
+    );
+  const open = visible && enabled && !!last && offscreen && !settled;
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const reveal = () => {
+    if (!last) return;
     if (!revealBlock?.(last.id)) return;
     // revealBlock mounts synchronously (flushSync), so the anchor is in the
     // DOM here — whether the turn was just mounted or was already there.
@@ -79,29 +86,64 @@ export function TasksPill({
       ?.scrollIntoView({ block: "center" });
     setOffscreen(false);
   };
+  // Without the experimental flag the strip mounts instantly exactly as
+  // before; the animated path keeps the frame mounted and folds it with a
+  // grid transition instead.
+  if (!animationsEnabled || reduceMotion) {
+    if (!open) return null;
+    return (
+      <div data-tasks-strip className="mx-1.5">
+        <StripButton items={items} onReveal={reveal} />
+      </div>
+    );
+  }
+  // The fusion selectors only match a strip that is actually showing, so the
+  // composer keeps its own top border while the strip is folded away.
+  if (!visible || !enabled || !last) return null;
   return (
-    <div data-tasks-strip className="mx-1.5">
-      <button
-        type="button"
-        title="Show tasks"
-        aria-label={`Show tasks (${taskListProgressLabel(items)})`}
-        data-tasks-pill
-        onClick={reveal}
-        className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
-      >
-        <ListEnd
-          className="size-3.5 shrink-0 text-content/50"
-          strokeWidth={1.75}
-        />
-        <span className="min-w-0 truncate text-[12px]">Tasks</span>
-        <span className="shrink-0 rounded-full bg-content/7 px-1.5 py-px font-mono text-[10px] text-content/50">
-          {taskListProgressLabel(items)}
-        </span>
-        <ChevronRight
-          className="ml-auto size-3.5 shrink-0 text-content/35"
-          strokeWidth={1.75}
-        />
-      </button>
+    <div
+      className="tasks-strip-body mx-1.5"
+      data-open={open}
+      // A folded strip stays mounted for the transition: keep its button
+      // out of tab order and off the screen reader until it opens.
+      inert={!open}
+      {...(open ? { "data-tasks-strip": "" } : {})}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <StripButton items={items} onReveal={reveal} />
+      </div>
     </div>
+  );
+}
+
+function StripButton({
+  items,
+  onReveal,
+}: {
+  items: TaskListItem[];
+  onReveal: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title="Show tasks"
+      aria-label={`Show tasks (${taskListProgressLabel(items)})`}
+      data-tasks-pill
+      onClick={onReveal}
+      className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
+    >
+      <ListEnd
+        className="size-3.5 shrink-0 text-content/50"
+        strokeWidth={1.75}
+      />
+      <span className="min-w-0 truncate text-[12px]">Tasks</span>
+      <span className="shrink-0 font-mono text-[10px] text-content/50">
+        {taskListProgressLabel(items)}
+      </span>
+      <ChevronRight
+        className="ml-auto size-3.5 shrink-0 text-content/35"
+        strokeWidth={1.75}
+      />
+    </button>
   );
 }

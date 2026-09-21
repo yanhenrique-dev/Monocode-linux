@@ -63,6 +63,7 @@ describe("TasksPill", () => {
   function renderPill(props?: {
     enabled?: boolean;
     blocks?: readonly Block[];
+    animationsEnabled?: boolean;
   }) {
     const revealBlock = vi.fn(() => true);
     const mount = document.createElement("div");
@@ -75,6 +76,7 @@ describe("TasksPill", () => {
           blocks: props?.blocks ?? [taskBlock("t1")],
           scope,
           enabled: props?.enabled ?? true,
+          animationsEnabled: props?.animationsEnabled,
           revealBlock,
         }),
       ),
@@ -104,6 +106,82 @@ describe("TasksPill", () => {
       expect(pill.textContent).toContain("1 of 3");
       act(() => pill.click());
       expect(revealBlock).toHaveBeenCalledWith("t1");
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("renders the counter as plain text, not a pill badge", () => {
+    const { root } = renderPill();
+    try {
+      setIntersecting(false);
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      const counter = [...pill.querySelectorAll("span")].find((span) =>
+        (span.textContent ?? "").includes("1 of 3"),
+      )!;
+      expect(counter.className).not.toContain("rounded-full");
+      expect(counter.className).not.toContain("bg-content");
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("keeps the animated frame mounted and folds it with data-open", () => {
+    const { root } = renderPill({ animationsEnabled: true });
+    try {
+      setIntersecting(true);
+      expect(container.querySelector("[data-tasks-strip]")).toBeNull();
+      const frame = container.querySelector(".tasks-strip-body")!;
+      expect(frame.getAttribute("data-open")).toBe("false");
+      setIntersecting(false);
+      expect(
+        container.querySelector("[data-tasks-strip]"),
+      ).not.toBeNull();
+      expect(
+        container
+          .querySelector(".tasks-strip-body")
+          ?.getAttribute("data-open"),
+      ).toBe("true");
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("keeps the folded strip out of tab order when animated", () => {
+    const { root } = renderPill({ animationsEnabled: true });
+    try {
+      setIntersecting(true);
+      const frame = container.querySelector(".tasks-strip-body")!;
+      expect(frame.hasAttribute("inert")).toBe(true);
+      setIntersecting(false);
+      expect(frame.hasAttribute("inert")).toBe(false);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("folds the settled strip instead of pinning it when animated", () => {
+    const done = taskBlock("t1");
+    done.taskList = {
+      items: [
+        { text: "Done", status: "completed" },
+        { text: "Skipped", status: "cancelled" },
+      ],
+    };
+    const { root } = renderPill({
+      animationsEnabled: true,
+      blocks: [done],
+    });
+    try {
+      setIntersecting(false);
+      expect(container.querySelector("[data-tasks-strip]")).toBeNull();
+      expect(
+        container
+          .querySelector(".tasks-strip-body")
+          ?.getAttribute("data-open"),
+      ).toBe("false");
     } finally {
       act(() => root.unmount());
     }
