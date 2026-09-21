@@ -233,7 +233,7 @@ export function ProjectSearch({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-none">
         {groups.map((group) => (
           <section key={group.path} className="border-b border-stroke">
             <div className="flex items-center gap-1.5 px-2 py-1.5">
