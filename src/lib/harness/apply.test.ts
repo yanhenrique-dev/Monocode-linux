@@ -444,6 +444,69 @@ describe("task list updates", () => {
     expect(session.blocks.some((block) => block.role === "plan")).toBe(false);
   });
 
+  it("keeps one block when a keyless snapshot lands between keyed ones", () => {
+    let session = appendUser(newSession("codex", "/tmp"), "fix it");
+    session = applyHarnessEvent(session, {
+      type: "tasks.updated",
+      key: "turn_1",
+      items: [
+        { text: "Inspect", status: "pending" },
+        { text: "Verify", status: "pending" },
+      ],
+    });
+    // Same turn, another source without a key: must update in place and keep it.
+    session = applyHarnessEvent(session, {
+      type: "tasks.updated",
+      items: [
+        { text: "Inspect", status: "pending" },
+        { text: "Verify", status: "pending" },
+      ],
+    });
+    session = applyHarnessEvent(session, {
+      type: "tasks.updated",
+      key: "turn_1",
+      items: [
+        { text: "Inspect", status: "completed" },
+        { text: "Verify", status: "in_progress" },
+      ],
+    });
+
+    const tasks = session.blocks.filter((block) => block.role === "tasks");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      text: "[x] Inspect\n[~] Verify",
+      taskList: {
+        key: "turn_1",
+        items: [
+          { text: "Inspect", status: "completed" },
+          { text: "Verify", status: "in_progress" },
+        ],
+      },
+    });
+  });
+
+  it("ignores a transient empty snapshot instead of dropping live progress", () => {
+    let session = appendUser(newSession("grok", "/tmp"), "fix it");
+    session = applyHarnessEvent(session, {
+      type: "tasks.updated",
+      items: [
+        { text: "Inspect", status: "in_progress" },
+        { text: "Verify", status: "pending" },
+      ],
+    });
+    session = applyHarnessEvent(session, {
+      type: "tasks.updated",
+      items: [],
+    });
+
+    const tasks = session.blocks.filter((block) => block.role === "tasks");
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.taskList?.items).toEqual([
+      { text: "Inspect", status: "in_progress" },
+      { text: "Verify", status: "pending" },
+    ]);
+  });
+
   it("merges partial status updates without removing or renaming tasks", () => {
     let session = appendUser(newSession("cursor", "/tmp"), "fix it");
     session = applyHarnessEvent(session, {

@@ -273,14 +273,23 @@ function upsertTaskList(
 
   if (items.length === 0) {
     if (existing < 0) return session;
+    // Some emitters send a transient empty snapshot (e.g. a cleared plan
+    // mid-turn). Dropping the live block here makes the pill fall back to an
+    // older turn, so an empty snapshot never deletes a non-empty block.
+    const storedItems = session.blocks[existing].taskList?.items ?? [];
+    if (storedItems.length > 0) return session;
     return {
       ...session,
       blocks: session.blocks.filter((_, index) => index !== existing),
     };
   }
 
+  // A keyless snapshot must not wipe the stored key: the next keyed snapshot
+  // would miss this block and fork a duplicate instead of updating it.
+  const storedKey =
+    existing >= 0 ? session.blocks[existing].taskList?.key : undefined;
   const taskList = {
-    ...(key ? { key } : {}),
+    ...(key ? { key } : storedKey ? { key: storedKey } : {}),
     ...(event.explanation?.trim()
       ? { explanation: event.explanation.trim() }
       : {}),
