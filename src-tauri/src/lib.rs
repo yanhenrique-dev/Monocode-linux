@@ -58,7 +58,7 @@ pub(crate) struct PasswdIdentity {
 }
 
 pub(crate) fn dirs_home() -> Option<String> {
-    for key in ["HOME", "USERPROFILE"] {
+    for key in ["HOME"] {
         if let Some(home) = std::env::var_os(key) {
             let home = home.to_string_lossy().into_owned();
             if !home.is_empty() {
