@@ -95,6 +95,7 @@ import {
   hasActiveSessionFilters,
   loadSessionSidebarFilters,
   saveSessionSidebarFilters,
+  subscribeSessionSidebarFilters,
   type SessionSidebarFilters,
 } from "../lib/sessionFilters";
 import type { HarnessId, LinkedWorkItem } from "../lib/session";
@@ -388,6 +389,12 @@ function SidebarComponent({
   );
   const [sessionFilters, setSessionFilters] = useState(
     loadSessionSidebarFilters,
+  );
+  // A toggle flipped in Settings → Archive (or another window) re-reads the
+  // store so the open sidebar never shows a stale filter.
+  useEffect(
+    () => subscribeSessionSidebarFilters(() => setSessionFilters(loadSessionSidebarFilters())),
+    [],
   );
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(
     null,

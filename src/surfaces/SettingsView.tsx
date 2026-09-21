@@ -176,6 +176,7 @@ import {
 import {
   loadSessionSidebarFilters,
   saveSessionSidebarFilters,
+  subscribeSessionSidebarFilters,
 } from "../lib/sessionFilters";
 import type { SessionSummary } from "../lib/sessionStore";
 import {
@@ -2909,6 +2910,12 @@ function ArchivePage({
   onDeleteProject?: (path: string) => void;
 }) {
   const [filters, setFilters] = useState(loadSessionSidebarFilters);
+  // A toggle flipped in the sidebar menu (or another window) re-reads the
+  // store so this page never shows a stale filter.
+  useEffect(
+    () => subscribeSessionSidebarFilters(() => setFilters(loadSessionSidebarFilters())),
+    [],
+  );
   const [deletingProject, setDeletingProject] =
     useState<ArchivedProject | null>(null);
   const [deletingSession, setDeletingSession] =
