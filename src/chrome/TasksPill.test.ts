@@ -133,7 +133,7 @@ describe("TasksPill", () => {
     try {
       setIntersecting(true);
       expect(container.querySelector("[data-tasks-strip]")).toBeNull();
-      const frame = container.querySelector(".tasks-strip-body")!;
+      const frame = container.querySelector(".fold-body")!;
       expect(frame.getAttribute("data-open")).toBe("false");
       setIntersecting(false);
       expect(
@@ -141,7 +141,7 @@ describe("TasksPill", () => {
       ).not.toBeNull();
       expect(
         container
-          .querySelector(".tasks-strip-body")
+          .querySelector(".fold-body")
           ?.getAttribute("data-open"),
       ).toBe("true");
     } finally {
@@ -153,7 +153,7 @@ describe("TasksPill", () => {
     const { root } = renderPill({ animationsEnabled: true });
     try {
       setIntersecting(true);
-      const frame = container.querySelector(".tasks-strip-body")!;
+      const frame = container.querySelector(".fold-body")!;
       expect(frame.hasAttribute("inert")).toBe(true);
       setIntersecting(false);
       expect(frame.hasAttribute("inert")).toBe(false);
@@ -179,7 +179,7 @@ describe("TasksPill", () => {
       expect(container.querySelector("[data-tasks-strip]")).toBeNull();
       expect(
         container
-          .querySelector(".tasks-strip-body")
+          .querySelector(".fold-body")
           ?.getAttribute("data-open"),
       ).toBe("false");
     } finally {
