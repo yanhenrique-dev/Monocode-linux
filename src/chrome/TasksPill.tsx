@@ -102,7 +102,7 @@ export function TasksPill({
   if (!visible || !enabled || !last) return null;
   return (
     <div
-      className="tasks-strip-body mx-1.5"
+      className="fold-body mx-1.5"
       data-open={open}
       // A folded strip stays mounted for the transition: keep its button
       // out of tab order and off the screen reader until it opens.
