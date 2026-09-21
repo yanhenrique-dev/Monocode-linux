@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { HARNESS_TITLE, sessionDisplayTitle, type Session } from "./session";
+import { IS_LINUX } from "./platform";
 import { loadSoundsEnabled, playCue } from "./sounds";
 import {
   allowsProjectNotification,
@@ -248,9 +249,33 @@ export function sessionNotificationSubject(
 }
 
 /**
- * Sends the banner when policy allows. Resolves true once the OS accepted it
- * so callers can skip the in-app cue: the OS sound stands in for it. A
- * rejected dispatch resolves false so the cue still plays.
+ * What the Rust `show_notification` command reports. `osSound` tells whether
+ * the platform itself played a sound: Linux only sets a sound-name hint the
+ * server may ignore, so callers must still play the in-app cue there.
+ */
+export type ShowNotificationResult = {
+  osSound: boolean;
+};
+
+type NotifyOutcome = {
+  sent: boolean;
+  osSound: boolean;
+};
+
+function readShowResult(raw: unknown, soundRequested: boolean): ShowNotificationResult {
+  if (raw && typeof raw === "object" && "osSound" in raw) {
+    return { osSound: Boolean((raw as { osSound: unknown }).osSound) };
+  }
+  // Backwards compatibility with backends that resolve void: every platform
+  // except Linux guarantees its requested sound, so only Linux assumes mute.
+  return { osSound: IS_LINUX ? false : soundRequested };
+}
+
+/**
+ * Sends the banner when policy allows. Resolves true once the OS accepted it.
+ * Input requests have no in-app sound of their own: the banner (plus the
+ * in-app approval toast) is the signal, so the OS sound hint is left to the
+ * server.
  */
 export async function notifySession(
   session: Session,
@@ -262,10 +287,20 @@ export async function notifySession(
     event === "finished" ? "agentFinished" : "agentInput",
   );
   if (!entry) {
-    console.debug("[notifications] skip: no notifiable subject", session.id);
+    console.debug(
+      "[notifications] skip: no notifiable subject",
+      session.id,
+      sessionVisible ? "visible" : "hidden",
+    );
     return false;
   }
-  return notifyProjectSession(session, event, sessionVisible, entry.subject);
+  const outcome = await notifyProjectSession(
+    session,
+    event,
+    sessionVisible,
+    entry.subject,
+  );
+  return outcome.sent;
 }
 
 /** One policy decision covers both the OS banner and its in-app sound fallback. */
@@ -275,16 +310,22 @@ export async function announceSessionFinished(
 ): Promise<void> {
   const entry = sessionNotificationSubject(session, "agentFinished");
   if (!entry) {
-    console.debug("[notifications] skip: no notifiable subject", session.id);
+    console.debug(
+      "[notifications] skip: no notifiable subject",
+      session.id,
+      sessionVisible ? "visible" : "hidden",
+    );
     return;
   }
-  const sent = await notifyProjectSession(
+  const outcome = await notifyProjectSession(
     session,
     "finished",
     sessionVisible,
     entry.subject,
   );
-  if (!sent) playCue("turnFinished", entry.subject);
+  // On Linux the banner carries no guaranteed sound, so the in-app cue
+  // always stands in when sounds are on — even when the banner showed.
+  if (!outcome.sent || !outcome.osSound) playCue("turnFinished", entry.subject);
 }
 
 async function notifyProjectSession(
@@ -292,44 +333,60 @@ async function notifyProjectSession(
   event: NotificationEvent,
   sessionVisible: boolean,
   subject: NotificationSubject,
-): Promise<boolean> {
+): Promise<NotifyOutcome> {
   if (!allowsProjectNotification(subject)) {
     console.debug(
       "[notifications] skip: project policy blocks",
+      session.id,
       subject.projectId,
       subject.category,
     );
-    return false;
+    return { sent: false, osSound: false };
   }
+  const enabled = loadNotificationsEnabled();
   const decision = shouldNotify({
-    enabled: loadNotificationsEnabled(),
+    enabled,
     permission,
     windowFocused,
     sessionVisible,
   });
   if (!decision) {
     console.debug("[notifications] skip: not eligible", {
-      enabled: loadNotificationsEnabled(),
+      sessionId: session.id,
+      projectId: subject.projectId,
+      category: subject.category,
+      enabled,
       permission,
       windowFocused,
       sessionVisible,
     });
-    return false;
+    return { sent: false, osSound: false };
   }
   const { title, subtitle, body } = notificationText(session, event);
+  const soundRequested = loadSoundsEnabled();
   try {
-    await invoke("show_notification", {
+    const raw = await invoke<ShowNotificationResult | void>(
+      "show_notification",
+      {
+        sessionId: session.id,
+        title,
+        subtitle,
+        body,
+        sound: soundRequested,
+      },
+    );
+    const { osSound } = readShowResult(raw, soundRequested);
+    console.debug("[notifications] banner shown", {
       sessionId: session.id,
-      title,
-      subtitle,
-      body,
-      sound: loadSoundsEnabled(),
+      category: subject.category,
+      soundRequested,
+      osSound,
     });
-    return true;
+    return { sent: true, osSound };
   } catch (error) {
     // Swallowed by design (the in-app cue stands in), but loud in DevTools:
     // a rejected dispatch is the only signal when the OS side fails.
-    console.warn("[notifications] show_notification rejected:", error);
-    return false;
+    console.warn("[notifications] show_notification rejected:", session.id, error);
+    return { sent: false, osSound: false };
   }
 }

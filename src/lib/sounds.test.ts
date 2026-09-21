@@ -13,6 +13,7 @@ vi.mock("cuelume", () => ({
 import {
   announceUpdateAvailable,
   CUSTOMIZABLE_CUES,
+  isAudioUnlocked,
   loadSoundPrefs,
   loadSoundsEnabled,
   playCue,
@@ -31,6 +32,8 @@ import { playSoundFile } from "./soundFiles";
 vi.mock("./soundFiles", () => ({
   playSoundFile: (...args: unknown[]) => playSoundFileMock(...args),
   setSoundFileVolume: vi.fn(),
+  audioPlaybackState: () => "running",
+  unlockAudio: vi.fn(),
 }));
 
 const playSoundFileMock = vi.fn();
@@ -195,6 +198,28 @@ describe("sounds", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("plays events stamped exactly at re-enable", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000);
+    try {
+      saveSoundsEnabled(false);
+      vi.setSystemTime(2000);
+      saveSoundsEnabled(true);
+      playCue("inboxUnseen", {
+        projectId: "work",
+        category: "issues",
+        occurredAt: 2000,
+      });
+      expect(play).toHaveBeenCalledExactlyOnceWith("bloom");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports the shared audio context as unlocked in tests", () => {
+    expect(isAudioUnlocked()).toBe(true);
   });
 
   it("dings once per update version", () => {

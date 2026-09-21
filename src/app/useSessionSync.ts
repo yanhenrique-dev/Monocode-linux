@@ -90,7 +90,6 @@ import {
   liveAgentsFromSessions,
 } from "../lib/liveAgents";
 import {
-  loadNotificationsEnabled,
   probeNotificationPermission,
   setWindowFocused,
 } from "../lib/notifications";
@@ -601,8 +600,10 @@ export function useSessionSync(deps: SessionSyncDeps) {
   useInputNotifications(sessions, activeSessionId);
 
   // Cache the OS decision so a turn ending later can skip a denied banner.
+  // Probe unconditionally: a stale "prompt" would otherwise grant banners
+  // the OS would drop, and Settings needs the true state before opt-in.
   useEffect(() => {
-    if (loadNotificationsEnabled()) void probeNotificationPermission();
+    void probeNotificationPermission();
   }, []);
   const busyForDoneRef = useRef(busySessionIds);
   const focusedForDoneRef = useRef(activeSessionId);

@@ -92,6 +92,7 @@ function installAudio(options?: {
 }
 
 import {
+  audioPlaybackState,
   clearSoundFileCache,
   clearSoundFileError,
   pickSoundFile,
@@ -99,6 +100,7 @@ import {
   resetAudioContext,
   setSoundFileVolume,
   soundFileError,
+  unlockAudio,
 } from "./soundFiles";
 
 const SOUND_PATH = "/home/user/Music/ding.ogg";
@@ -192,6 +194,29 @@ describe("soundFiles", () => {
       mocks.readBinaryFile.mockResolvedValue(new Uint8Array([1]));
       const result = await playSoundFile(SOUND_PATH);
       expect(result).toEqual({ ok: false, reason: "decode" });
+    });
+
+    it("reports a missing AudioContext as unavailable", () => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        globalThis,
+        "AudioContext",
+      );
+      try {
+        Object.defineProperty(globalThis, "AudioContext", {
+          value: undefined,
+          configurable: true,
+          writable: true,
+        });
+        resetAudioContext();
+        expect(audioPlaybackState()).toBe("unavailable");
+        expect(() => unlockAudio()).not.toThrow();
+      } finally {
+        if (descriptor) {
+          Object.defineProperty(globalThis, "AudioContext", descriptor);
+        }
+        resetAudioContext();
+        installAudio();
+      }
     });
   });
 });
