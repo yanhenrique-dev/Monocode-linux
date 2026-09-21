@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-09-21
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Per-user Linux desktop installer (`scripts/install-linux-desktop.sh`,
+  porte #295): installs release binary, launcher and icons to
+  `~/.local`, with reinstall/uninstall coverage and Freedesktop
+  single-layer escaping.
+- Antigravity ACP provider (porte #314): resolves `agy_acp_server.par`,
+  normalizes ACP protocol, manages session lifecycle and recovery, adds
+  models, skills, icons and transport tests. Unavailable on Windows by
+  design (no Windows ACP binary ships).
+- Chat message copy and Notes actions (porte #291): attachment-aware
+  clipboard copy/paste with size limits, transcript copy buttons,
+  async note save with pending/error states.
+- Skill file opens match activity label (porte #330): tool rows resolve
+  the file from the label, expand `~/` via recognized home, and only
+  show a diff preview when preview path matches the opened file.
+- Add-to-chat zero-tab fallback (porte #325): with no tabs open, the
+  request seeds a new session instead of being dropped.
+
+### Fixed
+
+- CodeRabbit review corrections: strict `previewMatchesFile` (no diff
+  for wrong file when label is not a path, e.g. "Edit dependency
+  versions"); prompt bubble expansion is keyboard-accessible via a
+  dedicated Show more button instead of a click-only div; Inbox header
+  and content share `max-w-[1600px]`; `prettyCwd` matches `Users`/`home`
+  case-insensitively; `resolveGates` null narrowing in Antigravity
+  live tests.
+- Inbox PR header full-width (porte #289): detail header uses
+  `max-w-[1600px]` to match the Code tab; diff sticky behavior already
+  present.
+
 ## [0.2.0] - 2026-09-21
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,

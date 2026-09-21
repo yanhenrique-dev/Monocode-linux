@@ -20,9 +20,23 @@ test -x "$home/.local/bin/monocode"
 test -f "$launcher"
 test "$(cat "$home/.local/share/unrelated.desktop")" = "keep"
 grep -F 'Exec="' "$launcher" >/dev/null
+# The launcher points at the installed copy; spaces stay literal in quotes.
+grep -F -x "Exec=\"$home/.local/bin/monocode\"" "$launcher" >/dev/null
 if command -v desktop-file-validate >/dev/null 2>&1; then
   desktop-file-validate "$launcher"
 fi
+
+# Backslashes, dollars, quotes, backticks get one freedesktop escape layer;
+# % doubles. Pinned against the same pipeline the installer uses.
+# shellcheck disable=SC2016 # $ and backticks are literals in this probe
+escape_probe="$(printf '%s' 'a\b$c%d"e`f' | sed \
+  -e 's/\\/\\\\/g' \
+  -e 's/"/\\"/g' \
+  -e 's/`/\\`/g' \
+  -e 's/\$/\\$/g' \
+  -e 's/%/%%/g')"
+# shellcheck disable=SC2016 # expected value is a literal
+test "$escape_probe" = 'a\\b\$c%%d\"e\`f'
 
 # Reinstall over the files managed by MonoCode, then remove only those files.
 HOME="$home" USER="installer-test" MONOCODE_BINARY="$binary" \

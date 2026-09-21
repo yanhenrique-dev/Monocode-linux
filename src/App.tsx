@@ -369,17 +369,19 @@ const onSelectProviderAccount = useCallback(
       if (tabsRef.current.length > 0) return;
       const detail = (event as CustomEvent<AddToChatRequest>).detail;
       if (!detail?.text) return;
-      const seedSession = sessionsRef.current[0] ?? sessionDefaults;
+      const seedSession =
+        sessionsRef.current[sessionsRef.current.length - 1] ?? sessionDefaults;
       const seedText =
         detail.mode === "plain"
           ? appendComposerInsert("", detail.text)
           : appendSelectionQuote("", detail.text);
+      if (!seedText.trim()) return;
       const fallbackSession: Session = {
         ...newSession(
           seedSession?.harness ?? "claude",
-          sessionDefaults?.cwd ?? projectCwdRef.current,
+          projectCwdRef.current,
           seedSession?.model,
-          sessionDefaults?.runtimeMode,
+          sessionDefaults?.runtimeMode ?? seedSession?.runtimeMode,
           seedSession?.modelSettings,
         ),
         composerSeed: seedText,

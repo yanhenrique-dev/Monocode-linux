@@ -383,9 +383,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
     () => true,
   );
   const saveNote = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const sessionTitle = sessionDisplayTitle(session.title, session.harness);
-      void createNote({
+      await createNote({
         title:
           sessionTitle && sessionTitle !== "New session"
             ? sessionTitle
@@ -398,8 +398,8 @@ const SessionPaneContent = memo(function SessionPaneContent({
     [session.cwd, session.harness, session.id, session.title],
   );
   const saveSelectionNote = useCallback(
-    (text: string) => {
-      void createNote({
+    async (text: string) => {
+      await createNote({
         title: noteTitle(text),
         body: text,
         sourceSessionId: session.id,
@@ -470,10 +470,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
       quoteRequest={quoteRequest}
       initialDraft={
         draftRef.current ??
-        restoredDraft ??
         (session.inboxCard || session.noteCard || session.handoffCard
           ? undefined
-          : session.composerSeed)
+          : (session.composerSeed ?? restoredDraft))
       }
       onDraftChange={(text) => {
         draftRef.current = text;

@@ -106,6 +106,17 @@ npm ci
 npm run build:linux
 ```
 
+Per-user desktop install (no `sudo`, no package). Installs the release binary
+under `~/.local/bin` and a launcher under `$XDG_DATA_HOME` (`~/.local/share`
+when unset):
+
+```bash
+npm run install:linux:desktop
+```
+
+Remove only those files with `npm run uninstall:linux:desktop`. It does not
+touch system paths or the Flatpak/AUR packaging in `packaging/`.
+
 Development mode, with hot-reload:
 
 ```bash
@@ -164,6 +175,8 @@ npm run check:rust   # cargo fmt, clippy and tests
 | `npm run tauri dev` | desktop app in development |
 | `npm run setup:linux` | installs dependencies on Debian/Ubuntu |
 | `npm run build:linux` | builds the AppImage |
+| `npm run install:linux:desktop` | per-user install: binary + launcher, no sudo |
+| `npm run uninstall:linux:desktop` | removes only the per-user install |
 | `npm run set-version` | syncs the version across manifests |
 
 ## Contributing

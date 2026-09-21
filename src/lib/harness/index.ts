@@ -95,6 +95,15 @@ export {
   forgetHermesSession,
   bindHermesSession,
 } from "./hermes";
+export {
+  sendAntigravityTurn,
+  steerAntigravityTurn,
+  cancelAntigravityTurn,
+  stopAntigravitySession,
+  forgetAntigravitySession,
+  respondAntigravityApproval,
+  bindAntigravitySession,
+} from "./antigravity";
 export { generateCursorSessionTitle } from "./cursorTitle";
 export { generateCodexSessionTitle } from "./codexTitle";
 export { generateOpenCodeSessionTitle } from "./opencodeTitle";
@@ -135,6 +144,7 @@ export { refreshPiCatalog, refreshOmpCatalog } from "./piCatalog";
 export { refreshFxCatalog } from "./fxCatalog";
 export { refreshGrokCatalog } from "./grokCatalog";
 export { refreshHermesCatalog } from "./hermesCatalog";
+export { refreshAntigravityCatalog } from "./antigravityCatalog";
 export { registerBuiltinHarnesses } from "./register";
 export {
   getHarnessAvailabilitySnapshot,

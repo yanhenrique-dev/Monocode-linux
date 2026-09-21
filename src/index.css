@@ -376,6 +376,39 @@ section[data-diff-file] {
   contain-intrinsic-block-size: auto 300px;
 }
 
+/* Touch layouts keep actions in flow. Desktop places them in the existing
+ * turn gap so revealing the controls never shifts or over-spaces the chat. */
+.user-message-actions {
+  width: fit-content;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .user-message-hover-zone {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .user-message-actions {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .user-message-row:hover .user-message-actions,
+  .user-message-row:focus-within .user-message-actions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-message-actions {
+    transition: none;
+  }
+}
+
 .user-message-with-link {
   display: block;
 }
@@ -1657,10 +1690,16 @@ html.is-resizing .glass-blur {
   }
 }
 
-/* Keep the original glass tint in dark mode. Light popovers use an opaque
-   surface so underlying content cannot show through. */
+/* Dark popovers sit on a mostly-opaque surface so text has solid ground.
+   A near-transparent tint lets bright wallpapers bleed through the blur
+   and halo thin text; the backdrop blur still softens what shows at the
+   rounded edge. Light popovers stay fully opaque. */
 .popover-backdrop {
-  background: color-mix(in srgb, var(--color-content) 2%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-background-base) 88%,
+    transparent
+  );
 }
 
 html.theme-light .popover-backdrop {

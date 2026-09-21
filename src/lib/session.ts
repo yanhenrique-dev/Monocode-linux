@@ -23,7 +23,8 @@ export type HarnessId =
   | "omp"
   | "fx"
   | "hermes"
-  | "mcode";
+  | "mcode"
+  | "antigravity";
 
 export const HARNESSES: HarnessId[] = [
   "claude",
@@ -36,6 +37,7 @@ export const HARNESSES: HarnessId[] = [
   "fx",
   "hermes",
   "mcode",
+  "antigravity",
 ];
 
 export type BlockRole =
@@ -182,6 +184,8 @@ export type AgentRunMeta = {
 export type AttachmentKind = "image" | "audio" | "file";
 
 export type Attachment = {
+  /** Live transcript only; deliberately excluded from persisted attachments. */
+  copyFromPath?: boolean;
   id: string;
   name: string;
   mimeType: string;
@@ -399,6 +403,7 @@ export const HARNESS_LABEL: Record<HarnessId, string> = {
   fx: "fx",
   hermes: "hermes",
   mcode: "mcode",
+  antigravity: "antigravity",
 };
 
 export const HARNESS_TITLE: Record<HarnessId, string> = {
@@ -412,6 +417,7 @@ export const HARNESS_TITLE: Record<HarnessId, string> = {
   fx: "fx",
   hermes: "Hermes Agent",
   mcode: "MiniMax Code",
+  antigravity: "Antigravity",
 };
 
 /** fx ACP rejects attachment prompt blocks. */
