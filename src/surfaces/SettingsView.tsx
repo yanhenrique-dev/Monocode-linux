@@ -130,6 +130,7 @@ import {
   UI_SCALE_MIN,
 } from "../lib/uiScale";
 import {
+  availableHarnessIds,
   getHarnessAvailabilitySnapshot,
   hasProbedHarnessAvailability,
   harnessUnavailableHint,
@@ -2737,7 +2738,7 @@ function ProvidersPage() {
   const [claudeHooks, setClaudeHooks] = useState(loadClaudeHooks);
   const { t } = useLocale();
   const effectiveChoice = hasProbedHarnessAvailability()
-    ? defaultSessionChoice(isHarnessAvailable)
+    ? defaultSessionChoice(availableHarnessIds())
     : choice;
 
   useEffect(() => {

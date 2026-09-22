@@ -1,9 +1,5 @@
 import type { HarnessId } from "./session";
 import { HARNESSES } from "./session";
-import {
-  hasProbedHarnessAvailability,
-  isHarnessAvailable,
-} from "./harness/availability";
 
 export type ModelSettingChoice = {
   value: string;
@@ -657,24 +653,24 @@ export function preferredModelId(harness: HarnessId): string {
 }
 
 /**
- * Provider + model new conversations should start with. A stale last choice
- * (harness since uninstalled) must not haunt new sessions: once probed, the
- * last harness is kept only while its CLI is present, otherwise the first
- * available harness wins. Never the hardcoded "cursor".
+ * Provider + model new conversations should start with.
+ *
+ * `availableHarnesses` is the probed CLI set (`HARNESSES.filter(
+ * isHarnessAvailable)` from the app layer). This module must not import the
+ * availability probe itself: it sits inside the session/models import graph
+ * that harness tests mock, and a static edge breaks their mock hoisting.
+ * `undefined` means unknown (probe pending): keep the last choice, else the
+ * static "claude" default — never a hardcoded "cursor", so an uninstalled
+ * CLI cannot haunt new sessions once the probe has run.
  */
 export function defaultSessionChoice(
-  available?: (id: HarnessId) => boolean,
+  availableHarnesses?: readonly HarnessId[],
 ): LastModelChoice {
-  const check =
-    available ??
-    (hasProbedHarnessAvailability() ? isHarnessAvailable : undefined);
   const last = loadLastModelChoice();
-  if (last && (!check || check(last.harness))) {
+  if (last && (!availableHarnesses || availableHarnesses.includes(last.harness))) {
     return { harness: last.harness, model: preferredModelId(last.harness) };
   }
-  const harness = check
-    ? (HARNESSES.find(check) ?? "claude")
-    : (last?.harness ?? "cursor");
+  const harness = availableHarnesses?.[0] ?? "claude";
   return { harness, model: preferredModelId(harness) };
 }
 

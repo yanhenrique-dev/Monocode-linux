@@ -27,6 +27,7 @@ import {
   type HarnessId,
   type Session,
 } from "../lib/session";
+import { availableHarnessIds } from "../lib/harness/availability";
 import { newTab } from "../lib/layout";
 import { forgetHarnessSession } from "../lib/harness";
 import { orchestrator } from "../lib/orchestration";
@@ -306,6 +307,7 @@ export function useHistory(deps: HistoryDeps) {
           newAvailableDefaultSession(
             seed?.cwd ?? projectCwdRef.current,
             seed?.runtimeMode,
+            availableHarnessIds(),
           ),
       });
       if (!result) return;

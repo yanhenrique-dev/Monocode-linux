@@ -5,7 +5,13 @@ import type { HarnessId } from "./session";
 const { isHarnessAvailable } = vi.hoisted(() => ({
   isHarnessAvailable: vi.fn<(id: HarnessId) => boolean>(),
 }));
-vi.mock("./harness/availability", () => ({ isHarnessAvailable }));
+vi.mock("./harness/availability", () => ({
+  isHarnessAvailable,
+  availableHarnessIds: () =>
+    (
+      ["claude", "codex", "cursor", "grok", "opencode", "pi", "omp", "fx", "hermes", "mcode", "antigravity"] as HarnessId[]
+    ).filter((id) => isHarnessAvailable(id)),
+}));
 
 import { preferredModelId, resolveModel, saveLastModelChoice } from "./models";
 import { newAvailableDefaultSession, newSessionForSeed } from "./session";

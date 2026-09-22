@@ -130,23 +130,8 @@ import {
 } from "./transcriptActivity";
 
 const NEAR_BOTTOM_PX = 16;
-<<<<<<< HEAD
 /** Below this turn count the list renders natively: native scroll, no jump. */
 const VIRTUALIZE_MIN_TURNS = 40;
-=======
-/** Rough turn height until measured; the virtualizer corrects per item. */
-const TURN_ESTIMATE_PX = 320;
-const TURN_ESTIMATE_USER_PX = 96;
-const TURN_ESTIMATE_TOOL_PX = 160;
-
-/** Pre-measure guess by turn shape; folds and prose correct on measure. */
-function estimateTurnHeight(turn: Block[] | undefined): number {
-  if (!turn || turn.length === 0) return TURN_ESTIMATE_PX;
-  if (turn.length === 1 && turn[0].role === "user") return TURN_ESTIMATE_USER_PX;
-  if (turn.every((block) => block.role === "tool")) return TURN_ESTIMATE_TOOL_PX;
-  return TURN_ESTIMATE_PX;
-}
->>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
 
 type Props = {
   blocks: Block[];
@@ -296,14 +281,10 @@ function AgentTranscriptContent({
     enabled: virtualize,
     count: turns.length,
     getScrollElement: () => scroller.current,
-<<<<<<< HEAD
     // Per-turn heuristic (text lines, tool rows) instead of a flat 320px:
     // a total close to reality means measurements barely move scrollTop.
     estimateSize: (index) =>
       estimateTurnHeight(turnsRef.current[index] ?? []),
-=======
-    estimateSize: (index) => estimateTurnHeight(turnsRef.current[index]),
->>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
     getItemKey,
     // Extreme sessions mount less chrome around the viewport.
     overscan: turns.length > 200 ? 4 : 8,
@@ -715,19 +696,6 @@ type TurnEnv = {
   remeasure: () => void;
 };
 
-<<<<<<< HEAD
-/**
- * One turn of the transcript: the virtualizer mounts only the visible window.
- * Memoized so streaming tokens recompute only turns whose blocks changed
- * (plus the live tail, whose `settled` flips) instead of the whole list.
- */
-const TranscriptTurn = memo(function TranscriptTurn({
-  turn,
-  absoluteIndex,
-  isLastTurn,
-  env,
-}: {
-=======
 /** Volatile block fields a turn re-render must observe; ids alone would freeze live tool progress. */
 export function sameTranscriptBlock(a: Block, b: Block): boolean {
   return (
@@ -761,7 +729,6 @@ export function sameTranscriptTurn(a: Block[], b: Block[]): boolean {
 }
 
 type TranscriptTurnProps = {
->>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
   turn: Block[];
   absoluteIndex: number;
   isLastTurn: boolean;
@@ -1061,9 +1028,6 @@ const TranscriptTurn = memo(function TranscriptTurn({
       ) : null}
     </div>
   );
-<<<<<<< HEAD
-});
-=======
 },
 compareTranscriptTurn);
 
@@ -1108,7 +1072,6 @@ function compareTranscriptTurn(
     a.remeasure === b.remeasure
   );
 }
->>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
 
 function AgentTranscriptComponent(props: Props) {
   return (
