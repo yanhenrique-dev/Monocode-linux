@@ -12,6 +12,7 @@ import {
   preferredModelSettings,
   resolveModel,
 } from "./models";
+import { isHarnessAvailable } from "./harness/availability";
 
 export type HarnessId =
   | "claude"
@@ -454,6 +455,39 @@ export function newDefaultSession(
 ): Session {
   const choice = defaultSessionChoice();
   return newSession(choice.harness, cwd, choice.model, runtimeMode);
+}
+
+/** New conversation on a provider actually installed. (porte #208) */
+export function newAvailableDefaultSession(
+  cwd = "~",
+  runtimeMode: RuntimeMode = DEFAULT_RUNTIME_MODE,
+): Session {
+  const { harness, model } = defaultSessionChoice(isHarnessAvailable);
+  return newSession(harness, cwd, model, runtimeMode);
+}
+
+type SessionSeed = {
+  harness: HarnessId;
+  model?: string;
+  runtimeMode?: RuntimeMode;
+  modelSettings?: Session["modelSettings"];
+};
+
+/** New conversation from a seed, falling back when its provider is gone. */
+export function newSessionForSeed(
+  seed: SessionSeed | undefined,
+  cwd: string,
+): Session {
+  if (!seed || !isHarnessAvailable(seed.harness)) {
+    return newAvailableDefaultSession(cwd, seed?.runtimeMode);
+  }
+  return newSession(
+    seed.harness,
+    cwd,
+    seed.model,
+    seed.runtimeMode,
+    seed.modelSettings,
+  );
 }
 
 /** First line of a prompt, truncated for the tab strip. */

@@ -9,7 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import {
-  newDefaultSession,
+  newAvailableDefaultSession,
   sessionWorkCwd,
   type Session,
 } from "../lib/session";
@@ -106,7 +106,7 @@ export function useProjectTerminals(deps: ProjectTerminalsDeps) {
   const onSplit = useCallback(
     (dir: SplitDir) => {
       if (!activeTab) return;
-      const session = newDefaultSession(
+      const session = newAvailableDefaultSession(
         sessionDefaults?.cwd ?? projectCwd,
         sessionDefaults?.runtimeMode,
       );

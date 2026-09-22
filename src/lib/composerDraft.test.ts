@@ -7,8 +7,10 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 import {
   discardPendingDraft,
   flushSessionDraft,
+  getLiveDraft,
   loadSessionDraft,
   saveSessionDraft,
+  setLiveDraft,
 } from "./composerDraft";
 
 describe("composerDraft", () => {
@@ -119,5 +121,27 @@ describe("composerDraft", () => {
     await expect(loadSessionDraft("s-5")).resolves.toBe("restored draft");
     invoke.mockRejectedValueOnce(new Error("missing table"));
     await expect(loadSessionDraft("s-6")).resolves.toBe("");
+  });
+
+  it("live draft answers back without a backend round-trip", () => {
+    expect(getLiveDraft("live-never")).toBeUndefined();
+    setLiveDraft("live-1", "half-typed message");
+    expect(getLiveDraft("live-1")).toBe("half-typed message");
+  });
+
+  it("live draft keeps sessions apart and holds the empty marker", async () => {
+    setLiveDraft("live-a", "draft A");
+    setLiveDraft("live-b", "draft B");
+    expect(getLiveDraft("live-a")).toBe("draft A");
+    // Clearing keeps an explicit empty marker so a remount inside the
+    // persist window does not resurrect the previous backend text.
+    setLiveDraft("live-a", "");
+    expect(getLiveDraft("live-a")).toBe("");
+    expect(getLiveDraft("live-b")).toBe("draft B");
+    // Once the backend confirms the empty write, the marker drops.
+    saveSessionDraft("live-a", "");
+    await vi.advanceTimersByTimeAsync(600);
+    expect(getLiveDraft("live-a")).toBeUndefined();
+    setLiveDraft("live-b", "");
   });
 });

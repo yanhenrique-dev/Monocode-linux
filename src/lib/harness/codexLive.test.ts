@@ -33,9 +33,14 @@ const {
   stopCodexSession,
   __codexTestReset,
 } = await import("./codex");
+// Dynamic: apply.ts reaches ./child through models/session/availability,
+// so a static import would run the mock factory before these declarations.
+const { applyHarnessEvent } = await import("./apply");
+// Dynamic: session.ts reaches ./child through harness/availability, so a
+// static import would run the mock factory before these declarations.
+const { newSession } = await import("../session");
 import type { HarnessEvent } from "./types";
-import { newSession, type RuntimeMode, type TurnIntent } from "../session";
-import { applyHarnessEvent } from "./apply";
+import type { RuntimeMode, TurnIntent } from "../session";
 
 // Shared live-harness scaffold (see `./liveTestUtils`); local aliases keep
 // the 200+ call sites below untouched.

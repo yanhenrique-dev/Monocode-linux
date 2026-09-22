@@ -17,7 +17,7 @@ import {
 } from "../lib/linear";
 import { linkedWorkItemFromInboxItem } from "../lib/sessionWorkItem";
 import { looksLikeProject } from "../lib/recents";
-import { newDefaultSession, type Session } from "../lib/session";
+import { newAvailableDefaultSession, type Session } from "../lib/session";
 import { newTab, type WorkspaceTab } from "../lib/layout";
 import {
   ADD_NOTE_TO_CHAT_EVENT,
@@ -74,7 +74,7 @@ export function useSessionBootstrap(deps: SessionBootstrapDeps) {
     setInboxViewOpen(false);
     setNotesViewOpen(false);
     const cwd = active?.cwd ?? sessionDefaults?.cwd ?? projectCwd;
-    const session = newDefaultSession(cwd, sessionDefaults?.runtimeMode);
+    const session = newAvailableDefaultSession(cwd, sessionDefaults?.runtimeMode);
     const tab = newTab(session.id);
     setSessions((prev) => [...prev, session]);
     appendTab(tab, cwd);
@@ -103,7 +103,7 @@ export function useSessionBootstrap(deps: SessionBootstrapDeps) {
             : `#${item.number}`;
         const linkedWorkItem = linkedWorkItemFromInboxItem(item);
         const session = {
-          ...newDefaultSession(cwd, sessionDefaults?.runtimeMode),
+          ...newAvailableDefaultSession(cwd, sessionDefaults?.runtimeMode),
           title: `${ref} ${item.title}`,
           inboxCard: inboxComposerCard(item, description),
           ...(linkedWorkItem ? { linkedWorkItem } : {}),
@@ -159,7 +159,7 @@ export function useSessionBootstrap(deps: SessionBootstrapDeps) {
         projectCwd;
       const title = card.title.trim();
       const session = {
-        ...newDefaultSession(cwd, sessionDefaults?.runtimeMode),
+        ...newAvailableDefaultSession(cwd, sessionDefaults?.runtimeMode),
         ...(title ? { title } : {}),
         noteCard: card,
       };

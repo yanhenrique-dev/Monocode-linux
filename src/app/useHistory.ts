@@ -20,8 +20,8 @@ import {
   summaryFromSession,
 } from "../lib/sessionHistory";
 import {
-  newDefaultSession,
-  newSession,
+  newAvailableDefaultSession,
+  newSessionForSeed,
   formatSessionTitle,
   sessionDisplayTitle,
   type HarnessId,
@@ -303,7 +303,7 @@ export function useHistory(deps: HistoryDeps) {
         replaceTarget,
         scope: tabCloseScope,
         createReplacement: (seed) =>
-          newDefaultSession(
+          newAvailableDefaultSession(
             seed?.cwd ?? projectCwdRef.current,
             seed?.runtimeMode,
           ),
@@ -453,12 +453,14 @@ export function useHistory(deps: HistoryDeps) {
             dirtyFiles: dirtyFilesRef.current,
           }),
           createReplacement: (latest) =>
-            newSession(
-              latest?.harness ?? seed?.harness ?? "cursor",
+            newSessionForSeed(
+              {
+                harness: latest?.harness ?? seed?.harness ?? "cursor",
+                model: latest?.model ?? seed?.model,
+                runtimeMode: latest?.runtimeMode ?? seed?.runtimeMode,
+                modelSettings: latest?.modelSettings ?? open?.modelSettings,
+              },
               latest?.cwd ?? seed?.cwd ?? sidebarCwd,
-              latest?.model ?? seed?.model,
-              latest?.runtimeMode ?? seed?.runtimeMode,
-              latest?.modelSettings ?? open?.modelSettings,
             ),
           confirmClose: async (closedTabs) => {
             const files = filesInWorkspaceTabs(closedTabs);

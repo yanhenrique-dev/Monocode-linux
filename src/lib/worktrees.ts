@@ -4,7 +4,7 @@ import { notifyGitChanged } from "./fs";
 import { isFilesystemTab, type FilePaneTab } from "./layout";
 import { isEqualOrInside, pathKey } from "./paths";
 import { isBlankSession } from "./projectReturn";
-import { newSession, sessionWorkCwd, type Session } from "./session";
+import { newSessionForSeed, sessionWorkCwd, type Session } from "./session";
 
 export type Worktree = {
   path: string;
@@ -167,13 +167,7 @@ export function sessionInWorktree(session: Session, tree: Worktree): Session {
       : isBlankSession(session)
         ? session
         : {
-            ...newSession(
-              session.harness,
-              session.cwd,
-              session.model,
-              session.runtimeMode,
-              session.modelSettings,
-            ),
+            ...newSessionForSeed(session, session.cwd),
             providerAccountId: session.providerAccountId,
           };
   return {

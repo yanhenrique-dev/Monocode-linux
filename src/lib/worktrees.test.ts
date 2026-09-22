@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { newFileTab, newTerminalFile } from "./layout";
 import { newSession, sessionWorkCwd } from "./session";
 import {
@@ -8,6 +8,14 @@ import {
   worktreeSessionIds,
   type Worktree,
 } from "./worktrees";
+
+// sessionInWorktree resolves the new session through the seed with provider
+// availability: pretend every provider is installed so cloning keeps the
+// source harness (the uninstalled fallback lives in sessionSeed.test.ts).
+vi.mock("./harness/availability", () => ({
+  isHarnessAvailable: vi.fn(() => true),
+  hasProbedHarnessAvailability: vi.fn(() => true),
+}));
 
 const tree: Worktree = {
   path: "/repo-worktrees/feature",

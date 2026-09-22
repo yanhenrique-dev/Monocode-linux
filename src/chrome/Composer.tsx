@@ -387,6 +387,22 @@ export const Composer = memo(function Composer({
       !!noteCard ||
       !!handoffCard,
   );
+  // A new conversation reusing this pane must not inherit the previous
+  // draft: useState seeds only on mount and the DOM sync below skips empty
+  // drafts, so an explicit reset runs here instead of remounting the pane.
+  const [draftSessionId, setDraftSessionId] = useState(sessionId);
+  if (draftSessionId !== sessionId) {
+    setDraftSessionId(sessionId);
+    const next = initialDraft ?? "";
+    setDraft(next);
+    setHasValue(
+      next.trim().length > 0 || !!inboxCard || !!noteCard || !!handoffCard,
+    );
+    if (ref.current) {
+      ref.current.value = next;
+      resizeComposer(ref.current);
+    }
+  }
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [fileDrag, setFileDrag] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);

@@ -52,7 +52,7 @@ import {
   cancelHarnessTurn,
   forgetHarnessSession,
 } from "../lib/harness";
-import { newDefaultSession, newSession, type Session } from "../lib/session";
+import { newAvailableDefaultSession, newSessionForSeed, type Session } from "../lib/session";
 import { isBlankSession, planProjectReturn } from "../lib/projectReturn";
 import {
   keepSessionChanges,
@@ -189,13 +189,7 @@ export function useProjects(deps: ProjectsDeps) {
       ) {
         setProjectCwd(normalized);
         setRecents(rememberProject(normalized));
-        const session = newSession(
-          current.harness,
-          normalized,
-          current.model,
-          current.runtimeMode,
-          current.modelSettings,
-        );
+        const session = newSessionForSeed(current, normalized);
         const tab = newTab(session.id);
         setSessions((prev) => [...prev, session]);
         appendTab(tab, normalized);
@@ -312,13 +306,7 @@ export function useProjects(deps: ProjectsDeps) {
       }
 
       const seed = current ?? sessionsRef.current[0];
-      const session = newSession(
-        seed?.harness ?? "claude",
-        normalized,
-        seed?.model,
-        seed?.runtimeMode,
-        seed?.modelSettings,
-      );
+      const session = newSessionForSeed(seed, normalized);
       const tab = newTab(session.id);
       setProjectCwd(normalized);
       setRecents(rememberProject(normalized));
@@ -424,7 +412,7 @@ export function useProjects(deps: ProjectsDeps) {
 
       if (nextTabs.length === 0) {
         const fallback = nextSessions[0];
-        const session = newDefaultSession("~", fallback?.runtimeMode);
+        const session = newAvailableDefaultSession("~", fallback?.runtimeMode);
         const tab = newTab(session.id);
         nextSessions = [...nextSessions, session];
         nextTabs = [tab];

@@ -58,8 +58,10 @@ import {
 } from "../lib/quoteDraft";
 import {
   flushSessionDraft,
+  getLiveDraft,
   loadSessionDraft,
   saveSessionDraft,
+  setLiveDraft,
 } from "../lib/composerDraft";
 import { createNote, noteTitle } from "../lib/notes";
 import { canEditLastTurn, lastTurnRecall } from "../lib/editLastTurn";
@@ -464,7 +466,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const workCwd = sessionWorkCwd(session);
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
-  const draftRef = useRef<string | undefined>(undefined);
+  const draftRef = useRef<string | undefined>(getLiveDraft(session.id));
   // Persisted draft for this session, loaded once per pane mount. The Composer
   // picks up late loads through its `initialDraft` sync effect. (porte #321)
   const [restoredDraft, setRestoredDraft] = useState<string | undefined>(
@@ -472,7 +474,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   );
   useEffect(() => {
     let cancelled = false;
-    draftRef.current = undefined;
+    draftRef.current = getLiveDraft(session.id);
     setRestoredDraft(undefined);
     void loadSessionDraft(session.id).then((text) => {
       if (!cancelled && text) setRestoredDraft(text);
@@ -525,6 +527,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       }
       onDraftChange={(text) => {
         draftRef.current = text;
+        setLiveDraft(session.id, text);
         saveSessionDraft(session.id, text);
       }}
       inboxCard={session.inboxCard}
