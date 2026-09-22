@@ -130,8 +130,23 @@ import {
 } from "./transcriptActivity";
 
 const NEAR_BOTTOM_PX = 16;
+<<<<<<< HEAD
 /** Below this turn count the list renders natively: native scroll, no jump. */
 const VIRTUALIZE_MIN_TURNS = 40;
+=======
+/** Rough turn height until measured; the virtualizer corrects per item. */
+const TURN_ESTIMATE_PX = 320;
+const TURN_ESTIMATE_USER_PX = 96;
+const TURN_ESTIMATE_TOOL_PX = 160;
+
+/** Pre-measure guess by turn shape; folds and prose correct on measure. */
+function estimateTurnHeight(turn: Block[] | undefined): number {
+  if (!turn || turn.length === 0) return TURN_ESTIMATE_PX;
+  if (turn.length === 1 && turn[0].role === "user") return TURN_ESTIMATE_USER_PX;
+  if (turn.every((block) => block.role === "tool")) return TURN_ESTIMATE_TOOL_PX;
+  return TURN_ESTIMATE_PX;
+}
+>>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
 
 type Props = {
   blocks: Block[];
@@ -281,10 +296,14 @@ function AgentTranscriptContent({
     enabled: virtualize,
     count: turns.length,
     getScrollElement: () => scroller.current,
+<<<<<<< HEAD
     // Per-turn heuristic (text lines, tool rows) instead of a flat 320px:
     // a total close to reality means measurements barely move scrollTop.
     estimateSize: (index) =>
       estimateTurnHeight(turnsRef.current[index] ?? []),
+=======
+    estimateSize: (index) => estimateTurnHeight(turnsRef.current[index]),
+>>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
     getItemKey,
     // Extreme sessions mount less chrome around the viewport.
     overscan: turns.length > 200 ? 4 : 8,
@@ -315,6 +334,16 @@ function AgentTranscriptContent({
     // Run once per mount: identity-stable on options, not on data.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [virtualize]);
+
+  // The last-turn stretch (prompt glued to the composer) applies only once
+  // items carry real measurements; stretching on estimates makes the
+  // composer jump when the measure lands.
+  const [anchorMeasured, setAnchorMeasured] = useState(false);
+  useLayoutEffect(() => {
+    if (!anchorMeasured && virtualize && virtualItems.length > 0) {
+      setAnchorMeasured(true);
+    }
+  }, [anchorMeasured, virtualize, virtualItems.length]);
 
   const revealBlock = useCallback(
     (blockId: string): boolean => {
@@ -607,7 +636,11 @@ function AgentTranscriptContent({
                   width: "100%",
                   transform: `translateY(${virtualItem.start}px)`,
                   minHeight:
-                    isLastTurn && anchorTurn && promptAnchor && lastTurnUserBlock
+                    isLastTurn &&
+                    anchorTurn &&
+                    promptAnchor &&
+                    lastTurnUserBlock &&
+                    anchorMeasured
                       ? "var(--transcript-viewport, 0px)"
                       : undefined,
                 }}
@@ -682,6 +715,7 @@ type TurnEnv = {
   remeasure: () => void;
 };
 
+<<<<<<< HEAD
 /**
  * One turn of the transcript: the virtualizer mounts only the visible window.
  * Memoized so streaming tokens recompute only turns whose blocks changed
@@ -693,11 +727,59 @@ const TranscriptTurn = memo(function TranscriptTurn({
   isLastTurn,
   env,
 }: {
+=======
+/** Volatile block fields a turn re-render must observe; ids alone would freeze live tool progress. */
+function sameTranscriptBlock(a: Block, b: Block): boolean {
+  return (
+    a.id === b.id &&
+    a.role === b.role &&
+    a.text === b.text &&
+    a.streaming === b.streaming &&
+    a.durationMs === b.durationMs &&
+    a.tool?.status === b.tool?.status &&
+    a.tool?.title === b.tool?.title &&
+    a.tool?.detail === b.tool?.detail &&
+    a.tool?.preview === b.tool?.preview &&
+    a.approval?.requestId === b.approval?.requestId &&
+    a.approval?.decided === b.approval?.decided &&
+    a.taskList === b.taskList &&
+    a.agentRun === b.agentRun &&
+    a.orchestration === b.orchestration &&
+    a.plan === b.plan &&
+    (a.attachments?.length ?? 0) === (b.attachments?.length ?? 0)
+  );
+}
+
+function sameTranscriptTurn(a: Block[], b: Block[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((block, index) => {
+      const other = b[index];
+      return other !== undefined && sameTranscriptBlock(block, other);
+    })
+  );
+}
+
+type TranscriptTurnProps = {
+>>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
   turn: Block[];
   absoluteIndex: number;
   isLastTurn: boolean;
   env: TurnEnv;
-}) {
+};
+
+/**
+ * One turn of the transcript: the virtualizer mounts only the visible
+ * window, and memo keeps settled turns out of every streaming re-render.
+ * `blocks` itself is excluded on purpose: the turn content comparison
+ * above already covers what the turn reads from it.
+ */
+const TranscriptTurn = memo(function TranscriptTurn({
+  turn,
+  absoluteIndex,
+  isLastTurn,
+  env,
+}: TranscriptTurnProps) {
   const userBlock = turnUserBlock(turn, env.managed);
   const secondOpinion = env.onSecondOpinion;
   const handoff = env.onHandoff;
@@ -979,7 +1061,54 @@ const TranscriptTurn = memo(function TranscriptTurn({
       ) : null}
     </div>
   );
+<<<<<<< HEAD
 });
+=======
+},
+compareTranscriptTurn);
+
+function compareTranscriptTurn(
+  previous: TranscriptTurnProps,
+  next: TranscriptTurnProps,
+): boolean {
+  if (previous.absoluteIndex !== next.absoluteIndex) return false;
+  if (previous.isLastTurn !== next.isLastTurn) return false;
+  if (!sameTranscriptTurn(previous.turn, next.turn)) return false;
+  const a = previous.env;
+  const b = next.env;
+  return (
+    a.managed === b.managed &&
+    a.busy === b.busy &&
+    a.harness === b.harness &&
+    a.model === b.model &&
+    a.modelSettings === b.modelSettings &&
+    a.cwd === b.cwd &&
+    a.transcriptLayout === b.transcriptLayout &&
+    a.promptAnchor === b.promptAnchor &&
+    a.anchorTurn === b.anchorTurn &&
+    a.openWork[previous.turn[0]?.id ?? ""] ===
+      b.openWork[next.turn[0]?.id ?? ""] &&
+    a.waitingForApproval === b.waitingForApproval &&
+    a.pendingQuestion === b.pendingQuestion &&
+    a.currentModelName === b.currentModelName &&
+    a.preparingHandoff === b.preparingHandoff &&
+    a.editableBlockId === b.editableBlockId &&
+    a.visible === b.visible &&
+    a.editingLastTurn === b.editingLastTurn &&
+    a.latestTurnAccessory === b.latestTurnAccessory &&
+    a.onApproval === b.onApproval &&
+    a.onSaveNote === b.onSaveNote &&
+    a.onOpenFile === b.onOpenFile &&
+    a.onOpenDiff === b.onOpenDiff &&
+    a.onOpenPlan === b.onOpenPlan &&
+    a.onBuildPlan === b.onBuildPlan &&
+    a.onSecondOpinion === b.onSecondOpinion &&
+    a.onHandoff === b.onHandoff &&
+    a.onEditLastTurn === b.onEditLastTurn &&
+    a.remeasure === b.remeasure
+  );
+}
+>>>>>>> 2b3ae91 (feat(transcript): memo turns, typed estimates, fold tracking, anchor gate, in-transcript find)
 
 function AgentTranscriptComponent(props: Props) {
   return (
@@ -1760,12 +1889,21 @@ function TurnRow({
 
   useEffect(() => {
     if (foldState !== "opening" && foldState !== "closing") return;
+    // A fold passes through intermediate heights for ~200ms while the
+    // virtualized item keeps its old size, shoving neighbors at the end.
+    // Remeasure mid-flight so the window tracks the animation instead.
+    const tracker = window.setInterval(() => {
+      onSettled?.();
+    }, 64);
     // Hidden tabs and reduced-motion styles may never fire animationend.
     const timer = window.setTimeout(() => {
       setFoldState(folded ? "closed" : "open");
       onSettled?.();
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearInterval(tracker);
+      window.clearTimeout(timer);
+    };
   }, [foldState, folded, onSettled]);
 
   if (folded && foldState === "closed") return null;

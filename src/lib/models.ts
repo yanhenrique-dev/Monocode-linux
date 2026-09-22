@@ -656,7 +656,6 @@ export function preferredModelId(harness: HarnessId): string {
   return defaultModelId(harness);
 }
 
-<<<<<<< HEAD
 /**
  * Provider + model new conversations should start with. A stale last choice
  * (harness since uninstalled) must not haunt new sessions: once probed, the
