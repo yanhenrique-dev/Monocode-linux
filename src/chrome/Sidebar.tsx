@@ -566,7 +566,7 @@ function SidebarComponent({
   const sidebarAnimations = useExperimentalAnimations();
   const [sidebarHeld, setSidebarHeld] = useState(sidebarVisible);
   const [sidebarEntered, setSidebarEntered] = useState(false);
-  const sidebarSeen = useRef(false);
+  const prevSidebarVisible = useRef(sidebarVisible);
   const {
     closing: sidebarClosing,
     requestClose: requestSidebarClose,
@@ -582,9 +582,11 @@ function SidebarComponent({
       cancelSidebarClose();
       setSidebarHeld(true);
       // The first commit that finds the sidebar already visible is the
-      // boot layout: appear dry, animate only later opens.
-      if (sidebarSeen.current) setSidebarEntered(true);
-      sidebarSeen.current = true;
+      // boot layout: appear dry, animate only false-to-true transitions.
+      if (sidebarVisible && !prevSidebarVisible.current) {
+        setSidebarEntered(true);
+      }
+      prevSidebarVisible.current = sidebarVisible;
     } else if (sidebarHeld) {
       requestSidebarClose();
     }

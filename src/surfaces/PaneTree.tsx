@@ -231,6 +231,11 @@ function PaneTreeComponent({
   onTerminalMetaChange,
 }: Props) {
   const treeRef = useRef<HTMLDivElement>(null);
+  /** First paint of the tree is dry; panes mounted later may fade in. */
+  const paintedRef = useRef(false);
+  useEffect(() => {
+    paintedRef.current = true;
+  }, []);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const [draft, setDraft] = useState<LayoutNode | null>(null);
@@ -446,6 +451,7 @@ function PaneTreeComponent({
                 exiting={!editorPane}
                 animating={fileAnimations}
                 onExitEnd={() => dropHeldFilePane(leaf.id)}
+                paintedRef={paintedRef}
               >
                 {(pane) => (
                   <FilePane
@@ -561,9 +567,6 @@ export const PaneTree = memo(
   (previous, next) => !previous.visible && !next.visible,
 );
 
-/** First paint of the tree is dry; panes mounted later may fade in. */
-let paneTreePainted = false;
-
 /** Enter/exit wrapper for the file pane: fades the center pane in place and
  * holds a just-closed pane through its outro. Uses the shared exit hook so
  * a missing `animationend` (WebKitGTK) still unmounts via timeout. */
@@ -572,20 +575,23 @@ function FilePanePresence({
   exiting,
   animating,
   onExitEnd,
+  paintedRef,
   children,
 }: {
   pane: EditorPane;
   exiting: boolean;
   animating: boolean;
   onExitEnd: () => void;
+  /** True once the tree committed its first paint: panes mounted before
+   * that are the boot layout and appear dry. */
+  paintedRef: { current: boolean };
   children: (pane: EditorPane) => ReactNode;
 }) {
   // Enter plays only for panes that arrive after boot; the boot layout
   // appears dry. Exit always plays while the held pane drains.
-  const [entered, setEntered] = useState(() => paneTreePainted);
+  const [entered, setEntered] = useState(() => paintedRef.current);
   const prevId = useRef(pane.id);
   useEffect(() => {
-    paneTreePainted = true;
     if (prevId.current !== pane.id) {
       prevId.current = pane.id;
       setEntered(true);

@@ -630,15 +630,11 @@ html.is-resizing * {
 .fold-body {
   display: grid;
   grid-template-rows: 0fr;
-  opacity: 0;
-  transition:
-    grid-template-rows var(--motion-fold-out) var(--motion-ease-out),
-    opacity var(--motion-out) ease;
+  transition: grid-template-rows var(--motion-fold-out) var(--motion-ease-out);
 }
 
 .fold-body[data-open="true"] {
   grid-template-rows: 1fr;
-  opacity: 1;
 }
 
 .fold-body > * {
@@ -1384,14 +1380,11 @@ html.is-resizing .glass-blur {
 .zen-phase-body {
   display: grid;
   grid-template-rows: 1fr;
-  transition:
-    grid-template-rows var(--motion-fold-in) var(--motion-ease-out),
-    opacity var(--motion-out) ease;
+  transition: grid-template-rows var(--motion-fold-in) var(--motion-ease-out);
 }
 
 .zen-phase-body[data-open="false"] {
   grid-template-rows: 0fr;
-  opacity: 0;
 }
 
 .zen-phase-body > * {
