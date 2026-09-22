@@ -642,8 +642,9 @@ export async function githubPrChecks(
       prChecksByKey.set(key, resolved);
       return resolved;
     } catch {
+      // Transient failure: return the fallback without caching it so the
+      // next mount retries instead of serving UNKNOWN forever.
       const unknown: GithubPrChecks = { state: "UNKNOWN", checks: [] };
-      prChecksByKey.set(key, unknown);
       return unknown;
     } finally {
       prChecksInflight.delete(key);
@@ -833,7 +834,7 @@ function mergeInboxListItems(
   delta: InboxItem[],
   since?: string,
 ): InboxItem[] {
-  if (delta.length === 0) return previous;
+  if (delta.length === 0 && !since) return previous;
   const byKey = new Map(previous.map((item) => [inboxItemKey(item), item]));
   for (const item of delta) byKey.set(inboxItemKey(item), item);
   if (since) {

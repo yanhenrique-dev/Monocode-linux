@@ -2566,6 +2566,7 @@ export function InboxDetail({
                   projectPath={item.projectPath}
                   repo={item.repo}
                   number={item.number}
+                  revision={revision}
                 />
               ) : null}
               {startError ? (

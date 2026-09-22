@@ -601,14 +601,18 @@ pub(crate) fn parse_github_pr_checks(json: &str) -> Result<GitHubPrChecks, Strin
             } else {
                 started_at
             };
+            // A terminal StatusContext carries its verdict in `state` with
+            // no `conclusion` (e.g. FAILURE). Normalize it so the frontend
+            // groups it as failed instead of successful.
+            let (status, conclusion) = match (status.to_uppercase(), conclusion.to_uppercase()) {
+                (status, conclusion) if !conclusion.is_empty() => (status, Some(conclusion)),
+                (status, _) if is_check_running_status(&status) => (status, None),
+                (status, _) => ("COMPLETED".to_string(), Some(status)),
+            };
             checks.push(GitHubPrCheck {
                 name: name.to_string(),
-                status: status.to_uppercase(),
-                conclusion: if conclusion.is_empty() {
-                    None
-                } else {
-                    Some(conclusion.to_uppercase())
-                },
+                status,
+                conclusion,
                 url: url.to_string(),
                 started_at: started_at.to_string(),
             });
@@ -616,6 +620,15 @@ pub(crate) fn parse_github_pr_checks(json: &str) -> Result<GitHubPrChecks, Strin
     }
     checks.sort_by(|a, b| a.name.cmp(&b.name).then(a.url.cmp(&b.url)));
     Ok(GitHubPrChecks { state, checks })
+}
+
+/// CheckRun/StatusContext states that mean "still running" rather than a
+/// verdict. Everything else without a conclusion is a terminal verdict.
+fn is_check_running_status(status: &str) -> bool {
+    matches!(
+        status,
+        "IN_PROGRESS" | "QUEUED" | "PENDING" | "WAITING" | "REQUESTED" | "EXPECTED"
+    )
 }
 
 /// Merge or change the lifecycle state of a GitHub pull request via `gh`.

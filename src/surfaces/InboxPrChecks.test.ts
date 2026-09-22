@@ -29,13 +29,14 @@ function check(overrides: Partial<GithubPrCheck> & { name: string }): GithubPrCh
 let container: HTMLDivElement;
 let root: Root;
 
-function renderChecks() {
+function renderChecks(revision = 0) {
   act(() =>
     root.render(
       createElement(GithubPrChecks, {
         projectPath: "/tmp/web",
         repo: "acme/web",
         number: 130,
+        revision,
       }),
     ),
   );
@@ -124,6 +125,52 @@ describe("GithubPrChecks", () => {
     await flush();
 
     expect(container.textContent).toContain("No conflicts with base branch");
+  });
+
+  it("prioritizes blocked over no-conflicts", async () => {
+    vi.mocked(githubPrChecks).mockResolvedValue({
+      state: "PENDING",
+      checks: [],
+    });
+    vi.mocked(githubPrMergeInfo).mockResolvedValue({
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "BLOCKED",
+    });
+    renderChecks();
+    await flush();
+
+    expect(container.textContent).toContain("Merging is blocked");
+    expect(container.textContent).not.toContain("No conflicts");
+  });
+
+  it("forces a reload when revision changes", async () => {
+    vi.mocked(githubPrChecks).mockResolvedValue({
+      state: "UNKNOWN",
+      checks: [],
+    });
+    renderChecks();
+    await flush();
+    expect(vi.mocked(githubPrChecks)).toHaveBeenCalledWith(
+      "/tmp/web",
+      "acme/web",
+      130,
+      undefined,
+    );
+
+    renderChecks(1);
+    await flush();
+    expect(vi.mocked(githubPrChecks)).toHaveBeenCalledWith(
+      "/tmp/web",
+      "acme/web",
+      130,
+      { force: true },
+    );
+    expect(vi.mocked(githubPrMergeInfo)).toHaveBeenCalledWith(
+      "/tmp/web",
+      "acme/web",
+      130,
+      { force: true },
+    );
   });
 
   it("reports an empty state when nothing is known", async () => {

@@ -1974,8 +1974,8 @@ fn parse_github_pr_checks_reads_runs_and_status_contexts() {
         .iter()
         .find(|check| check.name == "legacy-lint")
         .unwrap();
-    assert_eq!(legacy.status, "FAILURE");
-    assert_eq!(legacy.conclusion, None);
+    assert_eq!(legacy.status, "COMPLETED");
+    assert_eq!(legacy.conclusion, Some("FAILURE".into()));
 }
 
 #[test]

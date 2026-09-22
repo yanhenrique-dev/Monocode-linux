@@ -24,10 +24,13 @@ export function GithubPrChecks({
   projectPath,
   repo,
   number,
+  revision = 0,
 }: {
   projectPath: string;
   repo: string;
   number: number;
+  /** Bumped by explicit refreshes/actions: reloads checks past the cache. */
+  revision?: number;
 }) {
   const [checks, setChecks] = useState<GithubPrChecks | null>(null);
   const [mergeInfo, setMergeInfo] = useState<GithubPrMergeInfo | null>(null);
@@ -36,16 +39,17 @@ export function GithubPrChecks({
     let cancelled = false;
     setChecks(null);
     setMergeInfo(null);
-    void githubPrChecks(projectPath, repo, number).then((next) => {
+    const force = revision > 0 ? { force: true } : undefined;
+    void githubPrChecks(projectPath, repo, number, force).then((next) => {
       if (!cancelled) setChecks(next);
     });
-    void githubPrMergeInfo(projectPath, repo, number).then((next) => {
+    void githubPrMergeInfo(projectPath, repo, number, force).then((next) => {
       if (!cancelled) setMergeInfo(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [projectPath, repo, number]);
+  }, [projectPath, repo, number, revision]);
 
   if (!checks) return null;
   const { running, successful, failed } = groupGithubPrChecks(checks.checks);
@@ -142,14 +146,14 @@ function mergeNoteFor(
   }
   const mergeable = info.mergeable?.trim().toUpperCase();
   const state = info.mergeStateStatus?.trim().toUpperCase();
+  if (state === "BLOCKED") {
+    return { text: "Merging is blocked", className: "text-amber-400/90" };
+  }
   if (mergeable === "MERGEABLE" || state === "CLEAN" || state === "BEHIND") {
     return {
       text: "No conflicts with base branch",
       className: "text-content/55",
     };
-  }
-  if (state === "BLOCKED") {
-    return { text: "Merging is blocked", className: "text-amber-400/90" };
   }
   return null;
 }

@@ -114,6 +114,71 @@ describe("per-query list cache", () => {
     expect(merged.items.map((item) => item.number).sort()).toEqual([1, 2, 9]);
   });
 
+  it("evicts everything missing from an empty delta", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      switch (command) {
+        case "git_github_repositories":
+          return ["acme/web"] as never;
+        case "git_github_work_items": {
+          const { kind, updatedSince } = args as {
+            kind: string;
+            updatedSince?: string;
+          };
+          if (updatedSince) return [] as never;
+          return (
+            kind === "issue"
+              ? [
+                  workItem({
+                    number: 1,
+                    updatedAt: "2026-09-12T00:00:00Z",
+                  }),
+                ]
+              : [
+                  workItem({
+                    number: 2,
+                    kind: "pr",
+                    url: "https://github.com/acme/web/pull/2",
+                    updatedAt: "2026-09-12T00:00:00Z",
+                  }),
+                ]
+          ) as never;
+        }
+        case "linear_status":
+          return { connected: false } as never;
+        case "gitlab_connected":
+        case "gitlab_status":
+          return { connected: false } as never;
+        default:
+          throw new Error(`unexpected invoke: ${command}`);
+      }
+    });
+    const full = await listInboxItems(projects, openQuery);
+    expect(full.items.map((item) => item.number).sort()).toEqual([1, 2]);
+
+    const merged = await listInboxItems(projects, openQuery, {
+      since: "2026-09-11T00:00:00Z",
+    });
+    expect(merged.items).toEqual([]);
+  });
+
+  it("retries checks after a transient failure instead of caching UNKNOWN", async () => {
+    const { githubPrChecks } = await import("./githubTasks");
+    let calls = 0;
+    vi.mocked(invoke).mockImplementation(async (command) => {
+      if (command === "git_github_pr_checks") {
+        calls += 1;
+        if (calls === 1) throw new Error("offline");
+        return { state: "SUCCESS", checks: [] } as never;
+      }
+      throw new Error(`unexpected invoke: ${command}`);
+    });
+    const first = await githubPrChecks("/tmp/web", "acme/retry", 77);
+    expect(first).toEqual({ state: "UNKNOWN", checks: [] });
+    const second = await githubPrChecks("/tmp/web", "acme/retry", 77);
+    expect(second).toEqual({ state: "SUCCESS", checks: [] });
+    expect(calls).toBe(2);
+  });
+
   it("evicts window-fresh items missing from the delta, keeps idle ones", async () => {
     vi.mocked(invoke).mockImplementation(async (command, args) => {
       switch (command) {
