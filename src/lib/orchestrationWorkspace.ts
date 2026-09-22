@@ -81,11 +81,13 @@ export function consolidateOrchestrationTabs(
     }
     return remaining ? [remaining] : [];
   });
+  const leadTab = lead
+    ? next.find((tab) => leafIds(tab.layout).includes(lead))
+    : undefined;
+  if (lead && !leadTab) throw new Error(`Orchestration lead tab not found: ${lead}`);
   return {
     tabs: changed ? next : tabs,
-    activeTabId: lead
-      ? next.find((tab) => leafIds(tab.layout).includes(lead))!.id
-      : activeTabId,
+    activeTabId: leadTab ? leadTab.id : activeTabId,
   };
 }
 

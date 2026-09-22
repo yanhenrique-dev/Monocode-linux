@@ -42,7 +42,7 @@ import {
   useExitAnimation,
   useExperimentalAnimations,
 } from "../hooks/useExitAnimation";
-import { getIntlLocale } from "../lib/locale";
+import { formatCompactRelative } from "../lib/displayFormat";
 import { resolveModel } from "../lib/models";
 import type { OpenFileFn } from "../lib/search";
 import { sessionDisplayTitle } from "../lib/session";
@@ -2242,7 +2242,7 @@ function SessionCard({
     0;
   const title = sessionDisplayTitle(session.title, session.harness);
   const gitLabel = formatGitLabel(session.repo, session.branch);
-  const time = formatRelative(session.updatedAt, now);
+  const time = formatCompactRelative(session.updatedAt, now);
   const model =
     compact && !orchestrationExpanded
       ? null
@@ -2817,25 +2817,5 @@ function formatGitLabel(repo?: string, branch?: string): string {
   return branch || repo || "";
 }
 
-function formatRelative(value: number, now: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "";
-  const seconds = Math.max(0, Math.round((now - value) / 1000));
-  if (seconds < 60) return "now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    const rest = minutes % 60;
-    return rest ? `${hours}h ${rest}m` : `${hours}h`;
-  }
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  try {
-    return new Intl.DateTimeFormat(getIntlLocale(), {
-      month: "short",
-      day: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return "";
-  }
-}
+/** @deprecated Import `formatCompactRelative` from `../lib/displayFormat`. */
+export const formatRelative = formatCompactRelative;

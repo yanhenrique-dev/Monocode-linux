@@ -1,4 +1,5 @@
 import { nativeModelId } from "../models";
+import { logDebug } from "../logger";
 import type { RuntimeMode } from "../session";
 import { AcpClient, type AcpHandlers } from "./acp";
 import {
@@ -268,7 +269,7 @@ async function ensureLive(input: SendTurnInput): Promise<Live> {
       emit({ type: "session.ended", code });
     },
     (line) => {
-      console.debug("[monocode] mcode stderr", line);
+      logDebug("mcode", "stderr", line);
       if (/login|credential|api key|provider/i.test(line)) {
         emit({ type: "session.error", message: line.trim() });
       }

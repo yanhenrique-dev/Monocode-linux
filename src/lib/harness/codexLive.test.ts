@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createLiveWire,
+  withoutTurnIdentity,
+} from "./liveTestUtils";
 
-const sent: string[] = [];
-let onLine: ((line: string) => void) | undefined;
+const wire = createLiveWire();
+const sent = wire.sent;
 const writeChild = vi.fn(async (_id: string, line: string) => {
   sent.push(line);
 });
@@ -12,7 +16,7 @@ vi.mock("./child", () => ({
   killChild: async () => undefined,
   unwatchChild: () => undefined,
   watchChild: (_id: string, line: (l: string) => void) => {
-    onLine = line;
+    wire.connect(line);
   },
   writeChild,
 }));
@@ -33,30 +37,14 @@ import type { HarnessEvent } from "./types";
 import { newSession, type RuntimeMode, type TurnIntent } from "../session";
 import { applyHarnessEvent } from "./apply";
 
-function parse() {
-  return sent.map((line) => JSON.parse(line) as Record<string, unknown>);
-}
-
-function reply(id: number, result: unknown) {
-  onLine!(JSON.stringify({ id, result }));
-}
-
-function notify(method: string, params: unknown) {
-  onLine!(JSON.stringify({ method, params }));
-}
-function withoutTurnIdentity(events: HarnessEvent[]) {
-  return events.filter((event) => event.type !== "turn.started");
-}
-
-const waitFor = async (pred: () => boolean, label: string) => {
-  for (let i = 0; i < 200; i++) {
-    if (pred()) return;
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  throw new Error(
-    `timed out waiting for ${label}; sent=${JSON.stringify(parse().map((m) => m.method ?? `reply:${m.id}`))}`,
-  );
-};
+// Shared live-harness scaffold (see `./liveTestUtils`); local aliases keep
+// the 200+ call sites below untouched.
+const parse = (): Record<string, unknown>[] => wire.parse();
+const reply = (id: number, result: unknown): void => wire.reply(id, result);
+const notify = (method: string, params: unknown): void =>
+  wire.notify(method, params);
+const waitFor = (pred: () => boolean, label: string): Promise<void> =>
+  wire.waitFor(pred, label);
 
 async function startTurn(
   sessionId: string,
@@ -109,8 +97,7 @@ async function startTurn(
 
 describe("codex live turn sequence", () => {
   beforeEach(() => {
-    sent.length = 0;
-    onLine = undefined;
+    wire.reset();
     writeChild.mockClear();
   });
 
@@ -193,7 +180,7 @@ describe("codex live turn sequence", () => {
       const { events, turn } = await startTurn("codex-live", {
         resume,
         beforeThreadReply: async () => {
-          onLine!(
+          wire.deliver(
             JSON.stringify({
               id: "clock_setup",
               method: "currentTime/read",
@@ -228,7 +215,7 @@ describe("codex live turn sequence", () => {
       ).toMatchObject({
         collaborationMode: { mode: intent === "plan" ? "plan" : "default" },
       });
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: "pending_question",
           method: "item/tool/requestUserInput",
@@ -250,7 +237,7 @@ describe("codex live turn sequence", () => {
         ["clock_next", 1_789_000_005_123],
       ] as const) {
         now.mockReturnValue(millis);
-        onLine!(
+        wire.deliver(
           JSON.stringify({
             id,
             method: "currentTime/read",
@@ -290,7 +277,7 @@ describe("codex live turn sequence", () => {
           approvalsReviewer: "user",
         });
       }
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: 91,
           method: "item/commandExecution/requestApproval",
@@ -312,7 +299,7 @@ describe("codex live turn sequence", () => {
 
   it("still waits for an explicit command decision in supervised mode", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/commandExecution/requestApproval",
@@ -342,7 +329,7 @@ describe("codex live turn sequence", () => {
       const { events, turn } = await startTurn("codex-live");
       const settled = vi.fn();
       void turn.then(settled);
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: "child_approval",
           method: "item/commandExecution/requestApproval",
@@ -399,7 +386,7 @@ describe("codex live turn sequence", () => {
 
   it("clears a server-resolved child approval using its owning thread", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: "child_approval",
         method: "item/commandExecution/requestApproval",
@@ -449,7 +436,7 @@ describe("codex live turn sequence", () => {
     async (decision) => {
       const { events, turn } = await startTurn("codex-live");
       const permissions = { fileSystem: { read: ["/home/user/.gitconfig"] } };
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: "child_permissions",
           method: "item/permissions/requestApproval",
@@ -487,7 +474,7 @@ describe("codex live turn sequence", () => {
   it("advances the question queue when the server resolves a child's request", async () => {
     const { events, turn } = await startTurn("codex-live");
     for (const id of ["child_a", "child_b"]) {
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id,
           method: "item/tool/requestUserInput",
@@ -529,7 +516,7 @@ describe("codex live turn sequence", () => {
 
   it("fails the active turn if a child permission reply cannot be delivered", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: "child_approval",
         method: "item/commandExecution/requestApproval",
@@ -564,7 +551,7 @@ describe("codex live turn sequence", () => {
         runtimeMode: "full-access",
         intent,
       });
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: "question_rpc",
           method: "item/tool/requestUserInput",
@@ -619,7 +606,7 @@ describe("codex live turn sequence", () => {
     "clears pending questions on %s",
     async (action) => {
       const { events, turn } = await startTurn("codex-live");
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: 91,
           method: "item/tool/requestUserInput",
@@ -696,7 +683,7 @@ describe("codex live turn sequence", () => {
 
   it("does not collect secret answers in the transcript question UI", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/tool/requestUserInput",
@@ -730,7 +717,7 @@ describe("codex live turn sequence", () => {
     const { events, turn } = await startTurn("codex-live", {
       runtimeMode: "full-access",
     });
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/fileChange/requestApproval",
@@ -738,7 +725,7 @@ describe("codex live turn sequence", () => {
       }),
     );
     const permissions = { network: { enabled: true } };
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 92,
         method: "item/permissions/requestApproval",
@@ -761,7 +748,7 @@ describe("codex live turn sequence", () => {
   it("queues concurrent questions instead of hiding the first one", async () => {
     const { events, turn } = await startTurn("codex-live");
     for (const id of [91, 92])
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id,
           method: "item/tool/requestUserInput",
@@ -808,7 +795,7 @@ describe("codex live turn sequence", () => {
       const { events, turn } = await startTurn("codex-live", {
         runtimeMode: "full-access",
       });
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: 91,
           method: "mcpServer/elicitation/request",
@@ -849,7 +836,7 @@ describe("codex live turn sequence", () => {
     const { events, turn } = await startTurn("codex-live", {
       runtimeMode: "full-access",
     });
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "mcpServer/elicitation/request",
@@ -881,7 +868,7 @@ describe("codex live turn sequence", () => {
     async (isBlocking) => {
       const { events, turn } = await startTurn("codex-live");
       vi.useFakeTimers();
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: 91,
           method: "item/tool/requestUserInput",
@@ -921,7 +908,7 @@ describe("codex live turn sequence", () => {
   it("keeps an optional question open after interaction and preserves its answer", async () => {
     const { events, turn } = await startTurn("codex-live");
     vi.useFakeTimers();
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/tool/requestUserInput",
@@ -958,7 +945,7 @@ describe("codex live turn sequence", () => {
     const { events, turn } = await startTurn("codex-live");
     vi.useFakeTimers();
     for (const id of [91, 92])
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id,
           method: "item/tool/requestUserInput",
@@ -994,7 +981,7 @@ describe("codex live turn sequence", () => {
     async (action) => {
       const { events, turn } = await startTurn("codex-live");
       vi.useFakeTimers();
-      onLine!(
+      wire.deliver(
         JSON.stringify({
           id: 91,
           method: "item/tool/requestUserInput",
@@ -1040,7 +1027,7 @@ describe("codex live turn sequence", () => {
 
   it("reports unsupported MCP forms instead of returning an empty success", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 90,
         method: "item/tool/requestUserInput",
@@ -1049,7 +1036,7 @@ describe("codex live turn sequence", () => {
         },
       }),
     );
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "mcpServer/elicitation/request",
@@ -1073,7 +1060,7 @@ describe("codex live turn sequence", () => {
       type: "status",
       text: expect.stringContaining("does not support yet"),
     });
-    onLine!(
+    wire.deliver(
       JSON.stringify({ id: 92, method: "future/requestApproval", params: {} }),
     );
     await waitFor(() => parse().some((m) => m.id === 92), "protocol error");
@@ -1101,7 +1088,7 @@ describe("codex live turn sequence", () => {
 
   it("clears server-resolved approvals without replying twice", async () => {
     const { events, turn } = await startTurn("codex-live");
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/commandExecution/requestApproval",
@@ -1139,7 +1126,7 @@ describe("codex live turn sequence", () => {
       onEvent: (event) => events.push(event),
     });
     await Promise.resolve();
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/commandExecution/requestApproval",
@@ -1176,7 +1163,7 @@ describe("codex live turn sequence", () => {
     });
     reply(next.id as number, { turn: { id: "turn_2" } });
     notify("turn/started", { turn: { id: "turn_2" } });
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 92,
         method: "item/commandExecution/requestApproval",
@@ -1246,7 +1233,7 @@ describe("codex live turn sequence", () => {
       collaborationMode: { mode: "plan" },
     });
 
-    onLine!(
+    wire.deliver(
       JSON.stringify({
         id: 91,
         method: "item/commandExecution/requestApproval",
@@ -1444,8 +1431,7 @@ describe("codex live turn sequence", () => {
 
 describe("codex subagents", () => {
   beforeEach(() => {
-    sent.length = 0;
-    onLine = undefined;
+    wire.reset();
     writeChild.mockClear();
   });
 

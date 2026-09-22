@@ -155,6 +155,30 @@ import {
 } from "../lib/sessionFolders";
 import { SessionFolderPicker } from "./SessionFolderPicker";
 
+/** Which chrome surrounds the input: pickers above, bar on top. */
+export type ComposerChromeOptions = {
+  hideProjectPicker?: boolean;
+  hideBranchPicker?: boolean;
+  hideTopBar?: boolean;
+};
+
+/** Model + runtime selection for the composer. */
+export type ComposerModelProps = {
+  harness: HarnessId;
+  model: string;
+  modelSettings?: Record<string, string>;
+  runtimeMode: RuntimeMode;
+};
+
+/** Card/quote/question overlays pinned above the input. */
+export type ComposerCardProps = {
+  quoteRequest?: QuoteRequest;
+  inboxCard?: InboxComposerCard;
+  noteCard?: NoteComposerCard;
+  handoffCard?: HandoffComposerCard;
+  question?: UserQuestionPrompt;
+};
+
 type Props = {
   enabled?: boolean;
   focused: boolean;
@@ -170,9 +194,14 @@ type Props = {
   sessionId?: string;
   branch?: string;
   recents?: RecentProject[];
+  /** @deprecated Pass `chrome={{ hideProjectPicker: true }}` instead. */
   hideProjectPicker?: boolean;
+  /** @deprecated Pass `chrome={{ hideBranchPicker: true }}` instead. */
   hideBranchPicker?: boolean;
+  /** @deprecated Pass `chrome={{ hideTopBar: true }}` instead. */
   hideTopBar?: boolean;
+  /** Grouped chrome flags; wins over the deprecated flat flags. */
+  chrome?: ComposerChromeOptions;
   context?: ContextUsage;
   compactSupported?: boolean;
   quoteRequest?: QuoteRequest;
@@ -440,9 +469,10 @@ export function Composer({
   sessionId,
   branch,
   recents = [],
-  hideProjectPicker = false,
-  hideBranchPicker = false,
-  hideTopBar = false,
+  hideProjectPicker: flatHideProjectPicker = false,
+  hideBranchPicker: flatHideBranchPicker = false,
+  hideTopBar: flatHideTopBar = false,
+  chrome,
   context,
   compactSupported = false,
   quoteRequest,
@@ -492,6 +522,10 @@ export function Composer({
   onEditingLastTurnChange,
   children,
 }: Props) {
+  // Grouped `chrome` wins; flat flags stay for existing callers.
+  const hideProjectPicker = chrome?.hideProjectPicker ?? flatHideProjectPicker;
+  const hideBranchPicker = chrome?.hideBranchPicker ?? flatHideBranchPicker;
+  const hideTopBar = chrome?.hideTopBar ?? flatHideTopBar;
   const ref = useRef<HTMLTextAreaElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);

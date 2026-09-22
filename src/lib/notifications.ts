@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { logDebug, logWarn } from "./logger";
 import { HARNESS_TITLE, sessionDisplayTitle, type Session } from "./session";
 import { loadSoundsEnabled, playCue } from "./sounds";
 import {
@@ -283,8 +284,9 @@ export async function notifySession(
     event === "finished" ? "agentFinished" : "agentInput",
   );
   if (!entry) {
-    console.debug(
-      "[notifications] skip: no notifiable subject",
+    logDebug(
+      "notifications",
+      "skip: no notifiable subject",
       session.id,
       sessionVisible ? "visible" : "hidden",
     );
@@ -306,8 +308,9 @@ export async function announceSessionFinished(
 ): Promise<void> {
   const entry = sessionNotificationSubject(session, "agentFinished");
   if (!entry) {
-    console.debug(
-      "[notifications] skip: no notifiable subject",
+    logDebug(
+      "notifications",
+      "skip: no notifiable subject",
       session.id,
       sessionVisible ? "visible" : "hidden",
     );
@@ -331,8 +334,9 @@ async function notifyProjectSession(
   subject: NotificationSubject,
 ): Promise<NotifyOutcome> {
   if (!allowsProjectNotification(subject)) {
-    console.debug(
-      "[notifications] skip: project policy blocks",
+    logDebug(
+      "notifications",
+      "skip: project policy blocks",
       session.id,
       subject.projectId,
       subject.category,
@@ -347,7 +351,7 @@ async function notifyProjectSession(
     sessionVisible,
   });
   if (!decision) {
-    console.debug("[notifications] skip: not eligible", {
+    logDebug("notifications", "skip: not eligible", {
       sessionId: session.id,
       projectId: subject.projectId,
       category: subject.category,
@@ -372,7 +376,7 @@ async function notifyProjectSession(
       },
     );
     const { osSound } = readShowResult(raw);
-    console.debug("[notifications] banner shown", {
+    logDebug("notifications", "banner shown", {
       sessionId: session.id,
       category: subject.category,
       soundRequested,
@@ -382,7 +386,7 @@ async function notifyProjectSession(
   } catch (error) {
     // Swallowed by design (the in-app cue stands in), but loud in DevTools:
     // a rejected dispatch is the only signal when the OS side fails.
-    console.warn("[notifications] show_notification rejected:", session.id, error);
+    logWarn("notifications", "show_notification rejected:", session.id, error);
     return { sent: false, osSound: false };
   }
 }

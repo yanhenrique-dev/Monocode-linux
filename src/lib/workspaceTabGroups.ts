@@ -200,7 +200,9 @@ export function applyPlaceSessionOnPane({
   let nextSessions = replaceTarget
     ? sessions.filter((session) => session.id !== targetId)
     : sessions;
-  const targetTabId = tabs[targetIndex]!.id;
+  const targetTab = tabs[targetIndex];
+  if (!targetTab) return null;
+  const targetTabId = targetTab.id;
 
   let nextTabs = tabs.map((tab, index) => {
     if (index !== targetIndex) return tab;

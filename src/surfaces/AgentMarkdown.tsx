@@ -41,6 +41,7 @@ import { isAtxHeadingLine } from "../lib/markdownSource";
 import { useColorScheme } from "../hooks/useColorScheme";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { copyText } from "../lib/clipboard";
+import { useCopyFeedback } from "../lib/copyFeedback";
 import { revealPath } from "../lib/fs";
 import { INBOX_MEDIA_PREFIXES, isInboxMediaUrl } from "../lib/inboxMedia";
 import { isNoteImagePath } from "../lib/noteImages";
@@ -337,15 +338,7 @@ function MarkdownCode({
 }
 
 function CodeCopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  useEffect(() => {
-    setCopied(false);
-    return () => {
-      if (timer.current != null) window.clearTimeout(timer.current);
-    };
-  }, [code]);
+  const { copied, flash } = useCopyFeedback(code);
 
   return (
     <button
@@ -356,9 +349,7 @@ function CodeCopyButton({ code }: { code: string }) {
       onClick={() => {
         void copyText(code.replace(/\r?\n$/, "")).then(
           () => {
-            setCopied(true);
-            if (timer.current != null) window.clearTimeout(timer.current);
-            timer.current = window.setTimeout(() => setCopied(false), 1500);
+            flash();
           },
           () => {},
         );

@@ -1,4 +1,5 @@
 import { limitSection, parseJsonObject, stringField } from "./jsonText";
+import { GIT_SUBJECT_CHARS, truncateHead } from "./truncate";
 
 export type CommitMessage = {
   subject: string;
@@ -136,8 +137,9 @@ export function sanitizeCommitSubject(raw: string): string {
   const singleLine = raw.trim().split(/\r?\n/g)[0]?.trim() ?? "";
   const withoutTrailingPeriod = singleLine.replace(/[.]+$/g, "").trim();
   if (!withoutTrailingPeriod) return "";
-  if (withoutTrailingPeriod.length <= 72) return withoutTrailingPeriod;
-  return withoutTrailingPeriod.slice(0, 72).trimEnd();
+  if (withoutTrailingPeriod.length <= GIT_SUBJECT_CHARS)
+    return withoutTrailingPeriod;
+  return truncateHead(withoutTrailingPeriod, GIT_SUBJECT_CHARS).trimEnd();
 }
 
 export function sanitizePrTitle(raw: string): string {

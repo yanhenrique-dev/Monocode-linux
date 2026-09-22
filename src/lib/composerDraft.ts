@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { reportRejection } from "./reportError";
-
-const FLUSH_DELAY_MS = 500;
+import { DRAFT_FLUSH_DELAY_MS } from "./uiTimings";
+import { reportError } from "./errors";
 
 // Keyed by session id: multiple SessionPanes can be mounted at once (split
 // view), so a single global pending slot would let one pane clobber or flush
@@ -32,8 +31,10 @@ export function saveSessionDraft(sessionId: string, text: string): void {
     timer: setTimeout(() => {
       // Best-effort path: the entry stays pending on failure so an explicit
       // flush can retry it.
-      void persist(sessionId, revision).catch(reportRejection("composer-draft"));
-    }, FLUSH_DELAY_MS),
+      void persist(sessionId, revision).catch(
+        reportError("composerDraft.persist", { sessionId }),
+      );
+    }, DRAFT_FLUSH_DELAY_MS),
   });
 }
 

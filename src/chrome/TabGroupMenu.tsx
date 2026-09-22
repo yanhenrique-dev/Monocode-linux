@@ -24,6 +24,7 @@ import { effectivePets, resolveEffectiveMascot } from "../lib/customPets";
 import { TAB_GROUP_COLORS } from "../lib/tabGroups";
 import { ColorPickerPopover, ColorSwatchRow } from "./ColorPickerPopover";
 import { Popover } from "./Popover";
+import { SUBMENU_CLOSE_DELAY_MS } from "../lib/uiTimings";
 import { ProjectLogoIcon } from "./ProjectLogoIcon";
 import { ProjectMascot } from "./ProjectMascot";
 import { MOD } from "../lib/platform";
@@ -164,7 +165,11 @@ export function TabGroupMenu({
   };
   const scheduleSubmenuClose = () => {
     cancelSubmenuClose();
-    if (submenu) submenuCloseTimer.current = setTimeout(closeSubmenu, 180);
+    if (submenu)
+      submenuCloseTimer.current = setTimeout(
+        closeSubmenu,
+        SUBMENU_CLOSE_DELAY_MS,
+      );
   };
   useEffect(() => cancelSubmenuClose, [submenu]);
   const pickExtra = (id: string) => {

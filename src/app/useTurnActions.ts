@@ -76,6 +76,7 @@ import {
   saveLastModelSettings,
 } from "../lib/models";
 import { getSession, upsertSession } from "../lib/sessionStore";
+import { reportError } from "../lib/errors";
 import { notifyGitChanged } from "../lib/fs";
 import { notifyReviewChanged } from "../lib/checkpoint";
 import { nudgeWorkspace, scheduleNudge } from "./workspaceEvents";
@@ -85,7 +86,6 @@ import {
   consolidateOrchestrationTabs,
 } from "../lib/orchestrationWorkspace";
 import { CONTINUE_PROMPT, canAutoContinue } from "../lib/inFlight";
-import { reportRejection } from "../lib/reportError";
 import { isHarnessAvailable } from "../lib/harness/availability";
 import { selectedProviderAccountId } from "../lib/providerAccounts";
 
@@ -682,7 +682,9 @@ export function useTurnActions(deps: TurnActionsDeps) {
         ) {
           return;
         }
-        onStop(sessionId).catch(reportRejection("turn-stop-escape"));
+        onStop(sessionId).catch(
+          reportError("useTurnActions.escapeStop", { sessionId }),
+        );
       });
     };
     window.addEventListener("keydown", onEscape);
@@ -890,7 +892,9 @@ export function useTurnActions(deps: TurnActionsDeps) {
       },
       stop: async (id) => {
         const session = sessionsRef.current.find((entry) => entry.id === id);
-        await onStop(id, true).catch(reportRejection("turn-stop"));
+        await onStop(id, true).catch(
+          reportError("useTurnActions.stop", { sessionId: id }),
+        );
         try {
           if (session)
             await Promise.all(
@@ -942,7 +946,11 @@ export function useTurnActions(deps: TurnActionsDeps) {
               },
             }),
         )
-        .catch(reportRejection("control-request"));
+        .catch(
+          reportError("useTurnActions.controlRequest", {
+            sessionId: payload.sessionId,
+          }),
+        );
     });
     return () => {
       void listening.then((unlisten) => unlisten());

@@ -91,6 +91,14 @@ export interface WorkspaceTabsDeps {
   commitTabVisit: (history: TabVisitHistory) => void;
 }
 
+/**
+ * Workspace tab layout (groups / drag / close).
+ *
+ * Single responsibility: tab tree state and pane placement. Pure helpers
+ * live in `tabHelpers`; session data lives in `useSessionSync`.
+ * Follow-up split: `useTabGroups`, `useTabDrag`, `useTabClose`
+ * (see plan Fase 4).
+ */
 export function useWorkspaceTabs(deps: WorkspaceTabsDeps) {
   const {
     tabs,

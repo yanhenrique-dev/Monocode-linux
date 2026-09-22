@@ -564,8 +564,8 @@ export function ProjectRail({
     savePinnedProjects(next);
   };
 
-  const onProjectMenuPick = (action: string) => {
-    if (!projectMenu) return;
+  const onProjectMenuPick = (action: string): void | boolean => {
+    if (!projectMenu) return undefined;
     const { path, projectKey } = projectMenu;
     if (action === "project-group:new") {
       createGroup(projectMenu.x, projectMenu.y, path);
@@ -625,6 +625,7 @@ export function ProjectRail({
         name: resolveTabGroupLabel(projectKey, groupLabels, basename(path)),
       });
     }
+    return undefined;
   };
 
   const onConfirmDelete = () => {

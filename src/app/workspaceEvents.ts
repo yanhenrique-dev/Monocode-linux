@@ -12,6 +12,7 @@ import { notifyDirsChanged } from "../lib/fileTree";
 import { nudgeWatchedFiles } from "../lib/fileWatch";
 import { notifyGitChanged } from "../lib/fs";
 import { resolveWorkspacePath } from "../lib/paths";
+import { WORKSPACE_NUDGE_MS } from "../lib/uiTimings";
 import { loadReviewAdoptShell } from "../lib/settings";
 
 export type ScheduledFlush = { kind: "raf" | "timeout"; id: number };
@@ -94,7 +95,7 @@ function flushNudge() {
 export function scheduleNudge(cwd?: string) {
   pendingNudgeCwds.add(cwd);
   if (nudgeTimer) return;
-  nudgeTimer = setTimeout(flushNudge, 150);
+  nudgeTimer = setTimeout(flushNudge, WORKSPACE_NUDGE_MS);
 }
 
 export function nudgeOpenEditors(

@@ -16,6 +16,7 @@ import {
   reportQuitPoll,
 } from "./lib/appLifecycle";
 import { consumeInstalledUpdate } from "./lib/updateNotice";
+import { SPLASH_REMOVE_MS } from "./lib/uiTimings";
 import "./index.css";
 
 initAppearance();
@@ -30,7 +31,7 @@ function dismissBootSplash() {
   const fade = () => {
     activateWindowAppearance();
     splash.classList.add("boot-splash-out");
-    window.setTimeout(() => splash.remove(), 180);
+    window.setTimeout(() => splash.remove(), SPLASH_REMOVE_MS);
   };
   // useLayoutEffect runs before paint. Two frames later the app is on
   // screen, so the fade reveals UI instead of the desktop blur.

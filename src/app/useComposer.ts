@@ -40,6 +40,11 @@ import {
 } from "../lib/session";
 import type { ControlOutcome } from "../lib/orchestration";
 import { orchestrator } from "../lib/orchestration";
+import {
+  CONTROL_BUFFER_CHARS,
+  PROPOSAL_BUFFER_CHARS,
+  truncateTail,
+} from "../lib/truncate";
 import { selectedProviderAccountId } from "../lib/providerAccounts";
 import {
   completeOrchestrationProposal,
@@ -198,6 +203,15 @@ function activeOrchestrationError(sessionId: string): string | null {
     return null;
 }
 
+/**
+ * Composer turn submission (submit / steer / queue / handoff / plan).
+ *
+ * Single responsibility: turn the composer draft into harness turns.
+ * Session list ownership, tab layout, and orchestration runs live in
+ * `useSessionSync`, `useWorkspaceTabs`, and `useTurnActions`.
+ * Follow-up split: `useComposerSubmit`, `useComposerQueue`,
+ * `useComposerHandoff`, `useComposerPlan` (see plan Fase 4).
+ */
 export function useComposer(deps: ComposerDeps) {
   const {
     sessionsRef,
@@ -871,7 +885,10 @@ export function useComposer(deps: ComposerDeps) {
           if (event.type === "session.error") providerFailureSeen = true;
           if (proposalDraft) {
             if (event.type === "message.delta") {
-              proposalText = (proposalText + event.text).slice(-200_000);
+              proposalText = truncateTail(
+                proposalText + event.text,
+                PROPOSAL_BUFFER_CHARS,
+              );
               return null;
             }
             if (event.type === "message.completed") {
@@ -1011,7 +1028,10 @@ export function useComposer(deps: ComposerDeps) {
                 if (turnGen.current.get(sessionId) !== gen) return;
                 orchestrator.observe(sessionId, event);
                 if (options?.onSettled && event.type === "message.delta")
-                  controlText = (controlText + event.text).slice(-20_000);
+                  controlText = truncateTail(
+                    controlText + event.text,
+                    CONTROL_BUFFER_CHARS,
+                  );
                 if (options?.onSettled && event.type === "message.completed")
                   controlText += "\n";
                 if (event.type === "session.error")

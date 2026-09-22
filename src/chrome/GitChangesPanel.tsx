@@ -68,6 +68,7 @@ import {
 } from "../lib/appearance";
 import { generateCommitMessage, generatePrContent } from "../lib/harness";
 import { invalidateWatchedFiles } from "../lib/fileWatch";
+import { GIT_INVALIDATE_DELAY_MS } from "../lib/uiTimings";
 import { MOD } from "../lib/platform";
 import { applyProjectDiffStats } from "../hooks/useProjectDiffStats";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
@@ -179,7 +180,10 @@ export function GitChangesPanel({
           reload();
           notifyGitChanged();
           invalidateWatchedFiles(paths);
-          window.setTimeout(() => invalidateWatchedFiles(paths), 150);
+          window.setTimeout(
+            () => invalidateWatchedFiles(paths),
+            GIT_INVALIDATE_DELAY_MS,
+          );
         }}
       />
       {graphExpanded ? (

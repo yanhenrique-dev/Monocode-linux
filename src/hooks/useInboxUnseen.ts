@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  githubWorkItem,
   inboxListCacheKey,
   inboxItemKey,
   inboxProjectsForRail,
@@ -29,7 +28,6 @@ import {
   linkedWorkItemTargets,
   linkedWorkItemUpdateKey,
   type LinkedSessionUpdate,
-  type LinkedWorkItemTarget,
 } from "../lib/linkedSessionUpdates";
 import {
   markLinkedSessionUpdateSeen,
@@ -58,20 +56,15 @@ import {
   consumeInboxSelfActivity,
   subscribeInboxSelfActivity,
 } from "../lib/inboxSelfActivity";
-
-const POLL_MS = 30_000;
-const FALLBACK_REFRESH_MS = 60_000;
-const MAX_CONCURRENT_LOOKUPS = 3;
-/** Offline/rate-limit backoff ceiling for background polls. */
-const MAX_POLL_BACKOFF_MS = 5 * 60_000;
-
-function isRateLimitMessage(message: string): boolean {
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("rate limit") ||
-    (lower.includes("quota") && lower.includes("exceed"))
-  );
-}
+import {
+  fetchInboxFallbackUpdates,
+  inboxBackoffMs,
+  INBOX_FALLBACK_REFRESH_MS,
+  INBOX_POLL_MS,
+  INBOX_RATE_LIMIT_BACKOFF_MS,
+  isInboxRateLimitMessage,
+  mergeInboxSnapshots,
+} from "../lib/inboxPoll";
 
 type ProjectSeenEntry = InboxSeenEntry & NotificationSubject;
 
@@ -83,61 +76,18 @@ function seenEntries(items: readonly InboxItem[]): ProjectSeenEntry[] {
   }));
 }
 
-function mergeSnapshots(
-  current: ReadonlyMap<string, GithubWorkItem>,
-  snapshots: readonly (readonly [string, GithubWorkItem])[],
-): ReadonlyMap<string, GithubWorkItem> {
-  let next: Map<string, GithubWorkItem> | undefined;
-  for (const [key, item] of snapshots) {
-    if (current.get(key)?.updatedAt === item.updatedAt) continue;
-    next ??= new Map(current);
-    next.set(key, item);
-  }
-  return next ?? current;
-}
-
-async function fetchFallbackUpdates(
-  cwd: string,
-  targets: readonly LinkedWorkItemTarget[],
-): Promise<Array<readonly [string, GithubWorkItem]>> {
-  const results: Array<readonly [string, GithubWorkItem]> = [];
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < targets.length) {
-      const target = targets[cursor++];
-      if (!target) return;
-      try {
-        const item = await githubWorkItem(
-          cwd,
-          target.item.repo,
-          target.item.kind,
-          target.item.number,
-          { force: true },
-        );
-        if (Number.isFinite(Date.parse(item.updatedAt))) {
-          results.push([target.key, item]);
-        }
-      } catch {
-        // The next shared Inbox poll retries missing items.
-      }
-    }
-  };
-  await Promise.all(
-    Array.from(
-      { length: Math.min(MAX_CONCURRENT_LOOKUPS, targets.length) },
-      worker,
-    ),
-  );
-  return results;
-}
-
 export type InboxActivity = {
   unseen: boolean;
   linkedSessionUpdateIds: ReadonlySet<string>;
   linkedSessionUpdates: ReadonlyMap<string, LinkedSessionUpdate>;
 };
 
-/** One background refresh supplies both the Inbox badge and linked sessions. */
+/**
+ * One background refresh supplies both the Inbox badge and linked sessions.
+ *
+ * Single responsibility: subscription wiring + badge selectors. Poll timing,
+ * backoff, and fallback lookups live in `../lib/inboxPoll`.
+ */
 export function useInboxActivity(
   recents: RecentProject[],
   cwd: string,
@@ -313,34 +263,32 @@ export function useInboxActivity(
           }
         }
         if (snapshots.length > 0) {
-          setWorkItems((current) => mergeSnapshots(current, snapshots));
+          setWorkItems((current) => mergeInboxSnapshots(current, snapshots));
         }
 
         const now = Date.now();
         const missing = targets.filter((target) => {
           if (listedKeys.has(target.key)) return false;
           const last = fallbackFetchedAt.current.get(target.key) ?? 0;
-          if (now - last < FALLBACK_REFRESH_MS) return false;
+          if (now - last < INBOX_FALLBACK_REFRESH_MS) return false;
           fallbackFetchedAt.current.set(target.key, now);
           return true;
         });
         if (missing.length > 0) {
-          const fallback = await fetchFallbackUpdates(cwd, missing);
+          const fallback = await fetchInboxFallbackUpdates(cwd, missing);
           if (!cancelled && fallback.length > 0) {
-            setWorkItems((current) => mergeSnapshots(current, fallback));
+            setWorkItems((current) => mergeInboxSnapshots(current, fallback));
           }
         }
         const githubError = listed.errors.github;
-        if (githubError && isRateLimitMessage(githubError)) {
-          backoffUntil = Date.now() + 60_000;
+        if (githubError && isInboxRateLimitMessage(githubError)) {
+          backoffUntil = Date.now() + INBOX_RATE_LIMIT_BACKOFF_MS;
         }
       } catch {
         // Leave the last known badges; back off so a dead backend or
         // offline machine is not hammered every 30s.
         failures += 1;
-        backoffUntil =
-          Date.now() +
-          Math.min(POLL_MS * 2 ** failures, MAX_POLL_BACKOFF_MS);
+        backoffUntil = Date.now() + inboxBackoffMs(failures);
       } finally {
         pulling = false;
         if (!cancelled && pullAgain) {
@@ -358,7 +306,7 @@ export function useInboxActivity(
       // rate limits and dead backends actually quiet the poll. Forced pulls
       // stay reserved for explicit user refreshes.
       void pull(false);
-    }, POLL_MS);
+    }, INBOX_POLL_MS);
     const onVis = () => {
       if (!document.hidden) void pull(false);
     };

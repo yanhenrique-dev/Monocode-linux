@@ -1,6 +1,7 @@
 import { isEditTool } from "./harness/preview";
 import { limitSection } from "./jsonText";
 import { displayPath } from "./paths";
+import { HANDOFF_USER_LINE_CHARS, truncateHead } from "./truncate";
 import {
   HARNESS_TITLE,
   type Block,
@@ -34,7 +35,9 @@ export function buildHandoffComposerCard(input: {
     from: input.from,
     to: input.to,
     brief: input.brief,
-    ...(request ? { request: request.slice(0, 240) } : {}),
+    ...(request
+      ? { request: truncateHead(request, HANDOFF_USER_LINE_CHARS) }
+      : {}),
     ...(input.files.length > 0 ? { files: input.files.length } : {}),
   };
 }

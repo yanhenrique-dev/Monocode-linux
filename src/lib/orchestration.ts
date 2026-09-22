@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { HARNESSES, type HarnessId, type Session } from "./session";
+import { reportError } from "./errors";
+import {
+  CONTROL_BUFFER_CHARS,
+  PENDING_DETAIL_EXCERPT_CHARS,
+  TASK_RESULT_EXCERPT_CHARS,
+  truncateHead,
+  truncateTail,
+} from "./truncate";
 import type { ApprovalDecision, HarnessEvent } from "./harness/types";
 import { pendingApprovalForSession } from "./approvalToast";
 import type { UserQuestionReply } from "./userQuestion";
@@ -9,7 +17,6 @@ import {
   type OrchestrationChoice,
   type OrchestrationProposal,
 } from "./orchestrationPlan";
-import { reportError, reportRejection } from "./reportError";
 
 export type TaskStatus =
   "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
@@ -286,6 +293,17 @@ export class Orchestrator {
   bind(host: OrchestrationHost) {
     this.host = host;
   }
+  /** Host is set by `bind` before any run starts; fail loud if missed. */
+  private requireHost(): OrchestrationHost {
+    if (!this.host) throw new Error("Orchestrator host is not bound");
+    return this.host;
+  }
+  /** Run must exist while its turn is in flight; fail loud if missed. */
+  private requireRun(leadId: string): OrchestrationRun {
+    const run = this.run(leadId);
+    if (!run) throw new Error(`Orchestration run not found: ${leadId}`);
+    return run;
+  }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -337,7 +355,7 @@ export class Orchestrator {
     try {
       await saved;
     } catch (error) {
-      const current = this.run(run.leadId)!;
+      const current = this.requireRun(run.leadId);
       const running = current.tasks.filter(activeTask);
       this.runs = this.runs.map((entry) =>
         entry.leadId === run.leadId
@@ -358,7 +376,7 @@ export class Orchestrator {
         [run.leadId, ...running.map((task) => task.sessionId)].map(
           async (id) => {
             await this.host?.stop(id);
-            const latest = this.run(run.leadId)!;
+            const latest = this.requireRun(run.leadId);
             this.runs = this.runs.map((entry) =>
               entry.leadId === run.leadId
                 ? {
@@ -473,7 +491,7 @@ export class Orchestrator {
     const lead = this.host?.session(leadId);
     if (!lead || !sameCheckout(lead.cwd, proposal.cwd))
       throw new Error("Return to the proposal's project before starting");
-    const available = this.host!.choices();
+    const available = this.requireHost().choices();
     const allowedModels = settings.choices.filter((choice) =>
       available.some(
         (entry) =>
@@ -494,14 +512,19 @@ export class Orchestrator {
         "An assigned model is no longer available. Change that assignment before starting.",
       );
     const ids = new Map(planned.map((task) => [task.id, crypto.randomUUID()]));
+    const remapId = (assignmentId: string): string => {
+      const remapped = ids.get(assignmentId);
+      if (!remapped) throw new Error(`Unknown task assignment: ${assignmentId}`);
+      return remapped;
+    };
     const tasks: OrchestrationTask[] = await Promise.all(
       planned.map(async (task) => ({
         ...task,
-        id: ids.get(task.id)!,
+        id: remapId(task.id),
         assignmentId: task.id,
         sessionId: crypto.randomUUID(),
         scopes: await this.store.scopes(lead.cwd, task.files),
-        dependsOn: task.dependsOn.map((id) => ids.get(id)!),
+        dependsOn: task.dependsOn.map(remapId),
         status: "queued",
         accepted: false,
         delivered: true,
@@ -514,7 +537,7 @@ export class Orchestrator {
       settings.maxWorkers,
       { proposalId, allowedModels, tasks },
     );
-    this.host!.submit(
+    this.requireHost().submit(
       leadId,
       `The user confirmed the orchestration card, including any edits. The app has already queued the exact assignments below; do not delegate duplicates. Supervise them through the control CLI, review their changes, request corrections when needed, and finish the original request.\n\nOriginal request:\n${proposal.request}\n\nApproved assignments:\n${JSON.stringify(tasks.map(({ id, title, prompt, harness, model, modelSettings, files, dependsOn }) => ({ taskId: id, title, prompt, harness, model, modelSettings, files, dependsOn })))}`,
       (outcome) => {
@@ -523,7 +546,7 @@ export class Orchestrator {
             leadId,
             outcome.error ??
               "The lead was interrupted. Its agents were stopped; review and resume the run.",
-          ).catch(reportRejection("orchestration-pause"));
+          ).catch(reportError("orchestration.startPaused", { leadId }));
       },
     );
   }
@@ -551,7 +574,7 @@ export class Orchestrator {
       );
     if (!Number.isInteger(maxWorkers) || maxWorkers < 1 || maxWorkers > 4)
       throw new Error("Choose 1 to 4 workers");
-    const available = this.host!.choices().map((choice) => choice.harness);
+    const available = this.requireHost().choices().map((choice) => choice.harness);
     if (
       !allowedHarnesses.length ||
       allowedHarnesses.some((id) => !available.includes(id))
@@ -587,7 +610,7 @@ export class Orchestrator {
     const [canonicalRoot] = await this.store.scopes(lead.cwd, ["."]);
     const cli = await this.store.enable(leadId, lead.cwd);
     try {
-      await this.host!.stop(leadId); // Refresh the child environment before its next turn.
+      await this.requireHost().stop(leadId); // Refresh the child environment before its next turn.
       await this.commit({
         version: 1,
         leadId,
@@ -786,7 +809,7 @@ export class Orchestrator {
       patch: Partial<OrchestrationTask>,
       result: unknown,
     ) => {
-      const current = this.run(run.leadId)!;
+      const current = this.requireRun(run.leadId);
       return record(
         {
           ...current,
@@ -799,7 +822,7 @@ export class Orchestrator {
     };
     const task = () => {
       const id = text(input.taskId, "taskId", 128);
-      const found = this.run(run.leadId)!.tasks.find(
+      const found = this.requireRun(run.leadId).tasks.find(
         (entry) => entry.id === id,
       );
       if (!found)
@@ -812,7 +835,7 @@ export class Orchestrator {
       case "list":
         return {
           run: this.view(run),
-          harnesses: this.host!.choices()
+          harnesses: this.requireHost().choices()
             .filter((choice) => run.allowedHarnesses.includes(choice.harness))
             .map((choice) => ({
               ...choice,
@@ -836,7 +859,7 @@ export class Orchestrator {
           recovery:
             run.status === "active" ? undefined : this.inactiveReason(run),
           scopes: undefined,
-          waitingFor: this.waitingFor(this.run(run.leadId)!, target),
+          waitingFor: this.waitingFor(this.requireRun(run.leadId), target),
           needsInput: this.pendingInput(target),
         };
       }
@@ -851,7 +874,7 @@ export class Orchestrator {
           throw new Error(
             `Harness "${harness}" is not allowed in this run. Allowed: ${listed(run.allowedHarnesses)}.`,
           );
-        const choice = this.host!.choices().find(
+        const choice = this.requireHost().choices().find(
           (entry) => entry.harness === harness,
         );
         if (!choice) throw new Error("Worker harness is unavailable");
@@ -907,8 +930,8 @@ export class Orchestrator {
         };
         return record(
           {
-            ...this.run(run.leadId)!,
-            tasks: [...this.run(run.leadId)!.tasks, created],
+            ...this.requireRun(run.leadId),
+            tasks: [...this.requireRun(run.leadId).tasks, created],
           },
           {
             taskId: created.id,
@@ -958,15 +981,15 @@ export class Orchestrator {
             }`,
           );
         const guidance = text(input.text, "text");
-        await this.host!.steer(target.sessionId, guidance);
-        return record(this.run(run.leadId)!, {
+        await this.requireHost().steer(target.sessionId, guidance);
+        return record(this.requireRun(run.leadId), {
           taskId: target.id,
           steered: true,
         });
       }
       case "cancel":
         await this.cancelTask(run.leadId, task().id);
-        return record(this.run(run.leadId)!, { cancelled: true });
+        return record(this.requireRun(run.leadId), { cancelled: true });
       case "respond": {
         const target = task();
         const pending = this.pendingInput(target);
@@ -981,12 +1004,12 @@ export class Orchestrator {
         const decision = text(input.decision, "decision", 16);
         if (decision !== "allow" && decision !== "deny")
           throw new Error('decision must be "allow" or "deny"');
-        this.host!.respondApproval(
+        this.requireHost().respondApproval(
           target.sessionId,
           pending.requestId,
           decision,
         );
-        return record(this.run(run.leadId)!, {
+        return record(this.requireRun(run.leadId), {
           taskId: target.id,
           decision,
         });
@@ -1009,8 +1032,8 @@ export class Orchestrator {
                 kind: "answered",
                 answers: questionAnswers(input.answers, pending.questions),
               };
-        this.host!.answerQuestion(target.sessionId, pending.requestId, reply);
-        return record(this.run(run.leadId)!, {
+        this.requireHost().answerQuestion(target.sessionId, pending.requestId, reply);
+        return record(this.requireRun(run.leadId), {
           taskId: target.id,
           answered: reply.kind === "answered",
         });
@@ -1028,7 +1051,7 @@ export class Orchestrator {
         return changeTask(target.id, { accepted: true }, { accepted: true });
       }
       case "finish": {
-        const outstanding = this.run(run.leadId)!.tasks.filter(
+        const outstanding = this.requireRun(run.leadId).tasks.filter(
           (entry) => entry.status !== "cancelled" && !entry.accepted,
         );
         if (outstanding.length)
@@ -1038,7 +1061,7 @@ export class Orchestrator {
             )}. Accept a completed task with review, send a failed one another turn with message, or drop it with cancel.`,
           );
         const result = await record(
-          { ...this.run(run.leadId)!, status: "finished" },
+          { ...this.requireRun(run.leadId), status: "finished" },
           { finished: true },
         );
         await this.store.disable(run.leadId);
@@ -1083,7 +1106,7 @@ export class Orchestrator {
         const timer = setTimeout(finish, seconds * 1000);
       });
     }
-    return this.view(this.run(leadId)!);
+    return this.view(this.requireRun(leadId));
   }
   private async pump() {
     if (this.pumping) {
@@ -1163,7 +1186,7 @@ export class Orchestrator {
             );
             this.host.submit(task.sessionId, prompt, (outcome) => {
               void this.settle(run.leadId, task.id, outcome, attempt).catch(
-                reportRejection("orchestration-settle"),
+                console.error,
               );
             });
           } catch (error) {
@@ -1181,7 +1204,7 @@ export class Orchestrator {
         }
       }
     } catch (error) {
-      reportError("orchestration-dispatch", error);
+      console.error("Orchestration dispatch failed", error);
     } finally {
       this.pumping = false;
       if (this.pumpAgain) {
@@ -1201,7 +1224,7 @@ export class Orchestrator {
     if (task?.status === "cancelling") {
       if (outcome.text)
         await this.patchTask(leadId, taskId, {
-          result: outcome.text.slice(-20_000),
+          result: truncateTail(outcome.text, CONTROL_BUFFER_CHARS),
         });
       return;
     }
@@ -1219,7 +1242,7 @@ export class Orchestrator {
     this.writeChecks.delete(task.sessionId);
     await this.patchTask(leadId, taskId, {
       status: outcome.status,
-      result: outcome.text.slice(-20_000),
+      result: truncateTail(outcome.text, CONTROL_BUFFER_CHARS),
       error: outcome.error,
       delivered: false,
       accepted: false,
@@ -1235,7 +1258,7 @@ export class Orchestrator {
         status: "cancelling",
         ...(interruption ? { error: interruption } : {}),
       });
-      await this.host!.stop(task.sessionId);
+      await this.requireHost().stop(task.sessionId);
     }
     await this.patchTask(leadId, taskId, {
       status: interruption ? "failed" : "cancelled",
@@ -1267,7 +1290,7 @@ export class Orchestrator {
       lastPauseReason: error,
     });
     await Promise.all(
-      this.run(leadId)!
+      this.requireRun(leadId)
         .tasks.filter(activeTask)
         .map((task) => this.cancelTask(leadId, task.id, error)),
     );
@@ -1285,7 +1308,7 @@ export class Orchestrator {
         ...run.tasks.filter(activeTask).map((task) => task.sessionId),
       ].map((id) => this.host?.stop(id)),
     );
-    const latest = this.run(leadId)!;
+    const latest = this.requireRun(leadId);
     const stopped: OrchestrationRun = {
       ...latest,
       status: "stopped",
@@ -1321,7 +1344,8 @@ export class Orchestrator {
     )
       return null;
     if (run.leadId === id) return this.stopRun(id);
-    const task = run.tasks.find((entry) => entry.sessionId === id)!;
+    const task = run.tasks.find((entry) => entry.sessionId === id);
+    if (!task) return this.stopRun(run.leadId);
     return this.cancelTask(run.leadId, task.id);
   }
   /** Drain control writes before the database removes a lead or one of its workers. */
@@ -1350,7 +1374,10 @@ export class Orchestrator {
         if (run.leadId !== id) {
           // Read the transaction's pruned graph; never save the pre-delete snapshot.
           const updated = await this.store.load(run.leadId).catch((error) => {
-            reportError("orchestration-reload-after-delete", error);
+            console.error(
+              "Could not reload orchestration after deletion",
+              error,
+            );
             this.loaded.delete(run.leadId);
             return null;
           });
@@ -1442,13 +1469,13 @@ export class Orchestrator {
             const summary = results
               .map(
                 (task) =>
-                  `${task.id} — ${task.title}: ${task.status}\n${task.error ?? ""}\n${task.result.slice(-4000)}`,
+                  `${task.id} — ${task.title}: ${task.status}\n${task.error ?? ""}\n${truncateTail(task.result, TASK_RESULT_EXCERPT_CHARS)}`,
               )
               .join("\n\n");
             const asks = waiting
               .map(
                 ({ task, pending }) =>
-                  `${task.id} — ${task.title} needs ${pending.kind === "approval" ? "an approval" : "an answer"} (requestId ${pending.requestId}): ${pending.label}\n${pending.detail?.slice(0, 2000) ?? ""}${
+                  `${task.id} — ${task.title} needs ${pending.kind === "approval" ? "an approval" : "an answer"} (requestId ${pending.requestId}): ${pending.label}\n${pending.detail ? truncateHead(pending.detail, PENDING_DETAIL_EXCERPT_CHARS) : ""}${
                     pending.questions
                       ? `\n${JSON.stringify(pending.questions)}`
                       : ""
@@ -1468,7 +1495,7 @@ export class Orchestrator {
             ]
               .filter(Boolean)
               .join("\n\n");
-            this.host!.submit(run.leadId, body, (outcome) => {
+            this.requireHost().submit(run.leadId, body, (outcome) => {
               if (outcome.status !== "completed") {
                 void this.pause(
                   run.leadId,
@@ -1482,11 +1509,15 @@ export class Orchestrator {
                         : task,
                     ),
                   }),
-                ).catch(reportRejection("orchestration-continuation"));
+                ).catch(
+                  reportError("orchestration.continuation", {
+                    leadId: run.leadId,
+                  }),
+                );
               } else this.sync();
             });
           } catch (error) {
-            reportError("orchestration-continuation", error);
+            console.error("Orchestration continuation failed", error);
           } finally {
             this.waking.delete(run.leadId);
           }
@@ -1548,7 +1579,7 @@ export class Orchestrator {
         );
         return;
       }
-    })().catch(reportRejection("orchestration-write-check"));
+    })().catch(reportError("orchestration.writeCheck", { sessionId: id }));
     checks?.add(check);
     void check.finally(() => checks?.delete(check));
   }

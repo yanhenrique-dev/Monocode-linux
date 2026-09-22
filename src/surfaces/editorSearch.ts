@@ -27,6 +27,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { MOD, ALT, SHIFT } from "../lib/platform";
+import { isKeyboardEvent } from "../lib/errors";
 
 const MATCH_CAP = 999;
 const panels = new WeakMap<EditorView, FindPanel>();
@@ -433,7 +434,8 @@ class FindPanel implements Panel {
   }
 
   private onKeyDown(event: Event) {
-    const keyEvent = event as KeyboardEvent;
+    if (!isKeyboardEvent(event)) return;
+    const keyEvent = event;
     if (runScopeHandlers(this.view, keyEvent, "search-panel")) {
       keyEvent.preventDefault();
       return;
