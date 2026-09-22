@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.20] - 2026-09-22
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- GitHub inbox fidelity: `assignedToMe` also covers
+  `review-requested:@me` (PRs) and `mentions:@me` (issues); PR detail
+  shows a Checks section (in progress, successful, failed, mergeable
+  note) from `statusCheckRollup`; incremental snapshots evict stale
+  items.
+- Transcript virtualization by turn (TanStack Virtual) with gated
+  viewport, enable flag, and tests.
+- Tasks pill names the active task with a loading spinner and status
+  legend; sidebar session rows follow the live checkout branch.
+- ESLint 9 flat config baseline (warn-only) so `npm run lint` works.
+
+### Fixed
+
+- Approval toast only for background sessions; focused sessions resolve
+  inline on the tool row (Allow/Deny).
+- `errorMessage` never throws (safe fallback); `findOrThrow` preserves
+  falsy matches; logger storage access guarded.
+- Motion consistency: first sidebar open animates, folds animate with
+  grid rows only, file pane first paint stays dry.
+- CodeRabbit review findings applied across all PRs in this release.
+
 ## [0.2.17] - 2026-09-21
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
