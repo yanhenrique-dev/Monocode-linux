@@ -248,9 +248,10 @@ describe("provider defaults", () => {
   });
 
   it("keeps catalog defaults when nothing is saved", () => {
+    // No stale "cursor" default: unprobed, nothing installed-known, claude.
     expect(defaultSessionChoice()).toEqual({
-      harness: "cursor",
-      model: defaultModelId("cursor"),
+      harness: "claude",
+      model: defaultModelId("claude"),
     });
   });
 

@@ -1,5 +1,9 @@
 import type { HarnessId } from "./session";
 import { HARNESSES } from "./session";
+import {
+  hasProbedHarnessAvailability,
+  isHarnessAvailable,
+} from "./harness/availability";
 
 export type ModelSettingChoice = {
   value: string;
@@ -652,16 +656,26 @@ export function preferredModelId(harness: HarnessId): string {
   return defaultModelId(harness);
 }
 
-/** Provider + model new conversations should start with. */
+<<<<<<< HEAD
+/**
+ * Provider + model new conversations should start with. A stale last choice
+ * (harness since uninstalled) must not haunt new sessions: once probed, the
+ * last harness is kept only while its CLI is present, otherwise the first
+ * available harness wins. Never the hardcoded "cursor".
+ */
 export function defaultSessionChoice(
   available?: (id: HarnessId) => boolean,
 ): LastModelChoice {
+  const check =
+    available ??
+    (hasProbedHarnessAvailability() ? isHarnessAvailable : undefined);
   const last = loadLastModelChoice();
-  const preferred = last?.harness ?? "cursor";
-  const harness =
-    available && !available(preferred)
-      ? (HARNESSES.find(available) ?? preferred)
-      : preferred;
+  if (last && (!check || check(last.harness))) {
+    return { harness: last.harness, model: preferredModelId(last.harness) };
+  }
+  const harness = check
+    ? (HARNESSES.find(check) ?? "claude")
+    : (last?.harness ?? "cursor");
   return { harness, model: preferredModelId(harness) };
 }
 

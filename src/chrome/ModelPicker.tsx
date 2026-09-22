@@ -280,6 +280,11 @@ export function ModelPicker({
   ]
     .filter(Boolean)
     .join(" · ");
+  // A session can still reference a harness whose CLI went missing (stale
+  // last choice, restored tab). Say so on the trigger instead of showing a
+  // normal label; the menu already disables it with the install hint.
+  const triggerUnavailable =
+    hasProbedHarnessAvailability() && !isHarnessAvailable(current.harness);
 
   const pickerHarnesses = useMemo(() => {
     void availabilityVersion;
@@ -601,12 +606,16 @@ export function ModelPicker({
       <button
         ref={button}
         type="button"
-        title={`${triggerTitle} · Recent models: right-click or ${MOD}.`}
+        title={
+          triggerUnavailable
+            ? harnessUnavailableHint(current.harness)
+            : `${triggerTitle} · Recent models: right-click or ${MOD}.`
+        }
         aria-label={`${HARNESS_TITLE[current.harness]}${
           current.provider ? `, ${current.provider.name},` : ""
         } ${current.name}${
           triggerEffortLabel ? `, effort ${triggerEffortLabel}` : ""
-        }`}
+        }${triggerUnavailable ? ", not installed" : ""}`}
         aria-keyshortcuts={`${MOD}.`}
         aria-expanded={open || recentMenu != null}
         aria-haspopup={hideSettings ? "dialog" : "menu"}
@@ -625,6 +634,13 @@ export function ModelPicker({
       >
         <HarnessIcon harness={current.harness} className="size-4 shrink-0" />
         <span className="min-w-0 truncate text-[11px]">{current.name}</span>
+        {triggerUnavailable ? (
+          <span
+            aria-hidden
+            title={harnessUnavailableHint(current.harness)}
+            className="size-1.5 shrink-0 rounded-full bg-amber-400"
+          />
+        ) : null}
         {triggerEffortLabel ? (
           <span className="shrink-0 text-[11px] text-content/50">
             {triggerEffortLabel}
