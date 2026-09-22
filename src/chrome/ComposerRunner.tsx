@@ -234,9 +234,13 @@ export function ComposerRunner({
       coins.length = 0;
     };
 
+    // getBoundingClientRect x4 per frame forces layout: re-measure the
+    // track at most every 3rd frame, plus on resize observer callbacks.
+    let framesSinceMeasure = 0;
     const apply = (now: number) => {
       const dt = Math.min(now - last, 48);
       last = now;
+      framesSinceMeasure += 1;
 
       const box = boxRef.current;
       if (!enabledRef.current) {
@@ -267,9 +271,12 @@ export function ComposerRunner({
         return;
       }
 
-      if (!measureTrack()) {
-        showLayer(false);
-        return;
+      if (framesSinceMeasure >= 3 || trackWidth <= 0) {
+        framesSinceMeasure = 0;
+        if (!measureTrack()) {
+          showLayer(false);
+          return;
+        }
       }
       const track = { width: trackWidth, left: trackLeft, top: trackTop };
       showLayer(true);

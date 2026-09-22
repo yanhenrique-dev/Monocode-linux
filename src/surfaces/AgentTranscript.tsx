@@ -93,13 +93,12 @@ import { UserLinkPreview } from "./UserLinkPreview";
 import {
   activityPhaseTitle,
   activityStillRunning,
-  buildActivityPhases,
+  cachedTranscript,
   estimateTurnHeight,
   firstFoldableIndex,
   foldableWork,
   foldedBlocks,
   groupTurnItems,
-  groupTurns,
   initialThinkingIndex,
   isIncompleteTool,
   isSubagentBlock,
@@ -246,7 +245,12 @@ function AgentTranscriptContent({
       block.role === "handoff" && block.handoff?.status === "preparing",
   );
 
-  const turns = useMemo(() => groupTurns(blocks, managed), [blocks, managed]);
+  // Cross-mount cache: switching back to a settled session reuses the
+  // previous array identities instead of recomputing O(n) structure.
+  const turns = useMemo(
+    () => cachedTranscript(blocks, managed).turns,
+    [blocks, managed],
+  );
   const turnsRef = useRef(turns);
   useLayoutEffect(() => {
     turnsRef.current = turns;
@@ -484,38 +488,74 @@ function AgentTranscriptContent({
   const lastTurnUserBlock = lastTurn
     ? turnUserBlock(lastTurn, managed)
     : undefined;
-  const turnEnv: TurnEnv = {
-    blocks,
-    managed,
-    busy,
-    harness,
-    model,
-    modelSettings,
-    cwd,
-    transcriptLayout,
-    promptAnchor,
-    anchorTurn,
-    openWork,
-    toggleWork,
-    waitingForApproval,
-    pendingQuestion,
-    currentModelName,
-    preparingHandoff,
-    editableBlockId,
-    visible,
-    onApproval,
-    onSaveNote,
-    onOpenFile,
-    onOpenDiff,
-    onOpenPlan,
-    onBuildPlan,
-    onSecondOpinion,
-    onHandoff,
-    onEditLastTurn,
-    editingLastTurn,
-    latestTurnAccessory,
-    remeasure,
-  };
+  // Stable identity: TranscriptTurn/TranscriptBlock are memoized, so a fresh
+  // env object every token would defeat them and recompute every turn.
+  const turnEnv: TurnEnv = useMemo(
+    () => ({
+      blocks,
+      managed,
+      busy,
+      harness,
+      model,
+      modelSettings,
+      cwd,
+      transcriptLayout,
+      promptAnchor,
+      anchorTurn,
+      openWork,
+      toggleWork,
+      waitingForApproval,
+      pendingQuestion,
+      currentModelName,
+      preparingHandoff,
+      editableBlockId,
+      visible,
+      onApproval,
+      onSaveNote,
+      onOpenFile,
+      onOpenDiff,
+      onOpenPlan,
+      onBuildPlan,
+      onSecondOpinion,
+      onHandoff,
+      onEditLastTurn,
+      editingLastTurn,
+      latestTurnAccessory,
+      remeasure,
+    }),
+    [
+      blocks,
+      managed,
+      busy,
+      harness,
+      model,
+      modelSettings,
+      cwd,
+      transcriptLayout,
+      promptAnchor,
+      anchorTurn,
+      openWork,
+      toggleWork,
+      waitingForApproval,
+      pendingQuestion,
+      currentModelName,
+      preparingHandoff,
+      editableBlockId,
+      visible,
+      onApproval,
+      onSaveNote,
+      onOpenFile,
+      onOpenDiff,
+      onOpenPlan,
+      onBuildPlan,
+      onSecondOpinion,
+      onHandoff,
+      onEditLastTurn,
+      editingLastTurn,
+      latestTurnAccessory,
+      remeasure,
+    ],
+  );
 
   if (!visible) {
     // Hidden tabs keep state but mount no rows; reopening pins to the end.
@@ -633,8 +673,12 @@ type TurnEnv = {
   remeasure: () => void;
 };
 
-/** One turn of the transcript: the virtualizer mounts only the visible window. */
-function TranscriptTurn({
+/**
+ * One turn of the transcript: the virtualizer mounts only the visible window.
+ * Memoized so streaming tokens recompute only turns whose blocks changed
+ * (plus the live tail, whose `settled` flips) instead of the whole list.
+ */
+const TranscriptTurn = memo(function TranscriptTurn({
   turn,
   absoluteIndex,
   isLastTurn,
@@ -926,7 +970,7 @@ function TranscriptTurn({
       ) : null}
     </div>
   );
-}
+});
 
 function AgentTranscriptComponent(props: Props) {
   return (
@@ -1857,7 +1901,10 @@ const ActivityPhases = memo(function ActivityPhases({
   onOpenFile,
   onOpenDiff,
 }: ActivityPhasesProps) {
-  const phases = useMemo(() => buildActivityPhases(blocks), [blocks]);
+  const phases = useMemo(
+    () => cachedTranscript(blocks, false).phases,
+    [blocks],
+  );
 
   return (
     <div className={`flex min-w-0 flex-col gap-1 ${padded ? "px-4" : ""}`}>

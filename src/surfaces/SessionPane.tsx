@@ -234,7 +234,10 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const isEmpty = session.blocks.length === 0;
   const recallLastTurnRef = useRef<(() => void) | null>(null);
   const editLastTurnSupported = canEditLastTurn(session);
-  const turnRecall = editLastTurnSupported ? lastTurnRecall(session) : null;
+  const turnRecall = useMemo(
+    () => (editLastTurnSupported ? lastTurnRecall(session) : null),
+    [editLastTurnSupported, session],
+  );
   const backgroundRevision = useSyncExternalStore(
     subscribeProjectChatBackground,
     projectChatBackgroundRevision,
@@ -372,11 +375,22 @@ const SessionPaneContent = memo(function SessionPaneContent({
     if (!visible) setAstraWelcomeRun(null);
   }, [visible]);
   // Restore a saved run for this lead; its agents render on the sidebar card.
+  // Deferred past first paint: hydrate only feeds the sidebar, so it must
+  // not contend with transcript/composer mount on session switch.
   useEffect(() => {
-    if (!session.inboxAsk && !session.worktreeRemoved)
-      void orchestrator
-        .hydrate(session.id)
-        .catch(reportError("SessionPane.hydrate", { sessionId: session.id }));
+    if (!session.inboxAsk && !session.worktreeRemoved) {
+      const run = () =>
+        void orchestrator
+          .hydrate(session.id)
+          .catch(reportError("SessionPane.hydrate", { sessionId: session.id }));
+      if (typeof requestIdleCallback !== "undefined") {
+        const id = requestIdleCallback(run, { timeout: 1000 });
+        return () => cancelIdleCallback(id);
+      }
+      const timer = window.setTimeout(run, 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
   }, [session.id, session.inboxAsk, session.worktreeRemoved]);
   const [quoteRequest, setQuoteRequest] = useState<QuoteRequest>();
   const [editingLastTurn, setEditingLastTurn] = useState(false);
@@ -474,13 +488,17 @@ const SessionPaneContent = memo(function SessionPaneContent({
       );
     };
   }, [session.id]);
-  const composer = (
-    <Composer
-      enabled={visible}
-      focused={focused && composerFocused}
-      focusToken={composerFocusToken}
-      hotkeys={focused}
-      shell={!dockComposer}
+  // Memoized element: hidden panes (and panes whose session didn't change)
+  // skip reconciling the whole composer tree on unrelated renders.
+  // Callbacks from App are stable; the session object is the live dep.
+  const composer = useMemo(
+    () => (
+      <Composer
+        enabled={visible}
+        focused={focused && composerFocused}
+        focusToken={composerFocusToken}
+        hotkeys={focused}
+        shell={!dockComposer}
       harness={session.harness}
       model={session.model}
       modelSettings={session.modelSettings}
@@ -573,7 +591,53 @@ const SessionPaneContent = memo(function SessionPaneContent({
         recallLastTurnRef.current = recall;
       }}
       onEditingLastTurnChange={setEditingLastTurn}
-    />
+      />
+    ),
+    [
+      visible,
+      focused,
+      composerFocused,
+      composerFocusToken,
+      dockComposer,
+      session,
+      workCwd,
+      recents,
+      hideProjectPicker,
+      showDeckProjectPicker,
+      managed,
+      quoteRequest,
+      restoredDraft,
+      acknowledgeQuote,
+      replyQuestion,
+      onInboxCardDismiss,
+      onNoteCardDismiss,
+      onHandoffCardDismiss,
+      onQuestionInteraction,
+      onFocus,
+      onCwdChange,
+      onBranchChange,
+      onWorktreeChange,
+      onWorkspaceModeChange,
+      onWorktreeBaseChange,
+      onManageWorktrees,
+      onNewTerminal,
+      onModelChange,
+      onModelSettingsChange,
+      onRuntimeModeChange,
+      onSubmit,
+      onStop,
+      onCompactContext,
+      onPlaceSessionInFolder,
+      onDeleteQueuedMessage,
+      onEditQueuedMessage,
+      onQueuedMessageEditingChange,
+      onSteerQueuedMessage,
+      onResumeQueue,
+      onOpenFile,
+      isEmpty,
+      editLastTurnSupported,
+      turnRecall,
+    ],
   );
 
   return (
