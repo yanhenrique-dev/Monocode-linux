@@ -609,9 +609,17 @@ html.is-resizing * {
 /*
  * Queued messages render above the tasks strip (see MessageQueue): the
  * queue card carries the top corners, so the strip drops its own top
- * border and top rounding to read as one continuous surface.
+ * border and top rounding to read as one continuous surface. When the
+ * strip is absent (or folded to .fold-body[data-open="false"]), the queue
+ * fuses with the composer box instead.
  */
 [data-message-queue] + [data-tasks-strip] [data-tasks-pill] {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+[data-message-queue] + [data-composer] [data-composer-box],
+[data-message-queue] + .fold-body[data-open="false"] + [data-composer] [data-composer-box] {
   border-top-width: 0;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
