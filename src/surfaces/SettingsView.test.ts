@@ -148,6 +148,40 @@ describe("settings search reveal", () => {
 });
 
 describe("settings pages", () => {
+  it("shows background effect choices above scope when artwork is available", async () => {
+    localStorage.setItem(
+      "monocode.chatBackgroundPath",
+      "/app-data/backgrounds/chat-background.png",
+    );
+    await render("appearance");
+
+    const effect = container.querySelector(
+      "#new-thread-background-effect-dither",
+    )!;
+    const effectRow = effect.closest(".settings-row")!;
+    const scopeRow = container
+      .querySelector('[aria-label="Show background on"]')!
+      .closest(".settings-row")!;
+    expect(effect).not.toBeNull();
+    expect(
+      effectRow.compareDocumentPosition(scopeRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false })),
+    );
+    await act(async () => (effect as HTMLButtonElement).click());
+    expect(localStorage.getItem("monocode.newThreadBackgroundEffect")).toBe(
+      "dither",
+    );
+    expect(effect.getAttribute("aria-checked")).toBe("true");
+    expect(container.textContent).toContain(
+      "Rebuilds the artwork with a dithered color palette.",
+    );
+  });
+
   it("reopens, scrolls to, focuses and highlights the same project on a repeated notification settings request", async () => {
     vi.useFakeTimers();
     const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
