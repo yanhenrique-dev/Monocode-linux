@@ -607,16 +607,11 @@ html.is-resizing * {
 }
 
 /*
- * Same fusion for the queued-message card when it sits between the strip
- * and the box: drop its top border/radius and its horizontal inset so the
- * strip, queue and input read as one continuous surface instead of three
- * stacked bubbles.
+ * Queued messages render above the tasks strip (see MessageQueue): the
+ * queue card carries the top corners, so the strip drops its own top
+ * border and top rounding to read as one continuous surface.
  */
-[data-tasks-strip] + [data-composer] [data-message-queue] {
-  padding-left: 0;
-  padding-right: 0;
-}
-[data-tasks-strip] + [data-composer] [data-message-queue-card] {
+[data-message-queue] + [data-tasks-strip] [data-tasks-pill] {
   border-top-width: 0;
   border-top-left-radius: 0;
   border-top-right-radius: 0;

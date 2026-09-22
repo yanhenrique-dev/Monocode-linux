@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { Block, TaskListItem } from "../lib/session";
-import { lastTaskBlock, taskListProgressLabel } from "../lib/taskList";
+import {
+  lastTaskBlock,
+  taskListActiveLabel,
+  taskListProgressLabel,
+} from "../lib/taskList";
 import { ChevronRight, ListEnd } from "./icons";
 
 type Props = {
@@ -135,11 +139,16 @@ function StripButton({
   items: TaskListItem[];
   onReveal: () => void;
 }) {
+  const activeLabel = taskListActiveLabel(items);
   return (
     <button
       type="button"
-      title="Show tasks"
-      aria-label={`Show tasks (${taskListProgressLabel(items)})`}
+      title={activeLabel ? `Show tasks — ${activeLabel}` : "Show tasks"}
+      aria-label={
+        activeLabel
+          ? `Show tasks (${taskListProgressLabel(items)}: ${activeLabel})`
+          : `Show tasks (${taskListProgressLabel(items)})`
+      }
       data-tasks-pill
       onClick={onReveal}
       className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
@@ -148,10 +157,15 @@ function StripButton({
         className="size-3.5 shrink-0 text-content/50"
         strokeWidth={1.75}
       />
-      <span className="min-w-0 truncate text-[12px]">Tasks</span>
+      <span className="shrink-0 text-[12px]">Tasks</span>
       <span className="shrink-0 font-mono text-[10px] text-content/50">
         {taskListProgressLabel(items)}
       </span>
+      {activeLabel ? (
+        <span className="min-w-0 flex-1 truncate text-[12px] text-content/60">
+          {activeLabel}
+        </span>
+      ) : null}
       <ChevronRight
         className="ml-auto size-3.5 shrink-0 text-content/35"
         strokeWidth={1.75}
