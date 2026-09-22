@@ -557,6 +557,11 @@ function AgentTranscriptContent({
     ],
   );
 
+  // Files the transcript's tools touched: short markdown links resolve
+  // against these before the project index guesses. Before the early return
+  // below: hooks must run unconditionally across renders.
+  const fileCandidates = useMemo(() => transcriptFilePaths(blocks), [blocks]);
+
   if (!visible) {
     // Hidden tabs keep state but mount no rows; reopening pins to the end.
     return (
@@ -566,10 +571,6 @@ function AgentTranscriptContent({
       />
     );
   }
-
-  // Files the transcript's tools touched: short markdown links resolve
-  // against these before the project index guesses.
-  const fileCandidates = useMemo(() => transcriptFilePaths(blocks), [blocks]);
 
   return (
     <TranscriptCandidatesContext.Provider value={fileCandidates}>
