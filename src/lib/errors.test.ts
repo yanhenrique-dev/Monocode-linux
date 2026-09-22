@@ -16,6 +16,12 @@ describe("findOrThrow", () => {
       "tab not found",
     );
   });
+
+  it("shouldPreserveFalsyMatches", () => {
+    expect(findOrThrow([0, 1], (n) => n === 0, "zero")).toBe(0);
+    expect(findOrThrow([false, true], (b) => !b, "flag")).toBe(false);
+    expect(findOrThrow(["", "x"], (s) => s === "", "blank")).toBe("");
+  });
 });
 
 describe("isKeyboardEvent", () => {

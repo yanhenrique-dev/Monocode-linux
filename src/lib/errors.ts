@@ -28,9 +28,10 @@ export function findOrThrow<T>(
   predicate: (item: T) => boolean,
   what: string,
 ): T {
-  const found = items.find(predicate);
-  if (!found) throw new Error(`${what} not found`);
-  return found;
+  for (const item of items) {
+    if (predicate(item)) return item;
+  }
+  throw new Error(`${what} not found`);
 }
 
 /** Narrow an `Event` to `KeyboardEvent` without an `as` cast. */

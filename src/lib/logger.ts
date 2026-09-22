@@ -12,7 +12,7 @@ const DEBUG_KEY = "monocode.debug";
 
 function debugScopes(): string[] | null {
   try {
-    const raw = localStorage.getItem(DEBUG_KEY);
+    const raw = window.localStorage.getItem(DEBUG_KEY);
     if (!raw) return null;
     const scopes = raw
       .split(",")
@@ -26,7 +26,9 @@ function debugScopes(): string[] | null {
 
 function debugEnabled(scope: string): boolean {
   // SSR/tests without localStorage: keep debug visible, tests assert nothing.
-  if (typeof localStorage === "undefined") return true;
+  // `typeof localStorage` itself can throw when storage is blocked, so gate
+  // on `window` and keep the storage read inside the guarded scope lookup.
+  if (typeof window === "undefined") return true;
   const scopes = debugScopes();
   if (!scopes) return false;
   return scopes.includes("*") || scopes.includes(scope);
