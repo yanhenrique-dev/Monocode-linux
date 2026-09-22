@@ -5,10 +5,16 @@ export type ErrorReport = {
   message: string;
 };
 
-/** Human-readable message for any thrown value. */
+/** Human-readable message for any thrown value. Never throws: values
+ * without a primitive conversion (e.g. `Object.create(null)`) fall back
+ * to a safe message instead of raising inside the reporter. */
 export function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message || error.name;
-  return String(error);
+  try {
+    if (error instanceof Error) return error.message || error.name;
+    return String(error);
+  } catch {
+    return "Unknown error";
+  }
 }
 
 function debugEnabled(): boolean {

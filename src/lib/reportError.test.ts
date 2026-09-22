@@ -35,7 +35,9 @@ describe("reportError", () => {
     expect(() => reportError("draft", "db locked")).not.toThrow();
     expect(errorMessage("db locked")).toBe("db locked");
     expect(errorMessage(undefined)).toBe("undefined");
-    expect(logged).toHaveBeenCalledTimes(1);
+    expect(errorMessage(Object.create(null))).toBe("Unknown error");
+    expect(() => reportError("draft", Object.create(null))).not.toThrow();
+    expect(logged).toHaveBeenCalledTimes(2);
   });
 
   it("reportRejection returns a catch-compatible handler", async () => {
