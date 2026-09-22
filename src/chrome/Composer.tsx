@@ -274,7 +274,13 @@ function ToolButton({
   );
 }
 
-export function Composer({
+/**
+ * Memoized: the parent re-renders on every streaming token, but most props
+ * (callbacks from App, cards, settings) keep stable identity — only the
+ * session-derived values change. Skips the whole tree for hidden panes and
+ * unrelated renders.
+ */
+export const Composer = memo(function Composer({
   enabled = true,
   focused,
   focusToken,
@@ -459,7 +465,12 @@ export function Composer({
   const skillLimit = hasNativeCommands(harness)
     ? Number.POSITIVE_INFINITY
     : undefined;
-  const rankedSkills = rankSkills(slashItems, slash?.query ?? "", skillLimit);
+  // Sort + fuzzy on every streaming token otherwise: the picker is closed
+  // most of the time, so gate the work on an actual query change.
+  const rankedSkills = useMemo(
+    () => rankSkills(slashItems, slash?.query ?? "", skillLimit),
+    [slashItems, slash?.query, skillLimit],
+  );
   const attachmentsSupported = harnessSupportsAttachments(harness);
   const skillNames = useMemo(
     () => new Set(slashItems.map((skill) => skill.invocation)),
@@ -650,6 +661,18 @@ export function Composer({
     };
     const cached = peekProjectFiles(executionCwd);
     apply(cached ?? []);
+    // Lazy scan: the index matters only for the @ picker. Mounting every
+    // session switch rescans otherwise; opening @ refires via mentionOpen.
+    if (!mentionOpen && cached) {
+      const unsubCached = subscribeProjectFiles(() => {
+        const next = peekProjectFiles(executionCwd);
+        if (next) apply(next);
+      });
+      return () => {
+        cancelled = true;
+        unsubCached();
+      };
+    }
     void loadProjectFiles(executionCwd, mentionOpen)
       .then(apply)
       .catch(() => undefined);
@@ -734,8 +757,24 @@ export function Composer({
     if (creatingSkill) return;
     const cursor = el.selectionStart ?? 0;
     const token = slashTokenAt(el.value, cursor, hasNativeCommands(harness));
-    setSlash(token);
-    setMention(token ? null : mentionTokenAt(el.value, cursor));
+    // Compare before setting: unconditional sets re-render the whole
+    // composer (and recompute pickers) on every keystroke and every
+    // streaming token, even when the token didn't change.
+    setSlash((prev) =>
+      prev?.start === token?.start &&
+      prev?.end === token?.end &&
+      prev?.query === token?.query
+        ? prev
+        : (token ?? null),
+    );
+    const nextMention = token ? null : mentionTokenAt(el.value, cursor);
+    setMention((prev) =>
+      prev?.start === nextMention?.start &&
+      prev?.end === nextMention?.end &&
+      prev?.query === nextMention?.query
+        ? prev
+        : (nextMention ?? null),
+    );
   };
 
   const openSessionFolderPicker = useCallback(() => {
@@ -1950,7 +1989,7 @@ export function Composer({
       </div>
     </div>
   );
-}
+});
 
 // Memoized: the parent re-renders on every streaming token while busy,
 // but the highlight only depends on the draft. Without this, each token

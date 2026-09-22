@@ -17,6 +17,7 @@ import {
   stubFilePreview,
 } from "./preview";
 import { joinStreamText } from "./streamText";
+import { isKnownAuthRefreshMessage } from "./codexProtocol";
 import { taskListText } from "../taskList";
 import { isReviewablePlan } from "../plan";
 import { resolveModel } from "../models";
@@ -42,6 +43,7 @@ export function applyHarnessEvent(
         kind: event.kind,
         status: event.status,
         preview: event.preview,
+        paths: event.paths,
         streaming: true,
         agentModel: event.agentModel,
       });
@@ -53,6 +55,7 @@ export function applyHarnessEvent(
         status: event.status,
         detail: event.detail,
         preview: event.preview,
+        paths: event.paths,
         streaming: event.status !== "completed" && event.status !== "failed",
         agentModel: event.agentModel,
       });
@@ -111,13 +114,43 @@ export function applyHarnessEvent(
       return upsertTaskList(session, event);
     case "plan":
       return upsertPlan(session, event);
-    case "session.error":
-      return appendBlock(failStreaming(session), {
+    case "session.error": {
+      let failed = failStreaming(session);
+      // Codex can stream the known auth failure as assistant text before
+      // reporting it as a completed failure. The error row below already
+      // carries the original first line plus recovery steps, so drop the raw
+      // streamed block instead of showing both.
+      const streamed = [...failed.blocks]
+        .reverse()
+        .find((block) => block.role === "assistant");
+      if (streamed && isKnownAuthRefreshMessage(streamed.text)) {
+        failed = {
+          ...failed,
+          blocks: failed.blocks.filter((block) => block.id !== streamed.id),
+        };
+      }
+      // Codex can report the same failure twice for one turn: once as a
+      // completed agent message and again as the turn error. Stacking both
+      // reads as two separate problems, so keep one row per message. Only
+      // collapse against a previous error notice, never against plain status
+      // rows that happen to carry the same text.
+      const last = [...failed.blocks]
+        .reverse()
+        .find((block) => block.role !== "reasoning");
+      if (
+        last?.role === "system" &&
+        last.notice === "error" &&
+        last.text === event.message
+      ) {
+        return failed;
+      }
+      return appendBlock(failed, {
         id: crypto.randomUUID(),
         role: "system",
         text: event.message,
         notice: "error",
       });
+    }
     case "session.providerBound":
       return { ...session, providerSessionId: event.providerSessionId };
     case "turn.started": {
@@ -796,6 +829,7 @@ function upsertTool(
     status?: string;
     detail?: string;
     preview?: ToolPreview;
+    paths?: string[];
     streaming: boolean;
     agentModel?: string;
   },
@@ -804,6 +838,7 @@ function upsertTool(
   if (index < 0) {
     const detail = capToolDetail(patch.detail);
     const preview = fillPreview(patch.preview, detail, patch.kind, patch.title);
+    const createdPaths = mergeToolPaths(undefined, patch.paths);
     const label = finalToolLabel(
       session,
       patch.kind,
@@ -825,6 +860,7 @@ function upsertTool(
         status: patch.status,
         ...(detail ? { detail } : {}),
         ...(preview ? { preview } : {}),
+        ...(createdPaths ? { paths: createdPaths } : {}),
       },
     });
   }
@@ -844,6 +880,7 @@ function upsertTool(
   );
   const kind = patch.kind ?? prev.tool?.kind;
   const status = patch.status ?? prev.tool?.status;
+  const paths = mergeToolPaths(prev.tool?.paths, patch.paths);
   const agentName = prev.agentRun?.steps.length ? prev.agentRun.name : label;
   if (
     prev.text === label &&
@@ -854,7 +891,8 @@ function upsertTool(
     prev.tool?.detail === detail &&
     (!patch.agentModel || prev.agentRun?.model === patch.agentModel) &&
     (!prev.agentRun || prev.agentRun.name === agentName) &&
-    samePreview(prev.tool?.preview, preview)
+    samePreview(prev.tool?.preview, preview) &&
+    samePaths(prev.tool?.paths, paths)
   ) {
     return session;
   }
@@ -880,9 +918,28 @@ function upsertTool(
       status,
       ...(detail ? { detail } : {}),
       ...(preview ? { preview } : {}),
+      ...(paths ? { paths } : {}),
     },
   };
   return { ...session, blocks };
+}
+
+const MAX_TOOL_PATHS = 64;
+
+/** Union of stored + incoming tool paths, capped so a runaway edit can't grow the block. */
+function mergeToolPaths(
+  prev: readonly string[] | undefined,
+  next: readonly string[] | undefined,
+): string[] | undefined {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const path of [...(prev ?? []), ...(next ?? [])]) {
+    if (typeof path !== "string" || !path.trim() || seen.has(path)) continue;
+    seen.add(path);
+    merged.push(path);
+    if (merged.length >= MAX_TOOL_PATHS) break;
+  }
+  return merged.length > 0 ? merged : undefined;
 }
 
 const MAX_TOOL_DETAIL_CHARS = 8_000;
@@ -892,6 +949,12 @@ function capToolDetail(value: string | undefined): string | undefined {
   if (!text) return undefined;
   if (text.length <= MAX_TOOL_DETAIL_CHARS) return text;
   return `${text.slice(0, MAX_TOOL_DETAIL_CHARS)}\n…`;
+}
+
+function samePaths(a?: readonly string[], b?: readonly string[]): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((path, index) => path === b[index]);
 }
 
 function samePreview(a?: ToolPreview, b?: ToolPreview): boolean {

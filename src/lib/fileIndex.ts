@@ -185,9 +185,12 @@ export function rankProjectFiles(
 export async function resolveOpenablePath(
   cwd: string,
   href: string,
+  candidatePaths: readonly string[] = [],
 ): Promise<string | undefined> {
   const direct = resolveWorkspacePath(href, cwd);
   if (!direct) return undefined;
+  const fromCandidates = resolveCandidatePath(candidatePaths, cwd, direct);
+  if (fromCandidates) return fromCandidates;
 
   let files: ProjectFile[];
   try {
@@ -230,6 +233,33 @@ export async function resolveOpenablePath(
   return pickOpenableFile(byName, cwd, relHint).path;
 }
 
+/**
+ * Unique tool path wins when a short link sits outside the project cwd;
+ * ambiguous candidates fall through to the index instead of guessing.
+ */
+function resolveCandidatePath(
+  candidatePaths: readonly string[],
+  cwd: string,
+  direct: string,
+): string | undefined {
+  if (candidatePaths.length === 0) return undefined;
+  const candidates = new Map<string, string>();
+  for (const path of candidatePaths) {
+    const resolved = resolveWorkspacePath(path, cwd);
+    if (!resolved) continue;
+    candidates.set(normalizeEditorPath(resolved), resolved);
+  }
+  const exact = candidates.get(normalizeEditorPath(direct));
+  if (exact) return exact;
+  const relHint = relativePathHint(direct, cwd, direct);
+  const normalizedHint = normalizeEditorPath(relHint);
+  const suffixMatches = [...candidates].filter(([normalized]) =>
+    normalized.endsWith(`/${normalizedHint}`),
+  );
+  if (suffixMatches.length === 1) return suffixMatches[0][1];
+  return undefined;
+}
+
 /** Resolve shortened references while preserving paths selected from file UI. */
 export async function resolveFileOpenRequest(
   cwd: string,
@@ -237,7 +267,9 @@ export async function resolveFileOpenRequest(
   options?: FileOpenOptions,
 ): Promise<string> {
   if (options?.exact) return path;
-  return (await resolveOpenablePath(cwd, path)) ?? path;
+  return (
+    (await resolveOpenablePath(cwd, path, options?.candidatePaths)) ?? path
+  );
 }
 
 function relativePathHint(href: string, cwd: string, direct: string): string {

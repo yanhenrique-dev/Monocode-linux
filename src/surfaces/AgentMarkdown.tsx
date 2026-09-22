@@ -103,12 +103,42 @@ type FileLinkMenu = {
 const FileOpenContext = createContext<{
   cwd?: string;
   onOpenFile?: OpenFileFn;
+  /** Files the transcript's tool calls touched: preferred when opening short links. */
+  candidatePaths?: readonly string[];
   onFileContextMenu?: (
     event: ReactMouseEvent,
     path: string,
     navigation?: EditorNavigation,
   ) => void;
 }>({});
+
+/**
+ * Transcript-wide file candidates, set once per transcript so individual
+ * `AgentMarkdown` call sites don't each thread the list through.
+ * An explicit `candidatePaths` prop wins over the ambient list.
+ */
+export const TranscriptCandidatesContext = createContext<
+  readonly string[] | undefined
+>(undefined);
+
+/**
+ * Open wrapper carrying transcript candidates. Calls through with the exact
+ * old 2-arg shape when there are no candidates, so existing callers and
+ * tests observe no change.
+ */
+function useCandidateOpen() {
+  const { onOpenFile, candidatePaths } = useContext(FileOpenContext);
+  const ambient = useContext(TranscriptCandidatesContext);
+  return useCallback(
+    (path: string, navigation?: EditorNavigation) => {
+      const effective = candidatePaths ?? ambient;
+      if (!onOpenFile) return;
+      if (effective?.length) onOpenFile(path, navigation, { candidatePaths: effective });
+      else onOpenFile(path, navigation);
+    },
+    [onOpenFile, candidatePaths, ambient],
+  );
+}
 
 const RemoteMediaContext = createContext(false);
 
@@ -207,6 +237,7 @@ function MarkdownLink({
 }: MarkdownLinkProps) {
   const allowRemoteMedia = useContext(RemoteMediaContext);
   const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
+  const openCandidate = useCandidateOpen();
   const file = href ? resolveWorkspaceFileReference(href, cwd) : undefined;
   const label = textContent(children);
   if (allowRemoteMedia && href && isInboxMediaUrl(href)) {
@@ -224,7 +255,7 @@ function MarkdownLink({
         if (event.defaultPrevented) return;
         if (file && onOpenFile) {
           event.preventDefault();
-          onOpenFile(file.path, file.navigation);
+          openCandidate(file.path, file.navigation);
           return;
         }
         event.preventDefault();
@@ -254,16 +285,19 @@ function MarkdownCode({
 }: MarkdownCodeProps) {
   const incomplete = useIsCodeFenceIncomplete();
   const block = Object.prototype.hasOwnProperty.call(props, "data-block");
+  // Hooks before the branch below: the `block` path varies per element, so
+  // conditional hooks would change order between renders.
+  const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
+  const openCandidate = useCandidateOpen();
   if (!block) {
     const text = textContent(children);
     const fileName = inlineFileName(text);
-    const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
     const file = fileName
       ? resolveWorkspaceFileReference(text, cwd)
       : undefined;
     const open =
       file && onOpenFile
-        ? () => onOpenFile(file.path, file.navigation)
+        ? () => openCandidate(file.path, file.navigation)
         : undefined;
     return (
       <code
@@ -437,6 +471,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
   cwd,
   onOpenFile,
+  candidatePaths,
   allowRemoteMedia,
 }: {
   text: string;
@@ -444,6 +479,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className?: string;
   cwd?: string;
   onOpenFile?: OpenFileFn;
+  /** Files the transcript's tool calls touched: preferred when opening short links. */
+  candidatePaths?: readonly string[];
   allowRemoteMedia?: boolean;
 }) {
   const [fileMenu, setFileMenu] = useState<FileLinkMenu | null>(null);
@@ -456,8 +493,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     [],
   );
   const fileOpen = useMemo(
-    () => ({ cwd, onOpenFile, onFileContextMenu }),
-    [cwd, onOpenFile, onFileContextMenu],
+    () => ({ cwd, onOpenFile, candidatePaths, onFileContextMenu }),
+    [cwd, onOpenFile, candidatePaths, onFileContextMenu],
   );
   const remarkPlugins = useMemo<PluggableList>(
     () => [
@@ -479,8 +516,13 @@ export const AgentMarkdown = memo(function AgentMarkdown({
     setFileMenu(null);
 
     if (id === "open-monocode") {
-      if (fileMenu.navigation) onOpenFile?.(path, fileMenu.navigation);
-      else onOpenFile?.(path);
+      const effective = candidatePaths?.length ? candidatePaths : undefined;
+      if (!onOpenFile) return;
+      if (fileMenu.navigation) {
+        if (effective) onOpenFile(path, fileMenu.navigation, { candidatePaths: effective });
+        else onOpenFile(path, fileMenu.navigation);
+      } else if (effective) onOpenFile(path, undefined, { candidatePaths: effective });
+      else onOpenFile(path);
       return;
     }
 
@@ -801,6 +843,7 @@ function MarkdownCodePath({
   startLine?: number;
 }) {
   const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
+  const openCandidate = useCandidateOpen();
   const file = resolveWorkspaceFileReference(path, cwd);
   if (!file || !onOpenFile) {
     return <span className="markdown-code-path">{path}</span>;
@@ -813,7 +856,7 @@ function MarkdownCodePath({
       type="button"
       className="markdown-code-path markdown-code-path-link"
       title={file.path}
-      onClick={() => onOpenFile(file.path, navigation)}
+      onClick={() => openCandidate(file.path, navigation)}
       onContextMenu={(event) =>
         onFileContextMenu?.(event, file.path, navigation)
       }

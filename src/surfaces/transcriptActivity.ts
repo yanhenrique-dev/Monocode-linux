@@ -957,6 +957,98 @@ export function foldedBlocks(items: TurnItem[], fold: WorkFold): Block[] {
     );
 }
 
+/**
+ * Per-turn height estimate for the transcript virtualizer.
+ *
+ * A single constant (e.g. 320px) lies for turns ranging from a one-line
+ * answer to a 5000px tool dump: the list total starts wrong, and every
+ * real measurement shifts `scrollTop` under the user's wheel = the jump.
+ * This heuristic (header + per-block rows, capped) lands close enough
+ * that corrections stay sub-wheel-notch.
+ */
+export function estimateTurnHeight(turn: Block[]): number {
+  const TURN_BASE_PX = 120;
+  const TEXT_LINE_PX = 28;
+  const TEXT_CHARS_PER_LINE = 90;
+  const TOOL_ROW_PX = 320;
+  const PLAN_ROW_PX = 200;
+  const ATTACHMENT_PX = 72;
+  const TURN_CAP_PX = 4000;
+  let height = TURN_BASE_PX;
+  for (const block of turn) {
+    if (block.role === "tool") {
+      height += TOOL_ROW_PX;
+    } else if (block.role === "plan" || block.role === "tasks") {
+      height += PLAN_ROW_PX;
+    } else {
+      const lines = Math.max(
+        1,
+        Math.ceil((block.text?.length ?? 0) / TEXT_CHARS_PER_LINE),
+      );
+      height += lines * TEXT_LINE_PX;
+    }
+    height += (block.attachments?.length ?? 0) * ATTACHMENT_PX;
+  }
+  return Math.min(height, TURN_CAP_PX);
+}
+
+/**
+ * Every file the transcript's tool calls touched, in first-seen order.
+ * Shortened markdown links resolve against these before falling back to the
+ * project index: a `backup.yaml` link opens the file the agent actually
+ * edited, not the cwd guess.
+ */
+export function transcriptFilePaths(blocks: Block[]): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const push = (path: string | undefined) => {
+    if (typeof path !== "string" || !path.trim() || seen.has(path)) return;
+    seen.add(path);
+    paths.push(path);
+  };
+  for (const block of blocks) {
+    push(block.tool?.preview?.path);
+    for (const path of block.tool?.paths ?? []) push(path);
+  }
+  return paths;
+}
+
+type CachedTranscript = {
+  turns: Block[][];
+  phases: ActivityPhase[];
+};
+
+// Keyed by block-array identity, not by value: the store replaces the array
+// only when a session actually changes, so a remount of a settled session
+// hits with zero staleness risk (value keys collide whenever ids are reused
+// with different metadata). Streaming always produces a fresh array, so live
+// turns never read stale structure. WeakMap: dropped sessions release their
+// entries with nothing to evict.
+const transcriptCache = new WeakMap<
+  Block[],
+  { settled?: CachedTranscript; managed?: CachedTranscript }
+>;
+
+export function cachedTranscript(
+  blocks: Block[],
+  managed = false,
+): CachedTranscript {
+  let slot = transcriptCache.get(blocks);
+  if (!slot) {
+    slot = {};
+    transcriptCache.set(blocks, slot);
+  }
+  const variant = managed ? "managed" : "settled";
+  const hit = slot[variant];
+  if (hit) return hit;
+  const entry: CachedTranscript = {
+    turns: groupTurns(blocks, managed),
+    phases: buildActivityPhases(blocks),
+  };
+  slot[variant] = entry;
+  return entry;
+}
+
 /** True when a nested scroller should consume this wheel, not the parent. */
 export function nestedScrollAbsorbsWheel(
   el: { scrollTop: number; scrollHeight: number; clientHeight: number },

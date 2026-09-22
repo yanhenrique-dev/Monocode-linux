@@ -5,7 +5,9 @@ import {
   activityPhaseTitle,
   activityStillRunning,
   buildActivityPhases,
+  cachedTranscript,
   editVerb,
+  estimateTurnHeight,
   firstFoldableIndex,
   foldableWork,
   foldedBlocks,
@@ -19,6 +21,7 @@ import {
   resolveToolCallDisplay,
   isSubagentBlock,
   subagentBrief,
+  transcriptFilePaths,
   subagentFailureSummary,
   subagentName,
   toolCallLabel,
@@ -386,6 +389,120 @@ describe("groupTurns", () => {
       ["h1"],
       ["u2"],
     ]);
+  });
+});
+
+describe("estimateTurnHeight", () => {
+  it("stays near base for a short turn", () => {
+    const height = estimateTurnHeight([
+      { id: "u1", role: "user", text: "oi" },
+      { id: "a1", role: "assistant", text: "Olá!" },
+    ]);
+    expect(height).toBeGreaterThanOrEqual(120);
+    expect(height).toBeLessThan(320);
+  });
+
+  it("grows with long prose instead of a flat constant", () => {
+    const short = estimateTurnHeight([
+      { id: "a1", role: "assistant", text: "ok" },
+    ]);
+    const long = estimateTurnHeight([
+      { id: "a1", role: "assistant", text: "x".repeat(9000) },
+    ]);
+    expect(long).toBeGreaterThan(short * 3);
+  });
+
+  it("budgets tool rows above prose and caps gigantic turns", () => {
+    const tool = estimateTurnHeight([
+      { id: "t1", role: "tool", text: "run" },
+    ]);
+    const prose = estimateTurnHeight([
+      { id: "a1", role: "assistant", text: "run" },
+    ]);
+    expect(tool).toBeGreaterThan(prose);
+    const huge = estimateTurnHeight(
+      Array.from({ length: 30 }, (_, i) => ({
+        id: `t${i}`,
+        role: "tool",
+        text: "run",
+      })),
+    );
+    expect(huge).toBe(4000);
+  });
+});
+
+describe("transcriptFilePaths", () => {
+  it("collects every file a multi-file edit touched", () => {
+    const edited = {
+      id: "multi",
+      role: "tool",
+      text: "Edit a, b",
+      tool: {
+        kind: "edit",
+        preview: { path: "/repo/a.ts" },
+        paths: ["/repo/a.ts", "/repo/b.ts"],
+      },
+    };
+    expect(transcriptFilePaths([edited])).toEqual([
+      "/repo/a.ts",
+      "/repo/b.ts",
+    ]);
+  });
+
+  it("dedupes repeat touches keeping first-seen order", () => {
+    const blocks = [
+      {
+        id: "t1",
+        role: "tool",
+        text: "one",
+        tool: { preview: { path: "/repo/a.ts" }, paths: ["/repo/b.ts"] },
+      },
+      {
+        id: "t2",
+        role: "tool",
+        text: "two",
+        tool: { paths: ["/repo/b.ts", "/repo/c.ts"] },
+      },
+    ];
+    expect(transcriptFilePaths(blocks)).toEqual([
+      "/repo/a.ts",
+      "/repo/b.ts",
+      "/repo/c.ts",
+    ]);
+  });
+
+  it("ignores blocks without files", () => {
+    expect(
+      transcriptFilePaths([{ id: "a1", role: "assistant", text: "hi" }]),
+    ).toEqual([]);
+  });
+});
+
+describe("cachedTranscript", () => {
+  const blocks = [
+    { id: "u1", role: "user", text: "hi" },
+    { id: "a1", role: "assistant", text: "hello" },
+  ];
+
+  it("returns identical arrays for the same block array identity", () => {
+    const first = cachedTranscript(blocks);
+    const second = cachedTranscript(blocks);
+    expect(second.turns).toBe(first.turns);
+    expect(second.phases).toBe(first.phases);
+  });
+
+  it("recomputes for a fresh array even with equal content", () => {
+    const first = cachedTranscript(blocks);
+    const second = cachedTranscript([...blocks]);
+    expect(second.turns).not.toBe(first.turns);
+    expect(second.turns).toEqual(first.turns);
+  });
+
+  it("keeps managed and settled variants apart", () => {
+    const settled = cachedTranscript(blocks, false);
+    const managed = cachedTranscript(blocks, true);
+    expect(managed.turns).not.toBe(settled.turns);
+    expect(cachedTranscript(blocks, true).turns).toBe(managed.turns);
   });
 });
 
