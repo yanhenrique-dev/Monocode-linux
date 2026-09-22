@@ -583,13 +583,15 @@ function SidebarComponent({
       setSidebarHeld(true);
       // The first commit that finds the sidebar already visible is the
       // boot layout: appear dry, animate only false-to-true transitions.
-      if (sidebarVisible && !prevSidebarVisible.current) {
+      if (!prevSidebarVisible.current) {
         setSidebarEntered(true);
       }
-      prevSidebarVisible.current = sidebarVisible;
     } else if (sidebarHeld) {
       requestSidebarClose();
     }
+    // Track every change: without this the hidden branch never records
+    // itself and returning later reads a stale `true`, skipping anim-in.
+    prevSidebarVisible.current = sidebarVisible;
   }, [
     sidebarVisible,
     sidebarHeld,
