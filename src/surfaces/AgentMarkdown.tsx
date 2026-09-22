@@ -285,11 +285,13 @@ function MarkdownCode({
 }: MarkdownCodeProps) {
   const incomplete = useIsCodeFenceIncomplete();
   const block = Object.prototype.hasOwnProperty.call(props, "data-block");
+  // Hooks before the branch below: the `block` path varies per element, so
+  // conditional hooks would change order between renders.
+  const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
+  const openCandidate = useCandidateOpen();
   if (!block) {
     const text = textContent(children);
     const fileName = inlineFileName(text);
-    const { cwd, onOpenFile, onFileContextMenu } = useContext(FileOpenContext);
-    const openCandidate = useCandidateOpen();
     const file = fileName
       ? resolveWorkspaceFileReference(text, cwd)
       : undefined;
