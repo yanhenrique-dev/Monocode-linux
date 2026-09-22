@@ -21,6 +21,7 @@ let props: ComponentProps<typeof Sidebar>;
 function structure() {
   return {
     asides: container.querySelectorAll("aside").length,
+    hiddenAsides: container.querySelectorAll("aside.hidden").length,
     rails: container.querySelectorAll('nav[aria-label="Projects"]').length,
     settingsNav: (container.textContent ?? "").includes("Back") ? 1 : 0,
     cards: container.querySelectorAll("[data-session-card]").length,
@@ -90,7 +91,7 @@ afterEach(() => {
 });
 
 describe("settings transition", () => {
-  it("unmounts the session sidebar after its outro, then animates it back", () => {
+  it("keeps the session sidebar mounted and hidden, returning dry", () => {
     act(() => {
       root.render(createElement(Sidebar, props));
     });
@@ -99,30 +100,56 @@ describe("settings transition", () => {
     act(() => {
       root.render(createElement(Sidebar, { ...props, settingsOpen: true }));
     });
-    // Outro holds the fading panel briefly; settle must leave only the rail.
+    // Overlay hides without outro and without unmounting: no animation,
+    // cards stay mounted under `hidden`.
+    expect(structure()).toMatchObject({
+      asides: 1,
+      hiddenAsides: 1,
+      cards: 1,
+      animOut: 0,
+      animIn: 0,
+    });
     act(() => {
       vi.advanceTimersByTime(1000);
     });
+    // Still mounted after the old outro window: nothing was scheduled.
     expect(structure()).toMatchObject({
-      asides: 0,
-      rails: 1,
-      settingsNav: 1,
-      cards: 0,
+      asides: 1,
+      hiddenAsides: 1,
+      cards: 1,
     });
 
     act(() => {
       root.render(createElement(Sidebar, { ...props, settingsOpen: false }));
     });
-    // Returning plays the enter animation instead of appearing dry.
+    // Returning unhides dry: no enter animation replay.
     expect(structure()).toMatchObject({
       asides: 1,
+      hiddenAsides: 0,
       cards: 1,
       rails: 0,
-      animIn: 1,
+      animIn: 0,
     });
+  });
+
+  it("still plays outro and intro on a real close", () => {
+    act(() => {
+      root.render(createElement(Sidebar, props));
+    });
+    expect(structure()).toMatchObject({ asides: 1, cards: 1 });
+
+    act(() => {
+      root.render(createElement(Sidebar, { ...props, open: false }));
+    });
+    expect(structure()).toMatchObject({ asides: 1, animOut: 1 });
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    expect(structure()).toMatchObject({ asides: 1, cards: 1, rails: 0 });
+    expect(structure()).toMatchObject({ asides: 0, cards: 0 });
+
+    act(() => {
+      root.render(createElement(Sidebar, { ...props, open: true }));
+    });
+    expect(structure()).toMatchObject({ asides: 1, cards: 1, animIn: 1 });
   });
 });
