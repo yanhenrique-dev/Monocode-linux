@@ -103,6 +103,31 @@ describe("work fold motion", () => {
     expect(foldDetails()).toBeNull();
   });
 
+  it("settles shut when toggled mid-open", () => {
+    localStorage.setItem("monocode.experimentalAnimations", "1");
+    renderTranscript();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Show the work"]')!
+        .click();
+    });
+    expect(foldDetails()!.getAttribute("data-fold-state")).toBe("opening");
+
+    // Hide before the open animation ends: no animationend dispatched.
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Hide the work"]')!
+        .click();
+    });
+    expect(foldDetails()!.getAttribute("data-fold-state")).toBe("closing");
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(foldDetails()).toBeNull();
+  });
+
   it("snaps open and shut with experimental animations off", () => {
     localStorage.setItem("monocode.experimentalAnimations", "0");
     renderTranscript();
