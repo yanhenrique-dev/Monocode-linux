@@ -106,6 +106,7 @@ import {
   type InboxSource,
 } from "../lib/inboxFilters";
 import { copyText } from "../lib/clipboard";
+import { GithubPrChecks } from "./InboxPrChecks";
 import { projectKey, projectName } from "../lib/paths";
 import { playCue } from "../lib/sounds";
 import { sameProjectPath, type RecentProject } from "../lib/recents";
@@ -2560,6 +2561,14 @@ export function InboxDetail({
                   </button>
                 )}
               </div>
+              {githubKind === "pr" ? (
+                <GithubPrChecks
+                  projectPath={item.projectPath}
+                  repo={item.repo}
+                  number={item.number}
+                  revision={revision}
+                />
+              ) : null}
               {startError ? (
                 <p className="text-[12px] text-red-400/90">{startError}</p>
               ) : null}
