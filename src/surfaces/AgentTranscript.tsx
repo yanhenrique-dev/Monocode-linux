@@ -729,7 +729,7 @@ const TranscriptTurn = memo(function TranscriptTurn({
 }: {
 =======
 /** Volatile block fields a turn re-render must observe; ids alone would freeze live tool progress. */
-function sameTranscriptBlock(a: Block, b: Block): boolean {
+export function sameTranscriptBlock(a: Block, b: Block): boolean {
   return (
     a.id === b.id &&
     a.role === b.role &&
@@ -750,7 +750,7 @@ function sameTranscriptBlock(a: Block, b: Block): boolean {
   );
 }
 
-function sameTranscriptTurn(a: Block[], b: Block[]): boolean {
+export function sameTranscriptTurn(a: Block[], b: Block[]): boolean {
   return (
     a.length === b.length &&
     a.every((block, index) => {
