@@ -170,6 +170,11 @@ const en = {
     "This format cannot be decoded here — try .ogg or .wav",
   "settings.general.sounds.error.unavailable":
     "Audio playback is unavailable on this system",
+  "settings.general.sounds.engine.running": "Audio ready",
+  "settings.general.sounds.engine.suspended":
+    "Waiting for first click or keypress",
+  "settings.general.sounds.engine.unavailable":
+    "Audio unavailable — the host WebKitGTK needs working audio (GStreamer sink + Pulse/PipeWire)",
   "settings.general.notifications.label": "Notifications",
   "settings.general.notifications.description":
     "Notify when a reminder is due, or when an agent finishes or needs input in another session or while MonoCode is in the background. Click the notification to open that session.",
@@ -242,6 +247,8 @@ const en = {
     "Automatic updates aren't configured for this build.\n\nDownload releases at https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "updater.dialog.check_failed": "Couldn't check for updates.\n\n{error}",
   "updater.dialog.install_failed": "Couldn't install the update.\n\n{error}",
+  "updater.permission_hint":
+    "No write permission to the install folder (system path such as /usr/local/bin). Reinstall per-user into ~/.local/bin with `scripts/install-linux-desktop.sh`, or run with write access to that folder. Manual download: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "settings.chat.transcript.title": "Transcript",
   "settings.chat.transcript.description":
     "How a conversation reads as it grows.",
@@ -900,6 +907,11 @@ const ptBR: Record<LocaleKey, string> = {
     "Este formato não pode ser decodificado aqui — tente .ogg ou .wav",
   "settings.general.sounds.error.unavailable":
     "Reprodução de áudio indisponível neste sistema",
+  "settings.general.sounds.engine.running": "Áudio pronto",
+  "settings.general.sounds.engine.suspended":
+    "Aguardando primeiro clique ou tecla",
+  "settings.general.sounds.engine.unavailable":
+    "Áudio indisponível — o WebKitGTK do host precisa de áudio funcional (sink GStreamer + Pulse/PipeWire)",
   "settings.general.notifications.label": "Notificações",
   "settings.general.notifications.description":
     "Avisar quando um lembrete vencer ou quando um agente terminar ou precisar de atenção em outra sessão ou com o MonoCode em segundo plano. Clique na notificação para abrir a sessão.",
@@ -973,6 +985,8 @@ const ptBR: Record<LocaleKey, string> = {
     "Atualizações automáticas não configuradas nesta build.\n\nBaixe lançamentos em https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "updater.dialog.check_failed": "Não foi possível verificar atualizações.\n\n{error}",
   "updater.dialog.install_failed": "Não foi possível instalar a atualização.\n\n{error}",
+  "updater.permission_hint":
+    "Sem permissão de escrita na pasta de instalação (caminho de sistema como /usr/local/bin). Reinstale por usuário em ~/.local/bin com `scripts/install-linux-desktop.sh`, ou execute com acesso de escrita a essa pasta. Download manual: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "settings.chat.transcript.title": "Transcrição",
   "settings.chat.transcript.description":
     "Como a conversa é exibida à medida que cresce.",

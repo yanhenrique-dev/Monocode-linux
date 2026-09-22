@@ -161,6 +161,28 @@ Pré-requisitos no host:
 - O Web Audio começa suspenso até o primeiro clique/tecla. Se o primeiro
   turno terminar antes de qualquer gesto, o cue pode sair mudo uma vez;
   depois do primeiro gesto, normaliza.
+- Nenhum som no AppImage: o AppImage usa o WebKitGTK e o GStreamer do
+  host, então sem saída de áudio funcional no sistema não há cue. Nas
+  Configurações, a linha de status do som mostra `Áudio pronto`,
+  `Aguardando primeiro clique ou tecla` ou `Áudio indisponível`. Cheque
+  no host:
+
+```bash
+# Servidor de áudio de pé? (esperado: PipeWire ou PulseAudio)
+pactl info 2>/dev/null | head -n 3 || pipewire --version
+
+# Sinks de áudio do GStreamer presentes?
+if ! command -v gst-inspect-1.0 >/dev/null 2>&1; then
+  echo "gst-inspect-1.0 não está instalado; não foi possível verificar os sinks"
+else
+  gst-inspect-1.0 pulsesink alsasink 2>&1 | grep -i "no such element" \
+    || echo "sinks OK"
+fi
+
+# Web Audio do WebKitGTK funciona? Abra qualquer página de teste Web Audio
+# no navegador do sistema; se ela também ficar muda, o problema é o stack
+# de áudio do host, não o app.
+```
 - Ícone do banner: o app procura `com.monocode.desktop` e depois
   `monocode` no tema de ícones. Com integração desktop instalada
   (`scripts/install-linux-desktop.sh` ou pacote nativo), o banner usa o

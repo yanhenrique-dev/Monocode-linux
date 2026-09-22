@@ -266,8 +266,10 @@ import {
   type SoundPref,
 } from "../lib/sounds";
 import {
+  audioPlaybackState,
   pickSoundFile,
   playSoundFile,
+  type AudioPlaybackState,
   type SoundFileReason,
 } from "../lib/soundFiles";
 import {
@@ -853,6 +855,7 @@ function NotificationsPage({
             on={soundsEnabled}
             onChange={onSoundsEnabled}
           />
+          <AudioEngineState />
         </Row>
         <Row
           id="notifications"
@@ -3259,6 +3262,51 @@ const ERROR_HINT: Record<SoundFileReason, LocaleKey> = {
   unavailable: "settings.general.sounds.error.unavailable",
 };
 
+/** Live Web Audio state so a silent AppImage explains itself instead of
+ * failing quietly (host WebKitGTK without an audio sink stays here). */
+const AudioEngineState = memo(function AudioEngineState() {
+  const { t } = useLocale();
+  const [state, setState] = useState<AudioPlaybackState>(() =>
+    audioPlaybackState(),
+  );
+  useEffect(() => {
+    const sync = () => setState(audioPlaybackState());
+    // `resume()` resolve de forma assíncrona depois do gesto: repete a
+    // leitura enquanto segue suspenso em vez de uma única tentativa.
+    const timer = window.setInterval(() => {
+      sync();
+      if (audioPlaybackState() !== "suspended") {
+        window.clearInterval(timer);
+      }
+    }, 500);
+    window.addEventListener("pointerdown", sync);
+    window.addEventListener("keydown", sync);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pointerdown", sync);
+      window.removeEventListener("keydown", sync);
+    };
+  }, []);
+  const key =
+    state === "running"
+      ? "settings.general.sounds.engine.running"
+      : state === "suspended"
+        ? "settings.general.sounds.engine.suspended"
+        : "settings.general.sounds.engine.unavailable";
+  const dot =
+    state === "running"
+      ? "bg-emerald-400"
+      : state === "suspended"
+        ? "bg-amber-400"
+        : "bg-rose-400";
+  return (
+    <span className="flex items-center gap-1.5 text-[12px] text-content/60">
+      <span aria-hidden className={`size-1.5 rounded-full ${dot}`} />
+      <span role="status">{t(key)}</span>
+    </span>
+  );
+});
+
 const SoundCueRow = memo(function SoundCueRow({
   cue,
   pref,
@@ -3271,11 +3319,13 @@ const SoundCueRow = memo(function SoundCueRow({
   const { t } = useLocale();
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<SoundFileReason | null>(null);
+  const [engineBlocked, setEngineBlocked] = useState(false);
   const custom = pref !== "preset";
 
   const runTest = async () => {
     setTesting(true);
     setError(null);
+    setEngineBlocked(false);
     try {
       if (custom) {
         const result = await playSoundFile(pref);
@@ -3283,6 +3333,10 @@ const SoundCueRow = memo(function SoundCueRow({
         return;
       }
       previewCue(cue);
+      // The preset engine reports nothing on failure: re-read the shared
+      // context after resume had a chance, and say so when still blocked.
+      await new Promise((resolve) => window.setTimeout(resolve, 400));
+      if (audioPlaybackState() !== "running") setEngineBlocked(true);
     } finally {
       setTesting(false);
     }
@@ -3354,6 +3408,14 @@ const SoundCueRow = memo(function SoundCueRow({
           className="w-full text-right text-[12px] text-red-400/90"
         >
           {t(ERROR_HINT[error])}
+        </span>
+      ) : null}
+      {!custom && engineBlocked ? (
+        <span
+          role="alert"
+          className="w-full text-right text-[12px] text-amber-400/90"
+        >
+          {t("settings.general.sounds.engine.unavailable")}
         </span>
       ) : null}
     </Row>

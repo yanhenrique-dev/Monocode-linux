@@ -465,6 +465,17 @@ describe("settings search", () => {
   });
 });
 
+describe("audio engine state", () => {
+  it("shows the live engine state next to the sounds toggle", async () => {
+    await render("notifications");
+    const status = container.querySelector('[role="status"]');
+    expect(status).not.toBeNull();
+    // happy-dom has no Web Audio: the line must say unavailable, proving
+    // the state is wired and not silently blank.
+    expect(status?.textContent).toContain("Audio unavailable");
+  });
+});
+
 describe("interface blur master guard", () => {
   function blurToggle() {
     return container.querySelector<HTMLButtonElement>(
