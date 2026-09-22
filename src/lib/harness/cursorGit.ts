@@ -10,6 +10,7 @@ import {
   type PrContent,
 } from "../gitText";
 import { runCursorTextPrompt, stopCursorTextPrompt } from "./cursorText";
+import { HARNESS_SNIPPET_CHARS, truncateHead } from "../truncate";
 
 const GIT_TIMEOUT_MS = 60_000;
 
@@ -30,7 +31,10 @@ export async function generateCursorCommitMessage(cwd: string): Promise<string> 
   });
   const parsed = parseCommitMessage(output);
   if (parsed) return formatCommitMessage(parsed);
-  const snippet = output.trim().replace(/\s+/g, " ").slice(0, 240);
+  const snippet = truncateHead(
+    output.trim().replace(/\s+/g, " "),
+    HARNESS_SNIPPET_CHARS,
+  );
   throw new Error(
     snippet
       ? `Could not generate a commit message. Model replied: ${snippet}`

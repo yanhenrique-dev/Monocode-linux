@@ -5,6 +5,7 @@ import type { ContextUsage } from "./contextUsage";
 import { normalizeProjectPath } from "./recents";
 import { ompActiveAssistantTexts, ompSessionInterjections } from "./fs";
 import { backfillOmpInterjections, ompStatusSplitTexts } from "./ompInterjections";
+import { HANDOFF_USER_LINE_CHARS, truncateHead } from "./truncate";
 import type {
   AgentRunMeta,
   AgentStep,
@@ -801,7 +802,9 @@ function sanitizeSecondOpinion(
   if (!(HARNESSES as string[]).includes(value.from)) return undefined;
   if (!(HARNESSES as string[]).includes(value.to)) return undefined;
   const request =
-    typeof value.request === "string" ? value.request.trim().slice(0, 240) : "";
+    typeof value.request === "string"
+      ? truncateHead(value.request.trim(), HANDOFF_USER_LINE_CHARS)
+      : "";
   const files =
     typeof value.files === "number" && Number.isFinite(value.files)
       ? Math.max(0, Math.round(value.files))

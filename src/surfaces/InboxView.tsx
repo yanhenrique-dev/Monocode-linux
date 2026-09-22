@@ -1,12 +1,10 @@
 import { openExternalBestEffort } from "../lib/openExternal";
 import { getIntlLocale } from "../lib/locale";
 import {
-  Check,
   CheckCheck,
   ChevronDown,
   CircleDot,
   CircleX,
-  Copy,
   ExternalLink,
   GitCompare,
   GitMerge,
@@ -105,9 +103,8 @@ import {
   type InboxFilters,
   type InboxSource,
 } from "../lib/inboxFilters";
-import { copyText } from "../lib/clipboard";
+import { CopyBranchNameButton } from "./CopyBranchButton";
 import { projectKey, projectName } from "../lib/paths";
-import { playCue } from "../lib/sounds";
 import { sameProjectPath, type RecentProject } from "../lib/recents";
 import { sessionDisplayTitle, type LinkedWorkItem } from "../lib/session";
 import type { SessionSummary } from "../lib/sessionStore";
@@ -2703,44 +2700,6 @@ export function InboxDetail({
         </div>
       </div>
     </div>
-  );
-}
-
-function CopyBranchNameButton({ branch }: { branch: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  useEffect(() => {
-    setCopied(false);
-    return () => {
-      if (timer.current != null) window.clearTimeout(timer.current);
-    };
-  }, [branch]);
-
-  return (
-    <button
-      type="button"
-      title={copied ? "Copied" : "Copy branch name"}
-      aria-label={copied ? "Copied" : "Copy branch name"}
-      className="shrink-0 rounded p-0.5 text-content/40 hover:bg-content/8 hover:text-content/70"
-      onClick={() => {
-        void copyText(branch).then(
-          () => {
-            playCue("copy");
-            setCopied(true);
-            if (timer.current != null) window.clearTimeout(timer.current);
-            timer.current = window.setTimeout(() => setCopied(false), 2000);
-          },
-          () => {},
-        );
-      }}
-    >
-      {copied ? (
-        <Check className="size-3" strokeWidth={1.75} />
-      ) : (
-        <Copy className="size-3" strokeWidth={1.75} />
-      )}
-    </button>
   );
 }
 

@@ -184,6 +184,15 @@ export interface SessionSyncDeps {
   projectTerminalsRef: MutableRefObject<import("../lib/projectTerminal").ProjectTerminalDock[]>;
 }
 
+/**
+ * Session list synchronization (load / transfer / reminders / terminals).
+ *
+ * Single responsibility: keep the open session list consistent with tabs,
+ * history, and the inbox. Turn submission lives in `useComposer`, tab
+ * layout in `useWorkspaceTabs`.
+ * Follow-up split: `useSessionLoader`, `useSessionTransfer`,
+ * `useSessionRemindersBridge`, `useTerminalBridge` (see plan Fase 4).
+ */
 export function useSessionSync(deps: SessionSyncDeps) {
   const {
     sessions,

@@ -15,6 +15,7 @@ import type { Worktree } from "../lib/worktrees";
 import type { WorkspaceMode } from "../lib/session";
 import { ErrorBoundary } from "../chrome/ErrorBoundary";
 import { orchestrator, sameCheckout } from "../lib/orchestration";
+import { isCustomEvent, reportError } from "../lib/errors";
 import { DiscussionEmpty } from "../chrome/DiscussionEmpty";
 import { LinkedWorkItemUpdateNotice } from "../chrome/LinkedWorkItemUpdateNotice";
 import { SessionReview } from "../chrome/SessionReview";
@@ -372,7 +373,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
   // Restore a saved run for this lead; its agents render on the sidebar card.
   useEffect(() => {
     if (!session.inboxAsk && !session.worktreeRemoved)
-      void orchestrator.hydrate(session.id).catch(console.error);
+      void orchestrator
+        .hydrate(session.id)
+        .catch(reportError("SessionPane.hydrate", { sessionId: session.id }));
   }, [session.id, session.inboxAsk, session.worktreeRemoved]);
   const [quoteRequest, setQuoteRequest] = useState<QuoteRequest>();
   const [editingLastTurn, setEditingLastTurn] = useState(false);
@@ -435,7 +438,8 @@ const SessionPaneContent = memo(function SessionPaneContent({
   useEffect(() => {
     if (!addToChatTarget) return;
     const onAdd = (event: Event) => {
-      const detail = (event as CustomEvent<AddToChatRequest>).detail;
+      if (!isCustomEvent<AddToChatRequest>(event)) return;
+      const detail = event.detail;
       if (!detail?.text) return;
       addSelectionToChat(detail.text, detail.mode);
     };
@@ -464,7 +468,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
   }, [session.id]);
   useEffect(() => {
     return () => {
-      void flushSessionDraft().catch(console.error);
+      void flushSessionDraft().catch(
+        reportError("SessionPane.flushDraft", { sessionId: session.id }),
+      );
     };
   }, [session.id]);
   const composer = (
@@ -483,12 +489,13 @@ const SessionPaneContent = memo(function SessionPaneContent({
       sessionId={session.id}
       compactSupported={canCompactHarnessContext(session.harness)}
       recents={recents}
-      hideProjectPicker={
-        !!session.inboxAsk ||
-        (hideProjectPicker ? !showDeckProjectPicker : false)
-      }
-      hideBranchPicker={!!session.inboxAsk || managed}
-      hideTopBar={!!session.inboxAsk}
+      chrome={{
+        hideProjectPicker:
+          !!session.inboxAsk ||
+          (hideProjectPicker ? !showDeckProjectPicker : false),
+        hideBranchPicker: !!session.inboxAsk || managed,
+        hideTopBar: !!session.inboxAsk,
+      }}
       context={session.context}
       quoteRequest={quoteRequest}
       initialDraft={
@@ -550,7 +557,11 @@ const SessionPaneContent = memo(function SessionPaneContent({
       onSubmit={(text, attachments, options) =>
         onSubmit(session.id, text, attachments, options)
       }
-      onStop={() => void onStop(session.id).catch(console.error)}
+      onStop={() =>
+        void onStop(session.id).catch(
+          reportError("SessionPane.stop", { sessionId: session.id }),
+        )
+      }
       onCompactContext={() => onCompactContext(session.id)}
       onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
       queuedMessages={session.queuedMessages}

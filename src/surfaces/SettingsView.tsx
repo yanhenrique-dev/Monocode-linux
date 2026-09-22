@@ -161,6 +161,8 @@ import {
   subscribeModels,
 } from "../lib/models";
 import { prettyCwd, projectKey, projectName } from "../lib/paths";
+import { SECRET_REVEAL_MS } from "../lib/uiTimings";
+import { formatShortDate } from "../lib/displayFormat";
 import {
   loadArchivedProjects,
   looksLikeProject,
@@ -388,7 +390,7 @@ export function SettingsView({
       // Group/Row carry tabIndex -1: focusable programmatically, never by Tab.
       target?.focus?.({ preventScroll: true });
     }
-    const timer = window.setTimeout(() => setRevealed(null), 1800);
+    const timer = window.setTimeout(() => setRevealed(null), SECRET_REVEAL_MS);
     return () => window.clearTimeout(timer);
   }, [revealed, section, notificationProjectPath, notificationSettingsRequest]);
 
@@ -3069,7 +3071,7 @@ function ArchivePage({
                 {sessionDisplayTitle(session.title, session.harness)}
               </button>
               <span className="shrink-0 text-xs text-content/60 tabular-nums">
-                {formatDate(session.updatedAt)}
+                {formatShortDate(session.updatedAt)}
               </span>
               <SecondaryButton
                 onClick={() => onArchiveSession(session.id, false)}
@@ -3122,20 +3124,8 @@ function ArchivePage({
   );
 }
 
-function formatDate(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "";
-  try {
-    const date = new Date(value);
-    const sameYear = date.getFullYear() === new Date().getFullYear();
-    return new Intl.DateTimeFormat(getIntlLocale(), {
-      ...(sameYear ? {} : { year: "numeric" as const }),
-      month: "short",
-      day: "numeric",
-    }).format(date);
-  } catch {
-    return "";
-  }
-}
+/** @deprecated Import `formatShortDate` from `../lib/displayFormat`. */
+export const formatDate = formatShortDate;
 
 function PageHeader({
   title,

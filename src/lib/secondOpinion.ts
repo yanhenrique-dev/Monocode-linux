@@ -1,6 +1,7 @@
 import { isEditTool } from "./harness/preview";
 import { limitSection } from "./jsonText";
 import { displayPath } from "./paths";
+import { HANDOFF_USER_LINE_CHARS, truncateHead } from "./truncate";
 import {
   HARNESSES,
   HARNESS_TITLE,
@@ -148,7 +149,9 @@ export function buildSecondOpinionCard(input: {
   return {
     from: input.from,
     to: input.to,
-    ...(request ? { request: request.slice(0, 240) } : {}),
+    ...(request
+      ? { request: truncateHead(request, HANDOFF_USER_LINE_CHARS) }
+      : {}),
     ...(input.files.length > 0 ? { files: input.files.length } : {}),
     ...(input.kind ? { kind: input.kind } : {}),
   };

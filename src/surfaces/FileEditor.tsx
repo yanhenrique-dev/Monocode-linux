@@ -40,6 +40,7 @@ import {
 } from "../chrome/MarkdownModeToggle";
 import { useColorScheme } from "../hooks/useColorScheme";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import { asHtmlDivElement } from "../lib/errors";
 import { isLightScheme } from "../lib/appearance";
 import { formatText } from "../lib/format";
 import {
@@ -740,7 +741,7 @@ function CodeMirrorEditor({
     savedDocumentRef.current = view.state.doc;
     dirtyRef.current = false;
     viewRef.current = view;
-    lockOverscroll(view.scrollDOM as HTMLDivElement);
+    lockOverscroll(asHtmlDivElement(view.scrollDOM));
     if (showDiff) {
       if (gitOriginalRef.current) {
         setGitOriginal(view, gitOriginalRef.current);

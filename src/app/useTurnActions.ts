@@ -76,6 +76,7 @@ import {
   saveLastModelSettings,
 } from "../lib/models";
 import { getSession, upsertSession } from "../lib/sessionStore";
+import { reportError } from "../lib/errors";
 import { notifyGitChanged } from "../lib/fs";
 import { notifyReviewChanged } from "../lib/checkpoint";
 import { nudgeWorkspace, scheduleNudge } from "./workspaceEvents";
@@ -681,7 +682,9 @@ export function useTurnActions(deps: TurnActionsDeps) {
         ) {
           return;
         }
-        onStop(sessionId).catch(console.error);
+        onStop(sessionId).catch(
+          reportError("useTurnActions.escapeStop", { sessionId }),
+        );
       });
     };
     window.addEventListener("keydown", onEscape);
@@ -889,7 +892,9 @@ export function useTurnActions(deps: TurnActionsDeps) {
       },
       stop: async (id) => {
         const session = sessionsRef.current.find((entry) => entry.id === id);
-        await onStop(id, true).catch(console.error);
+        await onStop(id, true).catch(
+          reportError("useTurnActions.stop", { sessionId: id }),
+        );
         try {
           if (session)
             await Promise.all(
@@ -941,7 +946,11 @@ export function useTurnActions(deps: TurnActionsDeps) {
               },
             }),
         )
-        .catch(console.error);
+        .catch(
+          reportError("useTurnActions.controlRequest", {
+            sessionId: payload.sessionId,
+          }),
+        );
     });
     return () => {
       void listening.then((unlisten) => unlisten());

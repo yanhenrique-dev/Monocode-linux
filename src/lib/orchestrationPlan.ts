@@ -1,5 +1,6 @@
 import { HARNESSES, type Block, type HarnessId, type Session } from "./session";
 import { isEqualOrInside, pathKey } from "./paths";
+import { PROPOSAL_BUFFER_CHARS, truncateTail } from "./truncate";
 
 export type OrchestrationChoice = {
   harness: HarnessId;
@@ -277,7 +278,7 @@ export function completeOrchestrationProposal(
     return {
       ...draft,
       status: "invalid",
-      response: response.slice(-200_000),
+      response: truncateTail(response, PROPOSAL_BUFFER_CHARS),
       error:
         error ??
         `Could not prepare the assignment card: ${reason instanceof Error ? reason.message : String(reason)}`,

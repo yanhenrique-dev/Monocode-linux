@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { LAYER } from "../lib/layers";
+import { SUBMENU_CLOSE_DELAY_MS } from "../lib/uiTimings";
 import { Check, ChevronRight } from "./icons";
 import { Popover } from "./Popover";
 
@@ -102,7 +103,7 @@ export function ExplorerMenu({
 
   const scheduleClose = () => {
     cancelClose();
-    closeTimer.current = setTimeout(closeSubmenu, 180);
+    closeTimer.current = setTimeout(closeSubmenu, SUBMENU_CLOSE_DELAY_MS);
   };
 
   useEffect(() => cancelClose, []);

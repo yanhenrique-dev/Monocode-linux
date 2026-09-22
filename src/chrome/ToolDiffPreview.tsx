@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { ToolPreview } from "../lib/session";
 import { FilePreview } from "./FilePreview";
+import { HOVER_DELAY_MS } from "../lib/uiTimings";
 import { Popover } from "./Popover";
 import { X } from "./icons";
 
@@ -94,7 +95,7 @@ export function ToolDiffPreview({
           if (event.pointerType === "touch") return;
           hovered.current = true;
           clearTimer();
-          timer.current = setTimeout(() => setOpen(true), 300);
+          timer.current = setTimeout(() => setOpen(true), HOVER_DELAY_MS);
         }}
         onPointerLeave={() => {
           hovered.current = false;

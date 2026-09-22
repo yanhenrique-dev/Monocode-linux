@@ -112,6 +112,7 @@ export function selectedCommitSha(tab: WorkspaceTab): string | undefined {
     const file = pane.files.find((entry) => entry.id === pane.activeFileId);
     if (file && isCommitTab(file)) return file.commit.sha;
   }
+  return undefined;
 }
 
 export function isBlankWorkspaceTab(tab: WorkspaceTab, sessions: Session[]): boolean {

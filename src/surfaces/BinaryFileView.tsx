@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CircleAlert,
   Check,
@@ -11,6 +11,7 @@ import {
 import { ExplorerMenu } from "../chrome/ExplorerMenu";
 import { FileTypeIcon } from "../chrome/FileTypeIcon";
 import { copyText } from "../lib/clipboard";
+import { useCopyFeedback } from "../lib/copyFeedback";
 import { formatFileSize, sniffImageMime } from "../lib/filePreview";
 import { watchFile } from "../lib/fileWatch";
 import {
@@ -153,31 +154,19 @@ function ImageView({
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState<number | "fit">("fit");
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [copied, setCopied] = useState(false);
-  const copiedTimer = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (copiedTimer.current != null) window.clearTimeout(copiedTimer.current);
-    },
-    [],
-  );
+  const { copied, flash } = useCopyFeedback(path);
 
   const copyOriginal = useCallback(() => {
     setMenu(null);
     void copyFileToClipboard(path).then(
       () => {
-        setCopied(true);
-        if (copiedTimer.current != null) {
-          window.clearTimeout(copiedTimer.current);
-        }
-        copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
+        flash();
       },
       (error: unknown) => {
         console.error("Failed to copy image file:", error);
       },
     );
-  }, [path]);
+  }, [path, flash]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
