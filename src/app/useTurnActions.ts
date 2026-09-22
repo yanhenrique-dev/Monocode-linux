@@ -85,6 +85,7 @@ import {
   consolidateOrchestrationTabs,
 } from "../lib/orchestrationWorkspace";
 import { CONTINUE_PROMPT, canAutoContinue } from "../lib/inFlight";
+import { reportRejection } from "../lib/reportError";
 import { isHarnessAvailable } from "../lib/harness/availability";
 import { selectedProviderAccountId } from "../lib/providerAccounts";
 
@@ -681,7 +682,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
         ) {
           return;
         }
-        onStop(sessionId).catch(console.error);
+        onStop(sessionId).catch(reportRejection("turn-stop-escape"));
       });
     };
     window.addEventListener("keydown", onEscape);
@@ -889,7 +890,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       },
       stop: async (id) => {
         const session = sessionsRef.current.find((entry) => entry.id === id);
-        await onStop(id, true).catch(console.error);
+        await onStop(id, true).catch(reportRejection("turn-stop"));
         try {
           if (session)
             await Promise.all(
@@ -941,7 +942,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
               },
             }),
         )
-        .catch(console.error);
+        .catch(reportRejection("control-request"));
     });
     return () => {
       void listening.then((unlisten) => unlisten());

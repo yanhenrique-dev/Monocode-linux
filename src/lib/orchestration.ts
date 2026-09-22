@@ -9,6 +9,7 @@ import {
   type OrchestrationChoice,
   type OrchestrationProposal,
 } from "./orchestrationPlan";
+import { reportError, reportRejection } from "./reportError";
 
 export type TaskStatus =
   "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
@@ -522,7 +523,7 @@ export class Orchestrator {
             leadId,
             outcome.error ??
               "The lead was interrupted. Its agents were stopped; review and resume the run.",
-          ).catch(console.error);
+          ).catch(reportRejection("orchestration-pause"));
       },
     );
   }
@@ -1162,7 +1163,7 @@ export class Orchestrator {
             );
             this.host.submit(task.sessionId, prompt, (outcome) => {
               void this.settle(run.leadId, task.id, outcome, attempt).catch(
-                console.error,
+                reportRejection("orchestration-settle"),
               );
             });
           } catch (error) {
@@ -1180,7 +1181,7 @@ export class Orchestrator {
         }
       }
     } catch (error) {
-      console.error("Orchestration dispatch failed", error);
+      reportError("orchestration-dispatch", error);
     } finally {
       this.pumping = false;
       if (this.pumpAgain) {
@@ -1349,10 +1350,7 @@ export class Orchestrator {
         if (run.leadId !== id) {
           // Read the transaction's pruned graph; never save the pre-delete snapshot.
           const updated = await this.store.load(run.leadId).catch((error) => {
-            console.error(
-              "Could not reload orchestration after deletion",
-              error,
-            );
+            reportError("orchestration-reload-after-delete", error);
             this.loaded.delete(run.leadId);
             return null;
           });
@@ -1484,11 +1482,11 @@ export class Orchestrator {
                         : task,
                     ),
                   }),
-                ).catch(console.error);
+                ).catch(reportRejection("orchestration-continuation"));
               } else this.sync();
             });
           } catch (error) {
-            console.error("Orchestration continuation failed", error);
+            reportError("orchestration-continuation", error);
           } finally {
             this.waking.delete(run.leadId);
           }
@@ -1550,7 +1548,7 @@ export class Orchestrator {
         );
         return;
       }
-    })().catch(console.error);
+    })().catch(reportRejection("orchestration-write-check"));
     checks?.add(check);
     void check.finally(() => checks?.delete(check));
   }
