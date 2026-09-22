@@ -97,6 +97,19 @@ export function taskListProgressLabel(items: TaskListItem[]): string {
   return `${completed} of ${actionable || items.length}`;
 }
 
+/**
+ * Current phase legend for the tasks strip: the in-progress item's text,
+ * else the next pending item's text, else null once everything settled.
+ * Kept raw (untruncated) — the strip truncates with CSS.
+ */
+export function taskListActiveLabel(items: TaskListItem[]): string | null {
+  const active =
+    items.find((item) => item.status === "in_progress") ??
+    items.find((item) => item.status === "pending");
+  const text = active?.text.trim();
+  return text ? text : null;
+}
+
 function taskListMark(status: TaskListItemStatus): string {
   if (status === "completed") return "[x]";
   if (status === "in_progress") return "[~]";

@@ -50,9 +50,9 @@ describe("follow-up behavior setting", () => {
     localStorage.removeItem(FOLLOW_UP_BEHAVIOR_KEY);
   });
 
-  it("defaults to steer", () => {
-    expect(FOLLOW_UP_BEHAVIOR_DEFAULT).toBe("steer");
-    expect(loadFollowUpBehavior()).toBe("steer");
+  it("defaults to queue", () => {
+    expect(FOLLOW_UP_BEHAVIOR_DEFAULT).toBe("queue");
+    expect(loadFollowUpBehavior()).toBe("queue");
   });
 
   it("persists queue behavior", () => {
@@ -62,7 +62,7 @@ describe("follow-up behavior setting", () => {
 
   it("ignores unknown stored values", () => {
     localStorage.setItem(FOLLOW_UP_BEHAVIOR_KEY, "interrupt");
-    expect(loadFollowUpBehavior()).toBe("steer");
+    expect(loadFollowUpBehavior()).toBe("queue");
   });
 });
 

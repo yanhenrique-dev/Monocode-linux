@@ -4,6 +4,7 @@ import {
   lastTaskBlock,
   legacyTaskListFromText,
   normalizeTaskListStatus,
+  taskListActiveLabel,
   taskListFromToolInput,
   taskListProgressLabel,
   taskListText,
@@ -64,6 +65,34 @@ describe("task lists", () => {
         { text: "Two", status: "pending" },
       ]),
     ).toBe("1 of 2");
+  });
+
+  it("prefers the in-progress item for the active legend", () => {
+    expect(
+      taskListActiveLabel([
+        { text: "Done", status: "completed" },
+        { text: "Building", status: "in_progress" },
+        { text: "Later", status: "pending" },
+      ]),
+    ).toBe("Building");
+  });
+
+  it("falls back to the next pending item for the active legend", () => {
+    expect(
+      taskListActiveLabel([
+        { text: "Done", status: "completed" },
+        { text: "Later", status: "pending" },
+      ]),
+    ).toBe("Later");
+  });
+
+  it("returns null for the active legend once settled", () => {
+    expect(
+      taskListActiveLabel([
+        { text: "Done", status: "completed" },
+        { text: "Skipped", status: "cancelled" },
+      ]),
+    ).toBeNull();
   });
 
   it("selects the most recent non-empty task block", () => {

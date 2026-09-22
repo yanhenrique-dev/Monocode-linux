@@ -11,6 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Composer } from "../chrome/Composer";
+import { MessageQueue } from "../chrome/MessageQueue";
 import type { Worktree } from "../lib/worktrees";
 import type { WorkspaceMode } from "../lib/session";
 import { ErrorBoundary } from "../chrome/ErrorBoundary";
@@ -564,21 +565,6 @@ const SessionPaneContent = memo(function SessionPaneContent({
       }
       onCompactContext={() => onCompactContext(session.id)}
       onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
-      queuedMessages={session.queuedMessages}
-      queueStatus={session.queueStatus}
-      onDeleteQueuedMessage={(messageId) =>
-        onDeleteQueuedMessage(session.id, messageId)
-      }
-      onEditQueuedMessage={(messageId, text) =>
-        onEditQueuedMessage(session.id, messageId, text)
-      }
-      onQueuedMessageEditingChange={(messageId) =>
-        onQueuedMessageEditingChange(session.id, messageId)
-      }
-      onSteerQueuedMessage={(messageId) =>
-        onSteerQueuedMessage(session.id, messageId)
-      }
-      onResumeQueue={() => onResumeQueue(session.id)}
       onOpenFile={onOpenFile}
       busy={!!session.busy}
       editLastTurnSupported={editLastTurnSupported}
@@ -775,6 +761,23 @@ const SessionPaneContent = memo(function SessionPaneContent({
         </div>
         {dockComposer ? (
           <div className="mx-auto w-full max-w-4xl shrink-0">
+            <MessageQueue
+              messages={session.queuedMessages ?? []}
+              status={session.queueStatus}
+              onDelete={(messageId) =>
+                onDeleteQueuedMessage(session.id, messageId)
+              }
+              onEdit={(messageId, text) =>
+                onEditQueuedMessage(session.id, messageId, text)
+              }
+              onEditingChange={(messageId) =>
+                onQueuedMessageEditingChange(session.id, messageId)
+              }
+              onSteer={(messageId) =>
+                onSteerQueuedMessage(session.id, messageId)
+              }
+              onResume={() => onResumeQueue(session.id)}
+            />
             <TasksPill
               blocks={session.blocks}
               scope={transcriptScope}

@@ -530,7 +530,7 @@ const MODEL_CONTROLS_KEY = "monocode.modelControls";
 
 export type FollowUpBehavior = "steer" | "queue";
 
-export const FOLLOW_UP_BEHAVIOR_DEFAULT: FollowUpBehavior = "steer";
+export const FOLLOW_UP_BEHAVIOR_DEFAULT: FollowUpBehavior = "queue";
 
 export function loadFollowUpBehavior(): FollowUpBehavior {
   try {
