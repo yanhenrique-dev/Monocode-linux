@@ -5,7 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { announceUpdateAvailable } from "./sounds";
 import { rememberInstalledUpdate } from "./updateNotice";
-import { loadLocale, t } from "./locale";
+import { loadLocale, t, type Locale } from "./locale";
 
 export type UpdateFlowOptions = {
   /**
@@ -57,6 +57,25 @@ function flatpakIdle(currentVersion: string): UpdaterSnapshot {
 function isUpdaterNotConfiguredError(error: unknown): boolean {
   const text = error instanceof Error ? error.message : String(error);
   return /updater does not have any endpoints set/i.test(text);
+}
+
+/**
+ * Tauri stages the current executable next to itself (`tauri_current_*`).
+ * System-wide installs (/usr/local/bin, /usr/bin) owned by root fail here
+ * with EACCES (os error 13) even during `check()`.
+ */
+export function isSystemInstallPermissionError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /os error 13|permission denied|permiss[aã]o negada|insufficient permissions|tauri_current_/i.test(
+    text,
+  );
+}
+
+export function friendlyUpdateError(error: unknown, locale: Locale): string {
+  if (isSystemInstallPermissionError(error)) {
+    return t(locale, "updater.permission_hint");
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function readAppVersion(): Promise<string> {
@@ -156,7 +175,7 @@ export async function runUpdateFlow(
       return idle;
     }
 
-    const error = err instanceof Error ? err.message : String(err);
+    const error = friendlyUpdateError(err, locale);
     const failed: UpdaterSnapshot = { phase: "error", currentVersion, error };
     onProgress?.(failed);
     if (manual && showDialog) {
@@ -228,7 +247,7 @@ export async function installPendingUpdate(
       currentVersion: update.version,
     };
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
+    const error = friendlyUpdateError(err, locale);
     const failed: UpdaterSnapshot = {
       phase: "error",
       currentVersion,
