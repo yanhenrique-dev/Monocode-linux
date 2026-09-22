@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.25] - 2026-09-22
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Queued follow-ups render above the Tasks pill; the pill names the
+  active phase next to the counter.
+- Follow-up default is now Queue: Enter mid-turn waits for the turn to
+  finish instead of injecting into the running turn.
+- Codex auth-refresh failures show recovery steps instead of the raw
+  error; duplicate failure rows collapse into one.
+- Transcript file links prefer files the agent actually touched.
+- Transcript scroll without jumps: per-turn size estimates, native
+  scroll under 40 turns, wider end-zone, adaptive overscan.
+- Faster session switching: memoized render boundaries, per-session
+  transcript cache, idle hydration, lazy file index.
+
+### Fixed
+
+- Composer jank during streaming: memoized composer/highlight, throttled
+  runner measurements, resize early-return.
+- Sidebar no longer overlaps Settings during transitions.
+- Audible sound-engine diagnosis for AppImage builds.
+- Missing frontend dependencies declared in `package.json`.
+
 ## [0.2.20] - 2026-09-22
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
