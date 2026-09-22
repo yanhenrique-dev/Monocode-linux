@@ -77,14 +77,26 @@ export function TasksPill({
   const reveal = () => {
     if (!last) return;
     if (!revealBlock?.(last.id)) return;
-    // revealBlock mounts synchronously (flushSync), so the anchor is in the
-    // DOM here — whether the turn was just mounted or was already there.
-    // Scroll it into view (revealBlock alone preserves scroll position) and
-    // hide the pill; the observer re-shows it if scrolled away again.
-    scope.current
-      ?.querySelector<HTMLElement>(`[data-task-anchor="${last.id}"]`)
-      ?.scrollIntoView({ block: "center" });
-    setOffscreen(false);
+    // A virtualized turn commits after scrollToIndex returns, so wait a
+    // frame before querying the anchor; hide the pill only once the anchor
+    // is found, otherwise leave it up for another try.
+    const scroller = scope.current;
+    const query = () =>
+      scroller?.querySelector<HTMLElement>(
+        `[data-task-anchor="${last.id}"]`,
+      ) ?? null;
+    const anchor = query();
+    if (anchor) {
+      anchor.scrollIntoView({ block: "center" });
+      setOffscreen(false);
+      return;
+    }
+    requestAnimationFrame(() => {
+      const late = query();
+      if (!late) return;
+      late.scrollIntoView({ block: "center" });
+      setOffscreen(false);
+    });
   };
   // Without the experimental flag the strip mounts instantly exactly as
   // before; the animated path keeps the frame mounted and folds it with a

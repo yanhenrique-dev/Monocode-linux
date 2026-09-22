@@ -243,7 +243,13 @@ function AgentTranscriptContent({
 
   const turns = useMemo(() => groupTurns(blocks, managed), [blocks, managed]);
   const turnsRef = useRef(turns);
-  turnsRef.current = turns;
+  useLayoutEffect(() => {
+    turnsRef.current = turns;
+  }, [turns]);
+  const getItemKey = useCallback(
+    (index: number) => turns[index]?.[0]?.id ?? `turn-${index}`,
+    [turns],
+  );
 
   // Virtualize by turn when the scroller has a measurable viewport (real
   // browser): the engine sizes from offsetWidth/offsetHeight, so the gate
@@ -258,8 +264,7 @@ function AgentTranscriptContent({
     count: turns.length,
     getScrollElement: () => scroller.current,
     estimateSize: () => TURN_ESTIMATE_PX,
-    getItemKey: (index) =>
-      turnsRef.current[index]?.[0]?.id ?? `turn-${index}`,
+    getItemKey,
     overscan: 8,
     anchorTo: "end",
     followOnAppend: true,
