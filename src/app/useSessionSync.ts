@@ -33,6 +33,7 @@ import {
   type ResumedWorkspace,
 } from "../lib/appLifecycle";
 import { flushSessionDraft } from "../lib/composerDraft";
+import { reportError } from "../lib/reportError";
 import {
   focusedFileTab,
   isolateTerminalPanes,
@@ -703,7 +704,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
           try {
             await flushSessionDraft();
           } catch (reason) {
-            console.error(reason);
+            reportError("session-sync-draft", reason);
           }
           if (hasInFlightSessions(sessionsRef.current)) {
             flushHarnessEvents();

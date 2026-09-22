@@ -104,6 +104,7 @@ import {
   type InboxSource,
 } from "../lib/inboxFilters";
 import { CopyBranchNameButton } from "./CopyBranchButton";
+import { GithubPrChecks } from "./InboxPrChecks";
 import { projectKey, projectName } from "../lib/paths";
 import { sameProjectPath, type RecentProject } from "../lib/recents";
 import { sessionDisplayTitle, type LinkedWorkItem } from "../lib/session";
@@ -2557,6 +2558,14 @@ export function InboxDetail({
                   </button>
                 )}
               </div>
+              {githubKind === "pr" ? (
+                <GithubPrChecks
+                  projectPath={item.projectPath}
+                  repo={item.repo}
+                  number={item.number}
+                  revision={revision}
+                />
+              ) : null}
               {startError ? (
                 <p className="text-[12px] text-red-400/90">{startError}</p>
               ) : null}

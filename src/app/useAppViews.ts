@@ -20,6 +20,7 @@ import type { ConnectableInboxSource } from "../lib/inboxFilters";
 import type { LinkedWorkItem, Session } from "../lib/session";
 import type { SessionSummary } from "../lib/sessionStore";
 import { flushSessionDraft } from "../lib/composerDraft";
+import { reportError } from "../lib/reportError";
 
 export interface LinkedWorkItemPanelState {
   item: LinkedWorkItem;
@@ -147,7 +148,7 @@ export function useAppViews(deps: AppViewsDeps) {
     void flushSessionDraft().then(
       () => window.location.reload(),
       (reason) => {
-        console.error(reason);
+        reportError("app-reload-draft", reason);
         window.location.reload();
       },
     );

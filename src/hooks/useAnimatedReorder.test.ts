@@ -228,7 +228,9 @@ describe("workspace tab gestures", () => {
     vi.advanceTimersByTime(16);
     expect(tabs[0].style.transform).toBe("translate3d(130px, 0, 0)");
     expect(tabs[1].style.transform).toBe("translate3d(-100px, 0, 0)");
-    expect(tabs[2].style.transform).toBe("translate3d(0px, 0, 0)");
+    // Undisplaced tabs stay out of the compositor: no transform, no transition.
+    expect(tabs[2].style.transform).toBe("");
+    expect(tabs[2].style.transition).toBe("");
     expect(onReorder).not.toHaveBeenCalled();
   });
 

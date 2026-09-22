@@ -37,7 +37,7 @@ export function useExperimentalAnimations(): boolean {
  */
 export function useExitAnimation({
   enabled = true,
-  durationMs = 200,
+  durationMs = 150,
   onExit,
 }: {
   enabled?: boolean;

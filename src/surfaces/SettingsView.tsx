@@ -1107,11 +1107,25 @@ function ChatPage() {
           label={t("settings.chat.experimental_animations.label")}
           description={t("settings.chat.experimental_animations.description")}
         >
-          <Toggle
-            label={t("settings.chat.experimental_animations.toggle")}
-            on={experimentalAnimations}
-            onChange={onExperimentalAnimations}
-          />
+          <div className="flex items-center gap-3">
+            {experimentalAnimations ? (
+              <span
+                key="motion-preview"
+                aria-hidden
+                className="popover-open inline-block size-4 rounded-full bg-accent"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="inline-block size-4 rounded-full bg-content/20"
+              />
+            )}
+            <Toggle
+              label={t("settings.chat.experimental_animations.toggle")}
+              on={experimentalAnimations}
+              onChange={onExperimentalAnimations}
+            />
+          </div>
         </Row>
       </Group>
 

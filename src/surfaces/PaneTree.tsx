@@ -43,7 +43,10 @@ import {
   type ComposerTurnOptions,
 } from "../lib/session";
 import { FilePane } from "./FilePane";
-import { useExperimentalAnimations } from "../hooks/useExitAnimation";
+import {
+  useExitAnimation,
+  useExperimentalAnimations,
+} from "../hooks/useExitAnimation";
 import { SessionPane } from "./SessionPane";
 import type { SessionFolderTarget } from "../lib/sessionFolders";
 import type { Worktree } from "../lib/worktrees";
@@ -228,6 +231,11 @@ function PaneTreeComponent({
   onTerminalMetaChange,
 }: Props) {
   const treeRef = useRef<HTMLDivElement>(null);
+  /** First paint of the tree is dry; panes mounted later may fade in. */
+  const paintedRef = useRef(false);
+  useEffect(() => {
+    paintedRef.current = true;
+  }, []);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const [draft, setDraft] = useState<LayoutNode | null>(null);
@@ -296,7 +304,7 @@ function PaneTreeComponent({
           const { [id]: _removed, ...rest } = prev;
           return rest;
         });
-      }, 200);
+      }, 150);
     }
   }, [editorPanes, leaves, fileAnimations]);
   useEffect(
@@ -443,6 +451,7 @@ function PaneTreeComponent({
                 exiting={!editorPane}
                 animating={fileAnimations}
                 onExitEnd={() => dropHeldFilePane(leaf.id)}
+                paintedRef={paintedRef}
               >
                 {(pane) => (
                   <FilePane
@@ -558,31 +567,58 @@ export const PaneTree = memo(
   (previous, next) => !previous.visible && !next.visible,
 );
 
-/** Enter/exit wrapper for the file pane: plays the sidebar language on mount
- * and holds a just-closed pane through its outro. */
+/** Enter/exit wrapper for the file pane: fades the center pane in place and
+ * holds a just-closed pane through its outro. Uses the shared exit hook so
+ * a missing `animationend` (WebKitGTK) still unmounts via timeout. */
 function FilePanePresence({
   pane,
   exiting,
   animating,
   onExitEnd,
+  paintedRef,
   children,
 }: {
   pane: EditorPane;
   exiting: boolean;
   animating: boolean;
   onExitEnd: () => void;
+  /** True once the tree committed its first paint: panes mounted before
+   * that are the boot layout and appear dry. */
+  paintedRef: { current: boolean };
   children: (pane: EditorPane) => ReactNode;
 }) {
+  // Enter plays only for panes that arrive after boot; the boot layout
+  // appears dry. Exit always plays while the held pane drains.
+  const [entered, setEntered] = useState(() => paintedRef.current);
+  const prevId = useRef(pane.id);
+  useEffect(() => {
+    if (prevId.current !== pane.id) {
+      prevId.current = pane.id;
+      setEntered(true);
+    }
+  }, [pane.id]);
+  const { closing, requestClose, handleAnimationEnd, cancelClose } =
+    useExitAnimation({
+      enabled: animating,
+      durationMs: 150,
+      onExit: onExitEnd,
+    });
+  useEffect(() => {
+    if (!animating) return;
+    if (exiting) requestClose();
+    else cancelClose();
+  }, [exiting, animating, requestClose, cancelClose]);
   if (!animating) return <>{children(pane)}</>;
+  const exitingOrClosing = exiting || closing;
+  const motionClass = exitingOrClosing
+    ? "pane-anim-out"
+    : entered
+      ? "pane-anim-in"
+      : "";
   return (
     <div
-      className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${
-        exiting ? "sidebar-anim-out" : "sidebar-anim-in"
-      }`}
-      onAnimationEnd={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (exiting) onExitEnd();
-      }}
+      className={`flex h-full min-h-0 min-w-0 flex-1 flex-col ${motionClass}`}
+      onAnimationEnd={exitingOrClosing ? handleAnimationEnd : undefined}
     >
       {children(pane)}
     </div>

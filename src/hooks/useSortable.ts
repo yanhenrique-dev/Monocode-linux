@@ -229,7 +229,7 @@ export function useSortable(
         }
         if (!current?.active) return;
         if (!commit) return;
-        suppressClickUntil.current = performance.now() + 400;
+        suppressClickUntil.current = performance.now() + 150;
         if (current.dropTarget) {
           // A refused target still swallows the drop: the tab stays put rather
           // than reordering into a group it cannot join.

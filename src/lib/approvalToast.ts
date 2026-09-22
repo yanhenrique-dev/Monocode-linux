@@ -39,7 +39,7 @@ export function pendingApprovalForSession(
   return null;
 }
 
-/** True when the conversation pane for this session is focused and active. */
+/** True when conversation pane for session focused and active. */
 export function isSessionConversationFocused(
   sessionId: string,
   activeTabId: string,
@@ -53,6 +53,11 @@ export function isSessionConversationFocused(
   return composerFocused;
 }
 
+/**
+ * Pending approvals/questions in background sessions only. Focused
+ * conversation uses inline Allow/Deny row on tool line itself (ex: Find),
+ * never corner popup. Popup exists only when user cannot see inline row.
+ */
 export function hiddenApprovalNotices(
   sessions: Session[],
   activeTabId: string,

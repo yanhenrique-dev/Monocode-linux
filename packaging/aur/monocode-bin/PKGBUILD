@@ -1,7 +1,7 @@
 # Maintainer: yanhenrique-dev <yanhenrique-dev at users dot noreply dot github dot com>
 # https://github.com/yanhenrique-dev/Monocode-linux
 pkgname=monocode-bin
-pkgver=0.1.67
+pkgver=0.2.17
 pkgrel=1
 pkgdesc="MonoCode Linux — interface desktop para agentes de código (Tauri + React)"
 arch=('x86_64')
@@ -17,7 +17,7 @@ optdepends=(
 )
 source=("${pkgname}-${pkgver}.AppImage::${url}/releases/download/v${pkgver}/MonoCode_${pkgver}_amd64.AppImage"
         "LICENSE::${url}/raw/v${pkgver}/LICENSE")
-sha256sums=('3ebdcb5761a109882df70b0fc5b810494337e8cac64f3175dede617fd75e8add'
+sha256sums=('56e6bae6baa8edae12121fa4e0e4fab63a612c763f093141acf77d9768e8aac0'
             'f0da354982eb716d0036375be9322e2e77792acd0a782f1655ee75ea36c17640')
 
 prepare() {

@@ -201,7 +201,7 @@ export function Popover({
   const pendingReason = useRef<PopoverDismissReason | null>(null);
   const { closing, requestClose, handleAnimationEnd } = useExitAnimation({
     enabled: animationsEnabled,
-    durationMs: 200,
+    durationMs: 150,
     onExit: () => {
       const reason = pendingReason.current;
       pendingReason.current = null;
