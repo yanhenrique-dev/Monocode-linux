@@ -172,8 +172,12 @@ Pré-requisitos no host:
 pactl info 2>/dev/null | head -n 3 || pipewire --version
 
 # Sinks de áudio do GStreamer presentes?
-gst-inspect-1.0 pulsesink alsasink 2>&1 | grep -i "no such element" \
-  || echo "sinks OK"
+if ! command -v gst-inspect-1.0 >/dev/null 2>&1; then
+  echo "gst-inspect-1.0 não está instalado; não foi possível verificar os sinks"
+else
+  gst-inspect-1.0 pulsesink alsasink 2>&1 | grep -i "no such element" \
+    || echo "sinks OK"
+fi
 
 # Web Audio do WebKitGTK funciona? Abra qualquer página de teste Web Audio
 # no navegador do sistema; se ela também ficar muda, o problema é o stack

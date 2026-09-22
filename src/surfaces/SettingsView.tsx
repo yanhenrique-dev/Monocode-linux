@@ -3271,11 +3271,18 @@ const AudioEngineState = memo(function AudioEngineState() {
   );
   useEffect(() => {
     const sync = () => setState(audioPlaybackState());
-    const timer = window.setTimeout(sync, 500);
+    // `resume()` resolve de forma assíncrona depois do gesto: repete a
+    // leitura enquanto segue suspenso em vez de uma única tentativa.
+    const timer = window.setInterval(() => {
+      sync();
+      if (audioPlaybackState() !== "suspended") {
+        window.clearInterval(timer);
+      }
+    }, 500);
     window.addEventListener("pointerdown", sync);
     window.addEventListener("keydown", sync);
     return () => {
-      window.clearTimeout(timer);
+      window.clearInterval(timer);
       window.removeEventListener("pointerdown", sync);
       window.removeEventListener("keydown", sync);
     };
