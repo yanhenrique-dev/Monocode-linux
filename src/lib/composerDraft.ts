@@ -22,6 +22,9 @@ const pending = new Map<string, Entry>();
  */
 export function saveSessionDraft(sessionId: string, text: string): void {
   const prev = pending.get(sessionId);
+  // Same text (e.g. effect refire on unrelated renders): don't churn the
+  // debounce timer and revision for a no-op write.
+  if (prev && prev.text === text) return;
   if (prev?.timer) clearTimeout(prev.timer);
   const revision = (prev?.revision ?? 0) + 1;
   pending.set(sessionId, {

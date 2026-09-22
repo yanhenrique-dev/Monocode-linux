@@ -104,34 +104,36 @@ function settle() {
 }
 
 describe("transcript virtualization", () => {
+  // 45 turns: above the VIRTUALIZE_MIN_TURNS gate (40) so the suite keeps
+  // exercising the virtualized window instead of the native fallback.
   it("mounts only the visible window of a long session", () => {
-    renderTranscript(manyTurns(30));
+    renderTranscript(manyTurns(45));
     const mounted = turnCount();
     expect(mounted).toBeGreaterThan(0);
-    expect(mounted).toBeLessThan(30);
+    expect(mounted).toBeLessThan(45);
     // End-anchored: the latest reply is mounted, the first prompt is not.
-    expect(hasText("Answer 29")).toBe(true);
+    expect(hasText("Answer 44")).toBe(true);
     expect(hasText("Prompt 0")).toBe(false);
   });
 
   it("follows appended turns while pinned to the end", () => {
-    const blocks = manyTurns(30);
+    const blocks = manyTurns(45);
     renderTranscript(blocks);
-    expect(hasText("Answer 29")).toBe(true);
+    expect(hasText("Answer 44")).toBe(true);
     act(() => {
       root.render(
         createElement(AgentTranscript, {
-          blocks: [...blocks, ...pair(30)],
+          blocks: [...blocks, ...pair(45)],
         }),
       );
     });
     settle();
-    expect(hasText("Answer 30")).toBe(true);
+    expect(hasText("Answer 45")).toBe(true);
   });
 
   it("revealBlock mounts a distant turn on demand", () => {
     let reveal: ((blockId: string) => boolean) | null = null;
-    renderTranscript(manyTurns(30), {
+    renderTranscript(manyTurns(45), {
       onRevealReady: (fn: (blockId: string) => boolean) => {
         reveal = fn;
       },

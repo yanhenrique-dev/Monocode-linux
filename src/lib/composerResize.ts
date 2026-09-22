@@ -6,9 +6,15 @@ type Resizable = {
   scrollHeight: number;
 };
 
-/** A hidden tab stays mounted with no layout box, so it reports 0 here. */
+/**
+ * A hidden tab stays mounted with no layout box, so it reports 0 here.
+ * Skips the write when the height already matches: setting `auto` +
+ * reading `scrollHeight` forces a sync layout on every keystroke otherwise.
+ */
 export function resizeComposer(el: Resizable) {
   if (el.scrollHeight === 0) return;
+  const next = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+  if (el.style.height === next) return;
   el.style.height = "auto";
-  el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+  el.style.height = next;
 }

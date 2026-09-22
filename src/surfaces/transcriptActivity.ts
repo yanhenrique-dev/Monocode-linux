@@ -1013,6 +1013,42 @@ export function transcriptFilePaths(blocks: Block[]): string[] {
   return paths;
 }
 
+type CachedTranscript = {
+  turns: Block[][];
+  phases: ActivityPhase[];
+};
+
+// Keyed by block-array identity, not by value: the store replaces the array
+// only when a session actually changes, so a remount of a settled session
+// hits with zero staleness risk (value keys collide whenever ids are reused
+// with different metadata). Streaming always produces a fresh array, so live
+// turns never read stale structure. WeakMap: dropped sessions release their
+// entries with nothing to evict.
+const transcriptCache = new WeakMap<
+  Block[],
+  { settled?: CachedTranscript; managed?: CachedTranscript }
+>;
+
+export function cachedTranscript(
+  blocks: Block[],
+  managed = false,
+): CachedTranscript {
+  let slot = transcriptCache.get(blocks);
+  if (!slot) {
+    slot = {};
+    transcriptCache.set(blocks, slot);
+  }
+  const variant = managed ? "managed" : "settled";
+  const hit = slot[variant];
+  if (hit) return hit;
+  const entry: CachedTranscript = {
+    turns: groupTurns(blocks, managed),
+    phases: buildActivityPhases(blocks),
+  };
+  slot[variant] = entry;
+  return entry;
+}
+
 /** True when a nested scroller should consume this wheel, not the parent. */
 export function nestedScrollAbsorbsWheel(
   el: { scrollTop: number; scrollHeight: number; clientHeight: number },

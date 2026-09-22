@@ -5,6 +5,7 @@ import {
   activityPhaseTitle,
   activityStillRunning,
   buildActivityPhases,
+  cachedTranscript,
   editVerb,
   estimateTurnHeight,
   firstFoldableIndex,
@@ -474,6 +475,34 @@ describe("transcriptFilePaths", () => {
     expect(
       transcriptFilePaths([{ id: "a1", role: "assistant", text: "hi" }]),
     ).toEqual([]);
+  });
+});
+
+describe("cachedTranscript", () => {
+  const blocks = [
+    { id: "u1", role: "user", text: "hi" },
+    { id: "a1", role: "assistant", text: "hello" },
+  ];
+
+  it("returns identical arrays for the same block array identity", () => {
+    const first = cachedTranscript(blocks);
+    const second = cachedTranscript(blocks);
+    expect(second.turns).toBe(first.turns);
+    expect(second.phases).toBe(first.phases);
+  });
+
+  it("recomputes for a fresh array even with equal content", () => {
+    const first = cachedTranscript(blocks);
+    const second = cachedTranscript([...blocks]);
+    expect(second.turns).not.toBe(first.turns);
+    expect(second.turns).toEqual(first.turns);
+  });
+
+  it("keeps managed and settled variants apart", () => {
+    const settled = cachedTranscript(blocks, false);
+    const managed = cachedTranscript(blocks, true);
+    expect(managed.turns).not.toBe(settled.turns);
+    expect(cachedTranscript(blocks, true).turns).toBe(managed.turns);
   });
 });
 

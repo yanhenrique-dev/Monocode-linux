@@ -650,9 +650,9 @@ html.is-resizing * {
 
 html.theme-light [data-composer-box] {
   background: var(--color-background-base);
-  box-shadow:
-    0 6px 24px color-mix(in srgb, var(--color-content) 9%, transparent),
-    0 2px 6px color-mix(in srgb, var(--color-content) 6%, transparent);
+  /* Single short shadow: the 24px blur repainted the dock on every
+   * streaming token; depth now comes from the border. */
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-content) 12%, transparent);
 }
 
 /* Solid primary actions share the composer submit treatment. */
