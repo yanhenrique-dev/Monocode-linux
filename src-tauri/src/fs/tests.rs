@@ -1873,6 +1873,119 @@ fn parse_github_pr_merge_info_tolerates_partial_responses() {
     assert!(error.contains("Could not resolve to a Repository"));
 }
 
+fn work_item_fixture(number: i64, updated_at: &str) -> GitHubWorkItem {
+    GitHubWorkItem {
+        kind: "pr".into(),
+        number,
+        title: format!("PR {number}"),
+        url: format!("https://github.com/acme/app/pull/{number}"),
+        state: "open".into(),
+        created_at: "2026-01-01T00:00:00Z".into(),
+        updated_at: updated_at.into(),
+        labels: vec![],
+        assignees: vec![],
+        draft: false,
+        repo: "acme/app".into(),
+    }
+}
+
+#[test]
+fn merge_work_items_dedupes_review_requested_without_losing_assigned() {
+    let assigned = vec![
+        work_item_fixture(1, "2026-09-20T10:00:00Z"),
+        work_item_fixture(2, "2026-09-20T10:00:00Z"),
+    ];
+    let review_requested = vec![
+        work_item_fixture(2, "2026-09-20T10:00:00Z"),
+        work_item_fixture(3, "2026-09-21T10:00:00Z"),
+    ];
+    let merged = merge_work_items(assigned, review_requested);
+    assert_eq!(
+        merged.iter().map(|item| item.number).collect::<Vec<_>>(),
+        vec![3, 2, 1]
+    );
+}
+
+#[test]
+fn merge_work_items_prefers_fresher_snapshot_for_duplicates() {
+    let assigned = vec![work_item_fixture(7, "2026-09-20T10:00:00Z")];
+    let review_requested = vec![work_item_fixture(7, "2026-09-22T10:00:00Z")];
+    let merged = merge_work_items(assigned, review_requested);
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].updated_at, "2026-09-22T10:00:00Z");
+}
+
+#[test]
+fn parse_github_pr_checks_reads_runs_and_status_contexts() {
+    let json = r#"{
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "commits": {
+                            "nodes": [{
+                                "commit": {
+                                    "statusCheckRollup": {
+                                        "state": "PENDING",
+                                        "contexts": {
+                                            "nodes": [
+                                                {
+                                                    "name": "CI / check (pull_request)",
+                                                    "status": "IN_PROGRESS",
+                                                    "conclusion": null,
+                                                    "detailsUrl": "https://github.com/acme/app/actions/runs/1",
+                                                    "startedAt": "2026-09-22T10:00:00Z"
+                                                },
+                                                {
+                                                    "name": "CodeRabbit",
+                                                    "status": "COMPLETED",
+                                                    "conclusion": "SUCCESS",
+                                                    "detailsUrl": "https://github.com/acme/app/pull/130",
+                                                    "startedAt": "2026-09-22T09:00:00Z"
+                                                },
+                                                {
+                                                    "context": "legacy-lint",
+                                                    "state": "FAILURE",
+                                                    "targetUrl": "https://ci.example.com/9",
+                                                    "createdAt": "2026-09-22T08:00:00Z"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }]
+                        }
+                    }
+                }
+            }
+        }"#;
+    let checks = parse_github_pr_checks(json).unwrap();
+    assert_eq!(checks.state, "PENDING");
+    assert_eq!(checks.checks.len(), 3);
+    let running = checks
+        .checks
+        .iter()
+        .find(|check| check.name == "CI / check (pull_request)")
+        .unwrap();
+    assert_eq!(running.status, "IN_PROGRESS");
+    assert_eq!(running.conclusion, None);
+    assert_eq!(running.started_at, "2026-09-22T10:00:00Z");
+    let legacy = checks
+        .checks
+        .iter()
+        .find(|check| check.name == "legacy-lint")
+        .unwrap();
+    assert_eq!(legacy.status, "FAILURE");
+    assert_eq!(legacy.conclusion, None);
+}
+
+#[test]
+fn parse_github_pr_checks_tolerates_missing_rollup() {
+    let json = r#"{"data": {"repository": {"pullRequest": {"commits": {"nodes": []}}}}}"#;
+    let checks = parse_github_pr_checks(json).unwrap();
+    assert_eq!(checks.state, "UNKNOWN");
+    assert!(checks.checks.is_empty());
+}
+
 #[test]
 fn parse_github_work_item_thread_reads_graphql_errors() {
     let json = r#"{

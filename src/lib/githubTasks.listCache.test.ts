@@ -113,6 +113,78 @@ describe("per-query list cache", () => {
     });
     expect(merged.items.map((item) => item.number).sort()).toEqual([1, 2, 9]);
   });
+
+  it("evicts window-fresh items missing from the delta, keeps idle ones", async () => {
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      switch (command) {
+        case "git_github_repositories":
+          return ["acme/web"] as never;
+        case "git_github_work_items": {
+          const { kind, updatedSince } = args as {
+            kind: string;
+            updatedSince?: string;
+          };
+          if (updatedSince) {
+            return (
+              kind === "pr"
+                ? [
+                    workItem({
+                      number: 9,
+                      kind: "pr",
+                      url: "https://github.com/acme/web/pull/9",
+                      updatedAt: "2026-09-12T00:00:00Z",
+                    }),
+                    workItem({
+                      number: 2,
+                      kind: "pr",
+                      title: "PR2 updated",
+                      url: "https://github.com/acme/web/pull/2",
+                      updatedAt: "2026-09-12T01:00:00Z",
+                    }),
+                  ]
+                : []
+            ) as never;
+          }
+          return (
+            kind === "issue"
+              ? [workItem({ number: 1 })]
+              : [
+                  workItem({
+                    number: 2,
+                    kind: "pr",
+                    url: "https://github.com/acme/web/pull/2",
+                  }),
+                  // Fresh within the since window but absent from the delta:
+                  // closed on github.com, must leave the snapshot.
+                  workItem({
+                    number: 5,
+                    kind: "pr",
+                    url: "https://github.com/acme/web/pull/5",
+                    updatedAt: "2026-09-12T00:00:00Z",
+                  }),
+                ]
+          ) as never;
+        }
+        case "linear_status":
+          return { connected: false } as never;
+        case "gitlab_connected":
+        case "gitlab_status":
+          return { connected: false } as never;
+        default:
+          throw new Error(`unexpected invoke: ${command}`);
+      }
+    });
+    const full = await listInboxItems(projects, openQuery);
+    expect(full.items.map((item) => item.number).sort()).toEqual([1, 2, 5]);
+
+    const merged = await listInboxItems(projects, openQuery, {
+      since: "2026-09-11T00:00:00Z",
+    });
+    expect(merged.items.map((item) => item.number).sort()).toEqual([1, 2, 9]);
+    expect(
+      merged.items.find((item) => item.number === 2)?.title,
+    ).toBe("PR2 updated");
+  });
 });
 
 describe("invalidateGithubItemCaches", () => {

@@ -436,6 +436,188 @@ pub(crate) fn parse_github_pr_merge_info(json: &str) -> Result<GitHubPrMergeInfo
     })
 }
 
+/// One CI/review check on the pull request head, normalized from either a
+/// `CheckRun` or a legacy commit `StatusContext`.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrCheck {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub url: String,
+    pub started_at: String,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrChecks {
+    pub state: String,
+    pub checks: Vec<GitHubPrCheck>,
+}
+
+/// Check runs on the pull request head, via `gh`. Missing rollups (no CI
+/// configured) resolve to an empty list, never an error.
+#[tauri::command]
+pub async fn git_github_pr_checks(
+    cwd: String,
+    repo: String,
+    number: i64,
+) -> Result<GitHubPrChecks, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_github_pr_checks_for(&expand_home(&cwd), &repo, number)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn git_github_pr_checks_for(
+    root: &Path,
+    repo: &str,
+    number: i64,
+) -> Result<GitHubPrChecks, String> {
+    if number <= 0 {
+        return Err("GitHub pull request number must be positive".into());
+    }
+    let (owner, name) = split_github_repo(repo)?;
+    let owner_field = format!("owner={owner}");
+    let name_field = format!("name={name}");
+    let number_field = format!("number={number}");
+    let json = gh_checked(
+        root,
+        &[
+            "api",
+            "graphql",
+            "-f",
+            &format!("query={GITHUB_PR_CHECKS_QUERY}"),
+            "-F",
+            &owner_field,
+            "-F",
+            &name_field,
+            "-F",
+            &number_field,
+        ],
+    )?;
+    parse_github_pr_checks(&json)
+}
+
+const GITHUB_PR_CHECKS_QUERY: &str = r#"
+query InboxPullRequestChecks($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              state
+              contexts(first: 50) {
+                nodes {
+                  ... on CheckRun {
+                    name
+                    status
+                    conclusion
+                    detailsUrl
+                    startedAt
+                  }
+                  ... on StatusContext {
+                    context
+                    state
+                    targetUrl
+                    createdAt
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"#;
+
+pub(crate) fn parse_github_pr_checks(json: &str) -> Result<GitHubPrChecks, String> {
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|error| error.to_string())?;
+    if let Some(message) = value
+        .get("errors")
+        .and_then(|errors| errors.as_array())
+        .and_then(|errors| errors.first())
+        .and_then(|error| error.get("message"))
+        .and_then(|message| message.as_str())
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+    {
+        return Err(message.to_string());
+    }
+    let rollup =
+        value.pointer("/data/repository/pullRequest/commits/nodes/0/commit/statusCheckRollup");
+    let state = rollup
+        .and_then(|rollup| rollup.get("state"))
+        .and_then(|state| state.as_str())
+        .map(str::trim)
+        .filter(|state| !state.is_empty())
+        .unwrap_or("UNKNOWN")
+        .to_string();
+    let mut checks = Vec::new();
+    if let Some(nodes) = rollup
+        .and_then(|rollup| rollup.get("contexts"))
+        .and_then(|contexts| contexts.get("nodes"))
+        .and_then(|nodes| nodes.as_array())
+    {
+        for node in nodes {
+            let get = |key: &str| {
+                node.get(key)
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|text| !text.is_empty())
+                    .unwrap_or("")
+            };
+            // CheckRun shape first, StatusContext shape as fallback: both
+            // expose the display name under a different key.
+            let name = get("name");
+            let name = if name.is_empty() {
+                get("context")
+            } else {
+                name
+            };
+            if name.is_empty() {
+                continue;
+            }
+            let status = get("status");
+            let status = if status.is_empty() {
+                get("state")
+            } else {
+                status
+            };
+            let conclusion = get("conclusion");
+            let url = get("detailsUrl");
+            let url = if url.is_empty() {
+                get("targetUrl")
+            } else {
+                url
+            };
+            let started_at = get("startedAt");
+            let started_at = if started_at.is_empty() {
+                get("createdAt")
+            } else {
+                started_at
+            };
+            checks.push(GitHubPrCheck {
+                name: name.to_string(),
+                status: status.to_uppercase(),
+                conclusion: if conclusion.is_empty() {
+                    None
+                } else {
+                    Some(conclusion.to_uppercase())
+                },
+                url: url.to_string(),
+                started_at: started_at.to_string(),
+            });
+        }
+    }
+    checks.sort_by(|a, b| a.name.cmp(&b.name).then(a.url.cmp(&b.url)));
+    Ok(GitHubPrChecks { state, checks })
+}
+
 /// Merge or change the lifecycle state of a GitHub pull request via `gh`.
 #[tauri::command]
 pub async fn git_github_pr_action(
@@ -633,8 +815,34 @@ fn work_items_cache_key(
     state: &str,
     search: &str,
     limit: u32,
+    scope: &str,
 ) -> String {
-    format!("{repo}|{kind}|{assigned_to_me}|{state}|{search}|{limit}")
+    format!("{repo}|{kind}|{assigned_to_me}|{state}|{search}|{limit}|{scope}")
+}
+
+/// Merge two `gh list` snapshots, deduplicated by number. When both carry
+/// the same item, the fresher `updated_at` wins; the result stays newest
+/// first so the inbox paints a stable order.
+pub(crate) fn merge_work_items(
+    mut current: Vec<GitHubWorkItem>,
+    extra: Vec<GitHubWorkItem>,
+) -> Vec<GitHubWorkItem> {
+    for item in extra {
+        match current.iter_mut().find(|row| row.number == item.number) {
+            Some(row) => {
+                if item.updated_at > row.updated_at {
+                    *row = item;
+                }
+            }
+            None => current.push(item),
+        }
+    }
+    current.sort_by(|a, b| {
+        b.updated_at
+            .cmp(&a.updated_at)
+            .then(b.number.cmp(&a.number))
+    });
+    current
 }
 
 /// Drop cached lists for `repo` after a mutation (comment, merge, close…).
@@ -680,6 +888,68 @@ fn git_github_work_items_for(
         "open"
     };
     let limit_num = limit.clamp(1, 100);
+    let search = search.trim();
+    // Badge polls only need what changed since the last cycle: fold the
+    // bound into the search GitHub already applies server-side.
+    let since = updated_since.map(str::trim).filter(|s| !s.is_empty());
+    let combined = match (search.is_empty(), since) {
+        (false, Some(since)) => format!("{search} updated:>={since}"),
+        (false, None) => search.to_string(),
+        (true, Some(since)) => format!("updated:>={since}"),
+        (true, None) => String::new(),
+    };
+    let mut items = list_work_items(
+        root,
+        &repo,
+        kind,
+        state,
+        limit_num,
+        assigned_to_me,
+        &combined,
+        "assignee",
+    )?;
+    // `--assignee @me` misses what github.com still surfaces: PRs awaiting
+    // the viewer's review and issues mentioning them. A second scoped query
+    // covers those; its failure degrades to the assignee snapshot, never an
+    // error.
+    if assigned_to_me {
+        let scope = if kind == "pr" {
+            "review-requested:@me"
+        } else {
+            "mentions:@me"
+        };
+        let extra_search = if combined.is_empty() {
+            scope.to_string()
+        } else {
+            format!("{combined} {scope}")
+        };
+        if let Ok(extra) = list_work_items(
+            root,
+            &repo,
+            kind,
+            state,
+            limit_num,
+            false,
+            &extra_search,
+            scope,
+        ) {
+            items = merge_work_items(items, extra);
+        }
+    }
+    Ok(items)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn list_work_items(
+    root: &Path,
+    repo: &str,
+    kind: &str,
+    state: &str,
+    limit_num: u32,
+    assigned_to_me: bool,
+    search: &str,
+    scope: &str,
+) -> Result<Vec<GitHubWorkItem>, String> {
     let limit = limit_num.to_string();
     let fields = if kind == "pr" {
         "number,title,url,state,createdAt,updatedAt,labels,assignees,isDraft"
@@ -694,7 +964,7 @@ fn git_github_work_items_for(
         "--limit".into(),
         limit,
         "--repo".into(),
-        repo.clone(),
+        repo.to_string(),
         "--json".into(),
         fields.into(),
     ];
@@ -702,21 +972,11 @@ fn git_github_work_items_for(
         args.push("--assignee".into());
         args.push("@me".into());
     }
-    let search = search.trim();
-    // Badge polls only need what changed since the last cycle: fold the
-    // bound into the search GitHub already applies server-side.
-    let since = updated_since.map(str::trim).filter(|s| !s.is_empty());
-    let combined = match (search.is_empty(), since) {
-        (false, Some(since)) => format!("{search} updated:>={since}"),
-        (false, None) => search.to_string(),
-        (true, Some(since)) => format!("updated:>={since}"),
-        (true, None) => String::new(),
-    };
-    if !combined.is_empty() {
+    if !search.is_empty() {
         args.push("--search".into());
-        args.push(combined.clone());
+        args.push(search.to_string());
     }
-    let key = work_items_cache_key(&repo, kind, assigned_to_me, state, &combined, limit_num);
+    let key = work_items_cache_key(repo, kind, assigned_to_me, state, search, limit_num, scope);
     if let Ok(cache) = work_items_cache().lock() {
         if let Some((at, items)) = cache.get(&key) {
             if at.elapsed() < WORK_ITEMS_TTL {
@@ -726,7 +986,7 @@ fn git_github_work_items_for(
     }
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
     let json = gh_checked(root, &refs)?;
-    let items = parse_github_work_items(&json, kind, &repo)?;
+    let items = parse_github_work_items(&json, kind, repo)?;
     if let Ok(mut cache) = work_items_cache().lock() {
         if cache.len() >= WORK_ITEMS_MAX_ENTRIES {
             cache.retain(|_, (at, _)| at.elapsed() < WORK_ITEMS_TTL);

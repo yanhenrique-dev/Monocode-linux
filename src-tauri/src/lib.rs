@@ -210,6 +210,7 @@ pub fn run() {
             fs::github::git_github_work_item_comment,
             fs::github::git_github_pr_action,
             fs::github::git_github_pr_merge_info,
+            fs::github::git_github_pr_checks,
             fs::github::git_github_pr_diff,
             inbox_media::fetch_inbox_media,
             gitlab::gitlab_status,

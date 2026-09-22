@@ -485,6 +485,8 @@ export function invalidateGithubItemCaches(
     prDiffByKey.delete(prDiffCacheKey(repo, number, false));
     prDiffByKey.delete(prDiffCacheKey(repo, number, true));
     mergeInfoByKey.delete(mergeInfoKey(repo, number));
+    prChecksByKey.delete(mergeInfoKey(repo, number));
+    prChecksInflight.delete(mergeInfoKey(repo, number));
   }
   // The mutation moves updatedAt/state: every list snapshot is stale.
   inboxListGeneration += 1;
@@ -593,6 +595,103 @@ export function githubPrMergeConflicting(
   info: GithubPrMergeInfo | null | undefined,
 ): boolean {
   return info?.mergeable?.trim().toUpperCase() === "CONFLICTING";
+}
+
+/** One CI/review check on the pull request head. */
+export type GithubPrCheck = {
+  name: string;
+  status: string;
+  conclusion?: string;
+  url: string;
+  startedAt: string;
+};
+
+export type GithubPrChecks = {
+  state: string;
+  checks: GithubPrCheck[];
+};
+
+const prChecksByKey = new Map<string, GithubPrChecks>();
+const prChecksInflight = new Map<string, Promise<GithubPrChecks>>();
+
+/** Fetch (and cache) check runs on the PR head. Never throws: failures
+ * resolve to an empty list so the detail pane degrades to merge info. */
+export async function githubPrChecks(
+  cwd: string,
+  repo: string,
+  number: number,
+  options?: { force?: boolean },
+): Promise<GithubPrChecks> {
+  const key = mergeInfoKey(repo, number);
+  if (options?.force) {
+    prChecksByKey.delete(key);
+    prChecksInflight.delete(key);
+  }
+  const cached = prChecksByKey.get(key);
+  if (cached) return cached;
+  const inflight = prChecksInflight.get(key);
+  if (inflight) return inflight;
+  const pending = (async (): Promise<GithubPrChecks> => {
+    try {
+      const checks = await invoke<GithubPrChecks>("git_github_pr_checks", {
+        cwd,
+        repo,
+        number,
+      });
+      const resolved = checks ?? { state: "UNKNOWN", checks: [] };
+      prChecksByKey.set(key, resolved);
+      return resolved;
+    } catch {
+      const unknown: GithubPrChecks = { state: "UNKNOWN", checks: [] };
+      prChecksByKey.set(key, unknown);
+      return unknown;
+    } finally {
+      prChecksInflight.delete(key);
+    }
+  })();
+  prChecksInflight.set(key, pending);
+  return pending;
+}
+
+export function githubPrCheckRunning(check: GithubPrCheck): boolean {
+  const status = check.status.trim().toUpperCase();
+  return (
+    status === "IN_PROGRESS" ||
+    status === "QUEUED" ||
+    status === "PENDING" ||
+    status === "WAITING" ||
+    status === "REQUESTED"
+  );
+}
+
+export function githubPrCheckFailed(check: GithubPrCheck): boolean {
+  const conclusion = (check.conclusion ?? "").trim().toUpperCase();
+  return (
+    conclusion === "FAILURE" ||
+    conclusion === "TIMED_OUT" ||
+    conclusion === "CANCELLED" ||
+    conclusion === "ACTION_REQUIRED" ||
+    check.status.trim().toUpperCase() === "COMPLETED" &&
+      conclusion !== "SUCCESS" &&
+      conclusion !== "SKIPPED" &&
+      conclusion !== "NEUTRAL"
+  );
+}
+
+export function groupGithubPrChecks(checks: GithubPrCheck[]): {
+  running: GithubPrCheck[];
+  successful: GithubPrCheck[];
+  failed: GithubPrCheck[];
+} {
+  const running: GithubPrCheck[] = [];
+  const successful: GithubPrCheck[] = [];
+  const failed: GithubPrCheck[] = [];
+  for (const check of checks) {
+    if (githubPrCheckRunning(check)) running.push(check);
+    else if (githubPrCheckFailed(check)) failed.push(check);
+    else successful.push(check);
+  }
+  return { running, successful, failed };
 }
 
 /** Run a state-changing pull request action and return GitHub's fresh PR state. */
@@ -732,10 +831,28 @@ const INCREMENTAL_FULL_REFRESH_MS = 5 * 60_000;
 function mergeInboxListItems(
   previous: InboxItem[],
   delta: InboxItem[],
+  since?: string,
 ): InboxItem[] {
   if (delta.length === 0) return previous;
   const byKey = new Map(previous.map((item) => [inboxItemKey(item), item]));
   for (const item of delta) byKey.set(inboxItemKey(item), item);
+  if (since) {
+    const bound = Date.parse(since);
+    if (Number.isFinite(bound)) {
+      const seen = new Set(delta.map(inboxItemKey));
+      for (const item of previous) {
+        const key = inboxItemKey(item);
+        if (seen.has(key)) continue;
+        const updated = Date.parse(item.updatedAt);
+        // Fresh enough to have matched the window: absence means it left
+        // the result set (closed, merged, unassigned), so drop it instead
+        // of waiting for the full refresh. Idle items stay.
+        if (Number.isFinite(updated) && updated >= bound) {
+          byKey.delete(key);
+        }
+      }
+    }
+  }
   // Map order is insertion order: re-sort so merged snapshots keep the
   // updatedAt-descending contract (InboxView slices the first page).
   return sortInboxItems([...byKey.values()]);
@@ -772,8 +889,13 @@ export async function listInboxItems(
       // A mutation invalidated mid-flight: drop this pre-mutation snapshot
       // instead of painting stale state until the next poll.
       if (generation !== inboxListGeneration) return peekInboxList(projects, query) ?? result;
+      // A partial failure must not evict: a repo whose call failed is
+      // simply absent from the delta, not gone from GitHub.
+      const clean = Object.keys(result.errors).length === 0;
       const items =
-        since && prev ? mergeInboxListItems(prev.items, result.items) : result.items;
+        since && prev
+          ? mergeInboxListItems(prev.items, result.items, clean ? since : undefined)
+          : result.items;
       const merged = { items, errors: result.errors };
       inboxListCaches.set(key, { key, ...merged, fetchedAt: Date.now() });
       return merged;
