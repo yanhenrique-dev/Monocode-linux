@@ -91,6 +91,27 @@ describe("resolveOpenablePath", () => {
     ).resolves.toBe(ignored);
     expect(list).not.toHaveBeenCalled();
   });
+
+  it("uses a unique tool path when a short link is outside the project cwd", async () => {
+    const path = "/Users/me/other/project/platform/backup.yaml";
+    const resolved = await resolveOpenablePath(cwd, "backup.yaml", [path]);
+    expect(resolved).toBe(path);
+  });
+
+  it("does not guess between ambiguous tool paths", async () => {
+    const resolved = await resolveOpenablePath(cwd, "backup.yaml", [
+      "/Users/me/one/backup.yaml",
+      "/Users/me/two/backup.yaml",
+    ]);
+    expect(resolved).toBe(`${cwd}/backup.yaml`);
+  });
+
+  it("prefers the transcript-touched file over an index guess", async () => {
+    const resolved = await resolveOpenablePath(cwd, "App.tsx", [
+      "/Users/me/other/App.tsx",
+    ]);
+    expect(resolved).toBe("/Users/me/other/App.tsx");
+  });
 });
 
 describe("loadProjectFiles", () => {
