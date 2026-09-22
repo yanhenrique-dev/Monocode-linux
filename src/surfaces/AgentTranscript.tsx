@@ -83,7 +83,10 @@ import { useTranscriptLayout } from "../hooks/useTranscriptLayout";
 import { useTranscriptAnchor } from "../hooks/useTranscriptAnchor";
 import { useTranscriptSelection } from "../hooks/useTranscriptSelection";
 import type { TranscriptLayout } from "../lib/appearance";
-import { AgentMarkdown } from "./AgentMarkdown";
+import {
+  AgentMarkdown,
+  TranscriptCandidatesContext,
+} from "./AgentMarkdown";
 import { TranscriptSelectionMenu } from "./TranscriptSelectionMenu";
 import { parseUserMessageLink } from "../lib/linkPreview";
 import { UserLinkPreview } from "./UserLinkPreview";
@@ -91,6 +94,7 @@ import {
   activityPhaseTitle,
   activityStillRunning,
   buildActivityPhases,
+  estimateTurnHeight,
   firstFoldableIndex,
   foldableWork,
   foldedBlocks,
@@ -111,6 +115,7 @@ import {
   subagentModelName,
   subagentName,
   subagentReport,
+  transcriptFilePaths,
   toolCallLabel,
   toolCallState,
   turnCopyText,
@@ -123,8 +128,8 @@ import {
 } from "./transcriptActivity";
 
 const NEAR_BOTTOM_PX = 16;
-/** Rough turn height until measured; the virtualizer corrects per item. */
-const TURN_ESTIMATE_PX = 320;
+/** Below this turn count the list renders natively: native scroll, no jump. */
+const VIRTUALIZE_MIN_TURNS = 40;
 
 type Props = {
   blocks: Block[];
@@ -246,9 +251,12 @@ function AgentTranscriptContent({
   useLayoutEffect(() => {
     turnsRef.current = turns;
   }, [turns]);
+  // Stable identity across renders: the virtualizer memoizes options, so a
+  // new closure every turn-churn forced full recompute. Reads the ref, which
+  // the layout effect below keeps current; appends keep earlier indexes.
   const getItemKey = useCallback(
-    (index: number) => turns[index]?.[0]?.id ?? `turn-${index}`,
-    [turns],
+    (index: number) => turnsRef.current[index]?.[0]?.id ?? `turn-${index}`,
+    [],
   );
 
   // Virtualize by turn when the scroller has a measurable viewport (real
@@ -256,24 +264,37 @@ function AgentTranscriptContent({
   // reads the same signal. At zero height (tests, hidden tabs) every turn
   // renders in normal flow so queries keep finding the latest content.
   const [hasViewport, setHasViewport] = useState(false);
-  const virtualize = visible && hasViewport;
+  // Short sessions render natively: the virtualizer only pays off (and only
+  // risks estimate jumps) once the DOM gets heavy.
+  const virtualize =
+    visible && hasViewport && turns.length >= VIRTUALIZE_MIN_TURNS;
   const virtualizer = useVirtualizer({
     // Disabled (fallback path) the virtualizer creates no observers and
     // takes no measurements, so zero-height environments stay inert.
     enabled: virtualize,
     count: turns.length,
     getScrollElement: () => scroller.current,
-    estimateSize: () => TURN_ESTIMATE_PX,
+    // Per-turn heuristic (text lines, tool rows) instead of a flat 320px:
+    // a total close to reality means measurements barely move scrollTop.
+    estimateSize: (index) =>
+      estimateTurnHeight(turnsRef.current[index] ?? []),
     getItemKey,
-    overscan: 8,
+    // Extreme sessions mount less chrome around the viewport.
+    overscan: turns.length > 200 ? 4 : 8,
     anchorTo: "end",
     followOnAppend: true,
-    scrollEndThreshold: 80,
+    // Wide end-zone so appends while the user reads history don't yank.
+    scrollEndThreshold: 200,
   });
   const remeasure = useCallback(() => {
     virtualizer.measure();
   }, [virtualizer]);
   const virtualItems = virtualize ? virtualizer.getVirtualItems() : [];
+  // Turns added/removed: re-pin measurements so the new total lands before
+  // the next wheel event reads it.
+  useLayoutEffect(() => {
+    if (virtualize) virtualizer.measure();
+  }, [virtualize, virtualizer, turns.length]);
 
   // Mount pinned to the latest turn; the chat-anchored virtualizer then
   // holds the end while streaming grows the last item. The measure pass
@@ -506,7 +527,12 @@ function AgentTranscriptContent({
     );
   }
 
+  // Files the transcript's tools touched: short markdown links resolve
+  // against these before the project index guesses.
+  const fileCandidates = useMemo(() => transcriptFilePaths(blocks), [blocks]);
+
   return (
+    <TranscriptCandidatesContext.Provider value={fileCandidates}>
     <div
       ref={setScroller}
       className="agent-transcript h-full overflow-y-auto overflow-x-clip overscroll-none [overflow-anchor:none] font-mono text-[13px] leading-5"
@@ -570,6 +596,7 @@ function AgentTranscriptContent({
         />
       ) : null}
     </div>
+    </TranscriptCandidatesContext.Provider>
   );
 }
 

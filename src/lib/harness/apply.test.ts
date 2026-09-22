@@ -68,6 +68,96 @@ describe("turn duration", () => {
     expect(session.blocks[0]?.durationMs).toBe(7_000);
   });
 
+  it("keeps one row when the same failure arrives twice in a turn", () => {
+    let session = appendUser(newSession("codex", "/tmp"), "hi");
+    session = applyHarnessEvent(session, {
+      type: "session.error",
+      message: "boom",
+    });
+    session = applyHarnessEvent(session, {
+      type: "session.error",
+      message: "boom",
+    });
+    expect(
+      session.blocks.filter(
+        (block) => block.role === "system" && block.text === "boom",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps one error row for the full streamed auth failure sequence", () => {
+    const raw =
+      "Your access token could not be refreshed. Please log out and sign in again.";
+    const recovery = [raw, "", "recovery steps"].join("\n");
+    let session = appendUser(newSession("codex", "/tmp"), "hi");
+    // Streamed agent text lands first, then the rewritten completed message
+    // and the turn error each arrive as session.error.
+    session = applyHarnessEvent(session, {
+      type: "message.delta",
+      text: "Your access token could not be refreshed. ",
+    });
+    session = applyHarnessEvent(session, {
+      type: "message.delta",
+      text: "Please log out and sign in again.",
+    });
+    session = applyHarnessEvent(session, {
+      type: "session.error",
+      message: recovery,
+    });
+    session = applyHarnessEvent(session, {
+      type: "session.error",
+      message: recovery,
+    });
+    const errors = session.blocks.filter(
+      (block) => block.role === "system" && block.notice === "error",
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.text).toBe(recovery);
+    expect(
+      session.blocks.some(
+        (block) => block.role === "assistant" && block.text.includes(raw),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not collapse an error against a plain status row", () => {
+    let session = appendUser(newSession("codex", "/tmp"), "hi");
+    session = applyHarnessEvent(session, { type: "status", text: "boom" });
+    session = applyHarnessEvent(session, {
+      type: "session.error",
+      message: "boom",
+    });
+    expect(
+      session.blocks.filter(
+        (block) => block.role === "system" && block.text === "boom",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("records every path a multi-file edit touched", () => {
+    let session = appendUser(newSession("codex", "/tmp"), "edit");
+    session = applyHarnessEvent(session, {
+      type: "tool.started",
+      callId: "edit-1",
+      title: "Edit files",
+      kind: "edit",
+      status: "in_progress",
+      preview: { path: "/tmp/a.ts" },
+      paths: ["/tmp/a.ts", "/tmp/b.ts"],
+    });
+    session = applyHarnessEvent(session, {
+      type: "tool.updated",
+      callId: "edit-1",
+      status: "completed",
+      preview: { path: "/tmp/a.ts" },
+      paths: ["/tmp/c.ts"],
+    });
+    expect(
+      session.blocks.find((block) => block.tool?.callId === "edit-1")?.tool
+        ?.paths,
+    ).toEqual(["/tmp/a.ts", "/tmp/b.ts", "/tmp/c.ts"]);
+  });
+
   it("marks orphaned subagent work failed when the provider dies", () => {
     let session = appendUser(newSession("codex", "/tmp"), "delegate it");
     session = applyHarnessEvent(session, {
