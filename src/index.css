@@ -1792,7 +1792,8 @@ html.theme-light .popover-backdrop {
 }
 
 /* Sidebar and file-pane enter/exit share the popover language: slide from
-   the leading edge with a fade, 180ms in, 150ms out. */
+   the leading edge with a fade, 180ms in, 150ms out. The sidebar outro
+   fades in place so the exiting panel never slides under the rail. */
 @keyframes sidebar-in {
   from {
     opacity: 0;
@@ -1807,11 +1808,9 @@ html.theme-light .popover-backdrop {
 @keyframes sidebar-out {
   from {
     opacity: 1;
-    transform: none;
   }
   to {
     opacity: 0;
-    transform: translateX(-12px);
   }
 }
 
