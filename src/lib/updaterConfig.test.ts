@@ -56,4 +56,22 @@ describe("updater", () => {
     });
     expect(message).toHaveBeenCalledOnce();
   });
+
+  it("maps system-path permission errors to the reinstall hint", async () => {
+    getVersion.mockResolvedValue("0.2.17");
+    check.mockRejectedValue(
+      new Error(
+        'Permissão negada (os error 13) at path "/usr/local/bin/tauri_current_appli25gA"',
+      ),
+    );
+
+    await expect(runUpdateFlow(true)).resolves.toMatchObject({
+      phase: "error",
+      error: expect.stringContaining("~/.local/bin"),
+    });
+    expect(message).toHaveBeenCalledWith(
+      expect.not.stringContaining("tauri_current_appli25gA"),
+      { title: "MonoCode" },
+    );
+  });
 });
