@@ -8,6 +8,7 @@ import {
   Plus,
   RotateCcw,
 } from "../chrome/icons";
+import { Tooltip } from "../components/ui/tooltip";
 import { ExplorerMenu } from "../chrome/ExplorerMenu";
 import { FileTypeIcon } from "../chrome/FileTypeIcon";
 import { copyText } from "../lib/clipboard";
@@ -234,14 +235,16 @@ function ImageView({
         >
           <Minus className="size-3" strokeWidth={1.75} />
         </ZoomButton>
-        <button
-          type="button"
-          title="Fit to window"
-          onClick={() => setZoom("fit")}
-          className="w-11 rounded text-center tabular-nums hover:text-content"
-        >
-          {zoom === "fit" ? "Fit" : `${Math.round(zoom * 100)}%`}
-        </button>
+        <Tooltip content="Fit to window">
+          <button
+            type="button"
+            aria-label="Fit to window"
+            onClick={() => setZoom("fit")}
+            className="w-11 rounded text-center tabular-nums hover:text-content"
+          >
+            {zoom === "fit" ? "Fit" : `${Math.round(zoom * 100)}%`}
+          </button>
+        </Tooltip>
         <ZoomButton
           label="Zoom in"
           onClick={() =>
@@ -283,15 +286,16 @@ function ZoomButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      className="grid size-5 place-items-center rounded hover:bg-content/10 hover:text-content"
-    >
-      {children}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        className="grid size-5 place-items-center rounded hover:bg-content/10 hover:text-content"
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 

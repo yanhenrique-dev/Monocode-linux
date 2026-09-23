@@ -4,6 +4,7 @@ import { attachmentPreviewSrc } from "../lib/attachments";
 import type { Attachment } from "../lib/session";
 import { FileTypeIcon } from "./FileTypeIcon";
 import { ImageLightbox } from "./ImageLightbox";
+import { Tooltip } from "../components/ui/tooltip";
 
 type Props = {
   attachment: Attachment;
@@ -17,30 +18,31 @@ export function AttachmentChip({ attachment, onRemove }: Props) {
 
   return (
     <>
-      <div
-        className={`group relative flex min-w-0 items-center gap-1.5 rounded-md ${
-          image ? "" : "bg-content/10 py-0.5 pl-1 pr-1"
-        }`}
-        title={attachment.path ?? attachment.name}
-      >
+      <Tooltip content={attachment.path ?? attachment.name}>
+        <div
+          className={`group relative flex min-w-0 items-center gap-1.5 rounded-md ${
+            image ? "" : "bg-content/10 py-0.5 pl-1 pr-1"
+          }`}
+        >
         {image ? (
-          <button
-            type="button"
-            aria-label={`Open ${attachment.name} full screen`}
-            title={`Open ${attachment.name} full screen`}
-            onClick={(event) => {
-              event.stopPropagation();
-              setPreviewOpen(true);
-            }}
-            className="shrink-0 cursor-zoom-in rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <img
-              src={preview}
-              alt=""
-              draggable={false}
-              className="size-9 rounded-lg object-cover"
-            />
-          </button>
+          <Tooltip content={`Open ${attachment.name} full screen`}>
+            <button
+              type="button"
+              aria-label={`Open ${attachment.name} full screen`}
+              onClick={(event) => {
+                event.stopPropagation();
+                setPreviewOpen(true);
+              }}
+              className="shrink-0 cursor-zoom-in rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <img
+                src={preview}
+                alt=""
+                draggable={false}
+                className="size-9 rounded-lg object-cover"
+              />
+            </button>
+          </Tooltip>
         ) : (
           <>
             <span className="grid size-5 shrink-0 place-items-center">
@@ -52,24 +54,26 @@ export function AttachmentChip({ attachment, onRemove }: Props) {
           </>
         )}
         {onRemove ? (
-          <button
-            type="button"
-            title="Remove"
-            aria-label={`Remove ${attachment.name}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove();
-            }}
-            className={`grid shrink-0 place-items-center rounded-full text-content/70 hover:bg-content/15 hover:text-content ${
-              image
-                ? "absolute -right-1 -top-1 size-5 bg-content/20 opacity-100 shadow-sm glass-blur backdrop-blur-sm"
-                : "size-4 text-content/40"
-            }`}
-          >
-            <X className="size-3" strokeWidth={2} />
-          </button>
+          <Tooltip content={`Remove ${attachment.name}`}>
+            <button
+              type="button"
+              aria-label={`Remove ${attachment.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove();
+              }}
+              className={`grid shrink-0 place-items-center rounded-full text-content/70 hover:bg-content/15 hover:text-content ${
+                image
+                  ? "absolute -right-1 -top-1 size-5 bg-content/20 opacity-100 shadow-sm glass-blur backdrop-blur-sm"
+                  : "size-4 text-content/40"
+              }`}
+            >
+              <X className="size-3" strokeWidth={2} />
+            </button>
+          </Tooltip>
         ) : null}
       </div>
+      </Tooltip>
       {image && previewOpen ? (
         <ImageLightbox
           src={preview}

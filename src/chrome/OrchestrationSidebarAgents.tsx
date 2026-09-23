@@ -12,6 +12,7 @@ import {
   OrchestrationWorkers,
 } from "./OrchestrationActions";
 import { Check, ChevronDown, ChevronRight, CircleAlert } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 import { TerminalSpinner } from "./TerminalSpinner";
 
 export function OrchestrationSidebarAgents({
@@ -195,21 +196,22 @@ export function OrchestrationSidebarAgents({
                   )}
                   <div className="flex flex-wrap items-center gap-1">
                     {workers.openDetails && (
-                      <button
-                        type="button"
-                        title="Open this agent beside the orchestrator"
-                        className={solidAction}
-                        onClick={() =>
-                          workers.openDetails?.({
-                            sessionId: task.sessionId,
-                            leadId,
-                            title: task.title,
-                            harness: task.harness,
-                          })
-                        }
-                      >
-                        See details
-                      </button>
+                      <Tooltip content="Open this agent beside the orchestrator">
+                        <button
+                          type="button"
+                          className={solidAction}
+                          onClick={() =>
+                            workers.openDetails?.({
+                              sessionId: task.sessionId,
+                              leadId,
+                              title: task.title,
+                              harness: task.harness,
+                            })
+                          }
+                        >
+                          See details
+                        </button>
+                      </Tooltip>
                     )}
                     {live && ["queued", "running"].includes(live.status) && (
                       <button
@@ -266,21 +268,28 @@ export function OrchestrationSidebarAgents({
               </button>
             )}
             {resumeBlocker && actions?.stop && (
-              <button
-                type="button"
-                className={action}
-                disabled={pending}
-                title={`Stop ${resumeBlocker.title || "the other conversation"} so this run can resume`}
-                onClick={() => void perform(() => actions.stop!(resumeBlocker.id))}
+              <Tooltip
+                content={`Stop ${resumeBlocker.title || "the other conversation"} so this run can resume`}
               >
-                Stop blocker
-              </button>
+                <button
+                  type="button"
+                  className={action}
+                  title={
+                    pending
+                      ? `Stop ${resumeBlocker.title || "the other conversation"} so this run can resume`
+                      : undefined
+                  }
+                  disabled={pending}
+                  onClick={() =>
+                    void perform(() => actions.stop!(resumeBlocker.id))
+                  }
+                >
+                  Stop blocker
+                </button>
+              </Tooltip>
             )}
-            <button
-              type="button"
-              className={action}
-              disabled={pending || stopping || leadBusy || !!resumeBlocker}
-              title={
+            <Tooltip
+              content={
                 stopping
                   ? "Wait for interrupted agents to stop"
                   : leadBusy
@@ -289,18 +298,35 @@ export function OrchestrationSidebarAgents({
                       ? `Stop ${resumeBlocker.title || "the other conversation"} before resuming`
                       : "Continue queued work and review interrupted tasks"
               }
-              onClick={() =>
-                void perform(() =>
-                  orchestrator.start(
-                    leadId,
-                    run.allowedHarnesses,
-                    run.maxWorkers,
-                  ),
-                )
-              }
             >
-              Resume
-            </button>
+              <button
+                type="button"
+                className={action}
+                title={
+                  pending || stopping || leadBusy || resumeBlocker
+                    ? stopping
+                      ? "Wait for interrupted agents to stop"
+                      : leadBusy
+                        ? "Wait for the lead's interrupted turn to finish"
+                        : resumeBlocker
+                          ? `Stop ${resumeBlocker.title || "the other conversation"} before resuming`
+                          : "Unavailable right now"
+                    : undefined
+                }
+                disabled={pending || stopping || leadBusy || !!resumeBlocker}
+                onClick={() =>
+                  void perform(() =>
+                    orchestrator.start(
+                      leadId,
+                      run.allowedHarnesses,
+                      run.maxWorkers,
+                    ),
+                  )
+                }
+              >
+                Resume
+              </button>
+            </Tooltip>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronRight, CircleAlert, Folder } from "../icons";
+import { Input } from "../../components/ui/input";
 import { TerminalSpinner } from "../TerminalSpinner";
 import { folderAccent, type SessionFolder } from "../../lib/sessionFolders";
 import type { SessionSummary } from "../../lib/sessionStore";
@@ -164,9 +165,10 @@ export function FolderRenameRow({
       <span className="relative grid size-4 shrink-0 place-items-center text-content/50">
         <ChevronDown className="size-3.5" strokeWidth={1.75} />
       </span>
-      <input
+      <Input
         ref={inputRef}
         value={value}
+        aria-label="Rename folder"
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => finish(true)}
         onKeyDown={(event) => {

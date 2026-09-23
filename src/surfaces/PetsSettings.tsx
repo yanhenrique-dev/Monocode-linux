@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { SecondaryButton } from "../chrome/SecondaryButton";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   deleteCustomPet,
   effectivePets,
@@ -26,7 +27,13 @@ const EMPTY_FRAME = [
   "........",
 ];
 
-function FramePreview({ rows, className }: { rows: string[]; className?: string }) {
+function FramePreview({
+  rows,
+  className,
+}: {
+  rows: string[];
+  className?: string;
+}) {
   return (
     <svg
       aria-hidden
@@ -121,7 +128,9 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
 
   return (
     <div className="border-b border-content/10 px-4 py-4 last:border-b-0">
-      <div className="text-sm font-medium text-content">{t("settings.appearance.pets.add_title")}</div>
+      <div className="text-sm font-medium text-content">
+        {t("settings.appearance.pets.add_title")}
+      </div>
       <p className="mt-1 text-[12px] leading-relaxed text-content/60">
         {t("settings.appearance.pets.add_description")}
       </p>
@@ -131,7 +140,11 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
           onChange={frame === "rest" ? setRest : setTalk}
         />
         <div className="flex min-w-48 flex-1 flex-col gap-2">
-          <div className="flex gap-1" role="group" aria-label={t("settings.appearance.pets.frame_group")}>
+          <div
+            className="flex gap-1"
+            role="group"
+            aria-label={t("settings.appearance.pets.frame_group")}
+          >
             {(["rest", "talk"] as const).map((value) => (
               <button
                 key={value}
@@ -160,15 +173,17 @@ function PetCreator({ taken }: { taken: ReadonlySet<string> }) {
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-                placeholder={t("settings.appearance.pets.name_placeholder")}
-                aria-label={t("settings.appearance.pets.name_aria")}
+              placeholder={t("settings.appearance.pets.name_placeholder")}
+              aria-label={t("settings.appearance.pets.name_aria")}
               spellCheck={false}
               autoComplete="off"
-              className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content/35"
+              className="min-w-0 flex-1 bg-transparent text-[12px] text-content  placeholder:text-content/35"
             />
           </label>
           <div className="flex items-center gap-2">
-            <SecondaryButton onClick={onSave}>{t("settings.appearance.pets.save")}</SecondaryButton>
+            <SecondaryButton onClick={onSave}>
+              {t("settings.appearance.pets.save")}
+            </SecondaryButton>
             {saved ? (
               <span role="status" className="text-[12px] text-content/50">
                 {t("settings.appearance.pets.saved")}
@@ -244,7 +259,9 @@ export function PetsSettings() {
                       : "text-content/60 hover:bg-content/10 hover:text-content"
                   }`}
                 >
-                  {confirming ? t("settings.appearance.pets.confirm") : t("settings.appearance.pets.delete")}
+                  {confirming
+                    ? t("settings.appearance.pets.confirm")
+                    : t("settings.appearance.pets.delete")}
                 </button>
               ) : (
                 <button
@@ -273,20 +290,23 @@ export function PetsSettings() {
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {hidden.map((name) => (
-              <button
+              <Tooltip
                 key={name}
-                type="button"
-                onClick={() => setPetHidden(name, false)}
-                title={t("settings.appearance.pets.show_title", { name })}
-                className="flex items-center gap-2 rounded-md border border-content/15 px-2 py-1 text-xs text-content/60 opacity-60 hover:opacity-100"
+                content={t("settings.appearance.pets.show_title", { name })}
               >
-                <ProjectMascot
-                  project=""
-                  name={name}
-                  className="size-4 text-content/60"
-                />
-                {name}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setPetHidden(name, false)}
+                  className="flex items-center gap-2 rounded-md border border-content/15 px-2 py-1 text-xs text-content/60 opacity-60 hover:opacity-100"
+                >
+                  <ProjectMascot
+                    project=""
+                    name={name}
+                    className="size-4 text-content/60"
+                  />
+                  {name}
+                </button>
+              </Tooltip>
             ))}
           </div>
         </div>

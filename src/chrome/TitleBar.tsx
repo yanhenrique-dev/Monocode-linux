@@ -39,6 +39,7 @@ import { WindowControls } from "./WindowControls";
 import { MOD } from "../lib/platform";
 import type { RecentProject } from "../lib/recents";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   paneDropFromPoint,
   setExternalPaneDrop,
@@ -301,85 +302,88 @@ function TitleTabItem({
         if (canDrag) sortable.onItemPointerDown(tab.id, event);
       }}
     >
-      <button
-        type="button"
-        title={accessibleTooltip}
-        aria-label={accessibleTooltip}
-        data-tauri-drag-region="false"
-        onClick={() => {
-          if (sortable.consumeClick()) return;
-          onSelect(tab.id);
-        }}
-        className={`relative flex h-7.5 min-w-0 flex-1 cursor-default items-center gap-1.5 self-center rounded-md px-2 text-left ${
-          closable ? "pr-7" : "pr-2.5"
-        } ${
-          active
-            ? "bg-selection text-content"
-            : "text-content/50 hover:bg-content/5 hover:text-content"
-        }`}
-      >
-        {tab.harnesses.length > 0 ? (
-          <TabHarnesses
-            harnesses={tab.harnesses}
-            busyHarnesses={tab.busyHarnesses}
-            doneHarnesses={tab.doneHarnesses ?? []}
-            dimmed={!active}
-          />
-        ) : tab.terminal || !fileIcon ? (
-          <Terminal
-            className={`size-3.5 shrink-0 ${
-              active ? "text-content" : "text-content/55"
-            }`}
-            strokeWidth={1.75}
-          />
-        ) : (
-          <span className={!active ? "opacity-55" : undefined}>
-            <FileTypeIcon name={fileIcon} isDir={false} size={14} />
-          </span>
-        )}
-        {/* Keep two-line tabs compact while leaving room for descenders. */}
-        <span className="flex min-w-0 flex-1 flex-col justify-center">
-          <span className="flex min-w-0 items-center gap-1">
-            <span
-              className={`min-w-0 truncate leading-tight ${
-                meta
-                  ? "text-[13px] @min-[11rem]:text-[10px] @min-[11rem]:font-medium"
-                  : "text-[13px]"
-              }`}
-            >
-              {headline}
-            </span>
-            {tab.dirty ? (
-              <span
-                className="size-1.5 shrink-0 rounded-full bg-content/70"
-                title="Unsaved changes"
-                aria-label="Unsaved changes"
-              />
-            ) : null}
-          </span>
-          {meta ? (
-            <span className="hidden min-w-0 truncate text-[10px] leading-tight text-content/45 @min-[11rem]:block">
-              {meta}
-            </span>
-          ) : null}
-        </span>
-      </button>
-      {closable ? (
+      <Tooltip content={accessibleTooltip}>
         <button
           type="button"
-          title="Close Tab"
-          aria-label={`Close ${headline}`}
-          data-no-drag
+          aria-label={accessibleTooltip}
           data-tauri-drag-region="false"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose(tab.id);
+          onClick={() => {
+            if (sortable.consumeClick()) return;
+            onSelect(tab.id);
           }}
-          className="absolute right-1 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-content/50 opacity-0 hover:bg-content/10 hover:text-content group-hover:opacity-100"
+          className={`relative flex h-7.5 min-w-0 flex-1 cursor-default items-center gap-1.5 self-center rounded-md px-2 text-left ${
+            closable ? "pr-7" : "pr-2.5"
+          } ${
+            active
+              ? "bg-selection text-content"
+              : "text-content/50 hover:bg-content/5 hover:text-content"
+          }`}
         >
-          <X className="size-3" strokeWidth={1.75} />
+          {tab.harnesses.length > 0 ? (
+            <TabHarnesses
+              harnesses={tab.harnesses}
+              busyHarnesses={tab.busyHarnesses}
+              doneHarnesses={tab.doneHarnesses ?? []}
+              dimmed={!active}
+            />
+          ) : tab.terminal || !fileIcon ? (
+            <Terminal
+              className={`size-3.5 shrink-0 ${
+                active ? "text-content" : "text-content/55"
+              }`}
+              strokeWidth={1.75}
+            />
+          ) : (
+            <span className={!active ? "opacity-55" : undefined}>
+              <FileTypeIcon name={fileIcon} isDir={false} size={14} />
+            </span>
+          )}
+          {/* Keep two-line tabs compact while leaving room for descenders. */}
+          <span className="flex min-w-0 flex-1 flex-col justify-center">
+            <span className="flex min-w-0 items-center gap-1">
+              <span
+                className={`min-w-0 truncate leading-tight ${
+                  meta
+                    ? "text-[13px] @min-[11rem]:text-[10px] @min-[11rem]:font-medium"
+                    : "text-[13px]"
+                }`}
+              >
+                {headline}
+              </span>
+              {tab.dirty ? (
+                <Tooltip content="Unsaved changes">
+                  <span
+                    className="size-1.5 shrink-0 rounded-full bg-content/70"
+                    aria-label="Unsaved changes"
+                  />
+                </Tooltip>
+              ) : null}
+            </span>
+            {meta ? (
+              <span className="hidden min-w-0 truncate text-[10px] leading-tight text-content/45 @min-[11rem]:block">
+                {meta}
+              </span>
+            ) : null}
+          </span>
         </button>
+      </Tooltip>
+      {closable ? (
+        <Tooltip content={`Close ${headline}`}>
+          <button
+            type="button"
+            aria-label={`Close ${headline}`}
+            data-no-drag
+            data-tauri-drag-region="false"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+            className="absolute right-1 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-content/50 opacity-0 hover:bg-content/10 hover:text-content group-hover:opacity-100 focus-visible:opacity-100"
+          >
+            <X className="size-3" strokeWidth={1.75} />
+          </button>
+        </Tooltip>
       ) : null}
     </div>
   );
@@ -395,19 +399,20 @@ function TabStripChevron({
   const label = side === "left" ? "Scroll tabs left" : "Scroll tabs right";
   const Icon = side === "left" ? ChevronLeft : ChevronRight;
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      data-tauri-drag-region="false"
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={onClick}
-      className={`absolute top-1/2 z-40 grid size-6.5 -translate-y-1/2 place-items-center rounded-md bg-background-base/90 text-content/70 hover:bg-content/15 hover:text-content ${
-        side === "left" ? "left-1" : "right-1"
-      }`}
-    >
-      <Icon className="size-3.5" strokeWidth={1.75} />
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        data-tauri-drag-region="false"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onClick}
+        className={`absolute top-1/2 z-40 grid size-6.5 -translate-y-1/2 place-items-center rounded-md bg-background-base/90 text-content/70 hover:bg-content/15 hover:text-content ${
+          side === "left" ? "left-1" : "right-1"
+        }`}
+      >
+        <Icon className="size-3.5" strokeWidth={1.75} />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -429,57 +434,69 @@ export function IconButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active || accent}
-      aria-disabled={disabled}
-      data-tauri-drag-region="false"
-      onClick={() => {
-        if (disabled) return;
-        onClick?.();
-      }}
-      onContextMenu={onOpenContextMenu ? (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (disabled) return;
-        event.currentTarget.focus();
-        onOpenContextMenu(event.clientX, event.clientY);
-      } : undefined}
-      onKeyDown={onOpenContextMenu ? (event) => {
-        if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (disabled) return;
-        event.currentTarget.focus();
-        const rect = event.currentTarget.getBoundingClientRect();
-        onOpenContextMenu(rect.left, rect.bottom);
-      } : undefined}
-      className={`grid size-6.5 place-items-center rounded-md ${
-        disabled
-          ? "text-content/25"
-          : accent
-            ? "text-accent hover:bg-content/10"
-            : active
-              ? "text-content hover:bg-content/10"
-              : "text-content/50 hover:bg-content/10 hover:text-content"
-      }`}
-    >
-      {children}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active || accent}
+        aria-disabled={disabled}
+        data-tauri-drag-region="false"
+        onClick={() => {
+          if (disabled) return;
+          onClick?.();
+        }}
+        onContextMenu={
+          onOpenContextMenu
+            ? (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (disabled) return;
+                event.currentTarget.focus();
+                onOpenContextMenu(event.clientX, event.clientY);
+              }
+            : undefined
+        }
+        onKeyDown={
+          onOpenContextMenu
+            ? (event) => {
+                if (
+                  event.key !== "ContextMenu" &&
+                  !(event.shiftKey && event.key === "F10")
+                )
+                  return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (disabled) return;
+                event.currentTarget.focus();
+                const rect = event.currentTarget.getBoundingClientRect();
+                onOpenContextMenu(rect.left, rect.bottom);
+              }
+            : undefined
+        }
+        className={`grid size-6.5 place-items-center rounded-md ${
+          disabled
+            ? "text-content/25"
+            : accent
+              ? "text-accent hover:bg-content/10"
+              : active
+                ? "text-content hover:bg-content/10"
+                : "text-content/50 hover:bg-content/10 hover:text-content"
+        }`}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
 export function DevModeLabel() {
   if (!import.meta.env.DEV) return null;
   return (
-    <span
-      title="Development build"
-      className="mr-1 min-w-0 truncate rounded-md bg-skill/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-skill"
-    >
-      Development
-    </span>
+    <Tooltip content="Development build">
+      <span className="mr-1 min-w-0 truncate rounded-md bg-skill/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-skill">
+        Development
+      </span>
+    </Tooltip>
   );
 }
 

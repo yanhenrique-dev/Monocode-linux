@@ -28,6 +28,7 @@ import {
   type ReactNode,
 } from "react";
 import { FileTypeIcon } from "./FileTypeIcon";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   GitHistoryGraph,
   GraphResizeSash,
@@ -187,22 +188,19 @@ export function GitChangesPanel({
         }}
       />
       {graphExpanded ? (
-      <GraphResizeSash
-        height={graphHeight}
-        onHeightPaint={setGraphHeight}
-        onHeightCommit={(next) => {
-          setGraphHeight(next);
-          saveGraphPanelHeight(next);
-        }}
-        maxHeight={() => {
-          const pane = paneRef.current;
-          if (!pane) return GRAPH_PANEL_DEFAULT * 2;
-          return Math.max(
-            GRAPH_PANEL_MIN,
-            pane.clientHeight - 160,
-          );
-        }}
-      />
+        <GraphResizeSash
+          height={graphHeight}
+          onHeightPaint={setGraphHeight}
+          onHeightCommit={(next) => {
+            setGraphHeight(next);
+            saveGraphPanelHeight(next);
+          }}
+          maxHeight={() => {
+            const pane = paneRef.current;
+            if (!pane) return GRAPH_PANEL_DEFAULT * 2;
+            return Math.max(GRAPH_PANEL_MIN, pane.clientHeight - 160);
+          }}
+        />
       ) : null}
       <div
         className={`shrink-0 overflow-hidden border-t border-stroke ${
@@ -299,7 +297,10 @@ function ChangedFiles({
 
   useEffect(() => {
     if (!amendTarget) return;
-    if (amendTarget.branch === index?.branch && amendTarget.head === index?.head) {
+    if (
+      amendTarget.branch === index?.branch &&
+      amendTarget.head === index?.head
+    ) {
       return;
     }
     setAmendTarget(null);
@@ -573,7 +574,7 @@ function ChangedFiles({
                 void commit(false);
               }
             }}
-            className="max-h-40 w-full resize-none overflow-y-auto rounded-md bg-content/10 py-1 pr-8 pl-2 text-[13px] leading-5 text-content outline-none placeholder:text-content/35 disabled:opacity-40"
+            className="max-h-40 w-full resize-none overflow-y-auto rounded-md bg-content/10 py-1 pr-8 pl-2 text-[13px] leading-5 text-content  placeholder:text-content/35 disabled:opacity-40"
           />
           <button
             type="button"
@@ -584,7 +585,10 @@ function ChangedFiles({
             className="absolute top-1 right-1 grid size-5 place-items-center rounded-md text-content bg-content/10 hover:bg-content/20 hover:text-content disabled:opacity-40"
           >
             {busy === "generate" ? (
-              <LoaderCircle className="size-3.5 animate-spin" strokeWidth={1.75} />
+              <LoaderCircle
+                className="size-3.5 animate-spin"
+                strokeWidth={1.75}
+              />
             ) : (
               <WandSparkles className="size-3" strokeWidth={1} />
             )}
@@ -895,80 +899,93 @@ function GitSyncActions({
   return (
     <div className="mt-1.5 flex flex-col gap-1.5">
       {canPublish ? (
-        <button
-          type="button"
-          title={syncTitle}
-          disabled={!!busy}
-          onClick={onSync}
-          className={secondary}
-        >
-          {syncing ? (
-            <LoaderCircle
-              className="size-3.5 shrink-0 animate-spin"
+        <Tooltip content={syncTitle}>
+          <button
+            type="button"
+            title={busy ? syncTitle : undefined}
+            disabled={!!busy}
+            onClick={onSync}
+            className={secondary}
+          >
+            {syncing ? (
+              <LoaderCircle
+                className="size-3.5 shrink-0 animate-spin"
+                strokeWidth={1.75}
+              />
+            ) : (
+              <CloudUpload className="size-3.5 shrink-0" strokeWidth={1.75} />
+            )}
+            <span className="min-w-0 truncate">Publish Branch</span>
+          </button>
+        </Tooltip>
+      ) : canSync ? (
+        <Tooltip content={syncTitle}>
+          <button
+            type="button"
+            title={busy ? syncTitle : undefined}
+            disabled={!!busy}
+            onClick={onSync}
+            className={secondary}
+          >
+            <RefreshCw
+              className={`size-3.5 shrink-0 ${syncing ? "animate-spin" : ""}`}
               strokeWidth={1.75}
             />
-          ) : (
-            <CloudUpload className="size-3.5 shrink-0" strokeWidth={1.75} />
-          )}
-          <span className="min-w-0 truncate">Publish Branch</span>
-        </button>
-      ) : canSync ? (
-        <button
-          type="button"
-          title={syncTitle}
-          disabled={!!busy}
-          onClick={onSync}
-          className={secondary}
-        >
-          <RefreshCw
-            className={`size-3.5 shrink-0 ${syncing ? "animate-spin" : ""}`}
-            strokeWidth={1.75}
-          />
-          <span className="min-w-0 truncate">Sync Changes</span>
-          {behind > 0 ? (
-            <span className="shrink-0 tabular-nums text-content/55">
-              ↓{behind}
-            </span>
-          ) : null}
-          {ahead > 0 ? (
-            <span className="shrink-0 tabular-nums text-content/55">
-              ↑{ahead}
-            </span>
-          ) : null}
-        </button>
+            <span className="min-w-0 truncate">Sync Changes</span>
+            {behind > 0 ? (
+              <span className="shrink-0 tabular-nums text-content/55">
+                ↓{behind}
+              </span>
+            ) : null}
+            {ahead > 0 ? (
+              <span className="shrink-0 tabular-nums text-content/55">
+                ↑{ahead}
+              </span>
+            ) : null}
+          </button>
+        </Tooltip>
       ) : null}
       {showCreatePr ? (
-        <button
-          type="button"
-          title={createTitle}
-          disabled={!canCreatePr || !!busy}
-          onClick={onCreatePr}
-          className={secondary}
-        >
-          {busy === "pr" ? (
-            <LoaderCircle
-              className="size-3.5 shrink-0 animate-spin"
-              strokeWidth={1.75}
-            />
-          ) : (
-            <GitPullRequest className="size-3.5 shrink-0" strokeWidth={1.75} />
-          )}
-          Create PR
-        </button>
+        <Tooltip content={createTitle}>
+          <button
+            type="button"
+            title={!canCreatePr || busy ? createTitle : undefined}
+            disabled={!canCreatePr || !!busy}
+            onClick={onCreatePr}
+            className={secondary}
+          >
+            {busy === "pr" ? (
+              <LoaderCircle
+                className="size-3.5 shrink-0 animate-spin"
+                strokeWidth={1.75}
+              />
+            ) : (
+              <GitPullRequest
+                className="size-3.5 shrink-0"
+                strokeWidth={1.75}
+              />
+            )}
+            Create PR
+          </button>
+        </Tooltip>
       ) : null}
       {showViewPr ? (
-        <button
-          type="button"
-          title={viewTitle}
-          disabled={!canViewPr || !!busy}
-          onClick={onViewPr}
-          className={secondary}
+        <Tooltip
+          content={viewTitle ?? `View PR${pr?.number ? ` #${pr.number}` : ""}`}
         >
-          <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.75} />
-          <span className="min-w-0 truncate">
-            {pr?.number ? `View PR #${pr.number}` : "View PR"}
-          </span>
-        </button>
+          <button
+            type="button"
+            title={!canViewPr || busy ? (viewTitle ?? undefined) : undefined}
+            disabled={!canViewPr || !!busy}
+            onClick={onViewPr}
+            className={secondary}
+          >
+            <ExternalLink className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 truncate">
+              {pr?.number ? `View PR #${pr.number}` : "View PR"}
+            </span>
+          </button>
+        </Tooltip>
       ) : null}
     </div>
   );
@@ -1396,8 +1413,8 @@ function useDiffIndex(
   index: GitDiffIndex | null;
   reload: () => void;
 } {
-  const [index, setIndex] = useState<GitDiffIndex | null>(
-    () => cachedIndex(cwd),
+  const [index, setIndex] = useState<GitDiffIndex | null>(() =>
+    cachedIndex(cwd),
   );
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((value) => value + 1), []);

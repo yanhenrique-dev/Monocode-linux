@@ -22,6 +22,7 @@ import { terminalTabLabel } from "../lib/terminalTab";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useAnimatedReorder } from "../hooks/useAnimatedReorder";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
+import { Tooltip } from "../components/ui/tooltip";
 import { FileTypeIcon } from "./FileTypeIcon";
 import { HarnessIcon } from "./HarnessIcon";
 
@@ -244,146 +245,159 @@ export function SurfaceTabs({
         aria-label={label}
         className="scrollbar-none flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overscroll-none pl-1.5 pr-2.5"
       >
-      {onPaneDragStart ? (
-        <div
-          role="button"
-          title="Drag to reorder pane"
-          aria-label="Drag to reorder pane"
-          tabIndex={-1}
-          className="grid h-7.5 w-5 shrink-0 cursor-grab place-items-center rounded-md text-content/35 hover:bg-content/5 hover:text-content/70 active:cursor-grabbing touch-none"
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onPaneDragStart(event);
-          }}
-        >
-          <GripVertical className="size-3.5" strokeWidth={1.75} />
-        </div>
-      ) : null}
-      {files.map((file) => {
-        const active = file.id === activeFileId;
-        const dirty = dirtyFileIds.has(file.id);
-        const errors = fileErrorCounts.get(file.id) ?? 0;
-        const changes = isChangesTab(file);
-        const commit = isCommitTab(file);
-        const review = isReviewTab(file) && !changes;
-        const terminal = isTerminalTab(file);
-        const agent = isAgentTab(file) ? file.agent : null;
-        const { label, iconName, tooltip } = surfaceTabPresentation(file);
-        return (
-          <div
-            key={file.id}
-            ref={(el) => {
-              sortable.setItemRef(file.id, el);
-              if (el && file.id === activeFileId) activeTabRef.current = el;
-            }}
-            className="reorder-item tab-motion group relative flex h-full w-56 min-w-28 shrink touch-none items-center"
-            onMouseDownCapture={(event) => {
-              if (event.button === 1) event.preventDefault();
-            }}
-            onAuxClick={(event) => {
-              if (event.button !== 1) return;
-              event.preventDefault();
-              event.stopPropagation();
-              onCloseFile(file.id);
-            }}
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              if (
-                (event.target as HTMLElement | null)?.closest("[data-no-drag]")
-              ) {
-                return;
-              }
-              onSelectFile(file.id);
-              sortable.onItemPointerDown(file.id, event);
-            }}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onSelectFile(file.id);
-              setMenu({
-                x: event.clientX,
-                y: event.clientY,
-                fileId: file.id,
-              });
-            }}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              title={appendProblems(tooltip, errors)}
-              onClick={() => {
-                if (sortable.consumeClick()) return;
-                onSelectFile(file.id);
+        {onPaneDragStart ? (
+          <Tooltip content="Drag to reorder pane">
+            <div
+              role="button"
+              aria-label="Drag to reorder pane"
+              tabIndex={-1}
+              className="grid h-7.5 w-5 shrink-0 cursor-grab place-items-center rounded-md text-content/35 hover:bg-content/5 hover:text-content/70 active:cursor-grabbing touch-none"
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                onPaneDragStart(event);
               }}
-              className={`relative flex h-7.5 min-w-0 flex-1 cursor-default items-center gap-1.5 self-center rounded-md px-2 pr-7 text-left text-[13px] ${
-                active
-                  ? "bg-selection text-content"
-                  : "text-content/50 hover:bg-content/5 hover:text-content"
-              }`}
             >
-              {terminal ? (
-                <Terminal className="size-3.5 shrink-0" strokeWidth={1.75} />
-              ) : agent ? (
-                <HarnessIcon
-                  harness={agent.harness}
-                  className="size-3.5 shrink-0"
-                />
-              ) : changes || commit ? (
-                <GitCompare className="size-3.5 shrink-0" strokeWidth={1.75} />
-              ) : (
-                <FileTypeIcon name={iconName} isDir={false} size={14} />
-              )}
-              <span
-                className={`min-w-0 flex-1 truncate ${review ? "italic" : ""} ${
-                  errors
-                    ? active
-                      ? "text-red-400"
-                      : "text-red-400/75 group-hover:text-red-400"
-                    : ""
-                }`}
-              >
-                {label}
-              </span>
-              {dirty ? (
-                <span
-                  className="size-1.5 shrink-0 rounded-full bg-content/70"
-                  title="Unsaved changes"
-                  aria-label="Unsaved changes"
-                />
-              ) : null}
-            </button>
-            <button
-              type="button"
-              title={`Close ${label}`}
-              aria-label={`Close ${label}`}
-              data-no-drag
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
+              <GripVertical className="size-3.5" strokeWidth={1.75} />
+            </div>
+          </Tooltip>
+        ) : null}
+        {files.map((file) => {
+          const active = file.id === activeFileId;
+          const dirty = dirtyFileIds.has(file.id);
+          const errors = fileErrorCounts.get(file.id) ?? 0;
+          const changes = isChangesTab(file);
+          const commit = isCommitTab(file);
+          const review = isReviewTab(file) && !changes;
+          const terminal = isTerminalTab(file);
+          const agent = isAgentTab(file) ? file.agent : null;
+          const { label, iconName, tooltip } = surfaceTabPresentation(file);
+          return (
+            <div
+              key={file.id}
+              ref={(el) => {
+                sortable.setItemRef(file.id, el);
+                if (el && file.id === activeFileId) activeTabRef.current = el;
+              }}
+              className="reorder-item tab-motion group relative flex h-full w-56 min-w-28 shrink touch-none items-center"
+              onMouseDownCapture={(event) => {
+                if (event.button === 1) event.preventDefault();
+              }}
+              onAuxClick={(event) => {
+                if (event.button !== 1) return;
+                event.preventDefault();
                 event.stopPropagation();
                 onCloseFile(file.id);
               }}
-              className={`absolute right-1 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-content/50 hover:bg-content/10 hover:text-content ${
-                active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-              }`}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                if (
+                  (event.target as HTMLElement | null)?.closest(
+                    "[data-no-drag]",
+                  )
+                ) {
+                  return;
+                }
+                onSelectFile(file.id);
+                sortable.onItemPointerDown(file.id, event);
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSelectFile(file.id);
+                setMenu({
+                  x: event.clientX,
+                  y: event.clientY,
+                  fileId: file.id,
+                });
+              }}
             >
-              <X className="size-3" strokeWidth={1.75} />
-            </button>
-          </div>
-        );
-      })}
-      {onPaneDragStart ? (
-        <div
-          className="min-w-4 flex-1 cursor-grab active:cursor-grabbing"
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            onPaneDragStart(event);
-          }}
-        />
-      ) : null}
+              <Tooltip content={appendProblems(tooltip, errors)}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={appendProblems(tooltip, errors)}
+                  onClick={() => {
+                    if (sortable.consumeClick()) return;
+                    onSelectFile(file.id);
+                  }}
+                  className={`relative flex h-7.5 min-w-0 flex-1 cursor-default items-center gap-1.5 self-center rounded-md px-2 pr-7 text-left text-[13px] ${
+                    active
+                      ? "bg-selection text-content"
+                      : "text-content/50 hover:bg-content/5 hover:text-content"
+                  }`}
+                >
+                  {terminal ? (
+                    <Terminal
+                      className="size-3.5 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                  ) : agent ? (
+                    <HarnessIcon
+                      harness={agent.harness}
+                      className="size-3.5 shrink-0"
+                    />
+                  ) : changes || commit ? (
+                    <GitCompare
+                      className="size-3.5 shrink-0"
+                      strokeWidth={1.75}
+                    />
+                  ) : (
+                    <FileTypeIcon name={iconName} isDir={false} size={14} />
+                  )}
+                  <span
+                    className={`min-w-0 flex-1 truncate ${review ? "italic" : ""} ${
+                      errors
+                        ? active
+                          ? "text-red-400"
+                          : "text-red-400/75 group-hover:text-red-400"
+                        : ""
+                    }`}
+                  >
+                    {label}
+                  </span>
+                  {dirty ? (
+                    <Tooltip content="Unsaved changes">
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-content/70"
+                        aria-label="Unsaved changes"
+                      />
+                    </Tooltip>
+                  ) : null}
+                </button>
+              </Tooltip>
+              <Tooltip content={`Close ${label}`}>
+                <button
+                  type="button"
+                  aria-label={`Close ${label}`}
+                  data-no-drag
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onCloseFile(file.id);
+                  }}
+                  className={`absolute right-1 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded text-content/50 hover:bg-content/10 hover:text-content ${
+                    active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                >
+                  <X className="size-3" strokeWidth={1.75} />
+                </button>
+              </Tooltip>
+            </div>
+          );
+        })}
+        {onPaneDragStart ? (
+          <div
+            className="min-w-4 flex-1 cursor-grab active:cursor-grabbing"
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              onPaneDragStart(event);
+            }}
+          />
+        ) : null}
       </div>
       {trailing}
       {menu && menuFile ? (

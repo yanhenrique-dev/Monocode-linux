@@ -1,4 +1,5 @@
 import { AiIdea, CircleDashed, PanelRight, Play } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 import { planSummary, planTitle } from "../lib/plan";
 import type { HarnessId, PlanBlockMeta, PlanBuildTarget } from "../lib/session";
 import { BuildTargetButton } from "./SecondOpinionButton";
@@ -58,14 +59,15 @@ export function PlanPreview({
         )}
         <div className="min-w-0 flex-1">
           {onOpen ? (
-            <button
-              type="button"
-              className="block w-full truncate text-left font-sans text-[13px] font-medium text-content/90 hover:text-yellow-100"
-              title={title}
-              onClick={onOpen}
-            >
-              {title}
-            </button>
+            <Tooltip content={title}>
+              <button
+                type="button"
+                className="block w-full truncate text-left font-sans text-[13px] font-medium text-content/90 hover:text-yellow-100"
+                onClick={onOpen}
+              >
+                {title}
+              </button>
+            </Tooltip>
           ) : (
             <span
               className="block truncate font-sans text-[13px] font-medium text-content/90"

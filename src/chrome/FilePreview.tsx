@@ -1,4 +1,5 @@
 import { CircleDashed, X } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 import { MAX_PREVIEW_LINES } from "../lib/harness/preview";
 import { displayPath, resolveWorkspacePath } from "../lib/paths";
 import type { ToolPreview, ToolPreviewLine } from "../lib/session";
@@ -98,14 +99,15 @@ export function FilePreview({
       <div className="flex items-center gap-2 px-2.5 py-2">
         <FileTypeIcon name={fileName || "file"} isDir={false} />
         {filePath && onOpenFile ? (
-          <button
-            type="button"
-            className="min-w-0 flex-1 truncate text-left font-mono text-[12px] font-medium text-content/85 hover:text-sky-300 hover:underline"
-            title={path}
-            onClick={() => onOpenFile(filePath)}
-          >
-            {label}
-          </button>
+          <Tooltip content={path}>
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate text-left font-mono text-[12px] font-medium text-content/85 hover:text-sky-300 hover:underline"
+              onClick={() => onOpenFile(filePath)}
+            >
+              {label}
+            </button>
+          </Tooltip>
         ) : (
           <span
             className="min-w-0 flex-1 truncate font-mono text-[12px] font-medium text-content/85"

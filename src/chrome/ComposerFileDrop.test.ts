@@ -128,8 +128,9 @@ describe("Composer Explorer file drops", () => {
     expect(invoke).toHaveBeenCalledWith("inspect_paths", {
       paths: ["/project/src/main.ts"],
     });
+    expect(container.textContent).toContain("main.ts");
     expect(
       container.querySelector('[title="/project/src/main.ts"]'),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 });
