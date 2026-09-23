@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { LoaderCircle, X } from "../chrome/icons";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   formatRelativeTime,
   githubReviewStateLabel,
@@ -201,7 +202,7 @@ export function InboxCommentForm({
           }
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
-          className="max-h-40 w-full resize-none overflow-y-auto bg-transparent px-3 py-2 text-[13px] leading-5 text-content outline-none placeholder:text-content/35 disabled:opacity-40"
+          className="max-h-40 w-full resize-none overflow-y-auto bg-transparent px-3 py-2 text-[13px] leading-5 text-content  placeholder:text-content/35 disabled:opacity-40"
         />
         <div className="flex items-center justify-end px-2 pb-2">
           <button
@@ -280,20 +281,23 @@ function InboxComment({
           >
             <span aria-hidden>·</span>
             {comment.url && part === time ? (
-              <button
-                type="button"
-                title={
+              <Tooltip
+                content={
                   provider === "linear"
                     ? "Open in Linear"
                     : provider === "gitlab"
                       ? "Open on GitLab"
                       : "Open on GitHub"
                 }
-                onClick={() => openExternalBestEffort(comment.url)}
-                className="hover:text-content"
               >
-                {part}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => openExternalBestEffort(comment.url)}
+                  className="hover:text-content"
+                >
+                  {part}
+                </button>
+              </Tooltip>
             ) : (
               <span
                 className={
@@ -345,9 +349,7 @@ function InboxComment({
           {comment.replies.map((reply, index) => (
             <div
               key={reply.id}
-              className={`py-2.5 ${
-                index > 0 ? "border-t border-stroke" : ""
-              }`}
+              className={`py-2.5 ${index > 0 ? "border-t border-stroke" : ""}`}
             >
               <InboxComment
                 comment={reply}

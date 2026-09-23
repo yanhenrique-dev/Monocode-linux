@@ -2,6 +2,7 @@ import { code } from "@streamdown/code";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { openExternalBestEffort } from "../lib/openExternal";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   createContext,
   isValidElement,
@@ -133,7 +134,8 @@ function useCandidateOpen() {
     (path: string, navigation?: EditorNavigation) => {
       const effective = candidatePaths ?? ambient;
       if (!onOpenFile) return;
-      if (effective?.length) onOpenFile(path, navigation, { candidatePaths: effective });
+      if (effective?.length)
+        onOpenFile(path, navigation, { candidatePaths: effective });
       else onOpenFile(path, navigation);
     },
     [onOpenFile, candidatePaths, ambient],
@@ -519,9 +521,11 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       const effective = candidatePaths?.length ? candidatePaths : undefined;
       if (!onOpenFile) return;
       if (fileMenu.navigation) {
-        if (effective) onOpenFile(path, fileMenu.navigation, { candidatePaths: effective });
+        if (effective)
+          onOpenFile(path, fileMenu.navigation, { candidatePaths: effective });
         else onOpenFile(path, fileMenu.navigation);
-      } else if (effective) onOpenFile(path, undefined, { candidatePaths: effective });
+      } else if (effective)
+        onOpenFile(path, undefined, { candidatePaths: effective });
       else onOpenFile(path);
       return;
     }
@@ -852,17 +856,18 @@ function MarkdownCodePath({
     file.navigation ??
     (startLine && startLine > 0 ? { line: startLine } : undefined);
   return (
-    <button
-      type="button"
-      className="markdown-code-path markdown-code-path-link"
-      title={file.path}
-      onClick={() => openCandidate(file.path, navigation)}
-      onContextMenu={(event) =>
-        onFileContextMenu?.(event, file.path, navigation)
-      }
-    >
-      {path}
-    </button>
+    <Tooltip content={file.path}>
+      <button
+        type="button"
+        className="markdown-code-path markdown-code-path-link"
+        onClick={() => openCandidate(file.path, navigation)}
+        onContextMenu={(event) =>
+          onFileContextMenu?.(event, file.path, navigation)
+        }
+      >
+        {path}
+      </button>
+    </Tooltip>
   );
 }
 

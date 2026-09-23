@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { MessageQueueStatus, QueuedMessage } from "../../lib/session";
 import { isImeComposition } from "../../lib/keyboard";
 import { FileTypeIcon } from "../FileTypeIcon";
+import { Tooltip } from "../../components/ui/tooltip";
 import { fileMentionParts } from "../../lib/fileMentions";
 import type { ProjectFile } from "../../lib/fs";
 import { skillTextParts } from "../../lib/skills";
@@ -34,20 +35,21 @@ export function ToolButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={`grid size-6.5 shrink-0 place-items-center rounded-md ${
-        active
-          ? "bg-selection-emphasis text-content"
-          : "bg-selection text-content/50 hover:bg-selection-hover hover:text-content"
-      } disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content/50`}
-    >
-      {children}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onClick={onClick}
+        className={`grid size-6.5 shrink-0 place-items-center rounded-md ${
+          active
+            ? "bg-selection-emphasis text-content"
+            : "bg-selection text-content/50 hover:bg-selection-hover hover:text-content"
+        } disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-content/50`}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -154,27 +156,29 @@ export function MessageQueue({
                     }}
                     className="min-h-6 min-w-0 flex-1 resize-none rounded-md border border-content/15 bg-content/5 px-1.5 py-0.5 text-[12px] text-content outline-none focus:border-content/30"
                   />
-                  <button
-                    type="button"
-                    title="Save queued message"
-                    aria-label="Save queued message"
-                    disabled={
-                      !editDraft.trim() && message.attachments.length === 0
-                    }
-                    onClick={() => saveEdit(message)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content disabled:opacity-30"
-                  >
-                    <Check className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Cancel queued message edit"
-                    aria-label="Cancel queued message edit"
-                    onClick={cancelEdit}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
-                  >
-                    <X className="size-3.5" />
-                  </button>
+                  <Tooltip content="Save queued message">
+                    <button
+                      type="button"
+                      aria-label="Save queued message"
+                      disabled={
+                        !editDraft.trim() && message.attachments.length === 0
+                      }
+                      onClick={() => saveEdit(message)}
+                      className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content disabled:opacity-30"
+                    >
+                      <Check className="size-3.5" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Cancel queued message edit">
+                    <button
+                      type="button"
+                      aria-label="Cancel queued message edit"
+                      onClick={cancelEdit}
+                      className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </Tooltip>
                 </>
               ) : (
                 <>
@@ -189,24 +193,26 @@ export function MessageQueue({
                     <CornerDownRight className="size-3.5" />
                     Steer
                   </button>
-                  <button
-                    type="button"
-                    title="Edit queued message"
-                    aria-label="Edit queued message"
-                    onClick={() => startEdit(message)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
-                  >
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Remove queued message"
-                    aria-label="Remove queued message"
-                    onClick={() => onDelete?.(message.id)}
-                    className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  <Tooltip content="Edit queued message">
+                    <button
+                      type="button"
+                      aria-label="Edit queued message"
+                      onClick={() => startEdit(message)}
+                      className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Remove queued message">
+                    <button
+                      type="button"
+                      aria-label="Remove queued message"
+                      onClick={() => onDelete?.(message.id)}
+                      className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-content/10 hover:text-content"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </Tooltip>
                 </>
               )}
             </div>
@@ -297,39 +303,42 @@ export function ComposerAction({
 }) {
   if (busy) {
     return hasValue ? (
-      <button
-        type="button"
-        title="Send"
-        aria-label="Send"
-        onClick={onSend}
-        className="composer-send primary-action grid size-6.5 place-items-center rounded-md"
-      >
-        <ArrowUp className="size-3.5" strokeWidth={2.25} />
-      </button>
+      <Tooltip content="Send">
+        <button
+          type="button"
+          aria-label="Send"
+          onClick={onSend}
+          className="composer-send primary-action grid size-6.5 place-items-center rounded-md"
+        >
+          <ArrowUp className="size-3.5" strokeWidth={2.25} />
+        </button>
+      </Tooltip>
     ) : (
-      <button
-        type="button"
-        title="Stop"
-        aria-label="Stop"
-        onClick={onStop}
-        className="grid size-6.5 place-items-center rounded-md bg-white text-black hover:bg-white/90"
-      >
-        <Square className="size-2.5 fill-current" strokeWidth={0} />
-      </button>
+      <Tooltip content="Stop">
+        <button
+          type="button"
+          aria-label="Stop"
+          onClick={onStop}
+          className="grid size-6.5 place-items-center rounded-md bg-white text-black hover:bg-white/90"
+        >
+          <Square className="size-2.5 fill-current" strokeWidth={0} />
+        </button>
+      </Tooltip>
     );
   }
 
   return (
-    <button
-      type="button"
-      title="Send"
-      aria-label="Send"
-      disabled={!hasValue}
-      onClick={onSend}
-      className="composer-send primary-action grid size-6.5 place-items-center rounded-md disabled:cursor-default"
-    >
-      <ArrowUp className="size-3.5" strokeWidth={2.25} />
-    </button>
+    <Tooltip content="Send">
+      <button
+        type="button"
+        aria-label="Send"
+        disabled={!hasValue}
+        onClick={onSend}
+        className="composer-send primary-action grid size-6.5 place-items-center rounded-md disabled:cursor-default"
+      >
+        <ArrowUp className="size-3.5" strokeWidth={2.25} />
+      </button>
+    </Tooltip>
   );
 }
 

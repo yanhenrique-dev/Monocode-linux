@@ -9,6 +9,7 @@ import {
   StickyNote,
   X,
 } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 import {
   memo,
   useCallback,
@@ -546,19 +547,16 @@ export const Composer = memo(function Composer({
     }
     setAttachNotice(null);
   }, []);
-  const showAttachNotice = useCallback(
-    (message: string) => {
-      if (attachNoticeTimer.current != null) {
-        window.clearTimeout(attachNoticeTimer.current);
-      }
-      setAttachNotice(message);
-      attachNoticeTimer.current = window.setTimeout(() => {
-        attachNoticeTimer.current = null;
-        setAttachNotice(null);
-      }, 4500);
-    },
-    [],
-  );
+  const showAttachNotice = useCallback((message: string) => {
+    if (attachNoticeTimer.current != null) {
+      window.clearTimeout(attachNoticeTimer.current);
+    }
+    setAttachNotice(message);
+    attachNoticeTimer.current = window.setTimeout(() => {
+      attachNoticeTimer.current = null;
+      setAttachNotice(null);
+    }, 4500);
+  }, []);
   useEffect(
     () => () => {
       if (attachNoticeTimer.current != null) {
@@ -1887,50 +1885,54 @@ export const Composer = memo(function Composer({
               ) : null}
             </div>
             {orchestrationSelected && (
-              <button
-                type="button"
-                title="Turn off Orchestrator mode"
-                aria-label="Turn off Orchestrator mode"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  setOrchestrationSelected(false);
-                  ref.current?.focus();
-                }}
-                className="flex h-6.5 shrink-0 items-center gap-1 rounded-md bg-fuchsia-500/15 px-1.5 text-[11px] font-medium text-fuchsia-700 hover:bg-fuchsia-500/20 dark:bg-fuchsia-400/10 dark:text-fuchsia-200/90 dark:hover:bg-fuchsia-400/15"
-              >
-                <Share className="size-3.5" />
-                Orchestrator
-                <X className="size-3" />
-              </button>
+              <Tooltip content="Turn off Orchestrator mode">
+                <button
+                  type="button"
+                  aria-label="Turn off Orchestrator mode"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setOrchestrationSelected(false);
+                    ref.current?.focus();
+                  }}
+                  className="flex h-6.5 shrink-0 items-center gap-1 rounded-md bg-fuchsia-500/15 px-1.5 text-[11px] font-medium text-fuchsia-700 hover:bg-fuchsia-500/20 dark:bg-fuchsia-400/10 dark:text-fuchsia-200/90 dark:hover:bg-fuchsia-400/15"
+                >
+                  <Share className="size-3.5" />
+                  Orchestrator
+                  <X className="size-3" />
+                </button>
+              </Tooltip>
             )}
             {planSelected ? (
-              <button
-                type="button"
-                title="Turn off Plan mode"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setPlanSelected(false);
-                  ref.current?.focus();
-                }}
-                className="flex h-6.5 shrink-0 items-center gap-1 rounded-md bg-yellow-300/12 px-1.5 text-[11px] text-yellow-200/90 hover:bg-yellow-300/18"
-              >
-                <AiIdea className="size-3.5" />
-                Plan
-                <X className="size-3" />
-              </button>
+              <Tooltip content="Turn off Plan mode">
+                <button
+                  type="button"
+                  aria-label="Turn off Plan mode"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setPlanSelected(false);
+                    ref.current?.focus();
+                  }}
+                  className="flex h-6.5 shrink-0 items-center gap-1 rounded-md bg-yellow-300/12 px-1.5 text-[11px] text-yellow-200/90 hover:bg-yellow-300/18"
+                >
+                  <AiIdea className="size-3.5" />
+                  Plan
+                  <X className="size-3" />
+                </button>
+              </Tooltip>
             ) : null}
             {resendEdited ? (
-              <button
-                type="button"
-                title="Stop editing last message"
-                aria-label="Stop editing last message"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={exitEditMode}
-                className="edit-last-turn-button flex h-6.5 shrink-0 items-center gap-1 rounded-md border border-current/20 px-2 text-[11px] font-medium transition-[background-color,color,border-color] hover:border-current/35 hover:bg-content/15 hover:text-content focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-              >
-                <X className="size-3" strokeWidth={1.8} />
-                <span>Cancel edit</span>
-              </button>
+              <Tooltip content="Stop editing last message">
+                <button
+                  type="button"
+                  aria-label="Stop editing last message"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={exitEditMode}
+                  className="edit-last-turn-button flex h-6.5 shrink-0 items-center gap-1 rounded-md border border-current/20 px-2 text-[11px] font-medium transition-[background-color,color,border-color] hover:border-current/35 hover:bg-content/15 hover:text-content focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                >
+                  <X className="size-3" strokeWidth={1.8} />
+                  <span>Cancel edit</span>
+                </button>
+              </Tooltip>
             ) : null}
             <div
               className="composer-toolbar flex min-w-0 flex-1 items-center"

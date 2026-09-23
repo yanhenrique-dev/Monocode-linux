@@ -72,7 +72,7 @@ describe("InboxDetail layout", () => {
     expect(markup).toContain("data-linked-work-item-panel");
     expect(markup).toContain('aria-label="Linked issue #157"');
     expect(markup).toContain('aria-label="Resize linked issue panel"');
-    expect(markup).toContain('title="Close issue panel"');
+    expect(markup).toContain('aria-label="Close issue panel"');
     expect(markup).not.toContain("data-app-inbox");
     expect(markup).not.toContain("bg-background-base");
     expect(markup).not.toContain("backdrop-blur");

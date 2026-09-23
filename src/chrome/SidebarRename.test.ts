@@ -903,7 +903,7 @@ describe("sidebar linked work item updates", () => {
     const pullRequest = card().querySelector<HTMLButtonElement>(
       '[aria-label="Open PR #42"]',
     )!;
-    expect(pullRequest.title).toContain("beside this session");
+    expect(pullRequest.hasAttribute("title")).toBe(false);
     act(() => pullRequest.click());
     expect(props.onOpenInboxItem).toHaveBeenCalledExactlyOnceWith(
       linkedWorkItem,

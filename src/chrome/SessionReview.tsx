@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, FileDiff } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   keepSessionChanges,
@@ -240,23 +241,30 @@ function ReviewCard({
             >
               Undo
             </button>
-            <button
-              type="button"
-              title="Keep all session changes and dismiss this card"
-              disabled={disabled}
-              onClick={() => run("keep")}
-              className="h-7 rounded-md px-2.5 text-[11px] text-content/65 hover:bg-content/8 hover:text-content disabled:opacity-35"
-            >
-              Keep
-            </button>
-            <button
-              type="button"
-              title="Review changes"
-              onClick={() => onOpenDiff(undefined, { sessionId, cwd })}
-              className="h-7 rounded-md border border-content/12 bg-content/8 px-2.5 text-[11px] font-medium text-content/75 hover:bg-content/12 hover:text-content"
-            >
-              Review
-            </button>
+            <Tooltip content="Keep all session changes and dismiss this card">
+              <button
+                type="button"
+                title={
+                  disabled
+                    ? "Keep all session changes and dismiss this card"
+                    : undefined
+                }
+                disabled={disabled}
+                onClick={() => run("keep")}
+                className="h-7 rounded-md px-2.5 text-[11px] text-content/65 hover:bg-content/8 hover:text-content disabled:opacity-35"
+              >
+                Keep
+              </button>
+            </Tooltip>
+            <Tooltip content="Review changes">
+              <button
+                type="button"
+                onClick={() => onOpenDiff(undefined, { sessionId, cwd })}
+                className="h-7 rounded-md border border-content/12 bg-content/8 px-2.5 text-[11px] font-medium text-content/75 hover:bg-content/12 hover:text-content"
+              >
+                Review
+              </button>
+            </Tooltip>
           </div>
         </div>
         <ul

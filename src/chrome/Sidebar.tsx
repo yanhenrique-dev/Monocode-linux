@@ -123,6 +123,7 @@ import {
 } from "../lib/recents";
 import { ColorPickerPopover, ColorSwatchRow } from "./ColorPickerPopover";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
+import { Tooltip } from "../components/ui/tooltip";
 import { FileTree } from "./FileTree";
 import { HarnessIcon } from "./HarnessIcon";
 import { LiveAgentsPreview } from "./LiveAgentsPreview";
@@ -397,7 +398,10 @@ function SidebarComponent({
   // A toggle flipped in Settings → Archive (or another window) re-reads the
   // store so the open sidebar never shows a stale filter.
   useEffect(
-    () => subscribeSessionSidebarFilters(() => setSessionFilters(loadSessionSidebarFilters())),
+    () =>
+      subscribeSessionSidebarFilters(() =>
+        setSessionFilters(loadSessionSidebarFilters()),
+      ),
     [],
   );
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(
@@ -510,7 +514,10 @@ function SidebarComponent({
       return;
     }
     const available = new Set(sessionNavigationIds);
-    if (selectionAnchorRef.current && !available.has(selectionAnchorRef.current)) {
+    if (
+      selectionAnchorRef.current &&
+      !available.has(selectionAnchorRef.current)
+    ) {
       selectionAnchorRef.current = null;
     }
     setSelectedSessionIds((current) =>
@@ -592,12 +599,7 @@ function SidebarComponent({
     // Track every change: without this the hidden branch never records
     // itself and returning later reads a stale `true`, skipping anim-in.
     prevSidebarVisible.current = sidebarVisible;
-  }, [
-    sidebarVisible,
-    sidebarHeld,
-    requestSidebarClose,
-    cancelSidebarClose,
-  ]);
+  }, [sidebarVisible, sidebarHeld, requestSidebarClose, cancelSidebarClose]);
   const gitStatuses = useGitFileStatuses(gitRoot, open && tab === "files");
   const changeStats = useProjectDiffStats(gitRoot, open);
 
@@ -1055,9 +1057,10 @@ function SidebarComponent({
           : visibleIds.slice(Math.min(start, end), Math.max(start, end) + 1);
       selectionAnchorRef.current = start < 0 ? sessionId : anchor;
       setSelectedSessionIds(
-        (current) => new Set(
-          event.ctrlKey || event.metaKey ? [...current, ...range] : range,
-        ),
+        (current) =>
+          new Set(
+            event.ctrlKey || event.metaKey ? [...current, ...range] : range,
+          ),
       );
       return;
     }
@@ -1587,25 +1590,26 @@ function SidebarComponent({
                                 </ul>
                                 {onNew ? (
                                   <div className="border-t border-stroke p-1">
-                                    <button
-                                      type="button"
-                                      data-no-drag
-                                      data-tauri-drag-region="false"
-                                      title="New session"
-                                      aria-label="New session"
-                                      onClick={() =>
-                                        onNewInFolder(entry.folder.id)
-                                      }
-                                      className="relative flex w-full items-center gap-1 rounded-md border border-transparent px-2.5 py-1.5 text-left text-content/45 hover:bg-content/10 hover:text-content"
-                                    >
-                                      <Plus
-                                        className="size-3 shrink-0"
-                                        strokeWidth={1.75}
-                                      />
-                                      <span className="text-[13px] font-semibold leading-snug">
-                                        New session
-                                      </span>
-                                    </button>
+                                    <Tooltip content="New session">
+                                      <button
+                                        type="button"
+                                        data-no-drag
+                                        data-tauri-drag-region="false"
+                                        aria-label="New session"
+                                        onClick={() =>
+                                          onNewInFolder(entry.folder.id)
+                                        }
+                                        className="relative flex w-full items-center gap-1 rounded-md border border-transparent px-2.5 py-1.5 text-left text-content/45 hover:bg-content/10 hover:text-content"
+                                      >
+                                        <Plus
+                                          className="size-3 shrink-0"
+                                          strokeWidth={1.75}
+                                        />
+                                        <span className="text-[13px] font-semibold leading-snug">
+                                          New session
+                                        </span>
+                                      </button>
+                                    </Tooltip>
                                   </div>
                                 ) : null}
                               </>
@@ -1812,7 +1816,9 @@ function SidebarProjectPicker({
   notesActive?: boolean;
   inboxUnseen?: boolean;
 }) {
-  const [inboxMenu, setInboxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [inboxMenu, setInboxMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const inboxTrigger = useRef<HTMLElement | null>(null);
   return (
     <div
@@ -1848,8 +1854,10 @@ function SidebarProjectPicker({
             active={inboxActive}
             onClick={onOpenInbox}
             onOpenContextMenu={(x, y) => {
-              inboxTrigger.current = document.activeElement instanceof HTMLElement
-                ? document.activeElement : null;
+              inboxTrigger.current =
+                document.activeElement instanceof HTMLElement
+                  ? document.activeElement
+                  : null;
               setInboxMenu({ x, y });
             }}
           >
@@ -1928,20 +1936,21 @@ function SessionsHeaderButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-expanded={open}
-      aria-haspopup={hasPopup ? "menu" : undefined}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={onClick}
-      className={`relative z-50 grid size-6 place-items-center rounded-md text-content/70 hover:bg-content/10 hover:text-content ${
-        open || active ? "bg-selection text-content" : ""
-      }`}
-    >
-      {children}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup={hasPopup ? "menu" : undefined}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onClick}
+        className={`relative z-50 grid size-6 place-items-center rounded-md text-content/70 hover:bg-content/10 hover:text-content ${
+          open || active ? "bg-selection text-content" : ""
+        }`}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -2284,45 +2293,51 @@ function SessionCard({
 
   const linkedWorkItem = session.linkedWorkItem;
   const linkedUpdateDot = linkedUpdate ? (
-    <span
-      title={`Linked ${linkedWorkItem?.kind === "pr" ? "PR" : "issue"} updated since this session`}
-      aria-label="Linked work item updated"
-      className="size-1.5 shrink-0 rounded-full bg-accent"
-    />
+    <Tooltip
+      content={`Linked ${linkedWorkItem?.kind === "pr" ? "PR" : "issue"} updated since this session`}
+    >
+      <span
+        aria-label="Linked work item updated"
+        className="size-1.5 shrink-0 rounded-full bg-accent"
+      />
+    </Tooltip>
   ) : null;
   const workItemBadge = linkedWorkItem ? (
-    <button
-      type="button"
-      data-no-drag
-      data-tauri-drag-region="false"
-      title={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number} beside this session (${MOD}-click for GitHub)`}
-      aria-label={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number}`}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.metaKey || event.ctrlKey) {
-          openExternalBestEffort(linkedWorkItem.url);
-          return;
-        }
-        if (onOpenWorkItem) onOpenWorkItem(linkedWorkItem, session.id);
-        else openExternalBestEffort(linkedWorkItem.url);
-      }}
-      onAuxClick={(event) => {
-        if (event.button !== 1) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openExternalBestEffort(linkedWorkItem.url);
-      }}
-      className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-0.5 text-[11px] tabular-nums text-accent hover:underline"
+    <Tooltip
+      content={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number} beside this session (${MOD}-click for GitHub)`}
     >
-      {linkedWorkItem.kind === "pr" ? (
-        <GitPullRequest className="size-3" strokeWidth={1.75} />
-      ) : (
-        <CircleDot className="size-3" strokeWidth={1.75} />
-      )}
-      <span>#{linkedWorkItem.number}</span>
-    </button>
+      <button
+        type="button"
+        data-no-drag
+        data-tauri-drag-region="false"
+        aria-label={`Open ${linkedWorkItem.kind === "pr" ? "PR" : "issue"} #${linkedWorkItem.number}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.metaKey || event.ctrlKey) {
+            openExternalBestEffort(linkedWorkItem.url);
+            return;
+          }
+          if (onOpenWorkItem) onOpenWorkItem(linkedWorkItem, session.id);
+          else openExternalBestEffort(linkedWorkItem.url);
+        }}
+        onAuxClick={(event) => {
+          if (event.button !== 1) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openExternalBestEffort(linkedWorkItem.url);
+        }}
+        className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-0.5 text-[11px] tabular-nums text-accent hover:underline"
+      >
+        {linkedWorkItem.kind === "pr" ? (
+          <GitPullRequest className="size-3" strokeWidth={1.75} />
+        ) : (
+          <CircleDot className="size-3" strokeWidth={1.75} />
+        )}
+        <span>#{linkedWorkItem.number}</span>
+      </button>
+    </Tooltip>
   ) : null;
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -2488,169 +2503,173 @@ function SessionCard({
 
   return (
     <div className="group session-card relative">
-      <div
-        title={title}
-        data-session-card={session.id}
-        data-orchestration-card={orchestration ? "true" : undefined}
-        data-session-selected={isSelected ? "true" : undefined}
-        data-tauri-drag-region="false"
-        onPointerDown={onPointerDown}
-        onPointerEnter={schedulePrefetch}
-        onPointerLeave={cancelScheduledPrefetch}
-        onClick={(event) => {
-          if (performance.now() < skipClickUntil.current) return;
-          onSelect(session.id, event);
-        }}
-        onContextMenu={onContextMenu}
-        className={`relative border flex w-full cursor-default select-none touch-none flex-col rounded-md px-2.5 text-left ${cardPaddingY} ${
-          dragging ? "opacity-40" : ""
-        } ${
-          dropTarget
-            ? "text-content border-transparent"
-            : isSelected
-              ? "bg-accent/15 text-content border-transparent"
-              : needsApproval
-                ? "bg-content/20 text-content border-content/30 border-dashed"
-                : isActive
-                  ? "bg-selection text-content border-transparent"
-                  : `text-content/80 hover:text-content border-transparent ${
-                      orchestrationExpanded
-                        ? "bg-content/5 hover:bg-content/10"
-                        : "hover:bg-content/5"
-                    }`
-        }`}
-      >
-        {dropTarget ? (
-          <div className="pointer-events-none absolute inset-0 rounded-md bg-accent/20" />
-        ) : null}
+      <Tooltip content={title}>
         <div
-          role="button"
-          tabIndex={0}
-          aria-current={isActive ? "true" : undefined}
-          aria-pressed={isSelected}
-          data-session-select={session.id}
-          onKeyDown={onKeyDown}
-          onMouseDown={(event) => {
-            if (event.button !== 0) return;
-            // Shift-click can trigger :focus-visible. Mouse selection should
-            // only highlight the card; Tab can still focus this button.
-            event.preventDefault();
-            // Clear prior focus too, so shortcuts cannot target another card.
-            const focused = event.currentTarget.ownerDocument.activeElement;
-            if (focused instanceof HTMLElement) focused.blur();
+          data-session-card={session.id}
+          data-orchestration-card={orchestration ? "true" : undefined}
+          data-session-selected={isSelected ? "true" : undefined}
+          data-tauri-drag-region="false"
+          onPointerDown={onPointerDown}
+          onPointerEnter={schedulePrefetch}
+          onPointerLeave={cancelScheduledPrefetch}
+          onClick={(event) => {
+            if (performance.now() < skipClickUntil.current) return;
+            onSelect(session.id, event);
           }}
-          className="rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+          onContextMenu={onContextMenu}
+          className={`relative border flex w-full cursor-default select-none touch-none flex-col rounded-md px-2.5 text-left ${cardPaddingY} ${
+            dragging ? "opacity-40" : ""
+          } ${
+            dropTarget
+              ? "text-content border-transparent"
+              : isSelected
+                ? "bg-accent/15 text-content border-transparent"
+                : needsApproval
+                  ? "bg-content/20 text-content border-content/30 border-dashed"
+                  : isActive
+                    ? "bg-selection text-content border-transparent"
+                    : `text-content/80 hover:text-content border-transparent ${
+                        orchestrationExpanded
+                          ? "bg-content/5 hover:bg-content/10"
+                          : "hover:bg-content/5"
+                      }`
+          }`}
         >
-          {compact && !orchestrationExpanded ? null : (
-            <span className="relative flex items-center gap-2">
-              <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                <HarnessIcon
-                  harness={session.harness}
-                  className="size-3.5 shrink-0"
-                />
-                <span className="min-w-0 truncate text-[11px] text-content/50">
-                  {model}
+          {dropTarget ? (
+            <div className="pointer-events-none absolute inset-0 rounded-md bg-accent/20" />
+          ) : null}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-current={isActive ? "true" : undefined}
+            aria-pressed={isSelected}
+            data-session-select={session.id}
+            onKeyDown={onKeyDown}
+            onMouseDown={(event) => {
+              if (event.button !== 0) return;
+              // Shift-click can trigger :focus-visible. Mouse selection should
+              // only highlight the card; Tab can still focus this button.
+              event.preventDefault();
+              // Clear prior focus too, so shortcuts cannot target another card.
+              const focused = event.currentTarget.ownerDocument.activeElement;
+              if (focused instanceof HTMLElement) focused.blur();
+            }}
+            className="rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+          >
+            {compact && !orchestrationExpanded ? null : (
+              <span className="relative flex items-center gap-2">
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <HarnessIcon
+                    harness={session.harness}
+                    className="size-3.5 shrink-0"
+                  />
+                  <span className="min-w-0 truncate text-[11px] text-content/50">
+                    {model}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {linkedUpdateDot}
+                  {status}
                 </span>
               </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                {linkedUpdateDot}
-                {status}
+            )}
+            <span
+              className={`relative flex min-w-0 items-center gap-1.5 ${
+                compact && !orchestrationExpanded ? "" : "mt-1"
+              }`}
+            >
+              {session.pinned ? (
+                <Pin
+                  className="size-3 shrink-0 text-content/45"
+                  strokeWidth={1.75}
+                />
+              ) : null}
+              <span className="min-w-0 flex-1 line-clamp-1 text-[13px] font-semibold leading-snug text-content">
+                {title}
               </span>
+              {compact && !orchestrationExpanded ? (
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {linkedUpdateDot}
+                  {status}
+                </span>
+              ) : null}
             </span>
-          )}
-          <span
-            className={`relative flex min-w-0 items-center gap-1.5 ${
-              compact && !orchestrationExpanded ? "" : "mt-1"
-            }`}
-          >
-            {session.pinned ? (
-              <Pin
-                className="size-3 shrink-0 text-content/45"
-                strokeWidth={1.75}
-              />
-            ) : null}
-            <span className="min-w-0 flex-1 line-clamp-1 text-[13px] font-semibold leading-snug text-content">
-              {title}
-            </span>
-            {compact && !orchestrationExpanded ? (
-              <span className="flex shrink-0 items-center gap-1.5">
-                {linkedUpdateDot}
-                {status}
+          </div>
+          {orchestrationExpanded ? (
+            <OrchestrationSidebarAgents
+              leadId={session.id}
+              summary={orchestration!}
+            />
+          ) : null}
+          <span className="relative mt-1 flex items-center gap-2">
+            {gitLabel ? (
+              <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45">
+                <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
+                <span className="min-w-0 truncate">{gitLabel}</span>
               </span>
-            ) : null}
+            ) : (
+              <span className="min-w-0 flex-1" />
+            )}
+            <span className="relative flex shrink-0 items-center gap-px">
+              {onArchive ? (
+                <Tooltip content={archiveLabel}>
+                  <button
+                    type="button"
+                    data-no-drag
+                    data-tauri-drag-region="false"
+                    aria-label={`${archiveLabel} ${title}`}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onArchive();
+                    }}
+                    className="pointer-events-none grid size-5 place-items-center rounded-md text-content/70 opacity-0 hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                  >
+                    <Archive className="size-3 shrink-0" strokeWidth={1.75} />
+                  </button>
+                </Tooltip>
+              ) : null}
+              {workItemBadge}
+              {orchestration ? (
+                <div
+                  ref={orchestrationTooltipRootRef}
+                  className="relative shrink-0"
+                  onMouseEnter={() => setOrchestrationTooltipOpen(true)}
+                  onMouseLeave={() => setOrchestrationTooltipOpen(false)}
+                >
+                  <button
+                    type="button"
+                    data-no-drag
+                    data-tauri-drag-region="false"
+                    data-orchestration-icon
+                    aria-label={`Orchestrator, ${orchestration.tasks.length} ${
+                      orchestration.tasks.length === 1
+                        ? "subagent"
+                        : "subagents"
+                    }, ${orchestrationDone} done`}
+                    aria-describedby={
+                      orchestrationTooltipOpen
+                        ? orchestrationTooltipId
+                        : undefined
+                    }
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onFocus={() => setOrchestrationTooltipOpen(true)}
+                    onBlur={() => setOrchestrationTooltipOpen(false)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOrchestrationTooltipOpen(false);
+                      onSelect(session.id, event);
+                    }}
+                    className="grid size-5 shrink-0 place-items-center rounded-md text-fuchsia-300/65 hover:bg-content/10 hover:text-fuchsia-200/90"
+                  >
+                    <Share className="size-3" />
+                  </button>
+                </div>
+              ) : null}
+            </span>
           </span>
         </div>
-        {orchestrationExpanded ? (
-          <OrchestrationSidebarAgents
-            leadId={session.id}
-            summary={orchestration!}
-          />
-        ) : null}
-        <span className="relative mt-1 flex items-center gap-2">
-          {gitLabel ? (
-            <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] text-content/45">
-              <GitBranch className="size-3 shrink-0" strokeWidth={1.75} />
-              <span className="min-w-0 truncate">{gitLabel}</span>
-            </span>
-          ) : (
-            <span className="min-w-0 flex-1" />
-          )}
-          <span className="relative flex shrink-0 items-center gap-px">
-            {onArchive ? (
-              <button
-                type="button"
-                data-no-drag
-                data-tauri-drag-region="false"
-                title={archiveLabel}
-                aria-label={`${archiveLabel} ${title}`}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onArchive();
-                }}
-                className="pointer-events-none grid size-5 place-items-center rounded-md text-content/70 opacity-0 hover:bg-content/10 hover:text-content group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-              >
-                <Archive className="size-3 shrink-0" strokeWidth={1.75} />
-              </button>
-            ) : null}
-            {workItemBadge}
-            {orchestration ? (
-              <div
-                ref={orchestrationTooltipRootRef}
-                className="relative shrink-0"
-                onMouseEnter={() => setOrchestrationTooltipOpen(true)}
-                onMouseLeave={() => setOrchestrationTooltipOpen(false)}
-              >
-                <button
-                  type="button"
-                  data-no-drag
-                  data-tauri-drag-region="false"
-                  data-orchestration-icon
-                  aria-label={`Orchestrator, ${orchestration.tasks.length} ${
-                    orchestration.tasks.length === 1 ? "subagent" : "subagents"
-                  }, ${orchestrationDone} done`}
-                  aria-describedby={
-                    orchestrationTooltipOpen
-                      ? orchestrationTooltipId
-                      : undefined
-                  }
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onFocus={() => setOrchestrationTooltipOpen(true)}
-                  onBlur={() => setOrchestrationTooltipOpen(false)}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setOrchestrationTooltipOpen(false);
-                    onSelect(session.id, event);
-                  }}
-                  className="grid size-5 shrink-0 place-items-center rounded-md text-fuchsia-300/65 hover:bg-content/10 hover:text-fuchsia-200/90"
-                >
-                  <Share className="size-3" />
-                </button>
-              </div>
-            ) : null}
-          </span>
-        </span>
-      </div>
+      </Tooltip>
       {orchestration && orchestrationTooltipOpen ? (
         <Popover
           anchor={orchestrationTooltipRootRef}
@@ -2801,17 +2820,19 @@ function DiffStat({
     .join(" ");
 
   return (
-    <span
-      title={`${label} uncommitted`}
-      className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold tabular-nums"
-    >
-      {additions > 0 ? (
-        <span className="text-emerald-400">+{additions}</span>
-      ) : null}
-      {deletions > 0 ? (
-        <span className="text-red-400">-{deletions}</span>
-      ) : null}
-    </span>
+    <Tooltip content={`${label} uncommitted`}>
+      <span
+        aria-label={`${label} uncommitted`}
+        className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold tabular-nums"
+      >
+        {additions > 0 ? (
+          <span className="text-emerald-400">+{additions}</span>
+        ) : null}
+        {deletions > 0 ? (
+          <span className="text-red-400">-{deletions}</span>
+        ) : null}
+      </span>
+    </Tooltip>
   );
 }
 

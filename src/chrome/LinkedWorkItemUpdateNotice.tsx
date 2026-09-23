@@ -8,6 +8,7 @@ import {
   type LinkedWorkItemUpdateCard,
 } from "../lib/linkedWorkItemActivity";
 import { formatRelativeTime } from "../lib/githubTasks";
+import { Tooltip } from "../components/ui/tooltip";
 import { announceLinkedActivity } from "../lib/sounds";
 import { GlassBackdrop } from "./GlassBackdrop";
 import {
@@ -276,25 +277,27 @@ export function LinkedWorkItemUpdateNotice({
         ) : null}
 
         <div className="relative z-[1] flex min-w-0 items-center gap-1.5 border-t border-stroke px-3 py-2.5 text-[11px]">
-          <button
-            type="button"
-            title={agentLabel}
-            className="min-w-0 flex-1 truncate whitespace-nowrap rounded-md bg-content px-2 py-1 font-medium text-background-base hover:bg-content/90"
-            onClick={() => {
-              onAcknowledge();
-              onAddToChat(linkedWorkItemActivityPrompt(card));
-            }}
-          >
-            {agentLabel}
-          </button>
-          <button
-            type="button"
-            title={openLabel}
-            className="min-w-0 flex-1 truncate whitespace-nowrap rounded-md bg-content/10 px-2 py-1 font-medium hover:bg-content/15"
-            onClick={openActivity}
-          >
-            {openLabel}
-          </button>
+          <Tooltip content={agentLabel}>
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate whitespace-nowrap rounded-md bg-content px-2 py-1 font-medium text-background-base hover:bg-content/90"
+              onClick={() => {
+                onAcknowledge();
+                onAddToChat(linkedWorkItemActivityPrompt(card));
+              }}
+            >
+              {agentLabel}
+            </button>
+          </Tooltip>
+          <Tooltip content={openLabel}>
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate whitespace-nowrap rounded-md bg-content/10 px-2 py-1 font-medium hover:bg-content/15"
+              onClick={openActivity}
+            >
+              {openLabel}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </section>

@@ -44,7 +44,7 @@ function render() {
 
 function openSecondMenu() {
   const tab = container.querySelector<HTMLButtonElement>(
-    '[role="tab"][title="/repo/src/app.ts"]',
+    '[role="tab"][aria-label="/repo/src/app.ts"]',
   )!;
   act(() => {
     tab.parentElement!.dispatchEvent(
@@ -146,7 +146,7 @@ describe("file tab context menu", () => {
     props = { ...props, files: [files[0]], activeFileId: "first" };
     render();
     const tab = container.querySelector<HTMLButtonElement>(
-      '[role="tab"][title="/repo/README.md"]',
+      '[role="tab"][aria-label="/repo/README.md"]',
     )!;
     act(() => {
       tab.parentElement!.dispatchEvent(

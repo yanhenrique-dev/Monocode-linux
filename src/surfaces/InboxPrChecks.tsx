@@ -10,12 +10,8 @@ import {
   type GithubPrChecks,
   type GithubPrMergeInfo,
 } from "../lib/githubTasks";
-import {
-  Check,
-  CircleX,
-  ExternalLink,
-  LoaderCircle,
-} from "../chrome/icons";
+import { Check, CircleX, ExternalLink, LoaderCircle } from "../chrome/icons";
+import { Tooltip } from "../components/ui/tooltip";
 
 /** Check runs on the pull request head, grouped like github.com shows them:
  * in-progress checks with a spinner, successful checks, failures, and the
@@ -158,13 +154,7 @@ function mergeNoteFor(
   return null;
 }
 
-function CheckRow({
-  check,
-  icon,
-}: {
-  check: GithubPrCheck;
-  icon: ReactNode;
-}) {
+function CheckRow({ check, icon }: { check: GithubPrCheck; icon: ReactNode }) {
   const when = check.startedAt.trim()
     ? formatRelativeTime(check.startedAt)
     : "";
@@ -179,17 +169,15 @@ function CheckRow({
   );
   if (!check.url) return row;
   return (
-    <button
-      type="button"
-      title={`Open ${check.name}`}
-      onClick={() => openExternalBestEffort(check.url)}
-      className="group flex min-w-0 items-center gap-1 text-left hover:underline"
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">{row}</span>
-      <ExternalLink
-        className="size-3 shrink-0 text-content/30 group-hover:text-content/60"
-        strokeWidth={1.75}
-      />
-    </button>
+    <Tooltip content={`Open ${check.name}`}>
+      <button
+        type="button"
+        onClick={() => openExternalBestEffort(check.url)}
+        className="group flex min-w-0 items-center gap-1 text-left hover:underline"
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">{row}</span>
+        <ExternalLink className="size-3 shrink-0 text-content/30 group-hover:text-content/60" />
+      </button>
+    </Tooltip>
   );
 }

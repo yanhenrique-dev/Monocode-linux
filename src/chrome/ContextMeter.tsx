@@ -5,6 +5,7 @@ import {
   type ContextUsage,
 } from "../lib/contextUsage";
 import { Popover } from "./Popover";
+import { Tooltip } from "../components/ui/tooltip";
 
 const SIZE = 14;
 const STROKE = 2;
@@ -74,22 +75,25 @@ export function ContextMeter({
           <div className="text-[12px] leading-4 text-content">{headline}</div>
           <div className="text-[11px] leading-4 text-content/50">{detail}</div>
           {actionsOpen ? (
-            <button
-              type="button"
-              disabled={compactDisabled}
-              title={
+            <Tooltip
+              content={
                 compactDisabled
                   ? "Wait for the current operation to finish"
                   : "Compact this conversation's context"
               }
-              onClick={() => {
-                setOpen(false);
-                onCompact?.();
-              }}
-              className="mt-1.5 w-full rounded-md bg-content/10 px-2 py-1 text-[11px] text-content hover:bg-content/15 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Compact now
-            </button>
+              <button
+                type="button"
+                disabled={compactDisabled}
+                onClick={() => {
+                  setOpen(false);
+                  onCompact?.();
+                }}
+                className="mt-1.5 w-full rounded-md bg-content/10 px-2 py-1 text-[11px] text-content hover:bg-content/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Compact now
+              </button>
+            </Tooltip>
           ) : null}
         </Popover>
       ) : null}

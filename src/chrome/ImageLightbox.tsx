@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { LAYER } from "../lib/layers";
 import { X } from "./icons";
+import { Tooltip } from "../components/ui/tooltip";
 
 type Props = {
   src: string;
@@ -19,10 +20,14 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
     closeRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      onCloseRef.current();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      // Single-control dialog: keep Tab from escaping behind the backdrop.
+      if (event.key === "Tab") event.preventDefault();
     };
 
     window.addEventListener("keydown", onKeyDown, true);
@@ -51,16 +56,17 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         draggable={false}
         className="max-h-full max-w-full select-none object-contain shadow-2xl"
       />
-      <button
-        ref={closeRef}
-        type="button"
-        aria-label="Close image preview"
-        title="Close"
-        onClick={onClose}
-        className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-white/15 bg-black/45 text-white/80 shadow-lg glass-blur backdrop-blur-md hover:bg-black/65 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-      >
-        <X className="size-4" strokeWidth={2} />
-      </button>
+      <Tooltip content="Close">
+        <button
+          ref={closeRef}
+          type="button"
+          aria-label="Close image preview"
+          onClick={onClose}
+          className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-white/15 bg-black/45 text-white/80 shadow-lg glass-blur backdrop-blur-md hover:bg-black/65 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        >
+          <X className="size-4" strokeWidth={2} />
+        </button>
+      </Tooltip>
     </div>,
     document.body,
   );
