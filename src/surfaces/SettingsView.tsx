@@ -55,6 +55,8 @@ import {
   CHAT_BACKGROUND_OPACITY_MIN,
   CHAT_BACKGROUND_SESSION_OPACITY_DEFAULT,
   CHAT_BACKGROUND_SCOPE_DEFAULT,
+  NEW_THREAD_BACKGROUND_EFFECTS,
+  NEW_THREAD_BACKGROUND_EFFECT_DEFAULT,
   THEME_PREFERENCE_DEFAULT,
   UI_BLUR_DEFAULT,
   chatBackgroundSrc,
@@ -65,6 +67,7 @@ import {
   loadChatBackgroundPath,
   loadChatBackgroundSessionOpacity,
   loadChatBackgroundScope,
+  loadNewThreadBackgroundEffect,
   loadThemeDarkLightness,
   loadThemePreference,
   loadSidebarBlur,
@@ -84,6 +87,7 @@ import {
   saveChatBackgroundPath,
   saveChatBackgroundSessionOpacity,
   saveChatBackgroundScope,
+  setNewThreadBackgroundEffect,
   saveThemeDarkLightness,
   saveThemePreference,
   saveSidebarBlur,
@@ -114,6 +118,7 @@ import {
   THEME_SATURATION_MIN,
   type ThemePreference,
   type ChatBackgroundScope,
+  type NewThreadBackgroundEffect,
   type TranscriptLayout,
 } from "../lib/appearance";
 import {
@@ -202,6 +207,7 @@ import {
   saveLocale,
   useLocale,
   type Locale,
+  type LocaleKey,
 } from "../lib/locale";
 import {
   filterKeybindings,
@@ -1841,6 +1847,8 @@ function useAppearanceSettings() {
   );
   const [chatBackgroundScope, setChatBackgroundScope] =
     useState<ChatBackgroundScope>(loadChatBackgroundScope);
+  const [newThreadBackgroundEffect, setBackgroundEffect] =
+    useState<NewThreadBackgroundEffect>(loadNewThreadBackgroundEffect);
   const [chatBackgroundBusy, setChatBackgroundBusy] = useState(false);
   const [chatBackgroundError, setChatBackgroundError] = useState<string | null>(
     null,
@@ -2008,6 +2016,14 @@ function useAppearanceSettings() {
     setChatBackgroundScope(next);
   }, []);
 
+  const onNewThreadBackgroundEffect = useCallback(
+    (next: NewThreadBackgroundEffect) => {
+      setNewThreadBackgroundEffect(next);
+      setBackgroundEffect(next);
+    },
+    [],
+  );
+
   const onUiScale = useCallback((percent: number) => {
     const next = saveUiScale(percent / 100);
     setUiScale(next);
@@ -2046,6 +2062,7 @@ function useAppearanceSettings() {
     setChatBackgroundScope(
       applyChatBackgroundScope(loadChatBackgroundScope()),
     );
+    setBackgroundEffect(loadNewThreadBackgroundEffect());
     // State drives the background section visibility; paint only on a real
     // change — applyChatBackground bumps the image revision every call.
     const bgPath = loadChatBackgroundPath();
@@ -2093,6 +2110,7 @@ function useAppearanceSettings() {
     );
     onChatBackgroundBlur(CHAT_BACKGROUND_BLUR_DEFAULT);
     onChatBackgroundScope(CHAT_BACKGROUND_SCOPE_DEFAULT);
+    onNewThreadBackgroundEffect(NEW_THREAD_BACKGROUND_EFFECT_DEFAULT);
     if (chatBackgroundPath) void onClearChatBackground();
     onUiScale(Math.round(UI_SCALE_DEFAULT * 100));
   }, [
@@ -2128,6 +2146,7 @@ function useAppearanceSettings() {
     chatBackgroundSessionOpacity,
     chatBackgroundBlur,
     chatBackgroundScope,
+    newThreadBackgroundEffect,
     chatBackgroundBusy,
     chatBackgroundError,
     uiScale,
@@ -2145,6 +2164,7 @@ function useAppearanceSettings() {
     onChatBackgroundSessionOpacity,
     onChatBackgroundBlur,
     onChatBackgroundScope,
+    onNewThreadBackgroundEffect,
     onUiScale,
     restoreDefaults,
     revertAppearanceDrafts,
@@ -2479,12 +2499,11 @@ function ChatBackgroundCard({
         <div className="overflow-hidden rounded-lg border border-content/10">
           {hasImage ? (
             <div className="relative h-36">
-              <img
-                src={src ?? undefined}
-                alt=""
-                draggable={false}
-                className="size-full object-cover"
+              <div
+                aria-hidden
+                className="size-full bg-cover bg-center bg-no-repeat"
                 style={{
+                  backgroundImage: "var(--chat-background-image)",
                   opacity: appearance.chatBackgroundEmptyOpacity,
                   filter: `blur(${appearance.chatBackgroundBlur}px)`,
                 }}
@@ -2541,6 +2560,25 @@ function ChatBackgroundCard({
       </div>
       {hasImage ? (
         <>
+          <Row
+            label={t("settings.appearance.chat_background.effect.label")}
+            description={t(
+              `settings.appearance.chat_background.effect.description.${appearance.newThreadBackgroundEffect}` as LocaleKey,
+            )}
+          >
+            <Segmented
+              label={t("settings.appearance.chat_background.effect.selector")}
+              value={appearance.newThreadBackgroundEffect}
+              options={NEW_THREAD_BACKGROUND_EFFECTS.map((effect) => ({
+                value: effect,
+                label: t(
+                  `settings.appearance.chat_background.effect.${effect}` as LocaleKey,
+                ),
+              }))}
+              onChange={appearance.onNewThreadBackgroundEffect}
+              optionIdPrefix="new-thread-background-effect"
+            />
+          </Row>
           <Row
             label={t("settings.appearance.chat_background.scope.label")}
             description={t(

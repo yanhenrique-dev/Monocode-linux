@@ -41,11 +41,13 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  optionIdPrefix,
 }: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  optionIdPrefix?: string;
 }) {
   return (
     <div
@@ -58,6 +60,11 @@ export function Segmented<T extends string>({
     >
       {options.map((option) => (
         <button
+          id={
+            optionIdPrefix
+              ? `${optionIdPrefix}-${option.value.toLowerCase()}`
+              : undefined
+          }
           key={option.value}
           type="button"
           role="radio"

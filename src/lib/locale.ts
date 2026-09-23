@@ -583,6 +583,23 @@ const en = {
   "settings.appearance.chat_background.scope.selector": "Show background on",
   "settings.appearance.chat_background.scope.empty": "Empty only",
   "settings.appearance.chat_background.scope.all": "All sessions",
+  "settings.appearance.chat_background.effect.label": "Background effect",
+  "settings.appearance.chat_background.effect.selector": "Background effect",
+  "settings.appearance.chat_background.effect.none": "None",
+  "settings.appearance.chat_background.effect.dither": "Dither",
+  "settings.appearance.chat_background.effect.ascii": "ASCII",
+  "settings.appearance.chat_background.effect.halftone": "Halftone",
+  "settings.appearance.chat_background.effect.scanlines": "Scanlines",
+  "settings.appearance.chat_background.effect.description.none":
+    "Shows the original artwork.",
+  "settings.appearance.chat_background.effect.description.dither":
+    "Rebuilds the artwork with a dithered color palette.",
+  "settings.appearance.chat_background.effect.description.ascii":
+    "Recreates the artwork with colored characters on black.",
+  "settings.appearance.chat_background.effect.description.halftone":
+    "Recreates the artwork with colored print dots on black.",
+  "settings.appearance.chat_background.effect.description.scanlines":
+    "Adds a pronounced horizontal display-line texture.",
   "settings.appearance.chat_background.empty_visibility.label":
     "Empty chat visibility",
   "settings.appearance.chat_background.empty_visibility.description":
@@ -1320,6 +1337,23 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.appearance.chat_background.scope.selector": "Exibir fundo em",
   "settings.appearance.chat_background.scope.empty": "Só vazios",
   "settings.appearance.chat_background.scope.all": "Todas as sessões",
+  "settings.appearance.chat_background.effect.label": "Efeito do fundo",
+  "settings.appearance.chat_background.effect.selector": "Efeito do fundo",
+  "settings.appearance.chat_background.effect.none": "Nenhum",
+  "settings.appearance.chat_background.effect.dither": "Dither",
+  "settings.appearance.chat_background.effect.ascii": "ASCII",
+  "settings.appearance.chat_background.effect.halftone": "Meio-tom",
+  "settings.appearance.chat_background.effect.scanlines": "Scanlines",
+  "settings.appearance.chat_background.effect.description.none":
+    "Mostra a arte original.",
+  "settings.appearance.chat_background.effect.description.dither":
+    "Reconstrói a arte com paleta de cores dithered.",
+  "settings.appearance.chat_background.effect.description.ascii":
+    "Recria a arte com caracteres coloridos sobre preto.",
+  "settings.appearance.chat_background.effect.description.halftone":
+    "Recria a arte com pontos de impressão coloridos sobre preto.",
+  "settings.appearance.chat_background.effect.description.scanlines":
+    "Adiciona textura de linhas horizontais de display.",
   "settings.appearance.chat_background.empty_visibility.label":
     "Visibilidade no chat vazio",
   "settings.appearance.chat_background.empty_visibility.description":
