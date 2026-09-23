@@ -2323,14 +2323,7 @@ html.has-user-accent {
   --primary-foreground: var(--user-accent-foreground);
 }
 
-/* Global focus ring (F0). :where keeps specificity zero so per-component
- * focus styles still win; drag handles are not focusable. The composer
- * textarea is excluded: it autofocuses on open and the composer box already
- * signals focus with its border. */
-:where(:focus-visible:not(.composer-field)) {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
+/* Per-component focus styles own their indicators; no global ring. */
 
 /* Base UI popovers report placement via data-side (F1.3); keep the anchored
  * enter animation growing from the right edge. */
