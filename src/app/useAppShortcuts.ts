@@ -79,6 +79,7 @@ export interface AppShortcutsDeps {
   notesViewOpenRef: MutableRefObject<boolean>;
   settingsOpenRef: MutableRefObject<boolean>;
   whatsNewVersionRef: MutableRefObject<string | null>;
+  firstRunOpenRef: MutableRefObject<boolean>;
   sessionNavigationIdsRef: MutableRefObject<readonly string[]>;
   setSidebarTab: Dispatch<SetStateAction<import("../lib/appearance").SidebarTabId>>;
   onSelectHistorySession: (sessionId: string) => Promise<void>;
@@ -98,6 +99,7 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     notesViewOpenRef,
     settingsOpenRef,
     whatsNewVersionRef,
+    firstRunOpenRef,
     sessionNavigationIdsRef,
     onSelectHistorySession,
     onSelectProject,
@@ -315,7 +317,8 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
-            Boolean(whatsNewVersionRef.current);
+            Boolean(whatsNewVersionRef.current) ||
+            firstRunOpenRef.current;
           if (
             !shouldHandleListNavigation({
               blockedTarget,

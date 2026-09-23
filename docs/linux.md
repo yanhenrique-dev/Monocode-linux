@@ -68,6 +68,20 @@ Instale e autentique pelo menos um antes de abrir o app:
 | fx | `curl -fsSL https://fx.sh/setup.sh \| bash` | `fx login` |
 | Hermes Agent | `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash` | `hermes model` |
 
+## Primeira abertura
+
+Na primeira abertura, o MonoCode mostra um assistente de quatro passos com a
+versão instalada, CLIs de agentes detectadas, estado do GitHub CLI e provedores
+disponíveis. O assistente pode ser pulado a qualquer momento antes da conclusão.
+Depois disso, ele não aparece novamente. Transferências de janela também não
+exibem o assistente.
+
+- Use **Pular** para sair sem alterar provedores.
+- Use **Tentar novamente** no passo do GitHub depois de executar `gh auth login`.
+- O GitHub é opcional; o restante do MonoCode continua disponível sem ele.
+- O assistente apenas verifica permissões de notificação. Ele não solicita
+  permissão ao sistema.
+
 ### OpenCode: MCP, config e auth
 
 O MonoCode não gerencia MCP nem escreve `opencode.json`. O `opencode serve`

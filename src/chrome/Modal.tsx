@@ -36,6 +36,7 @@ type Props = {
   minimalHeader?: boolean;
   /** Hides the header close button (the dialog owns dismissal, e.g. busy forms). */
   hideClose?: boolean;
+  dismissible?: boolean;
   /** Extra classes on the panel (fixed height, etc). */
   className?: string;
   children: ReactNode;
@@ -175,21 +176,23 @@ export function ModalPanel({
 
 export function Modal(props: Props) {
   const animationsEnabled = useExperimentalAnimations();
+  const { dismissible = true } = props;
   const { closing, requestClose, handleAnimationEnd } = useExitAnimation({
     enabled: animationsEnabled,
     durationMs: 150,
     onExit: props.onClose,
   });
   const requestModalClose = useCallback(() => {
+    if (!dismissible) return;
     requestClose();
-  }, [requestClose]);
+  }, [dismissible, requestClose]);
   return (
     <Dialog
       open
       modal
-      disablePointerDismissal
+      disablePointerDismissal={!dismissible}
       onOpenChange={(open) => {
-        if (!open) requestModalClose();
+        if (dismissible && !open) requestModalClose();
       }}
     >
       <DialogPortal>
@@ -197,10 +200,11 @@ export function Modal(props: Props) {
           className={`modal-backdrop absolute inset-0 bg-black/40${
             closing ? " modal-backdrop-closing" : ""
           }`}
-          onMouseDown={requestModalClose}
+          onMouseDown={dismissible ? requestModalClose : undefined}
         />
         <ModalPanel
           {...props}
+          hideClose={!dismissible || props.hideClose}
           onClose={requestModalClose}
           panelClassName={closing ? "modal-panel-closing" : undefined}
           onPanelAnimationEnd={closing ? handleAnimationEnd : undefined}

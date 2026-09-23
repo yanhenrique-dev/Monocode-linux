@@ -203,6 +203,48 @@ describe("ModalPanel", () => {
     }
   });
 
+  it("keeps dismissal disabled when requested", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    localStorage.setItem("monocode.experimentalAnimations", "0");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root: Root = createRoot(container);
+    try {
+      const onClose = vi.fn();
+      await act(async () => {
+        root.render(
+          createElement(Modal, {
+            title: "Required",
+            onClose,
+            dismissible: false,
+            hideClose: true,
+            children: "Body",
+          }),
+        );
+      });
+
+      const backdrop = document.body.querySelector(".modal-backdrop");
+      const dialog = document.body.querySelector('[role="dialog"]');
+      expect(backdrop).not.toBeNull();
+      expect(dialog).not.toBeNull();
+      expect(document.body.querySelector('button[aria-label="Close"]')).toBeNull();
+
+      await act(async () => {
+        backdrop!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        dialog!.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+      document.body.innerHTML = "";
+      localStorage.removeItem("monocode.experimentalAnimations");
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("restores focus to the opener on unmount", async () => {
     const trigger = document.createElement("button");
     document.body.append(trigger);
