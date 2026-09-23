@@ -681,4 +681,38 @@ describe("Composer session swap", () => {
     );
     expect(textarea.value).toBe("");
   });
+
+  it("hydrates a late persisted draft without reporting an empty overwrite", async () => {
+    const onDraftChange = vi.fn();
+    const base = {
+      harness: "claude" as const,
+      model: "claude-sonnet",
+      runtimeMode: "supervised" as const,
+      executionCwd: "/repo",
+      sessionId: "session-a",
+      focused: false,
+      draftReady: false,
+      onFocus: vi.fn(),
+      onCwdChange: vi.fn(),
+      onModelChange: vi.fn(),
+      onRuntimeModeChange: vi.fn(),
+      onDraftChange,
+      onSubmit: vi.fn(),
+    };
+    await act(async () => root.render(createElement(Composer, base)));
+    expect(onDraftChange).not.toHaveBeenCalled();
+    await act(async () =>
+      root.render(
+        createElement(Composer, {
+          ...base,
+          draftReady: true,
+          initialDraft: "restored draft",
+        }),
+      ),
+    );
+    const textarea = container.querySelector("textarea")!;
+    expect(textarea.value).toBe("restored draft");
+    expect(onDraftChange).not.toHaveBeenCalledWith("");
+    expect(onDraftChange).toHaveBeenLastCalledWith("restored draft");
+  });
 });

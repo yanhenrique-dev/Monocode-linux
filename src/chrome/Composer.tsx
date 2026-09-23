@@ -204,6 +204,7 @@ type Props = {
   noteCard?: NoteComposerCard;
   handoffCard?: HandoffComposerCard;
   question?: UserQuestionPrompt;
+  draftReady?: boolean;
   busy?: boolean;
   editLastTurnSupported?: boolean;
   lastTurnRecall?: LastTurnRecall | null;
@@ -308,6 +309,7 @@ export const Composer = memo(function Composer({
   noteCard,
   handoffCard,
   question,
+  draftReady = true,
   busy = false,
   editLastTurnSupported = false,
   lastTurnRecall = null,
@@ -342,7 +344,9 @@ export const Composer = memo(function Composer({
   onEditingLastTurnChange,
   children,
 }: Props) {
-  // Grouped `chrome` wins; flat flags stay for existing callers.
+  const initialText =
+    typeof initialDraft === "string" ? initialDraft : "";
+  const hasInitialDraft = initialDraft !== undefined;
   const hideProjectPicker = chrome?.hideProjectPicker ?? flatHideProjectPicker;
   const hideBranchPicker = chrome?.hideBranchPicker ?? flatHideBranchPicker;
   const hideTopBar = chrome?.hideTopBar ?? flatHideTopBar;
@@ -356,7 +360,7 @@ export const Composer = memo(function Composer({
   const consumedQuoteId = useRef<number | null>(null);
   const slashRef = useRef<SlashToken | null>(null);
   const mentionRef = useRef<MentionToken | null>(null);
-  const [draft, setDraft] = useState(initialDraft ?? "");
+  const [draft, setDraft] = useState(initialText);
   const { branches: draftBranches } = useProjectBranchesState(
     executionCwd,
     draftWorkspace && enabled && !busy,
@@ -383,7 +387,7 @@ export const Composer = memo(function Composer({
   ]);
   const [hasValue, setHasValue] = useState(
     () =>
-      (initialDraft ?? "").trim().length > 0 ||
+      initialText.trim().length > 0 ||
       !!inboxCard ||
       !!noteCard ||
       !!handoffCard,
@@ -394,7 +398,7 @@ export const Composer = memo(function Composer({
   const [draftSessionId, setDraftSessionId] = useState(sessionId);
   if (draftSessionId !== sessionId) {
     setDraftSessionId(sessionId);
-    const next = initialDraft ?? "";
+    const next = initialText;
     setDraft(next);
     setHasValue(
       next.trim().length > 0 || !!inboxCard || !!noteCard || !!handoffCard,
@@ -721,12 +725,21 @@ export const Composer = memo(function Composer({
     );
   }, [rankedFiles.length]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!draftReady) return;
+    const next = initialText;
     const el = ref.current;
-    if (!el || !initialDraft) return;
-    if (el.value !== initialDraft) el.value = initialDraft;
-    resizeComposer(el);
-  }, [initialDraft]);
+    if (el && el.value !== next) {
+      el.value = next;
+      resizeComposer(el);
+    }
+    setDraft((current) => (current === next ? current : next));
+    setHasValue(
+      next.trim().length > 0 || !!inboxCard || !!noteCard || !!handoffCard,
+    );
+  }, [draftReady, handoffCard, inboxCard, initialText, noteCard]);
+
+  const draftReadyRef = useRef(draftReady);
 
   // Drafts changed while hidden could not be measured. Inbox panes are portaled
   // into place by a parent effect that runs after this one, so the first pass
@@ -743,8 +756,12 @@ export const Composer = memo(function Composer({
   }, [enabled]);
 
   useEffect(() => {
+    const wasReady = draftReadyRef.current;
+    draftReadyRef.current = draftReady;
+    if (!draftReady) return;
+    if (!wasReady && hasInitialDraft && draft !== initialText) return;
     onDraftChange?.(draft);
-  }, [draft, onDraftChange]);
+  }, [draft, draftReady, hasInitialDraft, initialText, onDraftChange]);
 
   const syncHighlightScroll = useCallback((el: HTMLTextAreaElement) => {
     const highlight = highlightRef.current;
@@ -1746,7 +1763,9 @@ export const Composer = memo(function Composer({
               data-composer-empty={navigationEmpty ? "true" : undefined}
               rows={1}
               spellCheck={false}
-              defaultValue={initialDraft}
+              readOnly={!draftReady}
+              aria-busy={!draftReady}
+              defaultValue={initialText}
               placeholder={
                 worktreeRemoved
                   ? "Select a branch or worktree to continue…"

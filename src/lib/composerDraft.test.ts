@@ -5,7 +5,9 @@ const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
 import {
+  activateSessionDraft,
   discardPendingDraft,
+  discardSessionDraft,
   flushSessionDraft,
   getLiveDraft,
   loadSessionDraft,
@@ -116,11 +118,13 @@ describe("composerDraft", () => {
     });
   });
 
-  it("loads a draft and treats failures as empty", async () => {
+  it("loads a draft and treats failures or malformed values as empty", async () => {
     invoke.mockResolvedValueOnce("restored draft");
     await expect(loadSessionDraft("s-5")).resolves.toBe("restored draft");
-    invoke.mockRejectedValueOnce(new Error("missing table"));
+    invoke.mockResolvedValueOnce([]);
     await expect(loadSessionDraft("s-6")).resolves.toBe("");
+    invoke.mockRejectedValueOnce(new Error("missing table"));
+    await expect(loadSessionDraft("s-7")).resolves.toBe("");
   });
 
   it("live draft answers back without a backend round-trip", () => {
@@ -133,15 +137,65 @@ describe("composerDraft", () => {
     setLiveDraft("live-a", "draft A");
     setLiveDraft("live-b", "draft B");
     expect(getLiveDraft("live-a")).toBe("draft A");
-    // Clearing keeps an explicit empty marker so a remount inside the
-    // persist window does not resurrect the previous backend text.
     setLiveDraft("live-a", "");
     expect(getLiveDraft("live-a")).toBe("");
     expect(getLiveDraft("live-b")).toBe("draft B");
-    // Once the backend confirms the empty write, the marker drops.
     saveSessionDraft("live-a", "");
     await vi.advanceTimersByTimeAsync(600);
     expect(getLiveDraft("live-a")).toBeUndefined();
     setLiveDraft("live-b", "");
+  });
+
+  it("drains a newer revision created during an in-flight flush", async () => {
+    let resolveFirst!: () => void;
+    invoke.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    saveSessionDraft("s-6", "first");
+    const flushing = flushSessionDraft();
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("composer_draft_set", {
+        sessionId: "s-6",
+        text: "first",
+      }),
+    );
+    saveSessionDraft("s-6", "second");
+    resolveFirst();
+    await flushing;
+    expect(invoke).toHaveBeenNthCalledWith(2, "composer_draft_set", {
+      sessionId: "s-6",
+      text: "second",
+    });
+  });
+
+  it("discards one session without dropping another pending draft", async () => {
+    saveSessionDraft("delete-me", "stale");
+    saveSessionDraft("keep-me", "keep");
+    await discardSessionDraft("delete-me");
+    await flushSessionDraft();
+    expect(invoke).not.toHaveBeenCalledWith("composer_draft_set", {
+      sessionId: "delete-me",
+      text: "stale",
+    });
+    expect(invoke).toHaveBeenCalledWith("composer_draft_set", {
+      sessionId: "keep-me",
+      text: "keep",
+    });
+    saveSessionDraft("delete-me", "late");
+    await flushSessionDraft();
+    expect(invoke).not.toHaveBeenCalledWith("composer_draft_set", {
+      sessionId: "delete-me",
+      text: "late",
+    });
+    activateSessionDraft("delete-me");
+    saveSessionDraft("delete-me", "reused");
+    await flushSessionDraft();
+    expect(invoke).toHaveBeenCalledWith("composer_draft_set", {
+      sessionId: "delete-me",
+      text: "reused",
+    });
   });
 });

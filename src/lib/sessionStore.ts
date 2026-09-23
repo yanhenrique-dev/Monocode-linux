@@ -25,6 +25,7 @@ import type {
 } from "./session";
 import { HARNESSES, RUNTIME_MODES } from "./session";
 import { restoreOrchestrationProposal } from "./orchestrationPlan";
+import { activateSessionDraft, discardSessionDraft } from "./composerDraft";
 
 import type { OrchestrationSummary } from "./orchestrationSummary";
 
@@ -343,6 +344,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
 export async function deleteSession(sessionId: string): Promise<void> {
   deletedSessionIds.add(sessionId);
   try {
+    await discardSessionDraft(sessionId);
     // A lead's workers may still have writes in flight. Finish those before
     // the deletion transaction strips their ownership metadata.
     await Promise.all([...sessionWriteQueues.values()]);
@@ -351,6 +353,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
     );
   } catch (error) {
     deletedSessionIds.delete(sessionId);
+    activateSessionDraft(sessionId);
     throw error;
   }
 }

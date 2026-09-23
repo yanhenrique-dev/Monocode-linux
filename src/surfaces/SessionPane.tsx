@@ -59,6 +59,7 @@ import {
   type QuoteRequest,
 } from "../lib/quoteDraft";
 import {
+  activateSessionDraft,
   flushSessionDraft,
   getLiveDraft,
   loadSessionDraft,
@@ -493,17 +494,26 @@ const SessionPaneContent = memo(function SessionPaneContent({
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
   const draftRef = useRef<string | undefined>(getLiveDraft(session.id));
-  // Persisted draft for this session, loaded once per pane mount. The Composer
-  // picks up late loads through its `initialDraft` sync effect. (porte #321)
   const [restoredDraft, setRestoredDraft] = useState<string | undefined>(
-    undefined,
+    getLiveDraft(session.id),
+  );
+  const [draftReady, setDraftReady] = useState(
+    getLiveDraft(session.id) !== undefined,
   );
   useEffect(() => {
     let cancelled = false;
-    draftRef.current = getLiveDraft(session.id);
-    setRestoredDraft(undefined);
+    activateSessionDraft(session.id);
+    const liveDraft = getLiveDraft(session.id);
+    draftRef.current = liveDraft;
+    setRestoredDraft(liveDraft);
+    setDraftReady(liveDraft !== undefined);
     void loadSessionDraft(session.id).then((text) => {
-      if (!cancelled && text) setRestoredDraft(text);
+      if (cancelled) return;
+      if (liveDraft === undefined) {
+        draftRef.current = text;
+        setRestoredDraft(text);
+      }
+      setDraftReady(true);
     });
     return () => {
       cancelled = true;
@@ -534,6 +544,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       cwd={session.cwd}
       executionCwd={workCwd}
       sessionId={session.id}
+      draftReady={draftReady}
       compactSupported={canCompactHarnessContext(session.harness)}
       recents={recents}
       chrome={{
@@ -636,6 +647,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       managed,
       quoteRequest,
       restoredDraft,
+      draftReady,
       acknowledgeQuote,
       replyQuestion,
       onInboxCardDismiss,

@@ -14,6 +14,9 @@ type Entry = {
   tail: Promise<void>;
 };
 const pending = new Map<string, Entry>();
+const writeChains = new Map<string, Promise<void>>();
+const discarded = new Set<string>();
+let flushPromise: Promise<void> | null = null;
 
 /**
  * Texto vivo por sessão, só em memória. (porte #336)
@@ -38,25 +41,26 @@ export function setLiveDraft(sessionId: string, text: string): void {
   live.set(sessionId, text);
 }
 
+export function activateSessionDraft(sessionId: string): void {
+  discarded.delete(sessionId);
+}
+
 /**
  * Persist the composer draft for a session, debounced per session. Only the
  * latest text for a session is written; rapid keystrokes collapse into a
  * single `composer_draft_set` invoke. (porte #321)
  */
 export function saveSessionDraft(sessionId: string, text: string): void {
+  if (discarded.has(sessionId)) return;
   const prev = pending.get(sessionId);
-  // Same text (e.g. effect refire on unrelated renders): don't churn the
-  // debounce timer and revision for a no-op write.
   if (prev && prev.text === text) return;
   if (prev?.timer) clearTimeout(prev.timer);
   const revision = (prev?.revision ?? 0) + 1;
   pending.set(sessionId, {
     text,
     revision,
-    tail: prev?.tail ?? Promise.resolve(),
+    tail: writeChains.get(sessionId) ?? prev?.tail ?? Promise.resolve(),
     timer: setTimeout(() => {
-      // Best-effort path: the entry stays pending on failure so an explicit
-      // flush can retry it.
       void persist(sessionId, revision).catch(
         reportError("composerDraft.persist", { sessionId }),
       );
@@ -64,15 +68,29 @@ export function saveSessionDraft(sessionId: string, text: string): void {
   });
 }
 
-/** Write any pending drafts immediately (used when the pane unmounts). */
 export function flushSessionDraft(): Promise<void> {
-  const writes = [...pending.entries()].map(([sessionId, entry]) =>
-    persist(sessionId, entry.revision),
-  );
-  return Promise.all(writes).then(() => undefined);
+  if (flushPromise) return flushPromise;
+  const run = (async () => {
+    while (true) {
+      const entries = [...pending.entries()];
+      if (entries.length === 0) {
+        const chains = [...writeChains.values()];
+        if (chains.length === 0) return;
+        await Promise.all(chains);
+        continue;
+      }
+      await Promise.all(
+        entries.map(([sessionId, entry]) => persist(sessionId, entry.revision)),
+      );
+    }
+  })();
+  const settled = run.finally(() => {
+    if (flushPromise === settled) flushPromise = null;
+  });
+  flushPromise = settled;
+  return settled;
 }
 
-/** Drop any pending draft without writing it. */
 export function discardPendingDraft(): void {
   for (const entry of pending.values()) {
     if (entry.timer) clearTimeout(entry.timer);
@@ -80,11 +98,20 @@ export function discardPendingDraft(): void {
   pending.clear();
 }
 
+export async function discardSessionDraft(sessionId: string): Promise<void> {
+  discarded.add(sessionId);
+  const entry = pending.get(sessionId);
+  if (entry?.timer) clearTimeout(entry.timer);
+  pending.delete(sessionId);
+  live.delete(sessionId);
+  await writeChains.get(sessionId);
+}
+
 export async function loadSessionDraft(sessionId: string): Promise<string> {
   try {
-    return (await invoke<string | null>("composer_draft_get", { sessionId })) ?? "";
+    const result: unknown = await invoke("composer_draft_get", { sessionId });
+    return typeof result === "string" ? result : "";
   } catch {
-    // A failed load must never block the composer; treat as no draft.
     return "";
   }
 }
@@ -96,23 +123,30 @@ async function persist(sessionId: string, revision: number): Promise<void> {
     clearTimeout(entry.timer);
     entry.timer = undefined;
   }
-  // Serialize behind earlier writes; a rejection here propagates to the
-  // explicit-flush caller while the chain itself stays alive for retries.
-  const write = entry.tail.then(() =>
-    invoke("composer_draft_set", { sessionId, text: entry.text }),
-  );
-  entry.tail = write.then(
+  const previous = writeChains.get(sessionId) ?? entry.tail;
+  const write = previous.catch(() => undefined).then(() => {
+    if (discarded.has(sessionId)) return undefined;
+    return invoke("composer_draft_set", { sessionId, text: entry.text });
+  });
+  const settled = write.then(
     () => undefined,
     () => undefined,
   );
-  await write;
-  // Only the newest revision may clear the slot: an older write finishing
-  // late must not drop text saved after it started.
+  writeChains.set(sessionId, settled);
+  entry.tail = settled;
+  try {
+    await write;
+  } finally {
+    if (writeChains.get(sessionId) === settled) writeChains.delete(sessionId);
+  }
+  if (discarded.has(sessionId)) {
+    if (pending.get(sessionId)?.revision === revision) {
+      pending.delete(sessionId);
+    }
+    return;
+  }
   if (pending.get(sessionId)?.revision === revision) {
     pending.delete(sessionId);
-    // Backend caught up: an empty marker served its purpose, drop it so the
-    // live map does not grow one entry per cleared session. Non-empty text
-    // stays as the fast path for remounts.
     if (live.get(sessionId) === "") live.delete(sessionId);
   }
 }
