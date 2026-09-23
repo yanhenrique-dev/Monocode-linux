@@ -343,12 +343,14 @@ export function resolveModel(harness: HarnessId, id?: string): AgentModel {
     if (prefix) return prefix;
   }
   const fallbackId = defaultModelId(harness);
-  return (
+  const sameHarness =
     (fallbackId ? findModel(fallbackId) : undefined) ??
     available[0] ??
-    MODELS.find((model) => model.harness === harness) ??
-    MODELS[0]
-  );
+    MODELS.find((model) => model.harness === harness);
+  // Never cross into another harness: with no catalog entry the protocol
+  // omits the model instead of sending a foreign one.
+  if (sameHarness) return sameHarness;
+  return { id: "", harness, name: "" };
 }
 
 /** Catalog-reported context window for a model id, when known. */
@@ -651,9 +653,15 @@ export function preferredModelId(harness: HarnessId): string {
 }
 
 /** Provider + model new conversations should start with. */
-export function defaultSessionChoice(): LastModelChoice {
+export function defaultSessionChoice(
+  available?: (id: HarnessId) => boolean,
+): LastModelChoice {
   const last = loadLastModelChoice();
-  const harness = last?.harness ?? "cursor";
+  const preferred = last?.harness ?? "cursor";
+  const harness =
+    available && !available(preferred)
+      ? (HARNESSES.find(available) ?? preferred)
+      : preferred;
   return { harness, model: preferredModelId(harness) };
 }
 

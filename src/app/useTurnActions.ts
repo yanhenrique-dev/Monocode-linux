@@ -34,6 +34,7 @@ import {
   HARNESS_TITLE,
   formatSessionTitle,
   newSession,
+  newSessionForSeed,
   sessionDisplayTitle,
   sessionWorkCwd,
   type ModelTarget,
@@ -799,11 +800,13 @@ export function useTurnActions(deps: TurnActionsDeps) {
             "The saved worker no longer matches its approved model. Create a new assignment.",
           );
         const fresh = {
-          ...newSession(
-            task.harness,
+          ...newSessionForSeed(
+            {
+              harness: task.harness,
+              model: task.model,
+              runtimeMode: lead.runtimeMode,
+            },
             run.cwd,
-            task.model,
-            lead.runtimeMode,
           ),
           ...(task.modelSettings
             ? {

@@ -634,3 +634,51 @@ describe("Composer edit last turn", () => {
     expect(onEditingChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe("Composer session swap", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it("drops the previous draft when the same pane switches sessions", async () => {
+    const base = {
+      harness: "claude" as const,
+      model: "claude-sonnet",
+      runtimeMode: "supervised" as const,
+      executionCwd: "/repo",
+      focused: false,
+      onFocus: vi.fn(),
+      onCwdChange: vi.fn(),
+      onModelChange: vi.fn(),
+      onRuntimeModeChange: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+    await act(async () =>
+      root.render(
+        createElement(Composer, {
+          ...base,
+          sessionId: "session-a",
+          initialDraft: "leftover from A",
+        }),
+      ),
+    );
+    const textarea = container.querySelector("textarea")!;
+    expect(textarea.value).toBe("leftover from A");
+    await act(async () =>
+      root.render(createElement(Composer, { ...base, sessionId: "session-b" })),
+    );
+    expect(textarea.value).toBe("");
+  });
+});

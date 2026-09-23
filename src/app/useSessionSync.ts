@@ -15,6 +15,7 @@ import {
   applyHarnessEvent,
   cancelHarnessTurn,
   forgetHarnessSession,
+  isHarnessAvailable,
   isLiveHarness,
   probeHarnessAvailability,
   refreshHarnessCatalogs,
@@ -77,6 +78,8 @@ import {
   replaceProjectHistory,
 } from "../lib/sessionHistory";
 import {
+  HARNESS_LABEL,
+  newAvailableDefaultSession,
   sessionNeedsInput,
   sessionWorkCwd,
   type Session,
@@ -418,7 +421,34 @@ export function useSessionSync(deps: SessionSyncDeps) {
   }, [resumed, readProjectReturnMemory]);
 
   useEffect(() => {
-    void probeHarnessAvailability();
+    void probeHarnessAvailability().then(() => {
+      setSessions((prev) =>
+        prev.map((session) => {
+          if (
+            session.blocks.length > 0 ||
+            isHarnessAvailable(session.harness)
+          ) {
+            return session;
+          }
+          const fallback = newAvailableDefaultSession(
+            session.cwd,
+            session.runtimeMode,
+          );
+          return {
+            ...session,
+            harness: fallback.harness,
+            providerSessionId: undefined,
+            providerAccountId: undefined,
+            model: fallback.model,
+            modelSettings: fallback.modelSettings,
+            title:
+              session.title === HARNESS_LABEL[session.harness]
+                ? fallback.title
+                : session.title,
+          };
+        }),
+      );
+    });
     // Only the harnesses already in this window. Probing every installed CLI
     // at boot left unused agents (especially Pi) running in the background.
     const harnesses = [

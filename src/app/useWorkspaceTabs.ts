@@ -44,7 +44,7 @@ import {
   type TabVisitHistory,
 } from "../lib/tabVisitHistory";
 import { basename, type GitFileDiffKind, type GitHistoryCommit } from "../lib/fs";
-import { newSession, type Session } from "../lib/session";
+import { newSessionForSeed, type Session } from "../lib/session";
 import { forgetHarnessSession } from "../lib/harness";
 import { isBlankSession } from "../lib/projectReturn";
 import { isBlankWorkspaceTab } from "./tabHelpers";
@@ -324,13 +324,7 @@ export function useWorkspaceTabs(deps: WorkspaceTabsDeps) {
               return;
             }
             const seed = sessionsRef.current[0];
-            const session = newSession(
-              seed?.harness ?? "claude",
-              file.cwd || projectCwd,
-              seed?.model,
-              seed?.runtimeMode,
-              seed?.modelSettings,
-            );
+            const session = newSessionForSeed(seed, file.cwd || projectCwd);
             setSessions((prev) => [...prev, session]);
             setTabs((prev) =>
               prev.map((entry) =>
@@ -486,13 +480,7 @@ export function useWorkspaceTabs(deps: WorkspaceTabsDeps) {
       const finishClear = () => {
         persistSession(oldSession);
 
-        const session = newSession(
-          oldSession.harness,
-          oldSession.cwd,
-          oldSession.model,
-          oldSession.runtimeMode,
-          oldSession.modelSettings,
-        );
+        const session = newSessionForSeed(oldSession, oldSession.cwd);
 
         setSessions((prev) => [...prev, session]);
         setDirtyFiles((prev) => {
@@ -536,16 +524,10 @@ export function useWorkspaceTabs(deps: WorkspaceTabsDeps) {
     );
     if (!tab) return;
 
-    const seedSession = (cwd: string) => {
-      const seed = sessionsRef.current[0];
-      return newSession(
-        seed?.harness ?? "claude",
-        cwd,
-        seed?.model,
-        seed?.runtimeMode,
-        seed?.modelSettings,
-      );
-    };
+      const seedSession = (cwd: string) => {
+        const seed = sessionsRef.current[0];
+        return newSessionForSeed(seed, cwd);
+      };
 
     // Stage one: files open in the active tab's editor panes close first.
     // Only when none are open does the command close every workspace tab.

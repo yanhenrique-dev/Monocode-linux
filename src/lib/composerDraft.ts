@@ -16,6 +16,29 @@ type Entry = {
 const pending = new Map<string, Entry>();
 
 /**
+ * Texto vivo por sessão, só em memória. (porte #336)
+ *
+ * O draft persistido cobre reload e restart, mas fecha/reabre rápido do pane
+ * perde teclas ainda no debounce: o flush do unmount é async e o remount
+ * carrega do backend antes dele terminar. Este mapa vive fora do React e
+ * responde na hora, sem round-trip. Até o texto vazio vira marcador, para o
+ * remount não ressuscitar o valor persistido anterior; o marcador cai quando
+ * o backend confirma a escrita.
+ */
+const live = new Map<string, string>();
+
+export function getLiveDraft(sessionId: string): string | undefined {
+  return live.get(sessionId);
+}
+
+export function setLiveDraft(sessionId: string, text: string): void {
+  // Keep the empty marker until the backend confirms it: deleting on clear
+  // lets a remount inside the persist window reload the previous text.
+  // persist() drops the marker once "" is confirmed written.
+  live.set(sessionId, text);
+}
+
+/**
  * Persist the composer draft for a session, debounced per session. Only the
  * latest text for a session is written; rapid keystrokes collapse into a
  * single `composer_draft_set` invoke. (porte #321)
@@ -87,5 +110,9 @@ async function persist(sessionId: string, revision: number): Promise<void> {
   // late must not drop text saved after it started.
   if (pending.get(sessionId)?.revision === revision) {
     pending.delete(sessionId);
+    // Backend caught up: an empty marker served its purpose, drop it so the
+    // live map does not grow one entry per cleared session. Non-empty text
+    // stays as the fast path for remounts.
+    if (live.get(sessionId) === "") live.delete(sessionId);
   }
 }

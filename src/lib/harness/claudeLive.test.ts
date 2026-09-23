@@ -2,18 +2,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyHarnessEvent } from "./apply";
 import { newSession } from "../session";
 
-const sent: string[] = [];
-const spawned: string[][] = [];
-let onLine: ((line: string) => void) | undefined;
-let onExit: ((code?: number | null) => void) | undefined;
-const writeChild = vi.fn(async (_id: string, line: string) => {
-  sent.push(line);
+// Hoisted: session.ts now reaches ./child through harness/availability, so
+// the mock factory runs before these declarations would initialize.
+const harness = vi.hoisted(() => {
+  const sent: string[] = [];
+  const spawned: string[][] = [];
+  let onLine: ((line: string) => void) | undefined;
+  let onExit: ((code?: number | null) => void) | undefined;
+  const writeChild = vi.fn(async (_id: string, line: string) => {
+    sent.push(line);
+  });
+  return { sent, spawned, writeChild,
+    get onLine() { return onLine; },
+    set onLine(next: ((line: string) => void) | undefined) { onLine = next; },
+    get onExit() { return onExit; },
+    set onExit(next: ((code?: number | null) => void) | undefined) { onExit = next; },
+  };
 });
+const sent = harness.sent;
+const spawned = harness.spawned;
+const writeChild = harness.writeChild;
 
 vi.mock("./child", () => ({
   resolveClaudeBinary: async () => ({ path: "/fake/claude" }),
   spawnChild: async (_id: string, _path: string, args: string[]) => {
-    spawned.push(args);
+    harness.spawned.push(args);
   },
   killChild: async () => undefined,
   unwatchChild: () => undefined,
@@ -22,10 +35,10 @@ vi.mock("./child", () => ({
     line: (l: string) => void,
     exit: (code?: number | null) => void,
   ) => {
-    onLine = line;
-    onExit = exit;
+    harness.onLine = line;
+    harness.onExit = exit;
   },
-  writeChild,
+  writeChild: harness.writeChild,
 }));
 
 const {
@@ -44,7 +57,7 @@ function parse() {
 }
 
 function emit(rec: Record<string, unknown>) {
-  onLine!(JSON.stringify(rec));
+  harness.onLine!(JSON.stringify(rec));
 }
 
 const waitFor = async (pred: () => boolean, label: string) => {
@@ -99,8 +112,8 @@ async function startTurn(
 beforeEach(() => {
   sent.length = 0;
   spawned.length = 0;
-  onLine = undefined;
-  onExit = undefined;
+  harness.onLine = undefined;
+  harness.onExit = undefined;
   writeChild.mockClear();
   __claudeTestReset();
 });
@@ -647,7 +660,7 @@ describe("claude subagents", () => {
       "second user prompt",
     );
 
-    onExit?.(1);
+    harness.onExit?.(1);
     await expect(second).rejects.toThrow("Claude Code exited");
     expect(first.events.some((event) => event.type === "session.ended")).toBe(
       false,

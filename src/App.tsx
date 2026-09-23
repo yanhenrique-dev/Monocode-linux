@@ -52,8 +52,8 @@ import {
   sameProjectPath,
 } from "./lib/recents";
 import {
-  newDefaultSession,
-  newSession,
+  newAvailableDefaultSession,
+  newSessionForSeed,
   sessionWorkCwd,
   type HarnessId,
   type Session,
@@ -148,7 +148,7 @@ export default function App({
   );
   const [seed] = useState(() => {
     const cwd = lastProjectPath() ?? "~";
-    const session = newDefaultSession(cwd);
+    const session = newAvailableDefaultSession(cwd);
     const tab = newTab(session.id);
     return { session, tab };
   });
@@ -221,13 +221,7 @@ export default function App({
       // Provider thread ids are account-owned. Keep the current conversation
       // pinned to its account and open a clean one for the selected profile.
       const session = {
-        ...newSession(
-          active.harness,
-          active.cwd,
-          active.model,
-          active.runtimeMode,
-          active.modelSettings,
-        ),
+        ...newSessionForSeed(active, active.cwd),
         providerAccountId: accountId,
       };
       const tab = newTab(session.id);
@@ -368,12 +362,15 @@ export default function App({
           : appendSelectionQuote("", detail.text);
       if (!seedText.trim()) return;
       const fallbackSession: Session = {
-        ...newSession(
-          seedSession?.harness ?? "claude",
+        ...newSessionForSeed(
+          {
+            harness: seedSession?.harness ?? "claude",
+            model: seedSession?.model,
+            runtimeMode:
+              sessionDefaults?.runtimeMode ?? seedSession?.runtimeMode,
+            modelSettings: seedSession?.modelSettings,
+          },
           projectCwdRef.current,
-          seedSession?.model,
-          sessionDefaults?.runtimeMode ?? seedSession?.runtimeMode,
-          seedSession?.modelSettings,
         ),
         composerSeed: seedText,
       };

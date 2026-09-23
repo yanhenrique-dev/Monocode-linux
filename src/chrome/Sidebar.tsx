@@ -45,7 +45,7 @@ import {
 import { formatCompactRelative } from "../lib/displayFormat";
 import { resolveModel } from "../lib/models";
 import type { OpenFileFn } from "../lib/search";
-import { sessionDisplayTitle } from "../lib/session";
+import { HARNESS_TITLE, sessionDisplayTitle } from "../lib/session";
 import { nextUnseenFinishedSessions } from "../lib/sessionDone";
 import { orchestrationTaskLabel } from "../lib/orchestrationSummary";
 import {
@@ -2248,7 +2248,8 @@ function SessionCard({
   const model =
     compact && !orchestrationExpanded
       ? null
-      : resolveModel(session.harness, session.model).name;
+      : resolveModel(session.harness, session.model).name ||
+        HARNESS_TITLE[session.harness];
   const statusClass = needsApproval
     ? "text-amber-400"
     : busy

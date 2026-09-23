@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { newSession, type RuntimeMode } from "../session";
-import { applyHarnessEvent } from "./apply";
+import type { RuntimeMode } from "../session";
 
 let onStdout: ((line: string) => void) | undefined;
 let onSseEvent: ((event: Record<string, unknown>) => void) | undefined;
@@ -70,6 +69,10 @@ const {
   stopOpenCodeSession,
 } = await import("./opencode");
 import type { HarnessEvent } from "./types";
+// Dynamic: apply.ts reaches ./child through models/session/availability,
+// so a static import would run the mock factory before these declarations.
+const { applyHarnessEvent } = await import("./apply");
+const { newSession } = await import("../session");
 
 const waitFor = async (predicate: () => boolean, label: string) => {
   for (let index = 0; index < 200; index += 1) {

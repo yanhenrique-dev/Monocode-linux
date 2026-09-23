@@ -254,6 +254,21 @@ describe("provider defaults", () => {
     });
   });
 
+  it("uses the first installed provider when the preferred one is unavailable", () => {
+    expect(defaultSessionChoice((harness) => harness === "codex")).toEqual({
+      harness: "codex",
+      model: defaultModelId("codex"),
+    });
+  });
+
+  it("keeps an installed saved default provider", () => {
+    saveLastModelChoice("opencode", "opencode:glm-5");
+    expect(defaultSessionChoice((harness) => harness === "opencode")).toEqual({
+      harness: "opencode",
+      model: "opencode:glm-5",
+    });
+  });
+
   it("keeps the six most recently used unique models", () => {
     saveRecentModelChoice("claude", "claude:opus-5");
     saveRecentModelChoice("cursor", "cursor:composer-2.5");
@@ -378,5 +393,12 @@ describe("live catalog overlays", () => {
     // A relaunch starts with the built-in catalog until discovery completes.
     resetHarnessModelOverlays();
     expect(resolveModel("claude", "claude:opus").id).toBe("claude:opus-5");
+  });
+
+  it("never resolves a foreign harness model for an empty catalog", () => {
+    resetHarnessModelOverlays();
+    const resolved = resolveModel("codex", "");
+    expect(resolved.harness).toBe("codex");
+    expect(resolved.id).toBe("");
   });
 });

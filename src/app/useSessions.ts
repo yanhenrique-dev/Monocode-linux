@@ -12,8 +12,8 @@ import {
   isLiveHarness,
 } from "../lib/harness";
 import {
-  newDefaultSession,
-  newSession,
+  newAvailableDefaultSession,
+  newSessionForSeed,
   sessionWorkCwd,
   type Session,
 } from "../lib/session";
@@ -325,7 +325,7 @@ export function useSessions(deps: SessionsDeps) {
                   ).body
                 : undefined;
           session = {
-            ...newDefaultSession(cwd),
+            ...newAvailableDefaultSession(cwd),
             title: `Ask · ${item.title}`,
             inboxAsk: {
               key,
@@ -363,13 +363,7 @@ export function useSessions(deps: SessionsDeps) {
           ),
         );
         const fresh = {
-          ...newSession(
-            current.harness,
-            current.cwd,
-            current.model,
-            current.runtimeMode,
-            current.modelSettings,
-          ),
+          ...newSessionForSeed(current, current.cwd),
           title: current.title,
           inboxAsk: current.inboxAsk,
         };

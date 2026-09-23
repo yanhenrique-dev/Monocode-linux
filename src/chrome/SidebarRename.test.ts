@@ -669,7 +669,10 @@ describe("sidebar orchestration card", () => {
       // The lead card carries the sidebar's ordinary active treatment.
       expect(card().className).toContain("bg-selection");
       // The lead names its own model, like every agent row beneath it.
-      expect(card().textContent).toContain("Claude Sonnet 5");
+      // With no catalog entry the card falls back to the harness name
+      // instead of borrowing another harness's model.
+      expect(card().textContent).toContain("Codex");
+      expect(card().textContent).not.toContain("Claude Sonnet 5");
       expect(card().textContent).not.toContain("Orchestrator");
       const orchestrationIcon = card().querySelector<HTMLButtonElement>(
         "[data-orchestration-icon]",
