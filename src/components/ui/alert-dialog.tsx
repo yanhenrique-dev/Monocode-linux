@@ -34,7 +34,7 @@ export function AlertDialogPopup({
     <BaseAlertDialog.Popup
       {...props}
       className={cn(
-        "absolute left-1/2 top-[22%] w-[min(420px,calc(100vw-24px))] -translate-x-1/2",
+        "absolute left-1/2 top-1/2 w-[min(420px,calc(100vw-24px))] max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2",
         className,
       )}
     />
