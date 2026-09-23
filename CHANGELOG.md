@@ -5,6 +5,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.30] - 2026-09-23
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Frontend UI on shadcn-style primitives over Base UI: dialog, popover,
+  dropdown/context menus, switch, slider, select, combobox, tabs, toast,
+  tooltip and alert-dialog bound to the runtime theme tokens, with the
+  previous Modal/Popover/ExplorerMenu APIs preserved.
+- Real tooltips (hover + keyboard focus) replacing native `title=` on the
+  Composer toolbar, TitleBar, SurfaceTabs, Sidebar, transcript actions and
+  Settings-adjacent controls.
+- Destructive confirms use `role=alertdialog` with Cancel focused and no
+  backdrop dismiss (ConfirmDialog, RemoveProject, archive delete).
+- Sessions: installed default provider with availability fallback, live
+  in-memory composer drafts over persisted ones (portes #208 e #336).
+- `resolveModel` never returns another harness's model; unknown models
+  fall back to the harness name in the Sidebar.
+
+### Fixed
+
+- Dialogs trap Tab and restore focus; popovers dismiss on outside press
+  and Escape with the previous focus restored.
+- Empty live draft no longer resurrects the previous persisted text on
+  fast pane remount; switching sessions in the same pane drops the
+  previous draft.
+- Stale provider account/session ids cleared when the harness fallback
+  swaps providers.
+- Test mocks hardened against the session↔availability import cycle.
+
 ## [0.2.25] - 2026-09-22
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
