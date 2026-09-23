@@ -15,8 +15,11 @@ import {
   X,
 } from "../chrome/icons";
 import {
+  createContext,
   memo,
   useCallback,
+  useContext,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -561,6 +564,9 @@ function AgentTranscriptContent({
   // against these before the project index guesses. Before the early return
   // below: hooks must run unconditionally across renders.
   const fileCandidates = useMemo(() => transcriptFilePaths(blocks), [blocks]);
+  // One clock per transcript: every LiveFoldTitle advances on this tick
+  // instead of running its own setInterval.
+  const elapsedTick = useElapsedTicker(visible && busy === true);
 
   if (!visible) {
     // Hidden tabs keep state but mount no rows; reopening pins to the end.
@@ -574,6 +580,7 @@ function AgentTranscriptContent({
 
   return (
     <TranscriptCandidatesContext.Provider value={fileCandidates}>
+    <ElapsedTickContext.Provider value={elapsedTick}>
     <div
       ref={setScroller}
       className="agent-transcript h-full overflow-y-auto overflow-x-clip overscroll-none [overflow-anchor:none] font-mono text-[13px] leading-5"
@@ -637,6 +644,7 @@ function AgentTranscriptContent({
         />
       ) : null}
     </div>
+    </ElapsedTickContext.Provider>
     </TranscriptCandidatesContext.Provider>
   );
 }
@@ -1538,11 +1546,14 @@ function UserMessageBlock({
       return;
     }
 
-    // Every user message carries one of these observers, so the callback runs
-    // once per message whenever the transcript reflows. `getComputedStyle`
-    // forces a style recalculation on each call and the line height only moves
-    // with the font or the UI scale — never with a resize — so it is resolved
-    // once here rather than on every delivery.
+    // Full-layout messages are never clamped (`line-clamp-4` only applies
+    // in chat) and never need single-line rounding: skip the observer so
+    // long sessions do not pay one ResizeObserver per user message.
+    if (!chat && expanded) return;
+
+    // `getComputedStyle` forces a style recalculation on each call and the
+    // line height only moves with the font or the UI scale — never with a
+    // resize — so it is resolved once here rather than on every delivery.
     let lineHeight = 0;
     let raf = 0;
     const sync = () => {
@@ -1560,6 +1571,13 @@ function UserMessageBlock({
         Number.isFinite(lineHeight) && el.scrollHeight <= lineHeight + 1,
       );
     };
+    // Line-clamped bubbles only need measuring while collapsed: an expanded
+    // message shows everything, so stop observing instead of re-measuring
+    // on every reflow of a long session.
+    if (expanded) {
+      sync();
+      return;
+    }
     const measure = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
@@ -1618,9 +1636,9 @@ function UserMessageBlock({
                 ? "edit-last-turn-button opacity-100"
                 : "text-content/35 opacity-0 hover:bg-content/10 hover:text-content/70 group-hover/usermsg:opacity-100"
             }`}
-          >
-            <Pencil className="size-3.5" strokeWidth={1.75} />
-          </button>
+            >
+              <Pencil className="size-3.5" strokeWidth={1.75} />
+            </button>
         ) : null}
         {block.attachments?.length ? (
           <div
@@ -2025,6 +2043,10 @@ function ActivityPhaseGroup({
   const open = waiting || (override ?? active);
   const [liveScroller, setLiveScroller] = useState<HTMLDivElement | null>(null);
   const title = activityPhaseTitle(phase, active, open);
+  // Streaming re-renders the whole phase per token. Defer the header text
+  // one tick so scroll and the live rows win over title fidelity for a frame.
+  const deferredTitle = useDeferredValue(title);
+  const renderTitle = active ? deferredTitle : title;
   // What the header is holding while the group runs, so the trail under it
   // starts one step back: a header repeating the row beneath it says the same
   // thing twice, and the thought drops into the trail as the agent moves on.
@@ -2066,13 +2088,13 @@ function ActivityPhaseGroup({
 
   const label = active ? (
     <Shimmer className="min-w-0 truncate font-sans text-sm" duration={1.6}>
-      {title}
+      {renderTitle}
     </Shimmer>
   ) : (
     // Dimmed to sit with the icons: the work is chrome around the answer, and
     // only the answer reads at full strength.
     <span className="min-w-0 flex-1 truncate font-sans text-sm text-content/50 transition-colors duration-200 group-hover:text-content/80">
-      {title}
+      {renderTitle}
     </span>
   );
 
@@ -2092,7 +2114,9 @@ function ActivityPhaseGroup({
         type="button"
         aria-expanded={open}
         aria-label={
-          open ? `Hide the steps for ${title}` : `Show the steps for ${title}`
+          open
+            ? `Hide the steps for ${renderTitle}`
+            : `Show the steps for ${renderTitle}`
         }
         onClick={() => setOverride(!open)}
         className="group flex w-full min-w-0 items-center gap-1.5 py-1 text-left"
@@ -2918,6 +2942,7 @@ function useElapsedFrom(
   startedAt: number | undefined,
   paused: boolean,
 ): number | null {
+  const tick = useContext(ElapsedTickContext);
   const fallback = useRef<number | null>(null);
   const pausedMs = useRef(0);
   const pauseStarted = useRef<number | null>(null);
@@ -2931,12 +2956,9 @@ function useElapsedFrom(
   }
 
   const origin = startedAt ?? (fallback.current ??= Date.now());
-  const [elapsedMs, setElapsedMs] = useState(() =>
-    Math.max(0, Date.now() - origin),
-  );
 
   useEffect(() => {
-    const start = startedAt ?? (fallback.current ??= Date.now());
+    fallback.current ??= Date.now();
     if (paused) {
       if (pauseStarted.current == null) pauseStarted.current = Date.now();
       return;
@@ -2945,23 +2967,40 @@ function useElapsedFrom(
       pausedMs.current += Date.now() - pauseStarted.current;
       pauseStarted.current = null;
     }
-    const tick = () => {
+  }, [startedAt, paused]);
+
+  // Re-render on the shared 1s tick so all live titles advance together
+  // with one timer per transcript instead of one per title.
+  void tick;
+
+  const pausedExtra =
+    paused && pauseStarted.current != null
+      ? Date.now() - pauseStarted.current
+      : 0;
+  return Math.max(0, Date.now() - origin - pausedMs.current - pausedExtra);
+}
+
+/** Shared 1s clock: one interval per transcript drives every live title. */
+const ElapsedTickContext = createContext(0);
+
+function useElapsedTicker(active: boolean): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
       // A hidden window has nothing to paint: skip the state write so the
       // live fold does not re-render every second while minimized.
       if (typeof document !== "undefined" && document.hidden) return;
-      setElapsedMs(Math.max(0, Date.now() - start - pausedMs.current));
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
-    const onVisible = () => tick();
+      setTick((n) => n + 1);
+    }, 1000);
+    const onVisible = () => setTick((n) => n + 1);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [startedAt, paused]);
-
-  return elapsedMs;
+  }, [active]);
+  return tick;
 }
 
 function formatWorkingDuration(

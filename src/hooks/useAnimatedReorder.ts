@@ -1,13 +1,19 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { flushSync } from "react-dom";
+import { APPEARANCE_CHANGE_EVENT } from "../lib/appearance";
 import { setGrabbing, suppressTextSelection } from "../lib/drag";
-import { reorderMotion } from "../lib/motion";
+import {
+  invalidateReorderMotion,
+  prefersReducedMotion,
+  reorderMotion,
+} from "../lib/motion";
 import { moveItem } from "../lib/reorder";
 
 export type ReorderExternalDrop<T extends string> = {
@@ -37,6 +43,15 @@ export function useAnimatedReorder<T extends string>(
   const orderKey = ids.join("\0");
 
   useLayoutEffect(() => () => cleanup.current?.(), [orderKey]);
+
+  useEffect(() => {
+    window.addEventListener(APPEARANCE_CHANGE_EVENT, invalidateReorderMotion);
+    return () =>
+      window.removeEventListener(
+        APPEARANCE_CHANGE_EVENT,
+        invalidateReorderMotion,
+      );
+  }, []);
 
   const setItemRef = useCallback((id: T, node: HTMLElement | null) => {
     if (node) nodes.current.set(id, node);
@@ -80,9 +95,7 @@ export function useAnimatedReorder<T extends string>(
       }
       const pointerId = event.pointerId;
       const startPosition = event[coordinate];
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
+      const reducedMotion = prefersReducedMotion();
       const { duration: motionDuration, easing } = reorderMotion();
       const duration = reducedMotion ? 0 : motionDuration;
       const transition = `transform ${duration}ms ${easing}`;

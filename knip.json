@@ -2,6 +2,6 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": ["src/main.tsx", "src-tauri/**/*"],
   "project": ["src/**/*.{ts,tsx}", "vite.config.ts", "vitest.config.ts"],
-  "ignore": ["src/**/*.test.ts", "src/vite-env.d.ts"],
+  "ignore": ["src/**/*.test.{ts,tsx}", "src/vite-env.d.ts"],
   "ignoreDependencies": ["happy-dom"]
 }

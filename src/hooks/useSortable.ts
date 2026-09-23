@@ -71,6 +71,8 @@ export function useSortable(
   const groupNodes = useRef(new Map<string, HTMLElement>());
   const drag = useRef<DragState | null>(null);
   const suppressClickUntil = useRef(0);
+  const frame = useRef(0);
+  const pendingPointer = useRef<{ x: number; y: number } | null>(null);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [toIndex, setToIndex] = useState<number | null>(null);
@@ -186,20 +188,29 @@ export function useSortable(
           setToIndex(from);
           onActivateRef.current?.(id);
         }
-        const dropOn = dropTargetAt(id, ev.clientX, ev.clientY);
-        const next = indexAt(ev.clientX, ev.clientY);
-        if (
-          next === current.toIndex &&
-          current.dropTarget?.kind === dropOn?.kind &&
-          current.dropTarget?.id === dropOn?.id &&
-          current.dropTarget?.allowed === dropOn?.allowed
-        ) {
-          return;
-        }
-        current.toIndex = next;
-        current.dropTarget = dropOn;
-        setToIndex(next);
-        setDropTarget(dropOn);
+        pendingPointer.current = { x: ev.clientX, y: ev.clientY };
+        if (frame.current) return;
+        frame.current = window.requestAnimationFrame(() => {
+          frame.current = 0;
+          const pending = pendingPointer.current;
+          const state = drag.current;
+          if (!pending || !state || state.id !== id) return;
+          pendingPointer.current = null;
+          const dropOn = dropTargetAt(id, pending.x, pending.y);
+          const next = indexAt(pending.x, pending.y);
+          if (
+            next === state.toIndex &&
+            state.dropTarget?.kind === dropOn?.kind &&
+            state.dropTarget?.id === dropOn?.id &&
+            state.dropTarget?.allowed === dropOn?.allowed
+          ) {
+            return;
+          }
+          state.toIndex = next;
+          state.dropTarget = dropOn;
+          setToIndex(next);
+          setDropTarget(dropOn);
+        });
       };
 
       const onUp = () => stop(true);
@@ -211,6 +222,9 @@ export function useSortable(
       };
 
       function stop(commit: boolean) {
+        window.cancelAnimationFrame(frame.current);
+        frame.current = 0;
+        pendingPointer.current = null;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
