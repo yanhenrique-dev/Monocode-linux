@@ -248,14 +248,15 @@ describe("provider defaults", () => {
   });
 
   it("keeps catalog defaults when nothing is saved", () => {
+    // No stale "cursor" default: unprobed, nothing installed-known, claude.
     expect(defaultSessionChoice()).toEqual({
-      harness: "cursor",
-      model: defaultModelId("cursor"),
+      harness: "claude",
+      model: defaultModelId("claude"),
     });
   });
 
   it("uses the first installed provider when the preferred one is unavailable", () => {
-    expect(defaultSessionChoice((harness) => harness === "codex")).toEqual({
+    expect(defaultSessionChoice(["codex"])).toEqual({
       harness: "codex",
       model: defaultModelId("codex"),
     });
@@ -263,7 +264,7 @@ describe("provider defaults", () => {
 
   it("keeps an installed saved default provider", () => {
     saveLastModelChoice("opencode", "opencode:glm-5");
-    expect(defaultSessionChoice((harness) => harness === "opencode")).toEqual({
+    expect(defaultSessionChoice(["opencode"])).toEqual({
       harness: "opencode",
       model: "opencode:glm-5",
     });

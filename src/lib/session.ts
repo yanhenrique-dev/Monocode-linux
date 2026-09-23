@@ -12,7 +12,7 @@ import {
   preferredModelSettings,
   resolveModel,
 } from "./models";
-import { isHarnessAvailable } from "./harness/availability";
+import { availableHarnessIds, isHarnessAvailable } from "./harness/availability";
 
 export type HarnessId =
   | "claude"
@@ -448,12 +448,17 @@ export function newSession(
   };
 }
 
-/** New conversation using the Providers defaults. */
+/**
+ * New conversation using the Providers defaults. Pass the probed CLI set
+ * (`availableHarnessIds()`) so a stale last choice cannot resurface an
+ * uninstalled harness; omitted means unknown (probe pending).
+ */
 export function newDefaultSession(
   cwd = "~",
   runtimeMode: RuntimeMode = DEFAULT_RUNTIME_MODE,
+  availableHarnesses?: readonly HarnessId[],
 ): Session {
-  const choice = defaultSessionChoice();
+  const choice = defaultSessionChoice(availableHarnesses);
   return newSession(choice.harness, cwd, choice.model, runtimeMode);
 }
 
@@ -461,8 +466,11 @@ export function newDefaultSession(
 export function newAvailableDefaultSession(
   cwd = "~",
   runtimeMode: RuntimeMode = DEFAULT_RUNTIME_MODE,
+  availableHarnesses?: readonly HarnessId[],
 ): Session {
-  const { harness, model } = defaultSessionChoice(isHarnessAvailable);
+  const { harness, model } = defaultSessionChoice(
+    availableHarnesses ?? availableHarnessIds(),
+  );
   return newSession(harness, cwd, model, runtimeMode);
 }
 

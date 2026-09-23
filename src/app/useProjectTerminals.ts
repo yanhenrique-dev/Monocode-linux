@@ -13,6 +13,7 @@ import {
   sessionWorkCwd,
   type Session,
 } from "../lib/session";
+import { availableHarnessIds } from "../lib/harness/availability";
 import {
   focusedFileTab,
   newTerminalFile,
@@ -109,6 +110,7 @@ export function useProjectTerminals(deps: ProjectTerminalsDeps) {
       const session = newAvailableDefaultSession(
         sessionDefaults?.cwd ?? projectCwd,
         sessionDefaults?.runtimeMode,
+        availableHarnessIds(),
       );
       setSessions((prev) => [...prev, session]);
       setTabs((prev) =>

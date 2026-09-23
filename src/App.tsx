@@ -1578,10 +1578,22 @@ export default function App({
                 />
               </Suspense>
             ) : null}
-            {searchViewOpen ||
-            inboxViewOpen ||
-            notesViewOpen ||
-            settingsOpen ? null : (
+            <div
+              className={
+                searchViewOpen ||
+                inboxViewOpen ||
+                notesViewOpen ||
+                settingsOpen
+                  ? "hidden"
+                  : "contents"
+              }
+              aria-hidden={
+                searchViewOpen ||
+                inboxViewOpen ||
+                notesViewOpen ||
+                settingsOpen
+              }
+            >
               <UsageFooter
                 providers={usageProviders}
                 session={usageSession}
@@ -1603,7 +1615,7 @@ export default function App({
                   currentProjectDock.pane.files.length > 0
                 }
               />
-            )}
+            </div>
           </div>
 
           {filePickerOpen ? (

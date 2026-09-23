@@ -100,6 +100,11 @@ export function isHarnessAvailable(id: HarnessId): boolean {
   return availability[id];
 }
 
+/** Probed-present CLIs in catalog order; empty before the first probe. */
+export function availableHarnessIds(): HarnessId[] {
+  return HARNESSES.filter((id) => availability[id]);
+}
+
 export function harnessUnavailableHint(
   id: HarnessId,
   locale: Locale = loadLocale(),

@@ -560,20 +560,21 @@ function SidebarComponent({
   const showSidebarFooter = !projectRailOpen;
   // A blank session has no project to browse, so the shell stands alone until
   // one is picked — whether or not the rail is open.
-  const sidebarVisible =
-    open &&
-    !searchActive &&
-    !inboxActive &&
-    !notesActive &&
-    !settingsOpen &&
-    inProject;
+  // Overlays (settings/search/inbox/notes) hide the panel without exit
+  // choreography: it stays mounted under `hidden` and returns dry. Only a
+  // real close (rail collapsed, no project) plays the outro and unmounts,
+  // so leaving settings never replays the enter slide.
+  const overlayOpen =
+    searchActive || inboxActive || notesActive || settingsOpen;
+  const sidebarMounted = open && inProject;
+  const sidebarVisible = sidebarMounted && !overlayOpen;
   // Smooth enter/exit behind the experimental-animations flag: hold the
   // panel mounted while the outro plays instead of unmounting instantly.
   // The boot layout appears dry; the intro plays only on later opens.
   const sidebarAnimations = useExperimentalAnimations();
-  const [sidebarHeld, setSidebarHeld] = useState(sidebarVisible);
+  const [sidebarHeld, setSidebarHeld] = useState(sidebarMounted);
   const [sidebarEntered, setSidebarEntered] = useState(false);
-  const prevSidebarVisible = useRef(sidebarVisible);
+  const prevSidebarMounted = useRef(sidebarMounted);
   const {
     closing: sidebarClosing,
     requestClose: requestSidebarClose,
@@ -585,21 +586,25 @@ function SidebarComponent({
     onExit: () => setSidebarHeld(false),
   });
   useEffect(() => {
-    if (sidebarVisible) {
+    if (sidebarMounted) {
       cancelSidebarClose();
       setSidebarHeld(true);
-      // The first commit that finds the sidebar already visible is the
+      // The first commit that finds the sidebar already mounted is the
       // boot layout: appear dry, animate only false-to-true transitions.
-      if (!prevSidebarVisible.current) {
+      // Overlay hide/show never touches the intro.
+      if (!prevSidebarMounted.current) {
         setSidebarEntered(true);
       }
     } else if (sidebarHeld) {
       requestSidebarClose();
     }
-    // Track every change: without this the hidden branch never records
-    // itself and returning later reads a stale `true`, skipping anim-in.
-    prevSidebarVisible.current = sidebarVisible;
-  }, [sidebarVisible, sidebarHeld, requestSidebarClose, cancelSidebarClose]);
+    prevSidebarMounted.current = sidebarMounted;
+  }, [
+    sidebarMounted,
+    sidebarHeld,
+    requestSidebarClose,
+    cancelSidebarClose,
+  ]);
   const gitStatuses = useGitFileStatuses(gitRoot, open && tab === "files");
   const changeStats = useProjectDiffStats(gitRoot, open);
 
@@ -1234,7 +1239,7 @@ function SidebarComponent({
               ? " sidebar-anim-in"
               : ""
           : ""
-      }`}
+      }${!sidebarVisible && !sidebarClosing ? " hidden" : ""}`}
     >
       {railVisible ? (
         <>
@@ -1778,7 +1783,7 @@ function SidebarComponent({
           onDismissUpdate={onDismissUpdate}
         />
       ) : null}
-      {sidebarVisible || sidebarHeld ? sidebarContent : null}
+      {sidebarMounted || sidebarHeld ? sidebarContent : null}
     </div>
   );
 }

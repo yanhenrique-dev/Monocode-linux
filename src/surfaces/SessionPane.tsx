@@ -1,4 +1,5 @@
-import { ChevronDown, GripVertical, X } from "../chrome/icons";
+import { ChevronDown, GripVertical, Search, X } from "../chrome/icons";
+import { searchTranscriptBlocks } from "../lib/transcriptSearch";
 import {
   memo,
   useCallback,
@@ -408,6 +409,33 @@ const SessionPaneContent = memo(function SessionPaneContent({
     (blockId: string) => revealBlockRef.current?.(blockId) ?? false,
     [],
   );
+  // In-transcript find: the virtualized list unmounts off-screen turns, so
+  // the webview find cannot reach them. Hits navigate via revealBlock.
+  const [transcriptSearchOpen, setTranscriptSearchOpen] = useState(false);
+  const [transcriptQuery, setTranscriptQuery] = useState("");
+  const [transcriptHit, setTranscriptHit] = useState(0);
+  const transcriptHits = useMemo(
+    () => searchTranscriptBlocks(session.blocks, transcriptQuery),
+    [session.blocks, transcriptQuery],
+  );
+  useEffect(() => {
+    setTranscriptHit(0);
+  }, [transcriptQuery, session.id]);
+  useEffect(() => {
+    if (!visible) setTranscriptSearchOpen(false);
+  }, [visible]);
+  const goTranscriptHit = useCallback(
+    (direction: 1 | -1) => {
+      if (transcriptHits.length === 0) return;
+      const next =
+        (transcriptHit + direction + transcriptHits.length) %
+        transcriptHits.length;
+      setTranscriptHit(next);
+      const hit = transcriptHits[next];
+      if (hit) revealBlock(hit.blockId);
+    },
+    [transcriptHits, transcriptHit, revealBlock],
+  );
   const addSelectionToChat = useCallback(
     (text: string, mode?: QuoteRequest["mode"]) => {
       quoteRequestId.current += 1;
@@ -804,22 +832,46 @@ const SessionPaneContent = memo(function SessionPaneContent({
               />
               {animationsEnabled && !reduceMotion ? (
                 <div
-                  className={`pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center transition-opacity duration-200 ${
-                    showJumpToBottom ? "opacity-100" : "opacity-0"
+                  className={`pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center gap-1 transition-opacity duration-200 ${
+                    showJumpToBottom || transcriptSearchOpen
+                      ? "opacity-100"
+                      : "opacity-0"
                   }`}
-                  inert={!showJumpToBottom}
-                  aria-hidden={!showJumpToBottom}
+                  inert={!showJumpToBottom && !transcriptSearchOpen}
+                  aria-hidden={!showJumpToBottom && !transcriptSearchOpen}
                 >
                   <JumpToBottomButton
                     onJump={() => jumpToBottomRef.current?.()}
                   />
+                  <TranscriptSearchButton
+                    onToggle={() =>
+                      setTranscriptSearchOpen((open) => !open)
+                    }
+                  />
                 </div>
-              ) : showJumpToBottom ? (
-                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center">
+              ) : showJumpToBottom || transcriptSearchOpen ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center gap-1">
                   <JumpToBottomButton
                     onJump={() => jumpToBottomRef.current?.()}
                   />
+                  <TranscriptSearchButton
+                    onToggle={() =>
+                      setTranscriptSearchOpen((open) => !open)
+                    }
+                  />
                 </div>
+              ) : null}
+              {transcriptSearchOpen ? (
+                <TranscriptSearchBox
+                  query={transcriptQuery}
+                  onQuery={setTranscriptQuery}
+                  hit={transcriptHits.length === 0 ? 0 : transcriptHit + 1}
+                  total={transcriptHits.length}
+                  excerpt={transcriptHits[transcriptHit]?.excerpt}
+                  onNext={() => goTranscriptHit(1)}
+                  onPrevious={() => goTranscriptHit(-1)}
+                  onClose={() => setTranscriptSearchOpen(false)}
+                />
               ) : null}
             </>
           )}
@@ -871,6 +923,105 @@ function JumpToBottomButton({ onJump }: { onJump: () => void }) {
     >
       <ChevronDown className="size-4" strokeWidth={2} />
     </button>
+  );
+}
+
+function TranscriptSearchButton({ onToggle }: { onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      title="Find in transcript"
+      aria-label="Find in transcript"
+      data-transcript-search-toggle
+      onClick={onToggle}
+      className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-background-base/95 text-content shadow-md hover:bg-content/5"
+    >
+      <Search className="size-3.5" strokeWidth={2} />
+    </button>
+  );
+}
+
+function TranscriptSearchBox({
+  query,
+  onQuery,
+  hit,
+  total,
+  excerpt,
+  onNext,
+  onPrevious,
+  onClose,
+}: {
+  query: string;
+  onQuery: (query: string) => void;
+  hit: number;
+  total: number;
+  excerpt?: string;
+  onNext: () => void;
+  onPrevious: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="search"
+      aria-label="Find in transcript"
+      className="absolute inset-x-0 bottom-9 z-30 mx-auto flex w-[min(420px,calc(100%-2rem))] items-center gap-1.5 rounded-lg border border-content/15 bg-background-base/95 px-2 py-1.5 font-sans text-xs text-content shadow-xl"
+    >
+      <Search className="size-3.5 shrink-0 text-content/50" strokeWidth={2} />
+      <input
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
+        type="text"
+        value={query}
+        aria-label="Find in transcript"
+        placeholder="Find in transcript"
+        onChange={(event) => onQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (event.shiftKey) onPrevious();
+            else onNext();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+          }
+        }}
+        className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-content/35"
+      />
+      <span
+        aria-live="polite"
+        title={excerpt ?? ""}
+        className="max-w-40 shrink-0 truncate text-content/50 tabular-nums"
+      >
+        {total === 0 ? (query.trim() ? "0/0" : "") : `${hit}/${total}`}
+      </span>
+      <button
+        type="button"
+        title="Previous match (Shift+Enter)"
+        aria-label="Previous match"
+        onClick={onPrevious}
+        className="grid size-5 shrink-0 place-items-center rounded hover:bg-content/10"
+      >
+        <ChevronDown className="size-3.5 rotate-180" strokeWidth={2} />
+      </button>
+      <button
+        type="button"
+        title="Next match (Enter)"
+        aria-label="Next match"
+        onClick={onNext}
+        className="grid size-5 shrink-0 place-items-center rounded hover:bg-content/10"
+      >
+        <ChevronDown className="size-3.5" strokeWidth={2} />
+      </button>
+      <button
+        type="button"
+        title="Close find (Escape)"
+        aria-label="Close find"
+        onClick={onClose}
+        className="grid size-5 shrink-0 place-items-center rounded hover:bg-content/10"
+      >
+        <X className="size-3.5" strokeWidth={2} />
+      </button>
+    </div>
   );
 }
 

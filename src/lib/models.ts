@@ -652,16 +652,25 @@ export function preferredModelId(harness: HarnessId): string {
   return defaultModelId(harness);
 }
 
-/** Provider + model new conversations should start with. */
+/**
+ * Provider + model new conversations should start with.
+ *
+ * `availableHarnesses` is the probed CLI set (`HARNESSES.filter(
+ * isHarnessAvailable)` from the app layer). This module must not import the
+ * availability probe itself: it sits inside the session/models import graph
+ * that harness tests mock, and a static edge breaks their mock hoisting.
+ * `undefined` means unknown (probe pending): keep the last choice, else the
+ * static "claude" default — never a hardcoded "cursor", so an uninstalled
+ * CLI cannot haunt new sessions once the probe has run.
+ */
 export function defaultSessionChoice(
-  available?: (id: HarnessId) => boolean,
+  availableHarnesses?: readonly HarnessId[],
 ): LastModelChoice {
   const last = loadLastModelChoice();
-  const preferred = last?.harness ?? "cursor";
-  const harness =
-    available && !available(preferred)
-      ? (HARNESSES.find(available) ?? preferred)
-      : preferred;
+  if (last && (!availableHarnesses || availableHarnesses.includes(last.harness))) {
+    return { harness: last.harness, model: preferredModelId(last.harness) };
+  }
+  const harness = availableHarnesses?.[0] ?? "claude";
   return { harness, model: preferredModelId(harness) };
 }
 
