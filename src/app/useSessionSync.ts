@@ -12,14 +12,12 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-  applyHarnessEvent,
   cancelHarnessTurn,
   forgetHarnessSession,
   isLiveHarness,
   probeHarnessAvailability,
   refreshHarnessCatalogs,
   startHarnessBridge,
-  type HarnessEvent,
 } from "../lib/harness";
 import {
   bindResumedSessions,
@@ -112,11 +110,7 @@ import {
   providerSignInRequestKey,
   setsEqual,
 } from "./tabHelpers";
-import {
-  cancelScheduledFlush,
-  scheduleHarnessFlush,
-  type ScheduledFlush,
-} from "./workspaceEvents";
+import { useHarnessFlush } from "./sessionSync/useHarnessFlush";
 import { useProjectBranches } from "../hooks/useProjectBranches";
 import { useInputNotifications } from "../hooks/useInputNotifications";
 import type { WindowTransferPayload } from "../lib/windowTransfer";
@@ -283,46 +277,11 @@ export function useSessionSync(deps: SessionSyncDeps) {
   const sessionLoadEpochs = useRef(new Map<string, number>());
   const openingSessionIds = useRef(new Set<string>());
   const activeSessionPrefetch = useRef<Promise<Session | null> | null>(null);
-  // Tokens arrive many times per frame; apply them once so React/markdown aren't
-  // recomputed for every delta.
-  const harnessQueued = useRef(new Map<string, HarnessEvent[]>());
-  const harnessFlush = useRef<ScheduledFlush | null>(null);
   const skipForgetSessionIds = useRef(new Set<string>());
-  const importedSessionsApplied = useRef(false);
-
-
-
-  useEffect(() => {
-    if (importedSessionsApplied.current) return;
-    const imported = windowTransfer?.sessions ?? resumed?.sessions;
-    if (!imported?.length) return;
-    importedSessionsApplied.current = true;
-    for (const session of imported) {
-      observedSessions.current.set(session.id, session);
-      lastPersisted.current.set(session.id, persistFingerprint(session));
-      const userId = lastUserBlockId(session);
-      if (userId) lastPersistedUserBlock.current.set(session.id, userId);
-      if (session.providerSessionId) {
-        lastBoundProvider.current.set(session.id, session.providerSessionId);
-      }
-    }
-  }, [windowTransfer, resumed]);
-
-  const flushHarnessEvents = useCallback(() => {
-    cancelScheduledFlush(harnessFlush.current);
-    harnessFlush.current = null;
-    const batches = harnessQueued.current;
-    if (batches.size === 0) return;
-    harnessQueued.current = new Map();
-    const prev = sessionsRef.current;
-    const next = prev.map((session) => {
-      const events = batches.get(session.id);
-      return events ? events.reduce(applyHarnessEvent, session) : session;
-    });
-    if (!next.some((session, index) => session !== prev[index])) return;
-    sessionsRef.current = next;
-    setSessions(next);
-  }, []);
+  const { flushHarnessEvents, enqueueHarnessEvent } = useHarnessFlush(
+    sessionsRef,
+    setSessions,
+  );
 
   const stopSessionForRemoval = useCallback(
     async (sessionId: string): Promise<Session | undefined> => {
@@ -343,46 +302,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
       return sessionsRef.current.find((session) => session.id === sessionId);
     },
     [flushHarnessEvents],
-  );
-
-  const applyApprovalEvent = useCallback(
-    (sessionId: string, event: HarnessEvent) => {
-      const queued = harnessQueued.current.get(sessionId) ?? [];
-      harnessQueued.current.delete(sessionId);
-      const events = [...queued, event];
-      const prev = sessionsRef.current;
-      const next = prev.map((session) =>
-        session.id === sessionId
-          ? events.reduce(applyHarnessEvent, session)
-          : session,
-      );
-      if (!next.some((session, index) => session !== prev[index])) return;
-      sessionsRef.current = next;
-      setSessions(next);
-    },
-    [],
-  );
-
-  const enqueueHarnessEvent = useCallback(
-    (sessionId: string, event: HarnessEvent) => {
-      if (
-        event.type === "approval.requested" ||
-        event.type === "approval.resolved" ||
-        event.type === "question.asked" ||
-        event.type === "question.resolved"
-      ) {
-        applyApprovalEvent(sessionId, event);
-        return;
-      }
-      const queued = harnessQueued.current;
-      const events = queued.get(sessionId);
-      if (events) events.push(event);
-      else queued.set(sessionId, [event]);
-      if (!harnessFlush.current) {
-        harnessFlush.current = scheduleHarnessFlush(flushHarnessEvents);
-      }
-    },
-    [applyApprovalEvent, flushHarnessEvents],
   );
 
   useEffect(() => {
@@ -412,8 +331,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
       window.removeEventListener("pagehide", reap);
       window.removeEventListener("beforeunload", reap);
       stopBridge();
-      cancelScheduledFlush(harnessFlush.current);
-      harnessFlush.current = null;
+      flushHarnessEvents();
     };
   }, [resumed, readProjectReturnMemory]);
 

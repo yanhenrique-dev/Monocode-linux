@@ -34,6 +34,7 @@
     "test:linux:installer": "bash scripts/test-linux-desktop-installer.sh"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-css": "^6.3.1",
@@ -64,6 +65,8 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
     "cuelume": "^0.2.2",
     "diff": "^9.0.0",
@@ -74,6 +77,7 @@
     "react-material-icon-theme": "^1.2.0",
     "rehype-harden": "^1.1.8",
     "streamdown": "^2.5.0",
+    "tailwind-merge": "^3.7.0",
     "unified": "^11.0.5"
   },
   "devDependencies": {

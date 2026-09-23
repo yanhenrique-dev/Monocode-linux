@@ -170,9 +170,6 @@ const en = {
     "This format cannot be decoded here — try .ogg or .wav",
   "settings.general.sounds.error.unavailable":
     "Audio playback is unavailable on this system",
-  "settings.general.sounds.engine.running": "Audio ready",
-  "settings.general.sounds.engine.suspended":
-    "Waiting for first click or keypress",
   "settings.general.sounds.engine.unavailable":
     "Audio unavailable — the host WebKitGTK needs working audio (GStreamer sink + Pulse/PipeWire)",
   "settings.general.notifications.label": "Notifications",
@@ -907,9 +904,6 @@ const ptBR: Record<LocaleKey, string> = {
     "Este formato não pode ser decodificado aqui — tente .ogg ou .wav",
   "settings.general.sounds.error.unavailable":
     "Reprodução de áudio indisponível neste sistema",
-  "settings.general.sounds.engine.running": "Áudio pronto",
-  "settings.general.sounds.engine.suspended":
-    "Aguardando primeiro clique ou tecla",
   "settings.general.sounds.engine.unavailable":
     "Áudio indisponível — o WebKitGTK do host precisa de áudio funcional (sink GStreamer + Pulse/PipeWire)",
   "settings.general.notifications.label": "Notificações",

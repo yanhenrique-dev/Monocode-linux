@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useReducedMotion } from "../lib/motion";
 
 const FRAMES = [
   "⠋",
@@ -19,18 +20,21 @@ export function TerminalSpinner({
   className?: string;
 }) {
   const [frame, setFrame] = useState(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const id = window.setInterval(
       () => setFrame((n) => (n + 1) % FRAMES.length),
       80,
     );
     return () => window.clearInterval(id);
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <span aria-hidden className={className}>
-      {FRAMES[frame]}
+      {reducedMotion ? FRAMES[0] : FRAMES[frame]}
     </span>
   );
 }

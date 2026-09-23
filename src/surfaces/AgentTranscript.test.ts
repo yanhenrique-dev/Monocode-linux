@@ -1,8 +1,25 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Block } from "../lib/session";
 import { AgentTranscript } from "./AgentTranscript";
+
+function stubExperimentalAnimations(value: string) {
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) =>
+      key === "monocode.experimentalAnimations" ? value : null,
+    setItem: () => {},
+    removeItem: () => {},
+  } as unknown as Storage);
+}
+
+beforeEach(() => {
+  stubExperimentalAnimations("1");
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function tool(id: string, approval?: Block["approval"]): Block {
   return {

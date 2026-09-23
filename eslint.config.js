@@ -41,7 +41,27 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/**/*.test.ts"],
+    // New split modules (Fases 1-4): strict any/assertion from birth.
+    files: [
+      "src/lib/motion.ts",
+      "src/hooks/useAnimatedReorder.ts",
+      "src/hooks/useExitAnimation.ts",
+      "src/hooks/useSortable.ts",
+      "src/surfaces/Shimmer.tsx",
+      "src/app/sessionSync/**/*.ts",
+      "src/app/composer/**/*.ts",
+      "src/chrome/sidebar/**/*.tsx",
+      "src/chrome/sidebar/**/*.ts",
+      "src/chrome/composer/**/*.tsx",
+      "src/surfaces/settings/**/*.tsx",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+    },
+  },
+  {
+    files: ["src/**/*.test.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off",
       "max-lines": "off",

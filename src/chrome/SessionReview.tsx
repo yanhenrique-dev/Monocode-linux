@@ -11,6 +11,7 @@ import { invalidateProjectFiles } from "../lib/fileIndex";
 import { invalidateWatchedFiles } from "../lib/fileWatch";
 import { basename, notifyGitChanged, subscribeGitChanged } from "../lib/fs";
 import { useLocale } from "../lib/locale";
+import { useReducedMotion } from "../lib/motion";
 import { FileTypeIcon } from "./FileTypeIcon";
 
 type Props = {
@@ -94,10 +95,7 @@ export function SessionReview({
   // The card represents the result of a turn. Keep it out of the live turn,
   // then refresh and reveal it once the turn has settled.
   const show = !busy && files.length > 0;
-  const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduceMotion = useReducedMotion();
   // Keep the last files around so the fold closes over the card it showed
   // instead of flashing an empty "Changed 0 files" on the way out.
   const lastFiles = useRef(files);
