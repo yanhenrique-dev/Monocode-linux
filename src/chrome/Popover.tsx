@@ -1,26 +1,21 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
-  useState,
   type ComponentPropsWithoutRef,
   type CSSProperties,
   type Ref,
 } from "react";
-import { createPortal } from "react-dom";
+import { Popover as BasePopover } from "@base-ui/react/popover";
 import { GlassBackdrop } from "./GlassBackdrop";
 import { LAYER } from "../lib/layers";
 import {
   useExitAnimation,
   useExperimentalAnimations,
 } from "../hooks/useExitAnimation";
-import {
-  placePopover,
-  type AnchorRect,
-  type PopoverAlign,
-  type PopoverPosition,
-  type PopoverSide,
+import type {
+  PopoverAlign,
+  PopoverSide,
 } from "../lib/popover";
 
 /**
@@ -64,12 +59,46 @@ type Props = Omit<ComponentPropsWithoutRef<"div">, "style"> & {
 const FRAME =
   "isolate overflow-hidden rounded-xl border border-content/10 shadow-xl";
 
-/** Which corner the open animation grows from, so it reads as anchored. */
-function origin(side: PopoverSide, align: PopoverAlign): string {
-  const near = align === "start" ? "0%" : align === "end" ? "100%" : "50%";
-  if (side === "bottom") return `${near} 0%`;
-  if (side === "top") return `${near} 100%`;
-  return side === "right" ? `0% ${near}` : `100% ${near}`;
+/** Floating UI virtual element for rects and bare points. */
+function virtualAnchor(rect: {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}) {
+  return {
+    getBoundingClientRect: () => DOMRect.fromRect(rect),
+  };
+}
+
+function toBaseAnchor(
+  anchor: PopoverAnchor,
+): Element | { getBoundingClientRect: () => DOMRect } | null {
+  if (!anchor) return null;
+  if (anchor instanceof HTMLElement) return anchor;
+  if ("current" in anchor) return anchor.current;
+  if ("width" in anchor) {
+    const rect = anchor;
+    return virtualAnchor({
+      left: rect.left,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    });
+  }
+  const { x, y } = anchor;
+  return virtualAnchor({
+    left: x,
+    top: y,
+    right: x,
+    bottom: y,
+    width: 0,
+    height: 0,
+  });
 }
 
 function anchorElement(anchor: PopoverAnchor): HTMLElement | null {
@@ -78,65 +107,19 @@ function anchorElement(anchor: PopoverAnchor): HTMLElement | null {
   return "current" in anchor ? anchor.current : null;
 }
 
-function toRect(rect: DOMRect | AnchorRect): AnchorRect {
-  return {
-    left: rect.left,
-    top: rect.top,
-    right: rect.right,
-    bottom: rect.bottom,
-    width: rect.width,
-    height: rect.height,
-  };
-}
-
-function anchorRect(anchor: PopoverAnchor): AnchorRect | null {
-  if (!anchor) return null;
-  if (anchor instanceof HTMLElement) {
-    return toRect(anchor.getBoundingClientRect());
-  }
-  if ("current" in anchor) {
-    const el = anchor.current;
-    return el ? toRect(el.getBoundingClientRect()) : null;
-  }
-  if ("width" in anchor) return toRect(anchor);
-  const { x, y } = anchor;
-  return { left: x, top: y, right: x, bottom: y, width: 0, height: 0 };
-}
-
-/** Points and rects are fresh objects every render; elements keep identity. */
-function anchorKey(anchor: PopoverAnchor): unknown {
-  if (!anchor || anchor instanceof HTMLElement || "current" in anchor) {
-    return anchor;
-  }
-  if ("width" in anchor) {
-    return `${anchor.left}:${anchor.top}:${anchor.width}:${anchor.height}`;
-  }
-  return `${anchor.x}:${anchor.y}`;
-}
-
-function samePosition(a: PopoverPosition | null, b: PopoverPosition): boolean {
-  return (
-    a != null &&
-    a.side === b.side &&
-    a.left === b.left &&
-    a.top === b.top &&
-    a.bottom === b.bottom &&
-    a.width === b.width &&
-    a.maxHeight === b.maxHeight
-  );
-}
-
 /**
  * A menu, dropdown, or flyout that escapes its pane: portalled to the body so
  * no local stacking context can paint over it, placed against its anchor with
  * viewport flipping, and animated in from the anchored edge.
+ *
+ * Positioning runs on Base UI (Floating UI); the public API is unchanged.
  */
 export function Popover({
   anchor,
   side = "bottom",
   align = "start",
-  gap,
-  padding,
+  gap = 6,
+  padding = 8,
   width,
   minHeight,
   maxHeight,
@@ -153,49 +136,15 @@ export function Popover({
   children,
   ...rest
 }: Props) {
-  const frame = useRef<HTMLDivElement | null>(null);
-  const surface = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState<PopoverPosition | null>(null);
+  const dismissRef = useRef(onDismiss);
+  const popupRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef(anchor);
   anchorRef.current = anchor;
-  const dismissRef = useRef(onDismiss);
-  dismissRef.current = onDismiss;
-  const key = anchorKey(anchor);
-
-  const place = useCallback(() => {
-    const el = frame.current;
-    const rect = anchorRect(anchorRef.current);
-    if (!el || !rect) return;
-    const next = placePopover(
-      rect,
-      { width: el.offsetWidth, height: el.offsetHeight },
-      { width: window.innerWidth, height: window.innerHeight },
-      { side, align, gap, padding, width, minHeight, maxHeight },
-    );
-    setPosition((prev) => (samePosition(prev, next) ? prev : next));
-    // `key` stands in for the anchor, which is read through a ref.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, side, align, gap, padding, width, minHeight, maxHeight]);
-
-  useLayoutEffect(() => {
-    place();
-    // Content that lands after open — a branch list, a filtered menu — resizes
-    // the surface, and a top-anchored menu has to be measured again to sit
-    // above its trigger rather than drift over it.
-    const observer = new ResizeObserver(place);
-    if (frame.current) observer.observe(frame.current);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [place]);
-
+  // Written in an effect, not during render: a discarded concurrent render
+  // must never swap the callback the committed tree's dismiss will run.
   useEffect(() => {
-    if (autoFocus) surface.current?.focus();
-  }, [autoFocus]);
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   const animationsEnabled = useExperimentalAnimations();
   const pendingReason = useRef<PopoverDismissReason | null>(null);
@@ -220,93 +169,112 @@ export function Popover({
     [animationsEnabled, requestClose],
   );
 
+  // Escape stays on a window capture listener (old semantics: works no
+  // matter where focus sits). Base UI's own escape-key close is ignored in
+  // `handleOpenChange` so a dismissal never fires twice.
+  useEffect(() => {
+    if (!onDismiss || !dismissOnEscape) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      dismiss("escape");
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onDismiss, dismissOnEscape, dismiss]);
+  // Outside press stays on our own pointerdown listener (old semantics:
+  // close on press, not on click — Base UI defaults to intentional/click
+  // dismissal). Base's outside-press is cancelled in `handleOpenChange`.
   useEffect(() => {
     if (!onDismiss) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
-      if (frame.current?.contains(target)) return;
+      if (popupRef.current?.contains(target)) return;
       if (anchorElement(anchorRef.current)?.contains(target)) return;
       const el =
         target instanceof Element ? target : (target.parentElement ?? null);
       if (ignore && el?.closest(ignore)) return;
       dismiss("outside");
     };
-    const onKey = (event: KeyboardEvent) => {
-      if (!dismissOnEscape || event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      dismiss("escape");
-    };
     window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [onDismiss, dismissOnEscape, ignore, dismiss]);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [onDismiss, ignore, dismiss]);
 
-  // The first pass measures the surface off to the side; the layout effect
-  // lands it before the browser paints.
-  const placed: CSSProperties = position
-    ? {
-        position: "fixed",
-        left: position.left,
-        top: position.top,
-        bottom: position.bottom,
-        width: position.width,
-        ...(constrainHeight ? { maxHeight: position.maxHeight } : {}),
-      }
-    : {
-        position: "fixed",
-        left: 0,
-        top: 0,
-        width,
-        ...(constrainHeight
-          ? { maxHeight: maxHeight ?? "calc(100vh - 16px)" }
-          : {}),
-        visibility: "hidden",
-      };
+  const handleOpenChange = useCallback(
+    (
+      open: boolean,
+      details: { reason: string; event: Event; cancel: () => void },
+    ) => {
+      if (open) return;
+      // Owned by the listeners above; never double-dismiss.
+      details.cancel();
+    },
+    [],
+  );
 
-  // Keep the backdrop-filter on a stable frame. WebKit can briefly paint a
-  // stale backdrop when the same composited element is transformed and then
-  // invalidated by a child hover. Only this unblurred content layer moves.
+  // Frame border compensation, like the old Popover: the glass frame eats
+  // 2px that the content max-height must give back (bare surfaces: 0).
   const frameInset = bare ? 0 : 2;
   const contentMaxHeight = constrainHeight
-    ? position
-      ? Math.max(0, position.maxHeight - frameInset)
-      : maxHeight != null
-        ? Math.max(0, maxHeight - frameInset)
-        : `calc(100vh - ${16 + frameInset}px)`
+    ? typeof maxHeight === "number"
+      ? Math.max(0, maxHeight - frameInset)
+      : (maxHeight ?? "calc(100vh - 16px)")
     : undefined;
 
-  return createPortal(
-    <div
-      ref={frame}
-      data-popover-side={position?.side ?? side}
-      style={{ ...placed, zIndex: layer }}
-      className={bare ? undefined : FRAME}
+  return (
+    <BasePopover.Root
+      open
+      modal={false}
+      onOpenChange={handleOpenChange}
     >
-      {bare ? null : <GlassBackdrop />}
-      <div
-        {...rest}
-        ref={(el) => {
-          surface.current = el;
-          if (typeof ref === "function") ref(el);
-          else if (ref) ref.current = el;
-        }}
-        data-popover-side={position?.side ?? side}
-        style={{
-          ...(contentMaxHeight != null ? { maxHeight: contentMaxHeight } : {}),
-          transformOrigin: origin(position?.side ?? side, align),
-          ...style,
-        }}
-        onAnimationEnd={closing ? handleAnimationEnd : undefined}
-        className={`${position && !closing ? "popover-open " : ""}${closing ? "popover-closing " : ""}relative z-[1] outline-none ${className ?? ""}`}
-      >
-        {children}
-      </div>
-    </div>,
-    document.body,
+      {/*
+        Base Portal resolves its container in a layout effect, so popup DOM
+        lands one commit after mount. Callers that focus on open (pickers)
+        already retry on the next frame; keep that contract.
+      */}
+      <BasePopover.Portal style={{ zIndex: layer }}>
+        <BasePopover.Positioner
+          anchor={toBaseAnchor(anchor)}
+          positionMethod="fixed"
+          side={side}
+          align={align}
+          sideOffset={gap}
+          alignOffset={0}
+          collisionPadding={padding}
+          data-popover-side={side}
+          className={bare ? undefined : FRAME}
+        >
+          {bare ? null : <GlassBackdrop />}
+          <BasePopover.Popup
+            {...rest}
+            ref={(el) => {
+              popupRef.current = el;
+              if (typeof ref === "function") ref(el);
+              else if (ref) ref.current = el;
+            }}
+            initialFocus={autoFocus}
+            // Callers own focus restore (e.g. mute control refocuses its
+            // trigger); Base would return focus to whatever held it when
+            // the async portal mount settled, usually body.
+            finalFocus={false}
+            data-popover-side={side}
+            style={{
+              width,
+              minHeight,
+              ...(contentMaxHeight != null
+                ? { maxHeight: contentMaxHeight }
+                : {}),
+              ...style,
+            }}
+            onAnimationEnd={closing ? handleAnimationEnd : undefined}
+            className={`${closing ? "popover-closing " : "popover-open "}relative z-[1] outline-none ${className ?? ""}`}
+          >
+            {children}
+          </BasePopover.Popup>
+        </BasePopover.Positioner>
+      </BasePopover.Portal>
+    </BasePopover.Root>
   );
 }
