@@ -301,7 +301,9 @@ describe("archived conversations", () => {
   }
 
   function dialog(): HTMLElement | null {
-    return document.querySelector<HTMLElement>('[role="dialog"]');
+    return document.querySelector<HTMLElement>(
+      '[role="dialog"], [role="alertdialog"]',
+    );
   }
 
   function dialogButton(label: string): HTMLButtonElement {
@@ -320,6 +322,8 @@ describe("archived conversations", () => {
     });
 
     await act(async () => rowDeleteButton("Fix login").click());
+    // The dialog portal settles a few commits after open; flush before querying.
+    for (let i = 0; i < 4; i++) await act(async () => {});
     expect(onDeleteSession).not.toHaveBeenCalled();
     expect(dialog()?.textContent).toContain("Delete “Fix login”?");
     await act(async () => {});
@@ -338,6 +342,7 @@ describe("archived conversations", () => {
     });
 
     await act(async () => rowDeleteButton("Fix login").click());
+    for (let i = 0; i < 4; i++) await act(async () => {});
     await act(async () => dialogButton("Cancel").click());
     expect(onDeleteSession).not.toHaveBeenCalled();
     expect(dialog()).toBeNull();
@@ -354,6 +359,7 @@ describe("archived conversations", () => {
     });
 
     await act(async () => rowDeleteButton("Ship release").click());
+    for (let i = 0; i < 4; i++) await act(async () => {});
     expect(dialog()?.textContent).toContain("Ship release");
     expect(dialog()?.textContent).not.toContain("Fix login");
     await act(async () => dialogButton("Delete").click());

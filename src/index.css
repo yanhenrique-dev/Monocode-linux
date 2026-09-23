@@ -846,6 +846,12 @@ header[data-tauri-drag-region] button {
     background-color 160ms ease;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .agent-markdown .markdown-code-copy {
+    transition: none;
+  }
+}
+
 .agent-markdown .markdown-code-copy:hover {
   background: color-mix(in srgb, var(--color-content) 10%, transparent);
   color: var(--color-content);
@@ -1170,6 +1176,12 @@ header[data-tauri-drag-region] button {
   animation: approval-toast-in var(--motion-in) var(--motion-ease);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .approval-toast {
+    animation: none;
+  }
+}
+
 @keyframes linked-activity-notice-in {
   from {
     transform: translateY(-8px);
@@ -1213,6 +1225,12 @@ header[data-tauri-drag-region] button {
   -webkit-background-clip: text;
   color: transparent;
   animation: shimmer-text var(--shimmer-duration, 2s) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+  }
 }
 
 /* Two-frame mascot loop — a hard swap plus a one-pixel hop, arcade style. */
@@ -1267,6 +1285,16 @@ header[data-tauri-drag-region] button {
 
 .composer-coin-edge {
   animation: mascot-talk 320ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-active,
+  .mascot-rest,
+  .mascot-talk,
+  .composer-coin-face,
+  .composer-coin-edge {
+    animation: none;
+  }
 }
 
 /* Freeze the hop while the runner is seeing stars after a chevron bonk. */
@@ -2216,4 +2244,95 @@ html.theme-light .popover-backdrop {
     var(--color-content) 10%,
     var(--color-background-base)
   );
+}
+
+/* ---- shadcn bridge (F0): aliases over MonoCode runtime tokens. ----
+ * Dark = default :root; light = html.theme-light (same vars flip via
+ * --background-lightness / --content-lightness). Never hardcode shadcn
+ * palette colors in components; always come through these aliases.
+ * shadcn `dark:` variant already maps to html:not(.theme-light) via the
+ * @custom-variant at the top of this file. */
+:root {
+  --background: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--background-lightness)
+  );
+  --foreground: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--content-lightness)
+  );
+  --card: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--background-lightness)
+  );
+  --card-foreground: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--content-lightness)
+  );
+  --popover: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--background-lightness)
+  );
+  --popover-foreground: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--content-lightness)
+  );
+  --primary: #fff;
+  --primary-foreground: #000;
+  --secondary: color-mix(
+    in srgb,
+    var(--foreground) var(--selection-strength),
+    transparent
+  );
+  --secondary-foreground: var(--foreground);
+  --muted: color-mix(
+    in srgb,
+    var(--foreground) var(--selection-subtle-strength),
+    transparent
+  );
+  --muted-foreground: color-mix(in srgb, var(--foreground) 60%, transparent);
+  --accent: color-mix(
+    in srgb,
+    var(--foreground) var(--selection-strength),
+    transparent
+  );
+  --accent-foreground: var(--foreground);
+  --destructive: #f87171;
+  --destructive-foreground: #000;
+  --border: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --input: color-mix(in srgb, var(--foreground) 15%, transparent);
+  --ring: var(--link-color);
+  --radius: 0.625rem;
+}
+
+html.theme-light {
+  --primary: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--content-lightness)
+  );
+  --primary-foreground: hsl(
+    var(--theme-hue) var(--theme-saturation) var(--background-lightness)
+  );
+  --destructive: #dc2626;
+  --destructive-foreground: #fff;
+}
+
+html.has-user-accent {
+  --primary: var(--user-accent-color);
+  --primary-foreground: var(--user-accent-foreground);
+}
+
+/* Global focus ring (F0). :where keeps specificity zero so per-component
+ * focus styles still win; drag handles are not focusable. */
+:where(:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Base UI popovers report placement via data-side (F1.3); keep the anchored
+ * enter animation growing from the right edge. */
+.popover-open[data-side="bottom"] {
+  transform-origin: 50% 0%;
+}
+.popover-open[data-side="top"] {
+  transform-origin: 50% 100%;
+}
+.popover-open[data-side="right"] {
+  transform-origin: 0% 50%;
+}
+.popover-open[data-side="left"] {
+  transform-origin: 100% 50%;
 }
