@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.31] - 2026-09-23
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Chat background effects for new threads: worker pipeline, 5 effects,
+  selector in Appearance, readiness fade, reduced-motion support.
+- In-transcript find, measured scroll anchor, per-turn memo with typed
+  block comparison, fold tracking.
+
+### Fixed
+
+- Settings/search/inbox/notes overlays hide the sidebar without outro
+  or remount; no phantom cursor on return.
+- Stale uninstalled default provider no longer haunts new sessions;
+  missing CLI hinted on the picker trigger.
+- Updater shows an actionable message without permission on system paths.
+
 ## [0.2.30] - 2026-09-23
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
