@@ -3,10 +3,12 @@ import {
   EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT,
   loadExperimentalAnimations,
 } from "../lib/appearance";
+import { useReducedMotion } from "../lib/motion";
 
 /** Experimental-animations flag minus reduced-motion: the single gate for enter/exit motion. */
 export function useExperimentalAnimations(): boolean {
   const [enabled, setEnabled] = useState(loadExperimentalAnimations);
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     const onChange = (event: Event) => {
       setEnabled(
@@ -18,10 +20,6 @@ export function useExperimentalAnimations(): boolean {
       window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
     };
   }, []);
-  const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return enabled && !reduceMotion;
 }
 

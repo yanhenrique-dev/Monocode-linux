@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  lazy,
+  Suspense,
 } from "react";
 import { Sidebar } from "./chrome/Sidebar";
 import { ApprovalToasts } from "./chrome/ApprovalToasts";
@@ -67,12 +69,33 @@ import { PaneTree } from "./surfaces/PaneTree";
 import { SessionPane } from "./surfaces/SessionPane";
 import { SessionSurface } from "./surfaces/SessionSurface";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
-import { SearchView } from "./surfaces/SearchView";
-import { SettingsView, type SettingsAnchor } from "./surfaces/SettingsView";
-import { InboxView, LinkedWorkItemPanel } from "./surfaces/InboxView";
+import { LinkedWorkItemPanel } from "./surfaces/InboxView";
+import type { SettingsAnchor } from "./surfaces/SettingsView";
 import type { InboxSessionPortal } from "./surfaces/InboxDiscussionPanel";
-import { NotesView } from "./surfaces/NotesView";
 import type { LinkedSessionUpdate } from "./lib/linkedSessionUpdates";
+
+/** Overlay views load on demand: boot renders panes first, these chunks
+ * arrive when the user opens search/inbox/notes/settings. */
+const SearchView = lazy(() =>
+  import("./surfaces/SearchView").then((module) => ({
+    default: module.SearchView,
+  })),
+);
+const SettingsView = lazy(() =>
+  import("./surfaces/SettingsView").then((module) => ({
+    default: module.SettingsView,
+  })),
+);
+const InboxView = lazy(() =>
+  import("./surfaces/InboxView").then((module) => ({
+    default: module.InboxView,
+  })),
+);
+const NotesView = lazy(() =>
+  import("./surfaces/NotesView").then((module) => ({
+    default: module.NotesView,
+  })),
+);
 import {
   loadLiveAgentsEnabled,
   loadNotesEnabled,
@@ -1458,20 +1481,22 @@ export default function App({
               </main>
             </div>
             {searchViewOpen ? (
-              <SearchView
-                open
-                cwd={sidebarCwd}
-                recents={recents}
-                history={projectHistory}
-                sessions={sessions.filter((session) => !session.inboxAsk)}
-                focusToken={searchViewFocusToken}
-                besideRail={projectRailOpen}
-                onClose={onLeaveSearch}
-                onToggleSidebar={onToggleSidebar}
-                onOpenFile={onOpenFile}
-                onOpenSession={onSelectHistorySession}
-                onOpenProject={onSelectProject}
-              />
+              <Suspense fallback={null}>
+                <SearchView
+                  open
+                  cwd={sidebarCwd}
+                  recents={recents}
+                  history={projectHistory}
+                  sessions={sessions.filter((session) => !session.inboxAsk)}
+                  focusToken={searchViewFocusToken}
+                  besideRail={projectRailOpen}
+                  onClose={onLeaveSearch}
+                  onToggleSidebar={onToggleSidebar}
+                  onOpenFile={onOpenFile}
+                  onOpenSession={onSelectHistorySession}
+                  onOpenProject={onSelectProject}
+                />
+              </Suspense>
             ) : null}
             <div className="hidden" aria-hidden>
               {sessions
@@ -1498,54 +1523,60 @@ export default function App({
                 })}
             </div>
             {inboxViewOpen ? (
-              <InboxView
-                cwd={sidebarCwd}
-                recents={recents}
-                besideRail={projectRailOpen}
-                onClose={onLeaveInbox}
-                onToggleSidebar={onToggleSidebar}
-                onStart={onStartInboxItem}
-                onAsk={onAskInboxItem}
-                onAskRestart={onRestartInboxAsk}
-                onAskMount={setInboxAskPortal}
-                sessions={inboxRelatedSessions}
-                onOpenSession={onOpenInboxSession}
-                onOpenIntegrations={onOpenInboxIntegrations}
-              />
+              <Suspense fallback={null}>
+                <InboxView
+                  cwd={sidebarCwd}
+                  recents={recents}
+                  besideRail={projectRailOpen}
+                  onClose={onLeaveInbox}
+                  onToggleSidebar={onToggleSidebar}
+                  onStart={onStartInboxItem}
+                  onAsk={onAskInboxItem}
+                  onAskRestart={onRestartInboxAsk}
+                  onAskMount={setInboxAskPortal}
+                  sessions={inboxRelatedSessions}
+                  onOpenSession={onOpenInboxSession}
+                  onOpenIntegrations={onOpenInboxIntegrations}
+                />
+              </Suspense>
             ) : null}
             {notesViewOpen ? (
-              <NotesView
-                besideRail={projectRailOpen}
-                cwd={projectCwd}
-                recents={recents}
-                onClose={onLeaveNotes}
-                onToggleSidebar={onToggleSidebar}
-              />
+              <Suspense fallback={null}>
+                <NotesView
+                  besideRail={projectRailOpen}
+                  cwd={projectCwd}
+                  recents={recents}
+                  onClose={onLeaveNotes}
+                  onToggleSidebar={onToggleSidebar}
+                />
+              </Suspense>
             ) : null}
             {settingsOpen ? (
-              <SettingsView
-                section={settingsSection}
-                anchor={settingsAnchor}
-                notificationProjectPath={notificationProjectPath}
-                notificationSettingsRequest={notificationSettingsRequest}
-                recents={recents}
-                cwd={sidebarCwd}
-                sessions={sidebarHistory}
-                liveSessions={sessions}
-                onRemoveWorktree={worktree.onRemoveWorktree}
-                onCheckWorktreeRemoval={worktree.onCheckWorktreeRemoval}
-                onDeleteWorktreeSessions={worktree.onDeleteWorktreeSessions}
-                onClose={onCloseSettings}
-                onSelectSection={onSelectSettingsSection}
-                onOpenSession={onOpenArchivedSession}
-                onArchiveSession={onArchiveHistorySession}
-                onDeleteSession={onDeleteHistorySession}
-                onRestoreProject={onRestoreProject}
-                onDeleteProject={(path) =>
-                  onRemoveProject(path, { purgeData: true })
-                }
-                onOpenWhatsNew={onOpenWhatsNew}
-              />
+              <Suspense fallback={null}>
+                <SettingsView
+                  section={settingsSection}
+                  anchor={settingsAnchor}
+                  notificationProjectPath={notificationProjectPath}
+                  notificationSettingsRequest={notificationSettingsRequest}
+                  recents={recents}
+                  cwd={sidebarCwd}
+                  sessions={sidebarHistory}
+                  liveSessions={sessions}
+                  onRemoveWorktree={worktree.onRemoveWorktree}
+                  onCheckWorktreeRemoval={worktree.onCheckWorktreeRemoval}
+                  onDeleteWorktreeSessions={worktree.onDeleteWorktreeSessions}
+                  onClose={onCloseSettings}
+                  onSelectSection={onSelectSettingsSection}
+                  onOpenSession={onOpenArchivedSession}
+                  onArchiveSession={onArchiveHistorySession}
+                  onDeleteSession={onDeleteHistorySession}
+                  onRestoreProject={onRestoreProject}
+                  onDeleteProject={(path) =>
+                    onRemoveProject(path, { purgeData: true })
+                  }
+                  onOpenWhatsNew={onOpenWhatsNew}
+                />
+              </Suspense>
             ) : null}
             {searchViewOpen ||
             inboxViewOpen ||

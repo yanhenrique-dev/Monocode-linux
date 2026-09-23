@@ -8,8 +8,22 @@ import { AgentTranscript } from "./AgentTranscript";
 let container: HTMLDivElement;
 let root: Root;
 
+function stubMatchMedia(matches: boolean) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    })),
+  );
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  stubMatchMedia(false);
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -130,6 +144,27 @@ describe("work fold motion", () => {
 
   it("snaps open and shut with experimental animations off", () => {
     localStorage.setItem("monocode.experimentalAnimations", "0");
+    renderTranscript();
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Show the work"]')!
+        .click();
+    });
+    const opened = foldDetails()!;
+    expect(opened.getAttribute("data-fold-state")).toBe("open");
+    expect(opened.getAttribute("data-fold-animated")).toBe("false");
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Hide the work"]')!
+        .click();
+    });
+    expect(foldDetails()).toBeNull();
+  });
+
+  it("snaps open and shut under reduced motion even with animations on", () => {
+    localStorage.setItem("monocode.experimentalAnimations", "1");
+    stubMatchMedia(true);
     renderTranscript();
 
     act(() => {

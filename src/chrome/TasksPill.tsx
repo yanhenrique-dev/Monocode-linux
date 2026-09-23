@@ -5,6 +5,7 @@ import {
   taskListActiveLabel,
   taskListProgressLabel,
 } from "../lib/taskList";
+import { useReducedMotion } from "../lib/motion";
 import { ChevronRight, ListEnd } from "./icons";
 
 type Props = {
@@ -34,10 +35,11 @@ export function TasksPill({
   revealBlock,
 }: Props) {
   const last = useMemo(() => lastTaskBlock(blocks), [blocks]);
+  const lastId = last?.id ?? null;
   const [offscreen, setOffscreen] = useState(false);
 
   useEffect(() => {
-    if (!visible || !enabled || !last) {
+    if (!visible || !enabled || !lastId) {
       setOffscreen(false);
       return;
     }
@@ -46,7 +48,7 @@ export function TasksPill({
       ".agent-transcript",
     );
     const anchor = scroller?.querySelector<HTMLElement>(
-      `[data-task-anchor="${last.id}"]`,
+      `[data-task-anchor="${lastId}"]`,
     );
     if (!scroller) return;
     // Paginated-out turn: the block exists but its anchor is not mounted.
@@ -63,7 +65,7 @@ export function TasksPill({
     );
     observer.observe(anchor);
     return () => observer.disconnect();
-  }, [visible, enabled, last, scope, blocks]);
+  }, [visible, enabled, lastId, scope]);
 
   const items = last?.taskList?.items ?? [];
   // Once every item settled, the pill would only ever read "Complete" —
@@ -74,10 +76,7 @@ export function TasksPill({
       (item) => item.status === "completed" || item.status === "cancelled",
     );
   const open = visible && enabled && !!last && offscreen && !settled;
-  const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduceMotion = useReducedMotion();
   const reveal = () => {
     if (!last) return;
     if (!revealBlock?.(last.id)) return;

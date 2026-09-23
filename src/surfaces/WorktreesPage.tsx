@@ -3,7 +3,7 @@ import { CreateWorktreeDialog } from "../chrome/CreateWorktreeDialog";
 import { DeleteWorktreeDialog } from "../chrome/DeleteWorktreeDialog";
 import { SearchableProjectPicker } from "../chrome/SearchableProjectPicker";
 import { SecondaryButton } from "../chrome/SecondaryButton";
-import { Group } from "./SettingsView";
+import { Group } from "./settings/SettingsChrome";
 import {
   FolderOpen,
   FolderTree,

@@ -28,6 +28,7 @@ import {
   EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT,
   TASKS_PILL_CHANGE_EVENT,
 } from "../lib/appearance";
+import { useReducedMotion } from "../lib/motion";
 import {
   canCompactHarnessContext,
   type ApprovalDecision,
@@ -315,10 +316,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
       window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
     };
   }, []);
-  const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduceMotion = useReducedMotion();
   const latestTurnAccessory = useMemo(
     () =>
       session.inboxAsk || session.worktreeRemoved ? undefined : (
