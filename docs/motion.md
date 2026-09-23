@@ -16,6 +16,13 @@ center pane never slides sideways.
   `useAnimatedReorder` via `motion.ts`).
 - `--motion-feedback-duration: 120ms` — hover/press color feedback.
 
+## First-run wizard
+
+Wizard reuses modal enter/exit timing: 180ms enter, 150ms exit, and the existing
+`modal-panel` fallback. Step and status feedback use `zen-step-in` and `Shimmer`
+only when experimental animations are enabled and reduced motion is off. No new
+motion token is required.
+
 ## Rules
 
 - Enter fills `backwards` (resting state is the truth, no retained

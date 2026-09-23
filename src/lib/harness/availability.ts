@@ -114,6 +114,10 @@ export function harnessUnavailableHint(
   return t(locale, "settings.providers.row.unavailable", { name, how });
 }
 
+export function harnessInstallHint(id: HarnessId): string | null {
+  return CLI[id].install ?? null;
+}
+
 export function probeHarnessAvailability(
   options?: { force?: boolean },
 ): Promise<void> {

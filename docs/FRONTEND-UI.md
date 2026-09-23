@@ -24,6 +24,8 @@ Decisão: sem troca de framework, sem restyle GNOME. Refinar com
 - Wrappers preservam API pública atual (Modal sm/md, Popover anchor/side,
   ExplorerMenu items, SecondaryButton danger). Call sites não reescrevem
   em massa; 1 família por PR.
+- `Modal dismissible={false}` bloqueia backdrop, X e Escape; footer permanece
+  caminho explícito de saída.
 - Portals usam `LAYER` (`src/lib/layers.ts`): popover 80, submenu 81,
   dialog 90, dialogPopover 91, toast 100. Nunca `z-50` shadcn.
 - `GlassBackdrop` dentro de Dialog/Popover quando glass ligado.

@@ -152,6 +152,7 @@ export interface SessionSyncDeps {
   inboxViewOpenRef: MutableRefObject<boolean>;
   notesViewOpenRef: MutableRefObject<boolean>;
   settingsOpenRef: MutableRefObject<boolean>;
+  firstRunOpenRef: MutableRefObject<boolean>;
   loadedProjectsRef: MutableRefObject<ReadonlySet<string>>;
   activeTabIdRef: MutableRefObject<string>;
   projectCwdRef: MutableRefObject<string>;
@@ -217,6 +218,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     inboxViewOpenRef,
     notesViewOpenRef,
     settingsOpenRef,
+    firstRunOpenRef,
     loadedProjectsRef,
     activeTabIdRef,
     projectCwdRef,
@@ -604,7 +606,8 @@ export function useSessionSync(deps: SessionSyncDeps) {
             !searchViewOpenRef.current &&
             !inboxViewOpenRef.current &&
             !notesViewOpenRef.current &&
-            !settingsOpenRef.current
+            !settingsOpenRef.current &&
+            !firstRunOpenRef.current
           ) {
             setComposerFocused(true);
             setComposerFocusToken((token) => token + 1);
