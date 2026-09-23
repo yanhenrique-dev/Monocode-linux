@@ -246,6 +246,8 @@ const en = {
   "updater.dialog.install_failed": "Couldn't install the update.\n\n{error}",
   "updater.permission_hint":
     "No write permission to the install folder (system path such as /usr/local/bin). Reinstall per-user into ~/.local/bin with `scripts/install-linux-desktop.sh`, or run with write access to that folder. Manual download: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
+  "updater.no_space_hint":
+    "Not enough disk space to download the update. Free some space and try again. Manual download: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "settings.chat.transcript.title": "Transcript",
   "settings.chat.transcript.description":
     "How a conversation reads as it grows.",
@@ -998,6 +1000,8 @@ const ptBR: Record<LocaleKey, string> = {
   "updater.dialog.install_failed": "Não foi possível instalar a atualização.\n\n{error}",
   "updater.permission_hint":
     "Sem permissão de escrita na pasta de instalação (caminho de sistema como /usr/local/bin). Reinstale por usuário em ~/.local/bin com `scripts/install-linux-desktop.sh`, ou execute com acesso de escrita a essa pasta. Download manual: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
+  "updater.no_space_hint":
+    "Sem espaço em disco para baixar a atualização. Libere espaço e tente de novo. Download manual: https://github.com/yanhenrique-dev/Monocode-linux/releases/latest",
   "settings.chat.transcript.title": "Transcrição",
   "settings.chat.transcript.description":
     "Como a conversa é exibida à medida que cresce.",
