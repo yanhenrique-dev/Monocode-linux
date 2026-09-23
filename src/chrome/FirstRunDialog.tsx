@@ -176,7 +176,7 @@ export function FirstRunDialog({
         <main
           className="min-h-0 flex-1 overflow-y-auto px-5 py-5"
           aria-busy={checking}
-          inert={checking || !report ? true : undefined}
+          inert={checking ? true : undefined}
         >
           {!report ? (
             error ? (

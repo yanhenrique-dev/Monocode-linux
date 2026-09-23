@@ -281,6 +281,29 @@ describe("FirstRunDialog", () => {
     expect(onOpenInbox).toHaveBeenCalledOnce();
   });
 
+  it("keeps retry interactive after the initial probe fails", async () => {
+    probes.probeFirstRunReport
+      .mockRejectedValueOnce(new Error("probe failed"))
+      .mockResolvedValue(report);
+
+    await act(async () => {
+      root.render(
+        createElement(FirstRunDialog, {
+          onClose: vi.fn(),
+          onOpenInbox: vi.fn(),
+          onOpenProviders: vi.fn(),
+        }),
+      );
+    });
+
+    const retry = button("Retry");
+    expect(retry.disabled).toBe(false);
+    await act(async () => retry.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+      "0.2.31",
+    );
+  });
+
   it("does not shimmer under reduced motion", async () => {
     localStorage.setItem("monocode.experimentalAnimations", "1");
     vi.stubGlobal(
