@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type RefObject } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
   COIN_EDGE_PATH,
@@ -35,6 +35,7 @@ import {
   type Coin,
 } from "../lib/composerRunner";
 import { projectKey, projectName } from "../lib/paths";
+import { subscribeOverlayOpenChanged } from "../lib/appearance";
 import {
   loadTabGroupColors,
   loadTabGroupCustomColors,
@@ -81,6 +82,13 @@ export function ComposerRunner({
 
   const project = projectName(cwd);
   const key = projectKey(cwd);
+  // Fullscreen overlays (settings/search/inbox/notes) cover the composer:
+  // park the pet instead of roaming over them.
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  useLayoutEffect(
+    () => subscribeOverlayOpenChanged(setOverlayOpen),
+    [],
+  );
   const appearance = useMemo(() => {
     return {
       name: resolveTabGroupMascot(key, loadTabGroupMascots()),
@@ -508,7 +516,7 @@ export function ComposerRunner({
       ref={layerRef}
       aria-hidden
       className="pointer-events-none fixed inset-0 z-40 overflow-visible"
-      style={{ visibility: "hidden" }}
+      style={{ visibility: "hidden", display: overlayOpen ? "none" : undefined }}
     >
       <div ref={coinsRef} className="absolute inset-0" />
       <div
