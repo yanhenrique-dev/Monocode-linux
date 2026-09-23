@@ -6,6 +6,12 @@ import { act, createElement, type MutableRefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const asyncMocks = vi.hoisted(() => ({
+  prepareAttachments: vi.fn(),
+  preparePrompt: vi.fn(),
+  steerHarnessTurn: vi.fn(),
+}));
+
 vi.mock("../lib/orchestration", () => ({
   orchestrator: {
     submissionError: vi.fn(),
@@ -21,8 +27,22 @@ vi.mock("../lib/harness", async (importOriginal) => {
     ...actual,
     isLiveHarness: () => true,
     canSteerHarness: () => true,
+    steerHarnessTurn: asyncMocks.steerHarnessTurn,
   };
 });
+
+vi.mock("../lib/attachments", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../lib/attachments")>();
+  return {
+    ...actual,
+    prepareAttachments: asyncMocks.prepareAttachments,
+  };
+});
+
+vi.mock("../lib/promptPreparation", () => ({
+  preparePrompt: asyncMocks.preparePrompt,
+}));
 
 import { orchestrator } from "../lib/orchestration";
 import type { HarnessEvent } from "../lib/harness";
@@ -78,6 +98,9 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   submissionError.mockReturnValue(undefined);
   forSession.mockReturnValue(undefined);
+  asyncMocks.prepareAttachments.mockResolvedValue([]);
+  asyncMocks.preparePrompt.mockImplementation(async (text: string) => text);
+  asyncMocks.steerHarnessTurn.mockResolvedValue(undefined);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -211,6 +234,38 @@ describe("useComposer.onSubmit guard clauses", () => {
     });
 
     expect(result).toBe("steered");
+  });
+
+  it("does not send a steer after its turn is stopped", async () => {
+    let releaseAttachments!: (value: never[]) => void;
+    asyncMocks.prepareAttachments.mockImplementationOnce(
+      () => new Promise<never[]>((resolve) => {
+        releaseAttachments = resolve;
+      }),
+    );
+    const turnGen = new Map([["s1", 3]]);
+    const { deps, events } = makeDeps([makeSession({ busy: true })], {
+      turnGen: { current: turnGen },
+    });
+    const api = renderApi(deps);
+
+    let result: unknown;
+    act(() => {
+      result = api.current!.onSubmit("s1", "late nudge", [], {
+        followUpBehavior: "steer",
+      });
+    });
+    expect(result).toBe("steered");
+
+    turnGen.set("s1", 4);
+    await act(async () => {
+      releaseAttachments([]);
+      await Promise.resolve();
+    });
+
+    expect(asyncMocks.preparePrompt).not.toHaveBeenCalled();
+    expect(asyncMocks.steerHarnessTurn).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
   });
 
   it("queues a busy-session follow-up when behavior is queue", () => {
