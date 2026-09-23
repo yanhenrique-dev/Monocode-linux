@@ -1,13 +1,18 @@
 import { X } from "./icons";
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import {
   useExitAnimation,
   useExperimentalAnimations,
 } from "../hooks/useExitAnimation";
-import { LAYER } from "../lib/layers";
 import { useLocale } from "../lib/locale";
+import {
+  Dialog,
+  DialogDescription,
+  DialogPopup,
+  DialogPortal,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { GlassBackdrop } from "./GlassBackdrop";
 
 export type ModalSize = "sm" | "md";
@@ -29,6 +34,8 @@ type Props = {
   size?: ModalSize;
   /** Keeps the accessible title while letting focused content own the visual hierarchy. */
   minimalHeader?: boolean;
+  /** Hides the header close button (the dialog owns dismissal, e.g. busy forms). */
+  hideClose?: boolean;
   /** Extra classes on the panel (fixed height, etc). */
   className?: string;
   children: ReactNode;
@@ -46,48 +53,59 @@ export function ModalPanel({
   description,
   size = "md",
   minimalHeader = false,
+  hideClose = false,
   className,
   children,
   panelClassName,
   onPanelAnimationEnd,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   const lockOverscroll = useLockOverscroll<HTMLDivElement>();
   const { t } = useLocale();
   const uid = useId();
   const titleId = `${uid}-title`;
   const descriptionId = description ? `${uid}-desc` : undefined;
 
+  // Focus trap lives in Base UI (Dialog root). Initial focus + restore stay
+  // explicit: the app unmounts dialogs while still open, a path where Base
+  // skips its own finalFocus restore. Dialogs without a close button focus
+  // their own content (e.g. SwitchBranchDialog's textarea).
   useEffect(() => {
-    if (!minimalHeader) closeRef.current?.focus();
-  }, [minimalHeader]);
+    previousFocus.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    if (!minimalHeader && !hideClose) closeRef.current?.focus();
+    return () => {
+      previousFocus.current?.focus?.();
+      previousFocus.current = null;
+    };
+  }, [minimalHeader, hideClose]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
       if (
-        event.key !== "Escape" ||
-        event.defaultPrevented ||
-        (event.target instanceof Element &&
-          event.target.closest("[data-dialog-popover]"))
-      )
-        return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
+        event.target instanceof Element &&
+        event.target.closest("[data-dialog-popover]")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, []);
 
   return (
     <div
       className={`absolute left-1/2 ${TOP[size]} ${WIDTH[size]} -translate-x-1/2`}
     >
-      <div
-        role="dialog"
+      <DialogPopup
         aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
+        initialFocus={false}
+        finalFocus={false}
         onMouseDown={(event) => event.stopPropagation()}
         className={`relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
       >
@@ -108,30 +126,40 @@ export function ModalPanel({
             <div
               className={minimalHeader ? "sr-only" : "min-w-0 flex-1 pt-0.5"}
             >
-              <h2
-                id={titleId}
-                className="text-2xl font-semibold leading-tight text-content"
-              >
-                {title}
-              </h2>
+              <DialogTitle
+                render={
+                  <h2
+                    id={titleId}
+                    className="text-2xl font-semibold leading-tight text-content"
+                  >
+                    {title}
+                  </h2>
+                }
+              />
               {description ? (
-                <p
-                  id={descriptionId}
-                  className="mt-0.5 truncate text-[12px] leading-snug text-content/50"
-                >
-                  {description}
-                </p>
+                <DialogDescription
+                  render={
+                    <p
+                      id={descriptionId}
+                      className="mt-0.5 truncate text-[12px] leading-snug text-content/50"
+                    >
+                      {description}
+                    </p>
+                  }
+                />
               ) : null}
             </div>
-            <button
-              ref={closeRef}
-              type="button"
-              aria-label={t("settings.common.close")}
-              onClick={onClose}
-              className="grid size-7 shrink-0 place-items-center rounded-md text-content/45 hover:bg-content/8 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <X className="size-3.5" strokeWidth={1.75} />
-            </button>
+            {hideClose ? null : (
+              <button
+                ref={closeRef}
+                type="button"
+                aria-label={t("settings.common.close")}
+                onClick={onClose}
+                className="grid size-7 shrink-0 place-items-center rounded-md text-content/45 hover:bg-content/8 hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <X className="size-3.5" strokeWidth={1.75} />
+              </button>
+            )}
           </header>
           <div
             ref={lockOverscroll}
@@ -140,7 +168,7 @@ export function ModalPanel({
             {children}
           </div>
         </div>
-      </div>
+      </DialogPopup>
     </div>
   );
 }
@@ -155,21 +183,29 @@ export function Modal(props: Props) {
   const requestModalClose = useCallback(() => {
     requestClose();
   }, [requestClose]);
-  return createPortal(
-    <div className="fixed inset-0" style={{ zIndex: LAYER.dialog }}>
-      <div
-        className={`modal-backdrop absolute inset-0 bg-black/40${
-          closing ? " modal-backdrop-closing" : ""
-        }`}
-        onMouseDown={requestModalClose}
-      />
-      <ModalPanel
-        {...props}
-        onClose={requestModalClose}
-        panelClassName={closing ? "modal-panel-closing" : undefined}
-        onPanelAnimationEnd={closing ? handleAnimationEnd : undefined}
-      />
-    </div>,
-    document.body,
+  return (
+    <Dialog
+      open
+      modal
+      disablePointerDismissal
+      onOpenChange={(open) => {
+        if (!open) requestModalClose();
+      }}
+    >
+      <DialogPortal>
+        <div
+          className={`modal-backdrop absolute inset-0 bg-black/40${
+            closing ? " modal-backdrop-closing" : ""
+          }`}
+          onMouseDown={requestModalClose}
+        />
+        <ModalPanel
+          {...props}
+          onClose={requestModalClose}
+          panelClassName={closing ? "modal-panel-closing" : undefined}
+          onPanelAnimationEnd={closing ? handleAnimationEnd : undefined}
+        />
+      </DialogPortal>
+    </Dialog>
   );
 }

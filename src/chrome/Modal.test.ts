@@ -1,27 +1,51 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Modal, ModalPanel } from "./Modal";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Modal } from "./Modal";
 
 describe("ModalPanel", () => {
-  it("names the dialog and close action", () => {
-    const markup = renderToStaticMarkup(
-      createElement(ModalPanel, {
-        title: "Example",
-        description: "A reusable shell",
-        onClose: vi.fn(),
-        children: "Body",
-      }),
-    );
+  function renderModal(props: Record<string, unknown>) {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const rooted: Root = createRoot(container);
+    act(() => {
+      rooted.render(
+        createElement(Modal, {
+          title: "Example",
+          onClose: vi.fn(),
+          children: "Body",
+          ...props,
+        }),
+      );
+    });
+    return { container, rooted };
+  }
 
-    expect(markup).toContain('role="dialog"');
-    expect(markup).toContain("modal-panel");
-    expect(markup).toContain("Example");
-    expect(markup).toContain("A reusable shell");
-    expect(markup).toContain("Body");
-    expect(markup).toContain('aria-label="Close"');
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.unstubAllGlobals();
+  });
+
+  it("names the dialog and close action", () => {
+    const { rooted, container } = renderModal({
+      description: "A reusable shell",
+    });
+    try {
+      const dialog = document.body.querySelector('[role="dialog"]');
+      expect(dialog).not.toBeNull();
+      expect(dialog?.getAttribute("aria-modal")).toBe("true");
+      expect(dialog?.textContent).toContain("Example");
+      expect(dialog?.textContent).toContain("A reusable shell");
+      expect(dialog?.textContent).toContain("Body");
+      expect(
+        dialog?.querySelector('button[aria-label="Close"]'),
+      ).not.toBeNull();
+    } finally {
+      act(() => rooted.unmount());
+      container.remove();
+    }
   });
 
   it("plays the panel outro before closing with animations on", async () => {
@@ -66,8 +90,7 @@ describe("ModalPanel", () => {
     }
   });
 
-  it("closes immediately with animations off", async () => {
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  it("closes immediately with animations off", async () => {    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     localStorage.setItem("monocode.experimentalAnimations", "0");
     const container = document.createElement("div");
     document.body.append(container);
@@ -103,18 +126,98 @@ describe("ModalPanel", () => {
   });
 
   it("can preserve an accessible title with a minimal visual header", () => {
-    const markup = renderToStaticMarkup(
-      createElement(ModalPanel, {
-        title: "Authentication required",
-        description: "Sign in to continue.",
-        minimalHeader: true,
-        onClose: vi.fn(),
-        children: "Provider login",
-      }),
-    );
+    const { rooted, container } = renderModal({
+      title: "Authentication required",
+      description: "Sign in to continue.",
+      minimalHeader: true,
+      children: "Provider login",
+    });
+    try {
+      const dialog = document.body.querySelector('[role="dialog"]');
+      expect(dialog?.textContent).toContain("Authentication required");
+      expect(dialog?.textContent).toContain("Provider login");
+      expect(
+        dialog?.querySelector("header .sr-only"),
+      ).not.toBeNull();
+    } finally {
+      act(() => rooted.unmount());
+      container.remove();
+    }
+  });
 
-    expect(markup).toContain('class="sr-only"');
-    expect(markup).toContain("Authentication required");
-    expect(markup).toContain("Provider login");
+  it("traps Tab inside the dialog", () => {
+    const { rooted, container } = renderModal({});
+    try {
+      const dialog = document.body.querySelector(
+        '[role="dialog"]',
+      ) as HTMLElement;
+      const buttons = Array.from(
+        dialog.querySelectorAll("button:not([disabled])"),
+      ) as HTMLButtonElement[];
+      expect(buttons.length).toBeGreaterThan(0);
+      const last = buttons[buttons.length - 1];
+      act(() => last.focus());
+      act(() => {
+        last.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Tab", bubbles: true }),
+        );
+      });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    } finally {
+      act(() => rooted.unmount());
+      container.remove();
+    }
+  });
+
+  it("closes on Escape with animations off", async () => {    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    localStorage.setItem("monocode.experimentalAnimations", "0");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root: Root = createRoot(container);
+    try {
+      const onClose = vi.fn();
+      await act(async () => {
+        root.render(
+          createElement(Modal, {
+            title: "Example",
+            onClose,
+            children: "Body",
+          }),
+        );
+      });
+
+      await act(async () => {
+        document.body
+          .querySelector('[role="dialog"]')!
+          .dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+          );
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
+      document.body.innerHTML = "";
+      localStorage.removeItem("monocode.experimentalAnimations");
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("restores focus to the opener on unmount", async () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    act(() => trigger.focus());
+    const { rooted, container } = renderModal({});
+    try {
+      const dialog = document.body.querySelector('[role="dialog"]');
+      expect(dialog).not.toBeNull();
+      // Explicit initial focus lands on the dialog close button.
+      expect(dialog?.contains(document.activeElement)).toBe(true);
+    } finally {
+      await act(async () => rooted.unmount());
+      container.remove();
+    }
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
   });
 });
