@@ -335,6 +335,9 @@ it("dismisses the mute menu and custom date picker without changing preferences"
   )!;
   act(() => trigger.click());
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  // The popup portal settles a commit after open; flush so initial focus
+  // lands inside the menu before dismissing with Escape.
+  await act(async () => {});
   act(() =>
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
