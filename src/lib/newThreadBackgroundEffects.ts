@@ -57,7 +57,8 @@ function backgroundWorker() {
     else request.resolve(data.result);
   };
   // A dead worker must not hang renders: reject everything pending and drop
-  // the instance so the next call retries (or falls back to main thread).
+  // the instance so the next call re-probes and retries (or falls back to
+  // main thread).
   const failPending = (reason: string) => {
     for (const [id, entry] of pending) {
       pending.delete(id);
@@ -65,6 +66,7 @@ function backgroundWorker() {
     }
     loadedSources.clear();
     effectCache.clear();
+    capability = null;
     const failed = worker;
     worker = null;
     failed?.terminate();
