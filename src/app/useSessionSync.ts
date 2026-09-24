@@ -191,6 +191,25 @@ export interface SessionSyncDeps {
  * Follow-up split: `useSessionLoader`, `useSessionTransfer`,
  * `useSessionRemindersBridge`, `useTerminalBridge` (see plan Fase 4).
  */
+export function beginHistoryRequest(
+  requests: Map<string, number>,
+  key: string,
+): number {
+  const request = (requests.get(key) ?? 0) + 1;
+  requests.set(key, request);
+  return request;
+}
+
+export function isCurrentHistoryRequest(
+  requests: ReadonlyMap<string, number>,
+  key: string,
+  request: number,
+  requestedCwd: string,
+  currentCwd: string,
+): boolean {
+  return requestedCwd === currentCwd && requests.get(key) === request;
+}
+
 export function useSessionSync(deps: SessionSyncDeps) {
   const {
     sessions,
@@ -267,6 +286,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     canForward: false,
   });
   const turnGen = useRef(new Map<string, number>());
+  const historyRequests = useRef(new Map<string, number>());
   const lastBoundProvider = useRef(new Map<string, string>());
   const lastPersistedUserBlock = useRef(new Map<string, string>());
   const inFlightSyncKey = useRef<string | null>(null);
@@ -690,16 +710,35 @@ export function useSessionSync(deps: SessionSyncDeps) {
     // tracked here — a status set from this effect lands a render too late to
     // suppress the empty state.
     const key = normalizeProjectPath(cwd);
+    const request = beginHistoryRequest(historyRequests.current, key);
     setHistoryErrorCwd((prev) => (prev === key ? null : prev));
     try {
       const rows = await listSessionsByProject(cwd);
-      if (cwd !== sidebarCwdRef.current) return;
+      if (
+        !isCurrentHistoryRequest(
+          historyRequests.current,
+          key,
+          request,
+          cwd,
+          sidebarCwdRef.current,
+        )
+      )
+        return;
       setHistory((current) => replaceProjectHistory(current, cwd, rows));
       setLoadedProjects((prev) =>
         prev.has(key) ? prev : new Set(prev).add(key),
       );
     } catch {
-      if (cwd !== sidebarCwdRef.current) return;
+      if (
+        !isCurrentHistoryRequest(
+          historyRequests.current,
+          key,
+          request,
+          cwd,
+          sidebarCwdRef.current,
+        )
+      )
+        return;
       // A failed revalidate keeps the cached cards rather than replacing a
       // good list with an error.
       if (!loadedProjectsRef.current.has(key)) setHistoryErrorCwd(key);
