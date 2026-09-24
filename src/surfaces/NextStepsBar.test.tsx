@@ -37,7 +37,7 @@ describe("NextStepsBar", () => {
       "review-changes",
     ]);
     try {
-      expect(container.querySelector('[role="toolbar"]')).not.toBeNull();
+      expect(container.querySelector('[role="group"]')).not.toBeNull();
       expect(
         container.querySelector('[data-next-step-action="jump-to-bottom"]'),
       ).not.toBeNull();

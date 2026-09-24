@@ -512,24 +512,17 @@ const SessionPaneContent = memo(function SessionPaneContent({
     loadNextStepsCount,
     () => 2,
   );
-  const [nextStepsDismissed, setNextStepsDismissed] = useState(false);
-  useEffect(() => {
-    setNextStepsDismissed(false);
-  }, [nextStepGeneration, session.id]);
   const nextStepActionList = useMemo(
     () => nextStepActions(nextStepsCount),
     [nextStepsCount],
   );
   const handleNextStepJump = useCallback(() => {
-    setNextStepsDismissed(true);
     jumpToBottomRef.current?.();
   }, []);
   const handleNextStepSearch = useCallback(() => {
-    setNextStepsDismissed(true);
     setTranscriptSearchOpen(true);
   }, []);
   const handleNextStepReview = useCallback(() => {
-    setNextStepsDismissed(true);
     onOpenDiff(undefined, { sessionId: session.id, cwd: workCwd });
   }, [onOpenDiff, session.id, workCwd]);
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
@@ -732,7 +725,6 @@ const SessionPaneContent = memo(function SessionPaneContent({
     !managed &&
     nextStepsEnabled &&
     nextStepGeneration !== undefined &&
-    !nextStepsDismissed &&
     !transcriptSearchOpen &&
     !showJumpToBottom &&
     nextStepActionList.length > 0;

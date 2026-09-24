@@ -100,9 +100,11 @@ const NotesView = lazy(() =>
 );
 import {
   loadLiveAgentsEnabled,
+  loadNextStepsEnabled,
   loadNotesEnabled,
   loadSettingsSection,
   subscribeLiveAgentsEnabled,
+  subscribeNextSteps,
   subscribeNotesEnabled,
   type SettingsSectionId,
 } from "./lib/settings";
@@ -874,32 +876,70 @@ export default function App({
   const [nextStepGenerations, setNextStepGenerations] = useState<
     Record<string, number>
   >({});
-  const onTurnSettled = useCallback((settlement: ComposerTurnSettlement) => {
-    if (turnGen.current.get(settlement.sessionId) !== settlement.generation) {
-      return;
-    }
-    const eligible = isNextStepCompletionEligible({
-      status: settlement.outcome.status,
-      intent: settlement.intent,
-      managed: settlement.managed,
-      nativeCommand: settlement.nativeCommand,
-    });
-    setNextStepGenerations((previous) => {
-      if (eligible) {
-        if (previous[settlement.sessionId] === settlement.generation) {
+  const nextStepsEnabled = useSyncExternalStore(
+    subscribeNextSteps,
+    loadNextStepsEnabled,
+    () => false,
+  );
+  useEffect(() => {
+    if (nextStepsEnabled) return;
+    setNextStepGenerations((previous) =>
+      Object.keys(previous).length === 0 ? previous : {},
+    );
+  }, [nextStepsEnabled]);
+  const clearNextStep = useCallback(
+    (sessionId: string, expectedGeneration?: number) => {
+      setNextStepGenerations((previous) => {
+        if (
+          expectedGeneration !== undefined &&
+          previous[sessionId] > expectedGeneration
+        ) {
           return previous;
         }
-        return {
-          ...previous,
-          [settlement.sessionId]: settlement.generation,
-        };
+        if (!(sessionId in previous)) return previous;
+        const next = { ...previous };
+        delete next[sessionId];
+        return next;
+      });
+    },
+    [],
+  );
+  const onTurnSettled = useCallback(
+    (settlement: ComposerTurnSettlement) => {
+      const currentGeneration = turnGen.current.get(settlement.sessionId);
+      if (currentGeneration !== settlement.generation) {
+        if (
+          currentGeneration !== undefined &&
+          currentGeneration > settlement.generation &&
+          settlement.outcome.status === "cancelled"
+        ) {
+          clearNextStep(settlement.sessionId, settlement.generation);
+        }
+        return;
       }
-      if (!(settlement.sessionId in previous)) return previous;
-      const next = { ...previous };
-      delete next[settlement.sessionId];
-      return next;
-    });
-  }, [turnGen]);
+      const eligible = isNextStepCompletionEligible({
+        status: settlement.outcome.status,
+        intent: settlement.intent,
+        managed: settlement.managed,
+        nativeCommand: settlement.nativeCommand,
+        enabled: loadNextStepsEnabled(),
+      });
+      if (eligible) {
+        setNextStepGenerations((previous) => {
+          if (previous[settlement.sessionId] === settlement.generation) {
+            return previous;
+          }
+          return {
+            ...previous,
+            [settlement.sessionId]: settlement.generation,
+          };
+        });
+      } else {
+        clearNextStep(settlement.sessionId);
+      }
+    },
+    [clearNextStep, turnGen],
+  );
   const {
     onModelChange,
     onModelSettingsChange,

@@ -675,11 +675,20 @@ export function useComposer(deps: ComposerDeps) {
         if (pendingSwitch) {
           void forgetHarnessSession(pendingSwitch.from, sessionId);
         }
-        options?.onSettled?.({
-          status: "failed",
+        const outcome = {
+          status: "failed" as const,
           text: "",
           error: "Harness is not connected",
+        };
+        onTurnSettled?.({
+          sessionId,
+          generation: gen,
+          outcome,
+          intent,
+          managed: options?.managed === true,
+          nativeCommand: rawCommand,
         });
+        options?.onSettled?.(outcome);
         return true;
       }
 
@@ -968,12 +977,18 @@ export function useComposer(deps: ComposerDeps) {
               onEvent: (event) => {
                 if (turnGen.current.get(sessionId) !== gen) return;
                 orchestrator.observe(sessionId, event);
-                if (options?.onSettled && event.type === "message.delta")
+                if (
+                  (options?.onSettled || onTurnSettled) &&
+                  event.type === "message.delta"
+                )
                   controlText = truncateTail(
                     controlText + event.text,
                     CONTROL_BUFFER_CHARS,
                   );
-                if (options?.onSettled && event.type === "message.completed")
+                if (
+                  (options?.onSettled || onTurnSettled) &&
+                  event.type === "message.completed"
+                )
                   controlText += "\n";
                 if (event.type === "session.error")
                   controlOutcome.error = event.message;

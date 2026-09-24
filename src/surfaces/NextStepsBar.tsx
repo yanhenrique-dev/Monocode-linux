@@ -20,12 +20,12 @@ export function NextStepsBar({
 
   return (
     <div
-      role="toolbar"
+      role="group"
       aria-label={t("next_steps.toolbar")}
       data-next-steps
       className="pointer-events-none absolute inset-x-0 bottom-full z-30 mb-2 flex justify-center"
     >
-      <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-content/15 bg-background-base/95 p-1 shadow-xl backdrop-blur-sm">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-content/15 bg-background-base/95 p-1 shadow-xl">
         {actions.map((action) => {
           const label =
             action === "jump-to-bottom"

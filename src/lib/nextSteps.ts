@@ -10,6 +10,7 @@ export type NextStepCompletion = {
   intent: "default" | "plan" | "build" | "orchestrate";
   managed: boolean;
   nativeCommand: boolean;
+  enabled: boolean;
 };
 
 export const NEXT_STEP_ACTIONS: readonly NextStepAction[] = [
@@ -26,6 +27,7 @@ export function isNextStepCompletionEligible(
   completion: NextStepCompletion,
 ): boolean {
   return (
+    completion.enabled &&
     completion.status === "completed" &&
     completion.intent === "default" &&
     !completion.managed &&
