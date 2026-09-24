@@ -103,6 +103,71 @@ describe("session persistence concurrency", () => {
     expect(commands).toEqual(["session_upsert", "session_delete"]);
   });
 
+  it("renews the expected revision after a queued write", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session: { expectedRevision: number } },
+      ) => {
+        if (command !== "session_upsert") return undefined;
+        expectedRevisions.push(args.session.expectedRevision);
+        return {
+          id: "s1",
+          revision: expectedRevisions.length,
+          cwd: "/tmp/project",
+          harness: "cursor",
+          model: "",
+          runtimeMode: "supervised",
+          title: "",
+          createdAt: 1,
+          updatedAt: 1,
+        };
+      },
+    );
+    const { upsertSession } = await loadStore();
+
+    await Promise.all([
+      upsertSession(session("s1")),
+      upsertSession({ ...session("s1"), title: "later" }),
+    ]);
+
+    expect(expectedRevisions).toEqual([0, 1]);
+  });
+
+  it("uses the revision loaded with a session", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session: { expectedRevision: number } },
+      ) => {
+        if (command === "session_get") return { ...session("s1"), revision: 7 };
+        if (command === "session_upsert") {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "s1",
+            revision: 8,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        return undefined;
+      },
+    );
+    const { getSession, upsertSession } = await loadStore();
+    const loaded = await getSession("s1");
+
+    await upsertSession(loaded!);
+
+    expect(expectedRevisions).toEqual([7]);
+  });
+
   it("archives only after the final active-turn snapshot is durable", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];

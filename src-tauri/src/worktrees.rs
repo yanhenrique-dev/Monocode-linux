@@ -410,7 +410,8 @@ fn prepare_removal(
             "UPDATE sessions SET worktree_removed = 1,
                worktree_cwd = COALESCE(NULLIF(worktree_cwd, ''), cwd),
                cwd = ?2, branch = NULL, provider_session_id = NULL,
-               context_used = NULL, context_window = NULL WHERE id = ?1",
+               context_used = NULL, context_window = NULL,
+               revision = revision + 1 WHERE id = ?1",
             rusqlite::params![id, session.detached_cwd],
         )
         .map_err(|e| e.to_string())?;
@@ -443,7 +444,7 @@ fn finish_removal(
             .execute(
                 "UPDATE sessions SET cwd = ?2, worktree_cwd = ?3, branch = ?4,
                provider_session_id = ?5, context_used = ?6, context_window = ?7,
-               worktree_removed = 0
+               worktree_removed = 0, revision = revision + 1
              WHERE id = ?1 AND worktree_removed = 1 AND cwd = ?8 AND worktree_cwd = ?9",
                 rusqlite::params![
                     session.id,

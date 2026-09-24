@@ -32,6 +32,7 @@ export type SessionSummary = {
   orchestrationLeadId?: string;
   orchestration?: OrchestrationSummary;
   id: string;
+  revision?: number;
   cwd: string;
   harness: HarnessId;
   model: string;
@@ -54,6 +55,7 @@ export type SessionSummary = {
 type SessionRecord = {
   orchestrationLeadId?: string;
   id: string;
+  revision?: number;
   cwd: string;
   harness: string;
   model: string;
@@ -187,6 +189,7 @@ export function sanitizeSessionForPersist(
  * write concurrently.
  */
 const sessionWriteQueues = new Map<string, Promise<unknown>>();
+const sessionRevisions = new Map<string, number>();
 const deletedSessionIds = new Set<string>();
 
 function enqueueSessionWrite<T>(
@@ -217,9 +220,11 @@ export async function upsertSession(
   const payload = sanitizeSessionForPersist(session);
   const summary = await enqueueSessionWrite(session.id, async () => {
     if (deletedSessionIds.has(session.id)) return null;
+    const expectedRevision = sessionRevisions.get(session.id) ?? 0;
     return invoke<SessionSummary>("session_upsert", {
       session: {
         ...payload,
+        expectedRevision,
         blocks: payload.blocks.map((block) =>
           block.orchestrationLeadId &&
           deletedSessionIds.has(block.orchestrationLeadId)
@@ -229,7 +234,12 @@ export async function upsertSession(
       },
     });
   });
-  return summary ? normalizeSummary(summary) : null;
+  if (!summary) return null;
+  const normalized = normalizeSummary(summary);
+  if (typeof normalized.revision === "number") {
+    sessionRevisions.set(session.id, normalized.revision);
+  }
+  return normalized;
 }
 
 /**
@@ -315,6 +325,9 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     sessionId,
   });
   if (!record) return null;
+  if (typeof record.revision === "number") {
+    sessionRevisions.set(sessionId, record.revision);
+  }
   const session = recordToSession(record);
   if (session.harness !== "omp" || !session.providerSessionId) {
     return recoverCursorSubagents(session);
@@ -349,6 +362,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
     await enqueueSessionWrite(sessionId, () =>
       invoke<void>("session_delete", { sessionId }),
     );
+    sessionRevisions.delete(sessionId);
   } catch (error) {
     deletedSessionIds.delete(sessionId);
     throw error;
@@ -700,6 +714,7 @@ function normalizeSummary(summary: SessionSummary): SessionSummary {
   const linkedWorkItem = sanitizeLinkedWorkItem(summary.linkedWorkItem);
   return {
     ...summary,
+    revision: typeof summary.revision === "number" ? summary.revision : 0,
     harness: asHarness(summary.harness),
     runtimeMode: asRuntimeMode(summary.runtimeMode),
     ...(summary.providerSessionId
