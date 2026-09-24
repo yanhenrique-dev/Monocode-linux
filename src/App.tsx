@@ -116,7 +116,8 @@ import { useWorkspaceTabs } from "./app/useWorkspaceTabs";
 import { useSessions } from "./app/useSessions";
 import { useHistory } from "./app/useHistory";
 import { useProjects } from "./app/useProjects";
-import { useComposer } from "./app/useComposer";
+import { useComposer, type ComposerTurnSettlement } from "./app/useComposer";
+import { isNextStepCompletionEligible } from "./lib/nextSteps";
 import { useTurnActions } from "./app/useTurnActions";
 import { useSessionBootstrap } from "./app/useSessionBootstrap";
 import { registerBuiltinHarnesses } from "./lib/harness";
@@ -870,6 +871,35 @@ export default function App({
     setProjectTerminals,
     onSelectHistorySession,
   });
+  const [nextStepGenerations, setNextStepGenerations] = useState<
+    Record<string, number>
+  >({});
+  const onTurnSettled = useCallback((settlement: ComposerTurnSettlement) => {
+    if (turnGen.current.get(settlement.sessionId) !== settlement.generation) {
+      return;
+    }
+    const eligible = isNextStepCompletionEligible({
+      status: settlement.outcome.status,
+      intent: settlement.intent,
+      managed: settlement.managed,
+      nativeCommand: settlement.nativeCommand,
+    });
+    setNextStepGenerations((previous) => {
+      if (eligible) {
+        if (previous[settlement.sessionId] === settlement.generation) {
+          return previous;
+        }
+        return {
+          ...previous,
+          [settlement.sessionId]: settlement.generation,
+        };
+      }
+      if (!(settlement.sessionId in previous)) return previous;
+      const next = { ...previous };
+      delete next[settlement.sessionId];
+      return next;
+    });
+  }, [turnGen]);
   const {
     onModelChange,
     onModelSettingsChange,
@@ -883,6 +913,7 @@ export default function App({
     setSessions,
     enqueueHarnessEvent,
     flushHarnessEvents,
+    onTurnSettled,
     dismissNoticesForContinuedSession,
   });
   const {
@@ -1143,6 +1174,7 @@ export default function App({
   const sessionPaneProps = useMemo(
     () => ({
       recents,
+      nextStepGenerations,
       hideProjectPicker: true,
       onFocus: onFocusPane,
       onClose: onClosePane,
@@ -1184,6 +1216,7 @@ export default function App({
     }),
     [
       recents,
+      nextStepGenerations,
       onFocusPane,
       onClosePane,
       onCwdChange,
@@ -1550,6 +1583,7 @@ export default function App({
                       <SessionPane
                         {...sessionPaneProps}
                         session={session}
+                        nextStepGeneration={nextStepGenerations[session.id]}
                         visible={visible}
                         focused={visible}
                         inSplit={false}

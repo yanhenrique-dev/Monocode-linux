@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextStepsBar } from "./NextStepsBar";
 
 function renderBar(actions: Array<"jump-to-bottom" | "search-transcript" | "review-changes">) {
@@ -19,9 +19,14 @@ function renderBar(actions: Array<"jump-to-bottom" | "search-transcript" | "revi
   return { container, root, callbacks };
 }
 
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+});
+
 afterEach(() => {
   document.body.innerHTML = "";
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("NextStepsBar", () => {
@@ -43,8 +48,10 @@ describe("NextStepsBar", () => {
         container.querySelector('[data-next-step-action="review-changes"]'),
       ).not.toBeNull();
       expect(
-        container.querySelector('[data-next-step-action="jump-to-bottom"]'),
-      ).toHaveAttribute("aria-label", "Jump to latest");
+        container
+          .querySelector('[data-next-step-action="jump-to-bottom"]')
+          ?.getAttribute("aria-label"),
+      ).toBe("Jump to latest");
     } finally {
       act(() => root.unmount());
       container.remove();

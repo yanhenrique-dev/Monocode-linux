@@ -127,6 +127,15 @@ import {
 } from "./workspaceEvents";
 
 
+export type ComposerTurnSettlement = {
+  sessionId: string;
+  generation: number;
+  outcome: ControlOutcome;
+  intent: TurnIntent;
+  managed: boolean;
+  nativeCommand: boolean;
+};
+
 export interface ComposerDeps {
   sessionsRef: MutableRefObject<Session[]>;
   activeSessionIdRef: MutableRefObject<string | undefined>;
@@ -135,7 +144,8 @@ export interface ComposerDeps {
   setSessions: Dispatch<SetStateAction<Session[]>>;
   enqueueHarnessEvent: (sessionId: string, event: HarnessEvent) => void;
   flushHarnessEvents: () => void;
-    dismissNoticesForContinuedSession: (sessionId: string) => void;
+  onTurnSettled?: (settlement: ComposerTurnSettlement) => void;
+  dismissNoticesForContinuedSession: (sessionId: string) => void;
 }
 
 /** Phase 3 (clean-code): names the deliberate fire-and-forget swallows below.
@@ -216,6 +226,7 @@ export function useComposer(deps: ComposerDeps) {
     setSessions,
     enqueueHarnessEvent,
     flushHarnessEvents,
+    onTurnSettled,
     dismissNoticesForContinuedSession,
   } = deps;
   const rewindingLastTurn = useRef(new Set<string>());
@@ -1184,11 +1195,19 @@ export function useComposer(deps: ComposerDeps) {
           if (options?.resendEdited) {
             rewindingLastTurn.current.delete(sessionId);
           }
-          options?.onSettled?.(
+          const outcome =
             turnGen.current.get(sessionId) !== gen
-              ? { status: "cancelled", text: controlText }
-              : controlOutcome,
-          );
+              ? { status: "cancelled" as const, text: controlText }
+              : controlOutcome;
+          onTurnSettled?.({
+            sessionId,
+            generation: gen,
+            outcome,
+            intent,
+            managed: options?.managed === true,
+            nativeCommand: rawCommand,
+          });
+          options?.onSettled?.(outcome);
         });
       return true;
     },
@@ -1196,6 +1215,7 @@ export function useComposer(deps: ComposerDeps) {
       dismissNoticesForContinuedSession,
       enqueueHarnessEvent,
       flushHarnessEvents,
+      onTurnSettled,
     ],
   );
 

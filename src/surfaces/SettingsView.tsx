@@ -221,6 +221,8 @@ import {
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
   loadModelControls,
+  loadNextStepsCount,
+  loadNextStepsEnabled,
   loadNotesEnabled,
   loadReviewAdoptShell,
   loadTerminalGpu,
@@ -231,6 +233,8 @@ import {
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
   saveModelControls,
+  saveNextStepsCount,
+  saveNextStepsEnabled,
   saveNotesEnabled,
   saveReviewAdoptShell,
   saveTerminalGpu,
@@ -242,6 +246,7 @@ import {
   type DiffViewer,
   type FollowUpBehavior,
   type ModelControls,
+  type NextStepsCount,
   type SettingsSearchResult,
   type SettingsSectionId,
 } from "../lib/settings";
@@ -991,6 +996,12 @@ function ChatPage() {
   );
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
+  const [nextStepsEnabled, setNextStepsEnabled] = useState(
+    loadNextStepsEnabled,
+  );
+  const [nextStepsCount, setNextStepsCount] = useState<NextStepsCount>(
+    loadNextStepsCount,
+  );
   const [modelControls, setModelControls] =
     useState<ModelControls>(loadModelControls);
   const [diffViewer, setDiffViewer] = useState<DiffViewer>(loadDiffViewer);
@@ -1033,6 +1044,16 @@ function ChatPage() {
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
     saveFollowUpBehavior(next);
     setFollowUpBehavior(next);
+  };
+
+  const onNextStepsEnabled = (next: boolean) => {
+    saveNextStepsEnabled(next);
+    setNextStepsEnabled(next);
+  };
+
+  const onNextStepsCount = (next: NextStepsCount) => {
+    saveNextStepsCount(next);
+    setNextStepsCount(next);
   };
 
   const onModelControls = (next: ModelControls) => {
@@ -1141,6 +1162,36 @@ function ChatPage() {
             ]}
             onChange={onFollowUpBehavior}
           />
+        </Row>
+        <Row
+          id="next-steps"
+          label={t("settings.chat.next_steps.label")}
+          description={t("settings.chat.next_steps.description")}
+        >
+          <div className="flex items-center gap-3">
+            <Toggle
+              label={t("settings.chat.next_steps.toggle")}
+              on={nextStepsEnabled}
+              onChange={onNextStepsEnabled}
+            />
+            {nextStepsEnabled ? (
+              <Segmented
+                label={t("settings.chat.next_steps.selector")}
+                value={nextStepsCount}
+                options={[
+                  {
+                    value: 2,
+                    label: t("settings.chat.next_steps.two"),
+                  },
+                  {
+                    value: 3,
+                    label: t("settings.chat.next_steps.three"),
+                  },
+                ]}
+                onChange={onNextStepsCount}
+              />
+            ) : null}
+          </div>
         </Row>
         <Row
           id="model-controls"

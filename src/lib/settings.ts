@@ -1,5 +1,8 @@
 import { ALT, MOD, SHIFT } from "./platform";
+import type { NextStepsCount } from "./nextSteps";
 import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
+
+export type { NextStepsCount };
 
 const SECTION_KEY = "monocode.settingsSection";
 
@@ -327,6 +330,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "queue steer interrupt send while running fila redirecionar acompanhamento",
   },
   {
+    id: "next-steps",
+    section: "chat",
+    label: "settings.chat.next_steps.label",
+    keywords:
+      "next steps suggestions shortcuts experimental composer proximos passos sugestoes atalhos",
+  },
+  {
     id: "model-controls",
     section: "chat",
     label: "settings.chat.model_controls.label",
@@ -549,6 +559,58 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
   } catch {
     // private mode / quota
   }
+}
+
+const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
+const NEXT_STEPS_COUNT_KEY = "monocode.nextStepsCount";
+export const NEXT_STEPS_CHANGE_EVENT = "monocode:next-steps-change";
+export const NEXT_STEPS_ENABLED_DEFAULT = false;
+export const NEXT_STEPS_COUNT_DEFAULT: NextStepsCount = 2;
+
+export function loadNextStepsEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(NEXT_STEPS_ENABLED_KEY);
+    if (raw == null) return NEXT_STEPS_ENABLED_DEFAULT;
+    return raw === "1" || raw === "true";
+  } catch {
+    return NEXT_STEPS_ENABLED_DEFAULT;
+  }
+}
+
+export function saveNextStepsEnabled(value: boolean) {
+  try {
+    localStorage.setItem(NEXT_STEPS_ENABLED_KEY, value ? "1" : "0");
+  } catch {
+    return;
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+}
+
+export function loadNextStepsCount(): NextStepsCount {
+  try {
+    const raw = localStorage.getItem(NEXT_STEPS_COUNT_KEY);
+    return raw === "2" ? 2 : raw === "3" ? 3 : NEXT_STEPS_COUNT_DEFAULT;
+  } catch {
+    return NEXT_STEPS_COUNT_DEFAULT;
+  }
+}
+
+export function saveNextStepsCount(value: NextStepsCount) {
+  try {
+    localStorage.setItem(NEXT_STEPS_COUNT_KEY, String(value));
+  } catch {
+    return;
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+}
+
+export function subscribeNextSteps(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(NEXT_STEPS_CHANGE_EVENT, onStoreChange);
+  return () =>
+    window.removeEventListener(NEXT_STEPS_CHANGE_EVENT, onStoreChange);
 }
 
 export type ModelControls = "menu" | "beside";

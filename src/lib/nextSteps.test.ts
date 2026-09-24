@@ -24,7 +24,6 @@ describe("next-step suggestions", () => {
       intent: "default",
       managed: false,
       nativeCommand: false,
-      enabled: true,
     };
     expect(isNextStepCompletionEligible(completion)).toBe(true);
     expect(
@@ -36,8 +35,5 @@ describe("next-step suggestions", () => {
     expect(
       isNextStepCompletionEligible({ ...completion, nativeCommand: true }),
     ).toBe(false);
-    expect(isNextStepCompletionEligible({ ...completion, enabled: false })).toBe(
-      false,
-    );
   });
 });
