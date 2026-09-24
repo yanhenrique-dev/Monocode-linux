@@ -374,6 +374,52 @@ fn copy_rejects_paste_into_self_through_a_symlink_alias() {
     assert!(err.contains("itself"));
 }
 
+#[cfg(unix)]
+#[test]
+fn create_path_rejects_a_symlinked_parent() {
+    let dir = tmp("create-symlink-parent");
+    let outside = tmp("create-symlink-outside");
+    std::os::unix::fs::symlink(&outside.0, dir.0.join("escape")).unwrap();
+
+    let err = create_path(
+        dir.0.to_string_lossy().into_owned(),
+        "escape/new.txt".into(),
+        false,
+    )
+    .unwrap_err();
+    assert!(err.contains("symlink") || err.contains("path"));
+    assert!(!outside.0.join("new.txt").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn write_text_file_rejects_a_symlinked_parent() {
+    let dir = tmp("write-symlink-parent");
+    let outside = tmp("write-symlink-outside");
+    std::os::unix::fs::symlink(&outside.0, dir.0.join("escape")).unwrap();
+
+    let path = dir.0.join("escape/new.txt");
+    let err = write_text_file_sync(&path.to_string_lossy(), "secret\n").unwrap_err();
+    assert!(err.contains("symlink") || err.contains("path"));
+    assert!(!outside.0.join("new.txt").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn git_file_diff_rejects_a_symlink_to_outside_the_repo() {
+    let repo = tmp("git-symlink-read");
+    let outside = tmp("git-symlink-outside");
+    if !init_git(&repo.0, "main", None) {
+        return;
+    }
+    let outside_file = outside.0.join("secret.txt");
+    std::fs::write(&outside_file, "secret\n").unwrap();
+    std::os::unix::fs::symlink(&outside_file, repo.0.join("secret-link.txt")).unwrap();
+
+    let err = git_file_diff_for(&repo.0, "secret-link.txt", false).unwrap_err();
+    assert!(err.contains("outside") || err.contains("path") || err.contains("symlink"));
+}
+
 fn relative_paths(files: &[ProjectFile]) -> Vec<&str> {
     files.iter().map(|f| f.relative.as_str()).collect()
 }
