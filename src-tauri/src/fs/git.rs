@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use super::constants::MAX_TEXT_FILE_BYTES;
-use super::path::{expand_home, path_to_js};
+use super::path::{canonicalize_with_missing, expand_home, path_to_js, reject_symlink_components};
 use super::write::git_url_repo_name;
 
 #[derive(Debug, Clone, Default)]
@@ -655,7 +655,10 @@ fn add_untracked_map(root: &Path, files: &mut HashMap<String, FileAcc>) {
 }
 
 fn text_line_count(path: &Path) -> i64 {
-    let Ok(meta) = std::fs::metadata(path) else {
+    if reject_symlink_components(path).is_err() {
+        return 0;
+    }
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
         return 0;
     };
     if !meta.is_file() || meta.len() == 0 || meta.len() > MAX_UNTRACKED_BYTES {
@@ -706,19 +709,8 @@ pub(crate) fn git_file_diff_for(
     relative: &str,
     staged: bool,
 ) -> Result<GitFileDiff, String> {
-    let relative = normalize_diff_path(relative);
-    if relative.is_empty()
-        || relative.starts_with('/')
-        || relative
-            .split('/')
-            .any(|part| part.is_empty() || part == "..")
-    {
-        return Err("Invalid path".into());
-    }
+    let relative = resolve_repo_path(root, relative)?;
     let abs = root.join(&relative);
-    if !abs.starts_with(root) {
-        return Err("Invalid path".into());
-    }
     if !git_is_work_tree(root) {
         return Err("Not a git repository".into());
     }
@@ -1278,9 +1270,10 @@ pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, S
     {
         return Err("Invalid path".into());
     }
-    let abs = root.join(&relative);
-    if !abs.starts_with(root) {
-        return Err("Invalid path".into());
+    let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let resolved = canonicalize_with_missing(&root.join(&relative))?;
+    if !resolved.starts_with(&canonical_root) {
+        return Err("Path resolves outside the repository".into());
     }
     Ok(relative)
 }

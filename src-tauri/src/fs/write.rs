@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::constants::{MAX_ATTACHMENT_EMBED_BYTES, MAX_TEXT_FILE_BYTES};
 use super::git::git_cmd;
-use super::path::expand_home;
+use super::path::{canonicalize_with_missing, expand_home, reject_symlink_components};
 
 fn resolve_under(parent: &Path, name: &str) -> Result<PathBuf, String> {
     if name.starts_with('/') || name.starts_with('\\') {
@@ -16,6 +16,8 @@ fn resolve_under(parent: &Path, name: &str) -> Result<PathBuf, String> {
         return Err("A file or folder name must be provided.".into());
     }
 
+    reject_symlink_components(parent)?;
+    let parent = canonicalize_with_missing(parent)?;
     let mut dest = parent.to_path_buf();
     for segment in trimmed.split(['/', '\\']) {
         if segment.is_empty() {
@@ -29,7 +31,8 @@ fn resolve_under(parent: &Path, name: &str) -> Result<PathBuf, String> {
         dest.push(segment);
     }
 
-    if !dest.starts_with(parent) {
+    reject_symlink_components(&dest)?;
+    if !dest.starts_with(&parent) {
         return Err("Invalid path".into());
     }
     Ok(dest)
@@ -53,6 +56,7 @@ fn already_exists(label: &str) -> String {
 #[tauri::command(async)]
 pub fn create_path(parent: String, name: String, is_dir: bool) -> Result<String, String> {
     let parent_dir = expand_home(&parent);
+    reject_symlink_components(&parent_dir)?;
     let dest = resolve_under(&parent_dir, &name)?;
     let label = file_label(&dest, &name);
 
@@ -226,11 +230,8 @@ pub(crate) fn write_text_file_sync(path: &str, content: &str) -> Result<(), Stri
     }
 
     let requested = expand_home(path);
-    let destination = if requested.exists() {
-        std::fs::canonicalize(&requested).map_err(|e| format!("{}: {e}", requested.display()))?
-    } else {
-        requested
-    };
+    reject_symlink_components(&requested)?;
+    let destination = canonicalize_with_missing(&requested)?;
     if destination.is_dir() {
         return Err("Cannot save text to a directory.".into());
     }
@@ -347,7 +348,10 @@ fn unique_name_in(dir: &Path, name: &str) -> String {
 }
 
 fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
-    let meta = std::fs::metadata(from).map_err(|e| format!("{}: {e}", from.display()))?;
+    let meta = std::fs::symlink_metadata(from).map_err(|e| format!("{}: {e}", from.display()))?;
+    if meta.file_type().is_symlink() {
+        return Err("Cannot copy a symbolic link".into());
+    }
     if meta.is_dir() {
         std::fs::create_dir(to).map_err(|e| format!("{}: {e}", to.display()))?;
         for ent in std::fs::read_dir(from).map_err(|e| format!("{}: {e}", from.display()))? {
@@ -367,10 +371,12 @@ pub(crate) fn rename_path_sync(path: &str, name: &str) -> Result<String, String>
     if !from.exists() {
         return Err(format!("{}: No such file or directory", from.display()));
     }
-    let parent = from
+    let parent_path = from
         .parent()
         .ok_or_else(|| "File has no parent directory.".to_string())?;
-    let dest = resolve_under(parent, name)?;
+    reject_symlink_components(parent_path)?;
+    let parent = canonicalize_with_missing(parent_path)?;
+    let dest = resolve_under(&parent, name)?;
     if same_entry(&from, &dest) {
         if from == dest {
             return Ok(from.to_string_lossy().into_owned());
@@ -413,13 +419,16 @@ pub async fn rename_path(path: String, name: String) -> Result<String, String> {
 
 pub(crate) fn delete_path_sync(path: &str) -> Result<(), String> {
     let path = expand_home(path);
-    if !path.exists() {
-        return Err(format!("{}: No such file or directory", path.display()));
-    }
-    if path.is_dir() {
-        std::fs::remove_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))
-    } else {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "File has no parent directory.".to_string())?;
+    reject_symlink_components(parent)?;
+    let metadata = std::fs::symlink_metadata(&path)
+        .map_err(|_| format!("{}: No such file or directory", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
         std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))
+    } else {
+        std::fs::remove_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))
     }
 }
 
@@ -438,17 +447,21 @@ fn dir_contains(dir: &Path, dest_parent: &Path) -> bool {
 }
 
 pub(crate) fn copy_path_sync(from: &str, dest_parent: &str) -> Result<String, String> {
-    let from = expand_home(from);
+    let from_path = expand_home(from);
+    let dest_parent_path = expand_home(dest_parent);
+    let from = canonicalize_with_missing(&from_path)?;
+    let dest_parent = canonicalize_with_missing(&dest_parent_path)?;
     if !from.exists() {
         return Err(format!("{}: No such file or directory", from.display()));
     }
-    let dest_parent = expand_home(dest_parent);
     if !dest_parent.is_dir() {
         return Err(format!("{} is not a folder", dest_parent.display()));
     }
     if from.is_dir() && dir_contains(&from, &dest_parent) {
         return Err("Cannot paste a folder into itself.".into());
     }
+    reject_symlink_components(&from_path)?;
+    reject_symlink_components(&dest_parent_path)?;
     let name = unique_name_in(
         &dest_parent,
         &file_label(&from, from.to_str().unwrap_or("copy")),
@@ -466,17 +479,21 @@ pub async fn copy_path(from: String, dest_parent: String) -> Result<String, Stri
 }
 
 pub(crate) fn move_path_sync(from: &str, dest_parent: &str) -> Result<String, String> {
-    let from = expand_home(from);
+    let from_path = expand_home(from);
+    let dest_parent_path = expand_home(dest_parent);
+    let from = canonicalize_with_missing(&from_path)?;
+    let dest_parent = canonicalize_with_missing(&dest_parent_path)?;
     if !from.exists() {
         return Err(format!("{}: No such file or directory", from.display()));
     }
-    let dest_parent = expand_home(dest_parent);
     if !dest_parent.is_dir() {
         return Err(format!("{} is not a folder", dest_parent.display()));
     }
     if from.is_dir() && dir_contains(&from, &dest_parent) {
         return Err("Cannot paste a folder into itself.".into());
     }
+    reject_symlink_components(&from_path)?;
+    reject_symlink_components(&dest_parent_path)?;
     let name = file_label(&from, from.to_str().unwrap_or("item"));
     let dest = dest_parent.join(&name);
     if same_entry(&from, &dest) {
