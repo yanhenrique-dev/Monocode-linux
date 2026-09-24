@@ -51,6 +51,7 @@ import {
   loadFirstRunDone,
   probeFirstRunReport,
   saveFirstRunDone,
+  shouldBlockAppAction,
   type FirstRunStore,
 } from "./firstRun";
 
@@ -113,6 +114,13 @@ describe("first-run flag", () => {
   });
 });
 
+describe("first-run app actions", () => {
+  it("blocks app actions only while setup is open", () => {
+    expect(shouldBlockAppAction(true)).toBe(true);
+    expect(shouldBlockAppAction(false)).toBe(false);
+  });
+});
+
 describe("first-run report", () => {
   it("probes version, CLIs, GitHub, sandbox, notifications, and audio", async () => {
     resetProbes();
@@ -150,16 +158,11 @@ describe("first-run report", () => {
     );
   });
 
-  it("converts GitHub probe errors into an unavailable status", async () => {
+  it("propagates GitHub probe errors for retry", async () => {
     resetProbes();
     probes.githubStatus.mockRejectedValue(new Error("IPC unavailable"));
-    const report = await probeFirstRunReport();
 
-    expect(report.github).toEqual({
-      connected: false,
-      installed: false,
-      authenticated: false,
-    });
+    await expect(probeFirstRunReport()).rejects.toThrow("IPC unavailable");
   });
 
   it("handles a null GitHub response from browser preview", async () => {
