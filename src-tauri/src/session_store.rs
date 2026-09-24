@@ -1824,6 +1824,21 @@ mod tests {
     }
 
     #[test]
+    fn stale_upsert_cannot_recreate_deleted_session() {
+        let store = SessionStore::open_in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let mut first = sample("s1", "/tmp/a", "First");
+        first.expected_revision = Some(0);
+        let summary = upsert_session(&conn, &first).unwrap();
+        delete_session(&conn, "s1").unwrap();
+
+        let mut stale = sample("s1", "/tmp/a", "Stale");
+        stale.expected_revision = Some(summary.revision);
+        assert!(upsert_session(&conn, &stale).is_err());
+        assert!(get_session(&conn, "s1").unwrap().is_none());
+    }
+
+    #[test]
     fn upsert_preserves_created_at_and_updates_fields() {
         let store = SessionStore::open_in_memory().unwrap();
         let conn = store.conn.lock().unwrap();
