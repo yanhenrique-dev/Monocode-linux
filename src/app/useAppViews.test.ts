@@ -73,12 +73,34 @@ afterEach(() => {
 
 describe("useAppViews overlay transitions", () => {
   it.each([
-    ["go to file", (views: ViewsApi) => views.onGoToFile()],
-    ["command palette", (views: ViewsApi) => views.onOpenCommandPalette()],
-    ["find in project", (views: ViewsApi) => views.onFindInProject()],
-  ])("closes settings before opening %s", (_name, open) => {
-    vi.mocked(deps.setSettingsOpen).mockClear();
-    act(() => open(api.current!));
-    expect(deps.setSettingsOpen).toHaveBeenCalledWith(false);
-  });
+    [
+      "go to file",
+      (views: ViewsApi) => views.onGoToFile(),
+      () => deps.setFilePickerOpen,
+    ],
+    [
+      "command palette",
+      (views: ViewsApi) => views.onOpenCommandPalette(),
+      () => deps.setFilePickerOpen,
+    ],
+    [
+      "find in project",
+      (views: ViewsApi) => views.onFindInProject(),
+      () => deps.setFilesSearchOpen,
+    ],
+  ])(
+    "closes settings before opening %s",
+    (_name, open, getDestination) => {
+      const settings = vi.mocked(deps.setSettingsOpen);
+      const destination = vi.mocked(getDestination());
+      settings.mockClear();
+      destination.mockClear();
+      act(() => open(api.current!));
+      expect(settings).toHaveBeenCalledWith(false);
+      expect(destination).toHaveBeenCalledWith(true);
+      expect(settings.mock.invocationCallOrder[0]).toBeLessThan(
+        destination.mock.invocationCallOrder[0],
+      );
+    },
+  );
 });
