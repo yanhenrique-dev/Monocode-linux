@@ -287,10 +287,8 @@ export async function upsertSession(
   try {
     summary = await enqueueSessionWrite(session.id, async () => {
       if (deletedSessionIds.has(session.id)) return null;
-      let expectedRevision = sessionRevisions.get(session.id);
-      if (expectedRevision === undefined) {
-        expectedRevision = (await refreshSessionRevision(session.id)) ?? 0;
-      }
+      const expectedRevision =
+        session.revision ?? sessionRevisions.get(session.id) ?? 0;
       return invoke<SessionSummary>("session_upsert", {
         session: {
           ...payload,
@@ -314,6 +312,7 @@ export async function upsertSession(
   }
   if (!summary) return null;
   const normalized = normalizeSummary(summary);
+  session.revision = normalized.revision;
   rememberSessionRevision(session.id, normalized.revision);
   return normalized;
 }
@@ -835,6 +834,7 @@ function recordToSession(record: SessionRecord): Session {
   const linkedWorkItem = sanitizeLinkedWorkItem(record.linkedWorkItem);
   return {
     id: record.id,
+    ...(typeof record.revision === "number" ? { revision: record.revision } : {}),
     cwd: record.cwd,
     harness: asHarness(record.harness),
     model: record.model,

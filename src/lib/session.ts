@@ -326,6 +326,7 @@ export type Session = {
   /** Temporary Inbox conversation: shares the runtime, never saved as a session. */
   inboxAsk?: InboxAskContext;
   id: string;
+  revision?: number;
   harness: HarnessId;
   model: string;
   modelSettings: Record<string, string>;
