@@ -6,7 +6,7 @@ Please don’t open PRs that add a new provider right now. The existing harnesse
 
 ## Get it running
 
-You need Node.js 20+, a current stable Rust toolchain, and at least one provider CLI installed and logged in:
+You need Node.js 20+, a current stable Rust toolchain, and at least one supported provider installed and ready:
 
 - [Claude Code](https://claude.com/product/claude-code) - `claude auth login`
 - [Codex](https://developers.openai.com/codex/cli) - `codex login`
@@ -17,6 +17,8 @@ You need Node.js 20+, a current stable Rust toolchain, and at least one provider
 - [omp](https://omp.sh) - `curl -fsSL https://omp.sh/install | sh`
 - [fx](https://fx.sh) - `curl -fsSL https://fx.sh/setup.sh | bash` then `fx login`
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) - Linux: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`; then run `hermes model`
+- [MiniMax Code](https://filecdn.minimax.chat/public/install.sh) - `curl -fsSL https://filecdn.minimax.chat/public/install.sh | bash` then `mcode login`
+- Antigravity - Install Antigravity, then run `agy` once in a terminal
 
 Linux is the only supported target. On Debian/Ubuntu, `npm run setup:linux` installs the native Tauri build dependencies.
 
@@ -25,7 +27,7 @@ npm install
 npm run tauri dev
 ```
 
-One provider is enough. MonoCode probes for each CLI at startup and disables the ones it can’t find, with a hint about how to install them, so a missing Codex doesn’t stop you from working on anything else.
+One provider is enough. MonoCode probes each supported integration at startup and disables the ones it cannot find, with a hint about how to install them, so a missing Codex does not stop you from working with another provider.
 
 ## Where things live
 
@@ -40,19 +42,21 @@ One provider is enough. MonoCode probes for each CLI at startup and disables the
 
 ```bash
 npm run check
+cargo check
+npm run test:linux:installer
 ```
 
-That runs what CI runs: vitest, `tsc --noEmit`, `cargo fmt`, `cargo clippy`, and `cargo test`. If it’s green locally it should be green on GitHub. `npm run check:web` and `npm run check:rust` run the two halves separately when you only touched one side.
+These commands match CI: frontend tests and type checking, Rust formatting, Clippy, compilation, Rust tests, and the per-user Linux installer test. `npm run check:web` and `npm run check:rust` run the two main halves separately when you only touched one side.
 
 ## New providers
 
-I’m pausing new harnesses until the current ones share the same patterns - session lifecycle, catalog probes, usage, approvals, and how slash commands and skills are wired. A PR that adds another provider will be closed for now, even if the work is good. Fixes, tests, and protocol bugs on Claude, Codex, Cursor, Grok, OpenCode, Pi, omp, fx, and Hermes Agent are still the best kind of contribution.
+I’m pausing new harnesses until the current ones share the same patterns - session lifecycle, catalog probes, usage, approvals, and how slash commands and skills are wired. A PR that adds another provider will be closed for now, even if the work is good. Fixes, tests, and protocol bugs on Claude, Codex, Cursor, Grok, OpenCode, Pi, omp, fx, Hermes Agent, MiniMax Code, and Antigravity are still the best kind of contribution.
 
 When the pause lifts, this section goes away.
 
 ## Pull requests
 
-Keep a PR to one thing, and say what changed and why. The [PR template](.github/pull_request_template.md) covers the rest. If it changes the UI, a before/after screenshot helps a lot.
+Keep a PR to one thing, and say what changed and why. The [PR template](../.github/pull_request_template.md) covers the rest. If it changes the UI, a before/after screenshot helps a lot.
 
 For anything that moves product direction - a new surface, new provider behavior, a refactor that changes the shape of the app - open an issue first. That’s not gatekeeping, I’d just rather you hear “I’m already halfway through that” before you write it than after. New providers are the exception: don’t send the adapter, even from an issue, until the pause above is gone.
 

@@ -51,12 +51,18 @@ export { hasInFlightSessions };
 export type BootWorkspace = {
   windowTransfer: WindowTransferPayload | null;
   resumed: ResumedWorkspace | null;
+  isFirstRun: boolean;
   /** Sidebar rows listed before first paint, so the rail is not empty. */
   history: SessionSummary[];
   historyCwd: string | null;
 };
 
-let resumedPromise: Promise<ResumedWorkspace | null> | null = null;
+type ResumedWorkspaceState = {
+  workspace: ResumedWorkspace | null;
+  hasInFlightRefs: boolean;
+};
+
+let resumedPromise: Promise<ResumedWorkspaceState> | null = null;
 let bootPromise: Promise<BootWorkspace> | null = null;
 let quitting = false;
 let quitDialogOpen = false;
@@ -69,6 +75,7 @@ let liveWorkspace: {
   projectTerminals: () => ProjectTerminalDock[];
   projectReturnMemory: () => ProjectReturnMemory;
   flush: () => void;
+  shouldPersist: () => boolean;
 } | null = null;
 
 export function isAppQuitting(): boolean {
@@ -83,6 +90,7 @@ export function setQuitWorkspace(
   projectTerminals: () => ProjectTerminalDock[],
   projectReturnMemory: () => ProjectReturnMemory,
   flush: () => void,
+  shouldPersist: () => boolean = () => true,
 ): () => void {
   liveWorkspace = {
     sessions,
@@ -92,6 +100,7 @@ export function setQuitWorkspace(
     projectTerminals,
     projectReturnMemory,
     flush,
+    shouldPersist,
   };
   bootingResumed = null;
   return () => {
@@ -107,6 +116,7 @@ export async function handleQuitRequested(): Promise<boolean> {
   if (liveWorkspace) {
     liveWorkspace.flush();
     quitting = true;
+    if (!liveWorkspace.shouldPersist()) return true;
     try {
       await persistQuitState(
         liveWorkspace.sessions(),
@@ -198,9 +208,13 @@ export async function closeBusyWindow(): Promise<void> {
   );
 }
 
-export function loadResumedWorkspace(): Promise<ResumedWorkspace | null> {
+function loadResumedWorkspaceState(): Promise<ResumedWorkspaceState> {
   if (!resumedPromise) resumedPromise = loadResumedWorkspaceOnce();
   return resumedPromise;
+}
+
+export function loadResumedWorkspace(): Promise<ResumedWorkspace | null> {
+  return loadResumedWorkspaceState().then((state) => state.workspace);
 }
 
 /** Transfer and restore run once; callers share the same promise. */
@@ -219,14 +233,16 @@ export function loadBootWorkspace(): Promise<BootWorkspace> {
         return {
           windowTransfer,
           resumed: null,
+          isFirstRun: false,
           history: listed?.rows ?? [],
           historyCwd: listed?.cwd ?? null,
         };
       }
-      const [resumed, hinted] = await Promise.all([
-        loadResumedWorkspace(),
+      const [resumedState, hinted] = await Promise.all([
+        loadResumedWorkspaceState(),
         historyHint,
       ]);
+      const resumed = resumedState.workspace;
       const listed = await historyForCwd(
         resumed?.projectCwd ?? hintedCwd,
         hintedCwd,
@@ -235,6 +251,7 @@ export function loadBootWorkspace(): Promise<BootWorkspace> {
       return {
         windowTransfer: null,
         resumed,
+        isFirstRun: !resumed && !resumedState.hasInFlightRefs && !hintedCwd,
         history: listed?.rows ?? [],
         historyCwd: listed?.cwd ?? null,
       };
@@ -265,7 +282,7 @@ async function historyForCwd(
   return listProjectHistory(cwd);
 }
 
-async function loadResumedWorkspaceOnce(): Promise<ResumedWorkspace | null> {
+async function loadResumedWorkspaceOnce(): Promise<ResumedWorkspaceState> {
   const [snapshotRaw, refs] = await Promise.all([
     loadWorkspaceSnapshot().catch(() => null),
     listInFlightSessions().catch(() => []),
@@ -311,7 +328,10 @@ async function loadResumedWorkspaceOnce(): Promise<ResumedWorkspace | null> {
         .map((session) => upsertSession(session).catch(() => null)),
     );
   }
-  return workspace;
+  return {
+    workspace,
+    hasInFlightRefs: refs.length > 0,
+  };
 }
 
 export function bindResumedSessions(sessions: Session[]): void {

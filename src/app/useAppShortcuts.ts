@@ -34,6 +34,7 @@ import {
   openFindInActiveEditor,
 } from "../surfaces/editorSearch";
 import { runUpdateFlow } from "../lib/updater";
+import { shouldBlockAppAction } from "../lib/firstRun";
 import { NOTIFICATION_CLICK_EVENT } from "../lib/notifications";
 import type { Session } from "../lib/session";
 import type { WorkspaceTab } from "../lib/layout";
@@ -79,6 +80,7 @@ export interface AppShortcutsDeps {
   notesViewOpenRef: MutableRefObject<boolean>;
   settingsOpenRef: MutableRefObject<boolean>;
   whatsNewVersionRef: MutableRefObject<string | null>;
+  firstRunOpenRef: MutableRefObject<boolean>;
   sessionNavigationIdsRef: MutableRefObject<readonly string[]>;
   setSidebarTab: Dispatch<SetStateAction<import("../lib/appearance").SidebarTabId>>;
   onSelectHistorySession: (sessionId: string) => Promise<void>;
@@ -98,6 +100,7 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     notesViewOpenRef,
     settingsOpenRef,
     whatsNewVersionRef,
+    firstRunOpenRef,
     sessionNavigationIdsRef,
     onSelectHistorySession,
     onSelectProject,
@@ -236,13 +239,20 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
   // Serializes F11 toggles: two quick presses must read/set in order,
   // otherwise both read the same state and only one toggle lands.
   const fullscreenQueue = useRef(Promise.resolve());
+  const runInteractive = useCallback(
+    (fn: () => void) => {
+      if (!shouldBlockAppAction(firstRunOpenRef.current)) fn();
+    },
+    [firstRunOpenRef],
+  );
   const run = useCallback((name: string, fn: () => void) => {
+    if (shouldBlockAppAction(firstRunOpenRef.current)) return;
     const now = performance.now();
     if (name === debounce.current.name && now - debounce.current.at < 80)
       return;
     debounce.current = { name, at: now };
     fn();
-  }, []);
+  }, [firstRunOpenRef]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -289,6 +299,11 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
         return;
       }
       const cmd = tabCommand(e);
+      if (cmd && shouldBlockAppAction(firstRunOpenRef.current)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (cmd) {
         if (cmd === "archive-session") {
           actions.current.onArchiveFocusedSession(e);
@@ -315,7 +330,8 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
-            Boolean(whatsNewVersionRef.current);
+            Boolean(whatsNewVersionRef.current) ||
+            firstRunOpenRef.current;
           if (
             !shouldHandleListNavigation({
               blockedTarget,
@@ -442,7 +458,7 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [run]);
+  }, [firstRunOpenRef, run]);
 
   useEffect(() => {
     const unlisten: Array<Promise<() => void>> = [
@@ -490,33 +506,46 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
       listen("toggle_sidebar", () =>
         run("toggle_sidebar", actions.current.onToggleSidebar),
       ),
-      listen("open_project", () => {
-        void actions.current.pickProject();
-      }),
+      listen("open_project", () =>
+        runInteractive(() => actions.current.pickProject()),
+      ),
       listen("go_to_file", () => run("go_to_file", actions.current.onGoToFile)),
       listen("open_command_palette", () =>
         run("open_command_palette", actions.current.onOpenCommandPalette),
       ),
       listen("reload", () => run("reload", actions.current.onReload)),
-      listen("open_search", () => actions.current.onOpenSearch()),
-      listen("open_inbox", () => actions.current.onOpenInbox()),
-      listen("open_notes", () => actions.current.onOpenNotes()),
-      listen("open_settings", () => actions.current.openSettings()),
-      listen("check_for_updates", () => {
-        void runUpdateFlow(true);
-      }),
-      listen("sidebar_opacity", () => {
-        actions.current.openSettings("appearance");
-      }),
-      listen("find_in_project", () => actions.current.onFindInProject()),
-      listen("find", () => {
-        openFindInActiveEditor();
-      }),
-      listen("open_model_picker", () => {
-        window.dispatchEvent(new Event("open_model_picker"));
-      }),
+      listen("open_search", () =>
+        runInteractive(() => actions.current.onOpenSearch()),
+      ),
+      listen("open_inbox", () =>
+        runInteractive(() => actions.current.onOpenInbox()),
+      ),
+      listen("open_notes", () =>
+        runInteractive(() => actions.current.onOpenNotes()),
+      ),
+      listen("open_settings", () =>
+        runInteractive(() => actions.current.openSettings()),
+      ),
+      listen("check_for_updates", () =>
+        runInteractive(() => {
+          void runUpdateFlow(true);
+        }),
+      ),
+      listen("sidebar_opacity", () =>
+        runInteractive(() => actions.current.openSettings("appearance")),
+      ),
+      listen("find_in_project", () =>
+        runInteractive(() => actions.current.onFindInProject()),
+      ),
+      listen("find", () => runInteractive(openFindInActiveEditor)),
+      listen("open_model_picker", () =>
+        runInteractive(() => {
+          window.dispatchEvent(new Event("open_model_picker"));
+        }),
+      ),
       // Every window hears the click; only the one holding the session acts.
       listen<string>(NOTIFICATION_CLICK_EVENT, ({ payload: sessionId }) => {
+        if (shouldBlockAppAction(firstRunOpenRef.current)) return;
         if (!sessionsRef.current.some((s) => s.id === sessionId)) return;
         const win = getCurrentWindow();
         // Windows leaves a minimized window minimized when it is only focused.
@@ -544,7 +573,7 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
     return () => {
       void Promise.all(unlisten).then((fns) => fns.forEach((fn) => fn()));
     };
-  }, [run]);
+  }, [firstRunOpenRef, run, runInteractive, sessionsRef]);
 
   return {
     onSessionNavigationOrder,

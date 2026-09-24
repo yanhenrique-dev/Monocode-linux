@@ -127,6 +127,34 @@ describe("project choices through lifecycle saves", () => {
     }
   });
 
+  it("does not persist quit state while first-run setup is open", async () => {
+    const state = workspace();
+    const { handleQuitRequested, setQuitWorkspace } =
+      await import("./appLifecycle");
+    const release = setQuitWorkspace(
+      () => state.sessions,
+      () => state.tabs,
+      () => state.activeTabId,
+      () => state.projectCwd,
+      () => [],
+      () => state.memory,
+      vi.fn(),
+      () => false,
+    );
+    try {
+      await expect(handleQuitRequested()).resolves.toBe(true);
+      expect(
+        vi
+          .mocked(invoke)
+          .mock.calls.filter(
+            ([command]) => command === "workspace_set_snapshot",
+          ),
+      ).toHaveLength(0);
+    } finally {
+      release();
+    }
+  });
+
   it("reads committed selection from live getters before autosave", async () => {
     const state = workspace();
     const { handleQuitRequested, setQuitWorkspace } =

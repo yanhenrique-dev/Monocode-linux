@@ -152,6 +152,7 @@ export interface SessionSyncDeps {
   inboxViewOpenRef: MutableRefObject<boolean>;
   notesViewOpenRef: MutableRefObject<boolean>;
   settingsOpenRef: MutableRefObject<boolean>;
+  firstRunOpenRef: MutableRefObject<boolean>;
   loadedProjectsRef: MutableRefObject<ReadonlySet<string>>;
   activeTabIdRef: MutableRefObject<string>;
   projectCwdRef: MutableRefObject<string>;
@@ -217,6 +218,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     inboxViewOpenRef,
     notesViewOpenRef,
     settingsOpenRef,
+    firstRunOpenRef,
     loadedProjectsRef,
     activeTabIdRef,
     projectCwdRef,
@@ -604,7 +606,8 @@ export function useSessionSync(deps: SessionSyncDeps) {
             !searchViewOpenRef.current &&
             !inboxViewOpenRef.current &&
             !notesViewOpenRef.current &&
-            !settingsOpenRef.current
+            !settingsOpenRef.current &&
+            !firstRunOpenRef.current
           ) {
             setComposerFocused(true);
             setComposerFocusToken((token) => token + 1);
@@ -637,6 +640,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
       () => projectTerminalsRef.current,
       readProjectReturnMemory,
       flushHarnessEvents,
+      () => !firstRunOpenRef.current,
     );
     void getCurrentWindow()
       .onCloseRequested((event) => {
@@ -659,17 +663,18 @@ export function useSessionSync(deps: SessionSyncDeps) {
             void closeBusyWindow();
             return;
           }
-          await persistQuitState(
-            sessionsRef.current,
-            tabsRef.current,
-            activeTabIdRef.current,
-            projectCwdRef.current,
-            readProjectReturnMemory(),
-            "unload",
-            projectTerminalsRef.current,
-          ).finally(() => {
-            void closeCurrentWindow();
-          });
+          if (!firstRunOpenRef.current) {
+            await persistQuitState(
+              sessionsRef.current,
+              tabsRef.current,
+              activeTabIdRef.current,
+              projectCwdRef.current,
+              readProjectReturnMemory(),
+              "unload",
+              projectTerminalsRef.current,
+            );
+          }
+          void closeCurrentWindow();
         })();
       })
       .then((fn) => {
@@ -679,7 +684,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
       releaseQuit();
       unlistenClose?.();
     };
-  }, [flushHarnessEvents, readProjectReturnMemory]);
+  }, [firstRunOpenRef, flushHarnessEvents, readProjectReturnMemory]);
 
   const refreshHistory = useCallback(async (cwd: string) => {
     if (!cwd || cwd === "~") return;
@@ -831,7 +836,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
   }, [sessions, tabs]);
 
   useEffect(() => {
-    if (windowTransfer) return;
+    if (firstRunOpenRef.current || windowTransfer) return;
     const snapshot = collectWorkspaceSnapshot(
       tabs,
       sessions,
@@ -859,6 +864,7 @@ export function useSessionSync(deps: SessionSyncDeps) {
     projectCwd,
     projectTerminals,
     windowTransfer,
+    firstRunOpenRef,
   ]);
 
   useEffect(() => {
@@ -867,7 +873,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
       .then((cwd) => {
         if (!looksLikeProject(cwd)) return;
         setProjectCwd(cwd);
-        setRecents((prev) => (prev.length > 0 ? prev : rememberProject(cwd)));
         setSessions((prev) =>
           prev.map((s) => (s.cwd === "~" ? { ...s, cwd } : s)),
         );

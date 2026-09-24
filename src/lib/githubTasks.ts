@@ -147,6 +147,8 @@ export type GithubStatus = {
   connected: boolean;
   installed: boolean;
   authenticated: boolean;
+  rateLimited?: boolean;
+  retryAfterSecs?: number;
 };
 
 export type InboxListResult = {

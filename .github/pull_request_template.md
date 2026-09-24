@@ -13,5 +13,9 @@
 ## Checklist
 
 - [ ] I ran `npm run check`
+- [ ] I ran `cargo check`
+- [ ] I ran `npm run test:linux:installer`
+- [ ] I added or updated tests
+- [ ] I updated documentation when behavior changed
 - [ ] This PR is small and focused
 - [ ] I did not mix unrelated changes
