@@ -29,6 +29,7 @@ import {
   listInFlightSessions,
   listSessionsByProject,
   loadWorkspaceSnapshot,
+  persistFingerprint,
   replaceInFlightSessions,
   saveWorkspaceSnapshot,
   shouldPersistSession,
@@ -305,11 +306,14 @@ async function loadResumedWorkspaceOnce(): Promise<ResumedWorkspace | null> {
 
   bootingResumed = workspace;
   if (workspace) {
-    await Promise.all(
-      workspace.sessions
-        .filter(shouldPersistSession)
-        .map((session) => upsertSession(session).catch(() => null)),
-    );
+    const changed = workspace.sessions.filter((session) => {
+      const original = loaded.get(session.id);
+      return (
+        shouldPersistSession(session) &&
+        (!original || persistFingerprint(session) !== persistFingerprint(original))
+      );
+    });
+    await Promise.all(changed.map((session) => upsertSession(session).catch(() => null)));
   }
   return workspace;
 }

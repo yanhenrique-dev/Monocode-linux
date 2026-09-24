@@ -399,4 +399,29 @@ describe("boot restoration", () => {
 
     expect(store.upsertSession).not.toHaveBeenCalled();
   });
+
+  it("persists a session changed while marking an interrupted turn", async () => {
+    const session = newSession("cursor", "/project");
+    session.busy = true;
+    session.blocks = [{ id: "user", role: "user", text: "saved" }];
+    const tab = newTab(session.id);
+    const snapshot = collectWorkspaceSnapshot(
+      [tab],
+      [session],
+      tab.id,
+      session.cwd,
+      new Map(),
+    );
+    const store = await import("./sessionStore");
+    const lifecycle = await import("./appLifecycle");
+    vi.mocked(store.loadWorkspaceSnapshot).mockResolvedValue(snapshot);
+    vi.mocked(store.listInFlightSessions).mockResolvedValue([
+      { sessionId: session.id, cwd: session.cwd },
+    ]);
+    vi.mocked(store.getSession).mockResolvedValue(session);
+
+    await lifecycle.loadResumedWorkspace();
+
+    expect(store.upsertSession).toHaveBeenCalledTimes(1);
+  });
 });
