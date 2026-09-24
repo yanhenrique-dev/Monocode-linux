@@ -1,13 +1,17 @@
 // @vitest-environment happy-dom
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyLocale,
   getIntlLocale,
   initLocale,
   loadLocale,
+  LocaleProvider,
   saveLocale,
   STRINGS,
   t,
+  useLocale,
 } from "./locale";
 
 beforeEach(() => {
@@ -28,6 +32,13 @@ describe("locale dictionaries", () => {
     expect(t("en", "settings.general.sounds.label")).toBe("Sounds");
   });
 
+  it("translates shell labels outside Settings", () => {
+    expect(t("pt-BR", "shell.menu.file")).toBe("Arquivo");
+    expect(t("pt-BR", "shell.title.new_session")).toBe("Nova sessão");
+    expect(t("pt-BR", "shell.filters.needs_approval")).toBe("Requer aprovação");
+    expect(t("pt-BR", "shell.usage.refresh")).toBe("Atualizar uso");
+  });
+
   it("interpolates {vars} and keeps unknown placeholders", () => {
     expect(
       t("en", "settings.general.update.available", {
@@ -41,6 +52,35 @@ describe("locale dictionaries", () => {
 });
 
 describe("locale store", () => {
+  it("re-renders translated consumers when locale changes", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    localStorage.setItem("monocode.locale", "en");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+
+    function Probe() {
+      const { t: translate } = useLocale();
+      return createElement("span", null, translate("shell.menu.file"));
+    }
+
+    await act(async () => {
+      root.render(
+        createElement(LocaleProvider, null, createElement(Probe)),
+      );
+    });
+    expect(container.textContent).toBe("File");
+
+    await act(async () => {
+      saveLocale("pt-BR");
+      applyLocale("pt-BR");
+    });
+    expect(container.textContent).toBe("Arquivo");
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it("round-trips through localStorage", () => {
     saveLocale("pt-BR");
     expect(loadLocale()).toBe("pt-BR");

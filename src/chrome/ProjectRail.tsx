@@ -19,6 +19,7 @@ import {
   Trash2,
 } from "./icons";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useLocale, type Translate } from "../lib/locale";
 import { useDragResize } from "../hooks/useDragResize";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useProjectDiffStats } from "../hooks/useProjectDiffStats";
@@ -100,15 +101,18 @@ import {
 import { NotificationMuteDatePicker } from "./NotificationMuteDatePicker";
 import { Popover } from "./Popover";
 import { InboxNotificationMenu } from "./InboxNotificationMenu";
-import { notificationMuteActions, notificationMuteDeadline, notificationMuteStatus } from "./notificationMuteActions";
+import {
+  notificationMuteActions,
+  notificationMuteDeadline,
+  notificationMuteStatus,
+} from "./notificationMuteActions";
 import { useProjectNotificationPreferences } from "../hooks/useProjectNotificationPreferences";
 import { useNotificationProjects } from "../hooks/useNotificationProjects";
 import { updateNotificationPreferences } from "../lib/notificationPreferences";
 import type { ExplorerMenuItem } from "./ExplorerMenu";
 
-const REVEAL_LABEL = "Open Containing Folder";
-
 function projectMenuExtraItems(
+  t: Translate,
   pinned: boolean,
   canRemove: boolean,
   canConfigureNotifications: boolean,
@@ -118,7 +122,11 @@ function projectMenuExtraItems(
   currentProjectGroupId?: string,
 ): TabGroupMenuExtraItem[] {
   const groupSubmenu: ExplorerMenuItem[] = [
-    { kind: "item", id: "project-group:new", label: "New group…" },
+    {
+      kind: "item",
+      id: "project-group:new",
+      label: t("shell.project.new_group"),
+    },
     ...(projectGroups.length > 0 ? [{ kind: "sep" } as const] : []),
     ...projectGroups.map((group) => ({
       kind: "item" as const,
@@ -130,29 +138,38 @@ function projectMenuExtraItems(
     {
       kind: "item",
       id: "project-group:none",
-      label: "Ungrouped",
+      label: t("shell.project.ungrouped"),
+
       checked: currentProjectGroupId == null,
     },
   ];
   const items: TabGroupMenuExtraItem[] = [
     {
       id: "background",
-      label: "Background image",
+      label: t("shell.project.background_image"),
+
       icon: ImagePlus,
     },
     {
       id: "project-group",
-      label: "Move to group",
+      label: t("shell.project.move_to_group"),
+
       icon: FolderTree,
       submenu: groupSubmenu,
     },
     pinned
-      ? { id: "unpin", label: "Unpin project", icon: PinOff }
-      : { id: "pin", label: "Pin project", icon: Pin },
-    { id: "reveal", label: REVEAL_LABEL, icon: FolderOpen },
+      ? { id: "unpin", label: t("shell.project.unpin"), icon: PinOff }
+      : { id: "pin", label: t("shell.project.pin"), icon: Pin },
+    {
+      id: "reveal",
+      label: t("shell.project.open_containing_folder"),
+      icon: FolderOpen,
+    },
+
     {
       id: "external-editor",
-      label: "Open in editor",
+      label: t("shell.project.open_editor"),
+
       icon: AppWindow,
       disabled: externalEditors === null,
       submenu:
@@ -161,7 +178,8 @@ function projectMenuExtraItems(
               {
                 kind: "item",
                 id: "external-editor:loading",
-                label: "Looking for editors…",
+                label: t("shell.project.looking_editors"),
+
                 disabled: true,
               },
             ]
@@ -175,14 +193,16 @@ function projectMenuExtraItems(
                 {
                   kind: "item",
                   id: "external-editor:none",
-                  label: "No supported editors found",
+                  label: t("shell.project.no_editors"),
+
                   disabled: true,
                 },
               ],
     },
     {
       id: "notifications-mute",
-      label: "Mute notifications",
+      label: t("shell.project.mute_notifications"),
+
       icon: BellOff,
       sepBefore: true,
       disabled: !notificationReady,
@@ -192,14 +212,25 @@ function projectMenuExtraItems(
   if (canConfigureNotifications) {
     items.push({
       id: "notifications-settings",
-      label: "Notification settings…",
+      label: t("shell.project.notification_settings"),
+
       icon: Settings,
     });
   }
   if (canRemove) {
     items.push(
-      { id: "archive", label: "Archive", icon: Archive, sepBefore: true },
-      { id: "delete", label: "Delete", icon: Trash2, danger: true },
+      {
+        id: "archive",
+        label: t("shell.project.archive"),
+        icon: Archive,
+        sepBefore: true,
+      },
+      {
+        id: "delete",
+        label: t("shell.project.delete"),
+        icon: Trash2,
+        danger: true,
+      },
     );
   }
   return items;
@@ -272,6 +303,7 @@ export function ProjectRail({
   onOpenWhatsNew,
   onDismissUpdate,
 }: Props) {
+  const { t } = useLocale();
   const resize = useDragResize({
     min: PROJECT_RAIL_WIDTH_MIN,
     max: () =>
@@ -324,7 +356,9 @@ export function ProjectRail({
     ? knownNotificationProject(notificationPath)
     : undefined;
   const menuMuteStatus = readyNotificationProject
-    ? notificationMuteStatus(notificationPreferences[readyNotificationProject.id])
+    ? notificationMuteStatus(
+        notificationPreferences[readyNotificationProject.id],
+      )
     : null;
   useEffect(() => {
     setProjectMenuError(null);
@@ -333,7 +367,8 @@ export function ProjectRail({
     let active = true;
     void listExternalEditors()
       .then((installed) => {
-        if (active) setExternalEditors(Array.isArray(installed) ? installed : []);
+        if (active)
+          setExternalEditors(Array.isArray(installed) ? installed : []);
       })
       .catch(() => {
         if (active) setExternalEditors([]);
@@ -423,7 +458,9 @@ export function ProjectRail({
 
   const openProjectMenu = (path: string, x: number, y: number) => {
     menuTrigger.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setInboxMenu(null);
     setNotificationMenu(null);
     setProjectMenu({
@@ -576,25 +613,34 @@ export function ProjectRail({
       if (projectGroups.some((group) => group.id === groupId)) {
         assignProjectGroup(path, groupId);
       }
-    }
-    else if (action === "mute:custom") {
+    } else if (action === "mute:custom") {
       if (!readyNotificationProject) return false;
-      setNotificationMenu({ ...projectMenu, project: readyNotificationProject });
-    }
-    else if (action.startsWith("mute:") || action === "notifications-resume") {
+      setNotificationMenu({
+        ...projectMenu,
+        project: readyNotificationProject,
+      });
+    } else if (
+      action.startsWith("mute:") ||
+      action === "notifications-resume"
+    ) {
       if (!readyNotificationProject) return false;
       const mutedUntil = notificationMuteDeadline(action);
-      if (action !== "notifications-resume" && mutedUntil === undefined) return false;
+      if (action !== "notifications-resume" && mutedUntil === undefined)
+        return false;
       try {
-        updateNotificationPreferences([readyNotificationProject.id], { mutedUntil });
+        updateNotificationPreferences([readyNotificationProject.id], {
+          mutedUntil,
+        });
       } catch {
-        setProjectMenuError("Could not save notification preferences. Please try again.");
+        setProjectMenuError(
+          "Could not save notification preferences. Please try again.",
+        );
         return false;
       }
-    }
-    else if (action.startsWith("external-editor:")) {
+    } else if (action.startsWith("external-editor:")) {
       const editorId = action.slice("external-editor:".length);
-      if (!externalEditors?.some((editor) => editor.id === editorId)) return false;
+      if (!externalEditors?.some((editor) => editor.id === editorId))
+        return false;
       void openInExternalEditor(editorId, path)
         .then(() => {
           setProjectMenu(null);
@@ -606,11 +652,9 @@ export function ProjectRail({
           );
         });
       return false;
-    }
-    else if (action === "notifications-settings") {
+    } else if (action === "notifications-settings") {
       onOpenNotificationSettings?.(path);
-    }
-    else if (action === "pin" || action === "unpin") onTogglePin(path);
+    } else if (action === "pin" || action === "unpin") onTogglePin(path);
     else if (action === "background") {
       setBackgroundProject({
         project: projectKey,
@@ -638,11 +682,16 @@ export function ProjectRail({
   const pinnedIds = sections.pinned.map((item) => item.path);
   const projectIds = groupedProjectSections.ungrouped.map((item) => item.path);
   const pinnedSortable = useAnimatedReorder(pinnedIds, onReorderPinned, "y");
-  const projectSortable = useAnimatedReorder(projectIds, onReorderProjects, "y");
+  const projectSortable = useAnimatedReorder(
+    projectIds,
+    onReorderProjects,
+    "y",
+  );
   return (
     <nav
       ref={resize.setPaneRef}
-      aria-label="Projects"
+      aria-label={t("shell.project.projects")}
+
       className="sidebar-glass relative flex shrink-0 flex-col border-r border-stroke"
     >
       <div
@@ -670,16 +719,18 @@ export function ProjectRail({
         <>
           <div className="flex shrink-0 flex-col gap-px px-2 pb-2 pt-0.5">
             <RailSearch
-              label="Search"
+              label={t("shell.project.search")}
+
               icon={Search}
               onClick={onSearch}
               active={searchActive}
               shortcut={`${MOD}K`}
-              ariaLabel={`Search (${MOD}K)`}
+              ariaLabel={`${t("shell.project.search")} (${MOD}K)`}
             />
             <div className="mt-0.5" />
             <RailAction
-              label="Inbox"
+              label={t("shell.project.inbox")}
+
               icon={Inbox}
               onClick={onOpenInbox}
               onOpenContextMenu={(x, y) => {
@@ -693,15 +744,20 @@ export function ProjectRail({
               }}
               active={inboxActive}
               dot={inboxUnseen}
-              ariaLabel={inboxUnseen ? "Inbox, new items" : "Inbox"}
+              ariaLabel={
+                inboxUnseen
+                  ? t("shell.project.inbox_new")
+                  : t("shell.project.inbox")
+              }
             />
             {notesEnabled ? (
               <RailAction
-                label="Notes"
+                label={t("shell.project.notes")}
+
                 icon={File}
                 onClick={onOpenNotes}
                 active={notesActive}
-                ariaLabel="Notes"
+                ariaLabel={t("shell.project.notes")}
               />
             ) : null}
           </div>
@@ -715,7 +771,8 @@ export function ProjectRail({
           >
             {sections.pinned.length > 0 ? (
               <ProjectSection
-                label="Pinned"
+                label={t("shell.project.pinned")}
+
                 items={sections.pinned}
                 muteStatuses={muteStatuses}
                 cwd={cwd}
@@ -737,7 +794,11 @@ export function ProjectRail({
 
             {projectGroups.length > 0 ? (
               <div className="mb-2 shrink-0">
-                <ProjectSectionHeader label="Groups" onAddGroup={createGroup} />
+                <ProjectSectionHeader
+                  label={t("shell.project.groups")}
+                  onAddGroup={createGroup}
+                />
+
                 <div className="flex flex-col gap-px px-2">
                   {groupedProjectSections.grouped.map(({ group, items }) => (
                     <ProjectGroupSection
@@ -780,12 +841,13 @@ export function ProjectRail({
             ) : null}
 
             <ProjectSection
-              label="Projects"
+              label={t("shell.project.projects")}
+
               items={groupedProjectSections.ungrouped}
               muteStatuses={muteStatuses}
               emptyLabel={
                 sections.projects.length === 0 && projectGroups.length === 0
-                  ? "No projects yet"
+                  ? t("shell.project.no_projects")
                   : undefined
               }
               onAdd={onOpenProject}
@@ -821,11 +883,12 @@ export function ProjectRail({
           />
           <div className="flex shrink-0 flex-col gap-px p-2">
             <RailAction
-              label="Settings"
+              label={t("shell.project.settings")}
+
               icon={Settings}
               onClick={onOpenSettings}
               shortcut={`${MOD},`}
-              ariaLabel={`Settings (${MOD},)`}
+              ariaLabel={`${t("shell.project.settings")} (${MOD},)`}
             />
           </div>
         </>
@@ -873,13 +936,19 @@ export function ProjectRail({
             menuTrigger.current?.focus();
           }}
           showActions={false}
-          leadingAction={menuMuteStatus ? {
-            id: "notifications-resume",
-            label: "Resume notifications",
-            description: menuMuteStatus,
-            icon: BellOff,
-          } : undefined}
+          leadingAction={
+            menuMuteStatus
+              ? {
+                  id: "notifications-resume",
+                  label: t("shell.project.resume_notifications"),
+
+                  description: menuMuteStatus,
+                  icon: BellOff,
+                }
+              : undefined
+          }
           extraItems={projectMenuExtraItems(
+            t,
             pinnedPaths.some((pinned) =>
               sameProjectPath(pinned, projectMenu.path),
             ),
@@ -890,9 +959,13 @@ export function ProjectRail({
             projectGroups,
             projectGroupIdForPath(projectMenu.path, projectGroupAssignments),
           )}
-          footer={projectMenuError ? (
-            <p role="alert" className="px-2 py-1 text-xs text-red-400">{projectMenuError}</p>
-          ) : null}
+          footer={
+            projectMenuError ? (
+              <p role="alert" className="px-2 py-1 text-xs text-red-400">
+                {projectMenuError}
+              </p>
+            ) : null
+          }
           onExtraPick={onProjectMenuPick}
         />
       ) : null}
@@ -1015,7 +1088,11 @@ function ProjectNotificationDatePicker({
       >
         {project.name}
       </p>
-      <NotificationMuteDatePicker projectIds={[project.id]} onCancel={onClose} onChanged={onClose} />
+      <NotificationMuteDatePicker
+        projectIds={[project.id]}
+        onCancel={onClose}
+        onChanged={onClose}
+      />
     </Popover>
   );
 }
@@ -1104,6 +1181,7 @@ function ProjectSectionHeader({
   onAdd?: () => void;
   onAddGroup?: (x: number, y: number) => void;
 }) {
+  const { t } = useLocale();
   return (
     <div className="flex items-center gap-1 px-3 pb-1.5 pt-1">
       <span className="min-w-0 flex-1 truncate px-1 text-xs text-content/50">
@@ -1112,8 +1190,9 @@ function ProjectSectionHeader({
       {onAddGroup ? (
         <button
           type="button"
-          title="New project group"
-          aria-label="New project group"
+          title={t("shell.project.new_project_group")}
+          aria-label={t("shell.project.new_project_group")}
+
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
             onAddGroup(rect.left, rect.bottom);
@@ -1126,8 +1205,9 @@ function ProjectSectionHeader({
       {onAdd ? (
         <button
           type="button"
-          title="Open project"
-          aria-label="Open project"
+          title={t("shell.project.open_project")}
+          aria-label={t("shell.project.open_project")}
+
           onClick={onAdd}
           className="grid size-5 shrink-0 place-items-center rounded-md text-content/70 hover:bg-content/8 hover:text-content"
         >
@@ -1169,6 +1249,7 @@ function ProjectGroupAppearanceMenu({
   onDelete: (id: string) => boolean;
   onClose: () => void;
 }) {
+  const { t } = useLocale();
   const group = groups.find((item) => item.id === menu.id);
   if (!group) return null;
   return (
@@ -1191,12 +1272,14 @@ function ProjectGroupAppearanceMenu({
       onPick={() => {}}
       onClose={onClose}
       showActions={false}
-      ariaLabel="Project group actions"
+      ariaLabel={t("shell.project.group_actions")}
+
       extraItems={[
         {
           id: "delete-project-group",
-          label: "Delete group",
-          description: "Projects will become ungrouped",
+          label: t("shell.project.delete_group"),
+          description: t("shell.project.projects_ungrouped"),
+
           icon: Trash2,
           danger: true,
         },
@@ -1247,12 +1330,16 @@ function ProjectGroupSection({
   groupLogos: ReturnType<typeof useTabGroupLogos>;
   groupMascots: Record<string, string>;
 }) {
+  const { t } = useLocale();
   const sortable = useAnimatedReorder(
     items.map((item) => item.path),
     onReorder,
     "y",
   );
-  const countLabel = `${items.length} ${items.length === 1 ? "project" : "projects"}`;
+  const countLabel =
+    items.length === 1
+      ? t("shell.project.group_count_one")
+      : t("shell.project.group_count_many", { count: items.length });
   const expanded = !group.collapsed;
   const openMenu = (target: HTMLElement, x?: number, y?: number) => {
     const rect = target.getBoundingClientRect();
@@ -1272,7 +1359,9 @@ function ProjectGroupSection({
         className="project-reorder-item group relative flex h-8 items-stretch rounded-md px-2 opacity-85 cursor-default"
         onContextMenu={(event) => {
           event.preventDefault();
-          event.currentTarget.querySelector<HTMLButtonElement>("button")?.focus();
+          event.currentTarget
+            .querySelector<HTMLButtonElement>("button")
+            ?.focus();
           openMenu(event.currentTarget, event.clientX, event.clientY);
         }}
       >
@@ -1317,8 +1406,9 @@ function ProjectGroupSection({
         <button
           type="button"
           data-no-drag
-          title="Group options"
-          aria-label={`${group.name} group options`}
+          title={t("shell.project.group_options")}
+          aria-label={`${group.name} ${t("shell.project.group_options_aria")}`}
+
           aria-haspopup="menu"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
@@ -1394,6 +1484,7 @@ function ProjectCard({
   groupLogos: ReturnType<typeof useTabGroupLogos>;
   groupMascots: Record<string, string>;
 }) {
+  const { t } = useLocale();
   const fallbackName = basename(item.path);
   const key = projectKey(item.path);
   const seed = projectName(item.path);
@@ -1406,17 +1497,15 @@ function ProjectCard({
   const additions = stats?.additions ?? 0;
   const deletions = stats?.deletions ?? 0;
   const hasChanges = files > 0 || additions > 0 || deletions > 0;
-  const cardTitle = projectCardTitle(item.path, name, stats, busy);
-  const cardAriaLabel = projectCardAriaLabel(name, stats, busy);
+  const cardTitle = projectCardTitle(item.path, name, stats, busy, t);
+  const cardAriaLabel = projectCardAriaLabel(name, stats, busy, t);
 
   return (
     <div
       ref={(el) => sortable.setItemRef(item.path, el)}
       data-selected={selected || undefined}
       className={`reorder-item project-reorder-item project-card group relative flex touch-none items-stretch rounded-md px-2 h-8 ${
-        selected
-          ? "bg-selection-strong text-content"
-          : "opacity-85"
+        selected ? "bg-selection-strong text-content" : "opacity-85"
       } cursor-default`}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
@@ -1437,7 +1526,8 @@ function ProjectCard({
         if (
           event.key !== "ContextMenu" &&
           !(event.shiftKey && event.key === "F10")
-        ) return;
+        )
+          return;
         event.preventDefault();
         event.stopPropagation();
         const rect = event.currentTarget.getBoundingClientRect();
@@ -1447,7 +1537,9 @@ function ProjectCard({
       <button
         type="button"
         title={muteStatus ? `${cardTitle}\n${muteStatus}` : cardTitle}
-        aria-label={muteStatus ? `${cardAriaLabel}, ${muteStatus}` : cardAriaLabel}
+        aria-label={
+          muteStatus ? `${cardAriaLabel}, ${muteStatus}` : cardAriaLabel
+        }
         aria-current={selected ? "true" : undefined}
         className="flex min-w-0 flex-1 cursor-default items-center gap-2 text-left transition-[padding] duration-150 motion-reduce:transition-none group-hover:pr-6 group-has-[:focus-visible]:pr-6"
       >
@@ -1487,15 +1579,20 @@ function ProjectCard({
             title={muteStatus}
             className="grid size-4 shrink-0 place-items-center text-amber-400"
           >
-            <BellOff className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+            <BellOff
+              className="size-3.5"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
           </span>
         ) : null}
       </button>
       <button
         type="button"
         data-no-drag
-        title="Project options"
-        aria-label="Project options"
+        title={t("shell.project.project_options")}
+        aria-label={t("shell.project.project_options")}
+
         aria-haspopup="menu"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
@@ -1514,14 +1611,15 @@ function ProjectCard({
       <button
         type="button"
         data-no-drag
-        title={pinned ? "Unpin project" : "Pin project"}
-        aria-label={pinned ? "Unpin project" : "Pin project"}
+        title={pinned ? t("shell.project.unpin") : t("shell.project.pin")}
+        aria-label={pinned ? t("shell.project.unpin") : t("shell.project.pin")}
+
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
           onTogglePin(item.path);
         }}
-          className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-content/75 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
+        className="absolute left-2 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-content/75 opacity-0 pointer-events-none transition-opacity hover:text-content group-hover:pointer-events-auto group-hover:opacity-100"
       >
         {pinned ? (
           <PinOff className="size-3.5" strokeWidth={1.75} />
@@ -1547,6 +1645,7 @@ function ProjectDiffStat({
   additions: number;
   deletions: number;
 }) {
+  const { t } = useLocale();
   if (additions <= 0 && deletions <= 0) return null;
 
   const label = [
@@ -1558,7 +1657,8 @@ function ProjectDiffStat({
 
   return (
     <span
-      title={`${label} uncommitted`}
+      title={`${label} ${t("shell.project.uncommitted")}`}
+
       className="flex shrink-0 items-center gap-1 font-mono text-[11px] font-semibold tabular-nums"
     >
       {additions > 0 ? (
@@ -1576,16 +1676,21 @@ function projectCardTitle(
   name: string,
   stats: GitDiffStats | null,
   busy: boolean,
+  t: Translate,
 ): string {
   const parts = [name, path];
-  if (busy) parts.push("Working");
+  if (busy) parts.push(t("shell.project.working"));
   const files = stats?.files ?? 0;
   const additions = stats?.additions ?? 0;
   const deletions = stats?.deletions ?? 0;
   if (files > 0 || additions > 0 || deletions > 0) {
     parts.push(
       [
-        files > 0 ? `${files} ${files === 1 ? "file" : "files"} changed` : "",
+        files > 0
+          ? files === 1
+            ? t("shell.project.files_changed_one")
+            : t("shell.project.files_changed_many", { count: files })
+          : "",
         additions > 0 ? `+${additions}` : "",
         deletions > 0 ? `-${deletions}` : "",
       ]
@@ -1600,14 +1705,19 @@ function projectCardAriaLabel(
   name: string,
   stats: GitDiffStats | null,
   busy: boolean,
+  t: Translate,
 ): string {
   const parts = [name];
-  if (busy) parts.push("working");
+  if (busy) parts.push(t("shell.project.working").toLowerCase());
   const files = stats?.files ?? 0;
   const additions = stats?.additions ?? 0;
   const deletions = stats?.deletions ?? 0;
   if (files > 0) {
-    parts.push(`${files} ${files === 1 ? "file" : "files"} changed`);
+    parts.push(
+      files === 1
+        ? t("shell.project.files_changed_one")
+        : t("shell.project.files_changed_many", { count: files }),
+    );
   }
   if (additions > 0) parts.push(`+${additions}`);
   if (deletions > 0) parts.push(`-${deletions}`);

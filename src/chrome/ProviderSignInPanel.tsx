@@ -2,6 +2,7 @@ import type { HarnessId } from "../lib/session";
 import { HARNESS_TITLE } from "../lib/session";
 import { HarnessIcon } from "./HarnessIcon";
 import { Check, RefreshCw } from "./icons";
+import { useLocale } from "../lib/locale";
 
 export type ProviderSignInState = "idle" | "running" | "complete" | "error";
 
@@ -22,6 +23,7 @@ export function ProviderSignInPanel({
   completeActionLabel?: string;
   autoFocus?: boolean;
 }) {
+  const { t } = useLocale();
   const title = HARNESS_TITLE[harness];
   const complete = state === "complete";
 
@@ -34,12 +36,14 @@ export function ProviderSignInPanel({
         <HarnessIcon harness={harness} className="size-9" />
       </span>
       <h2 className="mt-3.5 text-[15px] font-medium leading-5 text-content">
-        {complete ? `Signed in to ${title}` : "Authentication required"}
+        {complete
+          ? t("shell.auth.signed_in", { provider: title })
+          : t("shell.auth.authentication_required")}
       </h2>
       <p className="mt-1 max-w-56 text-[11px] leading-4 text-content/45">
         {complete
-          ? "You can retry your last message now."
-          : `Sign in to continue using ${title}.`}
+          ? t("shell.auth.retry_last_message")
+          : t("shell.auth.sign_in_continue", { provider: title })}
       </p>
       <button
         type="button"
@@ -54,10 +58,10 @@ export function ProviderSignInPanel({
           <Check className="size-3.5" aria-hidden />
         ) : null}
         {state === "running"
-          ? "Waiting for browser…"
+          ? t("shell.auth.waiting_browser")
           : complete
-            ? (completeActionLabel ?? "Signed in")
-            : `Sign in to ${title}`}
+            ? (completeActionLabel ?? t("shell.auth.signed_in_button"))
+            : t("shell.auth.sign_in_to_provider", { provider: title })}
       </button>
       {state === "error" && error ? (
         <p
