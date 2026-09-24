@@ -36,6 +36,7 @@ vi.mock("./sessionStore", async (importOriginal) => {
     listInFlightSessions: vi.fn().mockResolvedValue([]),
     listSessionsByProject: vi.fn().mockResolvedValue([]),
     getSession: vi.fn().mockResolvedValue(null),
+    upsertSession: vi.fn().mockResolvedValue(null),
   };
 });
 vi.mock("./harness", () => ({
@@ -368,5 +369,34 @@ describe("coordinated quit", () => {
     } finally {
       release();
     }
+  });
+});
+
+describe("boot restoration", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it("does not rewrite unchanged resumed sessions", async () => {
+    const session = newSession("cursor", "/project");
+    session.blocks = [{ id: "user", role: "user", text: "saved" }];
+    const tab = newTab(session.id);
+    const snapshot = collectWorkspaceSnapshot(
+      [tab],
+      [session],
+      tab.id,
+      session.cwd,
+      new Map(),
+    );
+    const store = await import("./sessionStore");
+    const lifecycle = await import("./appLifecycle");
+    vi.mocked(store.loadWorkspaceSnapshot).mockResolvedValue(snapshot);
+    vi.mocked(store.listInFlightSessions).mockResolvedValue([]);
+    vi.mocked(store.getSession).mockResolvedValue(session);
+
+    await lifecycle.loadResumedWorkspace();
+
+    expect(store.upsertSession).not.toHaveBeenCalled();
   });
 });
