@@ -40,7 +40,13 @@ pub(crate) fn reject_symlink_components(path: &Path) -> Result<(), String> {
 }
 
 pub(crate) fn canonicalize_with_missing(path: &Path) -> Result<PathBuf, String> {
-    let mut existing = path.to_path_buf();
+    let mut existing = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("{}: {error}", path.display()))?
+            .join(path)
+    };
     let mut missing = Vec::new();
     loop {
         match std::fs::symlink_metadata(&existing) {
@@ -81,4 +87,11 @@ pub(crate) fn path_to_js(path: &Path) -> String {
 fn preserves_unix_backslash_filenames() {
     assert_eq!(path_to_js(Path::new(r"/tmp/a\b.txt")), r"/tmp/a\b.txt");
     assert_eq!(expand_home(r"~\literal"), PathBuf::from(r"~\literal"));
+}
+
+#[test]
+fn canonicalize_missing_accepts_relative_paths() {
+    let resolved = canonicalize_with_missing(Path::new("relative/missing/file.txt")).unwrap();
+    assert!(resolved.is_absolute());
+    assert!(resolved.ends_with("relative/missing/file.txt"));
 }

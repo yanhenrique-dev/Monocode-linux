@@ -358,6 +358,28 @@ fn copy_folder_gets_a_unique_name_and_rejects_paste_into_self() {
 
 #[cfg(unix)]
 #[test]
+fn copy_rejects_nested_symlink_without_partial_destination() {
+    let dir = tmp("copy-nested-symlink");
+    let source = dir.0.join("source");
+    let outside = tmp("copy-nested-symlink-outside");
+    let dest_parent = dir.0.join("dest");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::create_dir(&dest_parent).unwrap();
+    std::fs::write(source.join("safe.txt"), "safe\n").unwrap();
+    let outside_file = outside.0.join("secret.txt");
+    std::fs::write(&outside_file, "secret\n").unwrap();
+    std::os::unix::fs::symlink(&outside_file, source.join("escape.txt")).unwrap();
+
+    let err =
+        copy_path_sync(&source.to_string_lossy(), &dest_parent.to_string_lossy()).unwrap_err();
+    assert!(err.contains("symbolic link"));
+    assert!(!dest_parent.join("source").exists());
+    assert!(!dest_parent.join("source/escape.txt").exists());
+    assert!(!dest_parent.join("source/secret.txt").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn copy_rejects_paste_into_self_through_a_symlink_alias() {
     let dir = tmp("folder-alias");
     let src = dir.0.join("src");
@@ -937,6 +959,31 @@ fn git_commit_diff_root_commit_is_added() {
     assert_eq!(diff.original, "");
     assert_eq!(diff.current, "alpha\n");
     assert_eq!(diff.status, "added");
+}
+
+#[cfg(unix)]
+#[test]
+fn git_commit_diff_reads_historical_blob_when_worktree_path_is_symlink() {
+    let dir = tmp("git-commit-symlink-worktree");
+    if !init_git_commit(&dir.0, &[("a.txt", "alpha\n")]) {
+        return;
+    }
+    let outside = tmp("git-commit-symlink-outside");
+    let outside_file = outside.0.join("secret.txt");
+    std::fs::write(&outside_file, "secret\n").unwrap();
+    std::fs::remove_file(dir.0.join("a.txt")).unwrap();
+    std::os::unix::fs::symlink(&outside_file, dir.0.join("a.txt")).unwrap();
+    let history = git_history_for(&dir.0, Some(1)).unwrap();
+    let sha = &history.commits[0].sha;
+
+    let diff = git_commit_file_diff_for(&dir.0, sha, "a.txt").unwrap();
+    assert_eq!(diff.original, "");
+    assert_eq!(diff.current, "alpha\n");
+    assert_eq!(diff.status, "added");
+    assert_eq!(
+        std::fs::read_to_string(outside.0.join("secret.txt")).unwrap(),
+        "secret\n"
+    );
 }
 
 #[test]

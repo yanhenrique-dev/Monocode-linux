@@ -1009,7 +1009,7 @@ pub(crate) fn git_commit_file_diff_for(
     sha: &str,
     relative: &str,
 ) -> Result<GitFileDiff, String> {
-    let relative = resolve_repo_path(root, relative)?;
+    let relative = validate_repo_relative_path(relative)?;
     if !git_is_work_tree(root) {
         return Err("Not a git repository".into());
     }
@@ -1260,7 +1260,7 @@ pub(crate) fn git_range_context_for(root: &Path) -> Result<GitRangeContext, Stri
     })
 }
 
-pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, String> {
+fn validate_repo_relative_path(relative: &str) -> Result<String, String> {
     let relative = normalize_diff_path(relative);
     if relative.is_empty()
         || relative.starts_with('/')
@@ -1270,6 +1270,11 @@ pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, S
     {
         return Err("Invalid path".into());
     }
+    Ok(relative)
+}
+
+pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, String> {
+    let relative = validate_repo_relative_path(relative)?;
     let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
     let resolved = canonicalize_with_missing(&root.join(&relative))?;
     if !resolved.starts_with(&canonical_root) {

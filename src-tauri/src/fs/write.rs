@@ -347,6 +347,20 @@ fn unique_name_in(dir: &Path, name: &str) -> String {
     }
 }
 
+fn validate_copy_tree(path: &Path) -> Result<(), String> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    if meta.file_type().is_symlink() {
+        return Err("Cannot copy a symbolic link".into());
+    }
+    if meta.is_dir() {
+        for entry in std::fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            validate_copy_tree(&entry.path())?;
+        }
+    }
+    Ok(())
+}
+
 fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
     let meta = std::fs::symlink_metadata(from).map_err(|e| format!("{}: {e}", from.display()))?;
     if meta.file_type().is_symlink() {
@@ -462,6 +476,7 @@ pub(crate) fn copy_path_sync(from: &str, dest_parent: &str) -> Result<String, St
     }
     reject_symlink_components(&from_path)?;
     reject_symlink_components(&dest_parent_path)?;
+    validate_copy_tree(&from)?;
     let name = unique_name_in(
         &dest_parent,
         &file_label(&from, from.to_str().unwrap_or("copy")),
