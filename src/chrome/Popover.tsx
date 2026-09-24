@@ -69,11 +69,17 @@ function virtualAnchor(rect: {
   height: number;
 }) {
   return {
-    getBoundingClientRect: () => DOMRect.fromRect(rect),
+    getBoundingClientRect: () =>
+      DOMRect.fromRect({
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }),
   };
 }
 
-function toBaseAnchor(
+export function toBaseAnchor(
   anchor: PopoverAnchor,
 ): Element | { getBoundingClientRect: () => DOMRect } | null {
   if (!anchor) return null;
