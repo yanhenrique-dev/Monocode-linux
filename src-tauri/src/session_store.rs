@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   provider_session_id TEXT,
   blocks_json TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+   updated_at INTEGER NOT NULL,
+   revision INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS sessions_cwd_updated_idx
@@ -103,6 +104,8 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
 #[serde(rename_all = "camelCase")]
 pub struct SessionUpsert {
     pub id: String,
+    #[serde(default)]
+    pub expected_revision: Option<i64>,
     pub cwd: String,
     pub harness: String,
     pub model: String,
@@ -133,6 +136,7 @@ pub struct SessionUpsert {
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub id: String,
+    pub revision: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orchestration_lead_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -164,6 +168,7 @@ pub struct SessionSummary {
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecord {
     pub id: String,
+    pub revision: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orchestration_lead_id: Option<String>,
     pub cwd: String,
@@ -551,6 +556,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ("pinned", "INTEGER NOT NULL DEFAULT 0"),
         ("linked_work_item_json", "TEXT"),
         ("provider_account_id", "TEXT"),
+        ("revision", "INTEGER NOT NULL DEFAULT 1"),
     ] {
         ensure_session_column(conn, column, decl)?;
     }
@@ -639,6 +645,21 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ensure_session_column(conn, "worktree_removed", "INTEGER NOT NULL DEFAULT 0")?;
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (15, ?1)",
+            params![now_millis()],
+        )?;
+    }
+    if current < 16 {
+        ensure_session_column(conn, "revision", "INTEGER NOT NULL DEFAULT 1")?;
+        conn.execute_batch(
+            "DROP INDEX IF EXISTS sessions_cwd_cover_idx;
+             CREATE INDEX IF NOT EXISTS sessions_cwd_cover_idx
+               ON sessions (cwd, has_user_message, updated_at DESC, id, harness,
+                            model, runtime_mode, title, provider_session_id,
+                            created_at, branch, archived, pinned,
+                            linked_work_item_json, revision);",
+        )?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (16, ?1)",
             params![now_millis()],
         )?;
     }
@@ -908,6 +929,7 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
     remember_worker_from_blocks(conn, &session.id, &session.blocks)?;
     Ok(SessionSummary {
         id: session.id.clone(),
+        revision: 1,
         orchestration_lead_id: worker_parent(conn, &session.id)?,
         orchestration: orchestration_summary(conn, &session.id)?,
         cwd: session.cwd.clone(),
@@ -1195,6 +1217,7 @@ fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<Session
         let linked_work_item = optional_json(row.get(12)?);
         Ok(SessionSummary {
             id: row.get(0)?,
+            revision: 0,
             orchestration_lead_id: None,
             orchestration: optional_json(row.get(13)?),
             cwd: row.get(1)?,
@@ -1235,6 +1258,7 @@ fn list_linked(conn: &Connection) -> rusqlite::Result<Vec<SessionSummary>> {
         let pinned: i64 = row.get(11)?;
         Ok(SessionSummary {
             id: row.get(0)?,
+            revision: 0,
             orchestration_lead_id: None,
             orchestration: optional_json(row.get(13)?),
             cwd: row.get(1)?,
@@ -1439,8 +1463,9 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
                     Box::new(e),
                 )
             })?;
-            Ok(SessionRecord {
-                id: row.get(0)?,
+             Ok(SessionRecord {
+                 id: row.get(0)?,
+                 revision: 0,
                 orchestration_lead_id: worker_parent(conn, session_id)?,
                 cwd: row.get(1)?,
                 harness: row.get(2)?,
@@ -1560,6 +1585,7 @@ mod tests {
     fn sample(id: &str, cwd: &str, title: &str) -> SessionUpsert {
         SessionUpsert {
             id: id.into(),
+            expected_revision: None,
             cwd: cwd.into(),
             harness: "cursor".into(),
             model: "gpt-5".into(),
@@ -1770,6 +1796,31 @@ mod tests {
             )
             .unwrap();
         assert_eq!(branch, 1);
+    }
+
+    #[test]
+    fn stale_upsert_is_rejected_without_overwriting_newer_transcript() {
+        let store = SessionStore::open_in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let mut first = sample("s1", "/tmp/a", "First");
+        first.expected_revision = Some(0);
+        let first_summary = upsert_session(&conn, &first).unwrap();
+
+        let mut newer = sample("s1", "/tmp/a", "Newer");
+        newer.expected_revision = Some(first_summary.revision);
+        newer.blocks = json!([
+            { "id": "b1", "role": "user", "text": "hello" },
+            { "id": "b2", "role": "assistant", "text": "new" }
+        ]);
+        let newer_summary = upsert_session(&conn, &newer).unwrap();
+
+        let mut stale = sample("s1", "/tmp/a", "Stale");
+        stale.expected_revision = Some(first_summary.revision);
+        assert!(upsert_session(&conn, &stale).is_err());
+
+        let stored = get_session(&conn, "s1").unwrap().unwrap();
+        assert_eq!(stored.revision, newer_summary.revision);
+        assert_eq!(stored.blocks, newer.blocks);
     }
 
     #[test]
