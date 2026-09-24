@@ -35,16 +35,19 @@ body:
   - type: dropdown
     id: provider
     attributes:
-      label: Provider CLI
+      label: Provider or integration
       options:
         - Claude Code
         - Codex
-        - Cursor
+        - Cursor CLI
         - Grok Build
         - OpenCode
         - Pi
         - omp
         - fx
+        - Hermes Agent
+        - MiniMax Code
+        - Antigravity
         - Multiple / not sure
     validations:
       required: true
