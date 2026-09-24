@@ -517,8 +517,11 @@ const SessionPaneContent = memo(function SessionPaneContent({
     () => 2,
   );
   const nextStepActionList = useMemo(
-    () => nextStepActions(nextStepsCount),
-    [nextStepsCount],
+    () =>
+      nextStepActions(nextStepsCount).filter(
+        (action) => showJumpToBottom || action !== "jump-to-bottom",
+      ),
+    [nextStepsCount, showJumpToBottom],
   );
   const dismissNextSteps = useCallback(() => {
     if (nextStepGeneration !== undefined) {
@@ -739,7 +742,6 @@ const SessionPaneContent = memo(function SessionPaneContent({
     nextStepGeneration !== undefined &&
     nextStepDismissedGeneration !== nextStepGeneration &&
     !transcriptSearchOpen &&
-    !showJumpToBottom &&
     nextStepActionList.length > 0;
 
   return (

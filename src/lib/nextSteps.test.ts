@@ -31,6 +31,14 @@ describe("next-step suggestions", () => {
       isNextStepCompletionEligible({ ...completion, status: "failed" }),
     ).toBe(false);
     expect(
+      isNextStepCompletionEligible({ ...completion, status: "cancelled" }),
+    ).toBe(false);
+    for (const intent of ["plan", "build", "orchestrate"] as const) {
+      expect(
+        isNextStepCompletionEligible({ ...completion, intent }),
+      ).toBe(false);
+    }
+    expect(
       isNextStepCompletionEligible({ ...completion, managed: true }),
     ).toBe(false);
     expect(
