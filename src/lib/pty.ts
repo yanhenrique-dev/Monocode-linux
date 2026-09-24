@@ -15,6 +15,7 @@ const dataBufferBytes = new Map<string, number>();
  * in the process; decoding those in a window that never mounted them was
  * megabytes of base64 work and a 256KB replay buffer per stranger id. */
 const openedPtys = new Set<string>();
+const ptyGenerations = new Map<string, string>();
 
 /**
  * Replay budget for a PTY whose view is not mounted. Chunks arrive at up to
@@ -132,10 +133,14 @@ export async function spawnPty(
   cwd: string,
   cols: number,
   rows: number,
-): Promise<void> {
+): Promise<string> {
+  const generation = crypto.randomUUID();
+  ptyGenerations.set(id, generation);
   try {
-    await invoke("pty_spawn", { id, cwd, cols, rows });
+    await invoke("pty_spawn", { id, cwd, cols, rows, generation });
+    return generation;
   } catch (error) {
+    if (ptyGenerations.get(id) === generation) ptyGenerations.delete(id);
     if (import.meta.env.DEV) console.debug("[pty] spawn failed", id, error);
     throw error;
   }
@@ -170,18 +175,30 @@ export async function getPtyStatus(
   return invoke<{ foreground: string | null }>("pty_status", { id });
 }
 
-export async function killPty(id: string): Promise<void> {
-  dataHandlers.delete(id);
-  exitHandlers.delete(id);
-  openedPtys.delete(id);
-  clearBuffered(id);
-  await invoke("pty_kill", { id }).catch(() => undefined);
+export async function killPty(
+  id: string,
+  generation?: string,
+): Promise<void> {
+  const ownsCurrent =
+    generation === undefined || ptyGenerations.get(id) === generation;
+  if (ownsCurrent) {
+    dataHandlers.delete(id);
+    exitHandlers.delete(id);
+    openedPtys.delete(id);
+    clearBuffered(id);
+    ptyGenerations.delete(id);
+  }
+  await invoke(
+    "pty_kill",
+    generation === undefined ? { id } : { id, generation },
+  ).catch(() => undefined);
 }
 
 export async function killAllPtys(): Promise<void> {
   dataHandlers.clear();
   exitHandlers.clear();
   openedPtys.clear();
+  ptyGenerations.clear();
   dataBuffer.clear();
   dataBufferBytes.clear();
   await invoke("pty_kill_all").catch(() => undefined);
