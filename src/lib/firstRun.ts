@@ -61,11 +61,15 @@ export function saveFirstRunDone(store?: FirstRunStore): void {
   }
 }
 
+export function shouldBlockAppAction(firstRunOpen: boolean): boolean {
+  return firstRunOpen;
+}
+
 export async function probeFirstRunReport(): Promise<FirstRunReport> {
   const [version, , github, flatpak, notifications, audio] = await Promise.all([
     readAppVersion(),
     probeHarnessAvailability({ force: true }),
-    githubStatus().catch(() => unavailableGithubStatus()),
+    githubStatus(),
     isFlatpakSandbox(),
     probeNotificationPermission(),
     audioPlaybackState(),
