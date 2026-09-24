@@ -96,8 +96,21 @@ describe("TerminalView pty lifecycle", () => {
       );
     });
     // StrictMode mounts, cleans up, and mounts again: two spawns, one kill.
-    expect(calls("pty_spawn")).toHaveLength(2);
-    expect(calls("pty_kill")).toHaveLength(1);
+    const spawns = calls("pty_spawn");
+    const kills = calls("pty_kill");
+    expect(spawns).toHaveLength(2);
+    expect(kills).toHaveLength(1);
+    expect(spawns[0]?.[1]).toMatchObject({
+      generation: expect.any(String),
+    });
+    expect(spawns[1]?.[1]).toMatchObject({
+      generation: expect.any(String),
+    });
+    expect(spawns[0]?.[1].generation).not.toBe(spawns[1]?.[1].generation);
+    expect(kills[0]?.[1]).toMatchObject({
+      id: "t1",
+      generation: spawns[0]?.[1].generation,
+    });
   });
 
   it("kills the pty on unmount", async () => {
