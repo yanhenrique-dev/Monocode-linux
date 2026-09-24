@@ -876,6 +876,8 @@ export default function App({
   const [nextStepGenerations, setNextStepGenerations] = useState<
     Record<string, number>
   >({});
+  const [dismissedNextStepGenerations, setDismissedNextStepGenerations] =
+    useState<Record<string, number>>({});
   const nextStepsEnabled = useSyncExternalStore(
     subscribeNextSteps,
     loadNextStepsEnabled,
@@ -884,6 +886,9 @@ export default function App({
   useEffect(() => {
     if (nextStepsEnabled) return;
     setNextStepGenerations((previous) =>
+      Object.keys(previous).length === 0 ? previous : {},
+    );
+    setDismissedNextStepGenerations((previous) =>
       Object.keys(previous).length === 0 ? previous : {},
     );
   }, [nextStepsEnabled]);
@@ -900,6 +905,27 @@ export default function App({
         const next = { ...previous };
         delete next[sessionId];
         return next;
+      });
+      setDismissedNextStepGenerations((previous) => {
+        if (
+          expectedGeneration !== undefined &&
+          previous[sessionId] > expectedGeneration
+        ) {
+          return previous;
+        }
+        if (!(sessionId in previous)) return previous;
+        const next = { ...previous };
+        delete next[sessionId];
+        return next;
+      });
+    },
+    [],
+  );
+  const dismissNextStep = useCallback(
+    (sessionId: string, generation: number) => {
+      setDismissedNextStepGenerations((previous) => {
+        if (previous[sessionId] === generation) return previous;
+        return { ...previous, [sessionId]: generation };
       });
     },
     [],
@@ -933,6 +959,12 @@ export default function App({
             ...previous,
             [settlement.sessionId]: settlement.generation,
           };
+        });
+        setDismissedNextStepGenerations((previous) => {
+          if (!(settlement.sessionId in previous)) return previous;
+          const next = { ...previous };
+          delete next[settlement.sessionId];
+          return next;
         });
       } else {
         clearNextStep(settlement.sessionId);
@@ -993,6 +1025,7 @@ export default function App({
     enqueueHarnessEvent,
     flushHarnessEvents,
     onSubmit,
+    onTurnInvalidated: clearNextStep,
     focusOpenSession,
     onSelectHistorySession,
     ensureOpenSession,
@@ -1215,6 +1248,8 @@ export default function App({
     () => ({
       recents,
       nextStepGenerations,
+      dismissedNextStepGenerations,
+      onDismissNextStep: dismissNextStep,
       hideProjectPicker: true,
       onFocus: onFocusPane,
       onClose: onClosePane,
@@ -1257,6 +1292,8 @@ export default function App({
     [
       recents,
       nextStepGenerations,
+      dismissedNextStepGenerations,
+      dismissNextStep,
       onFocusPane,
       onClosePane,
       onCwdChange,
@@ -1624,6 +1661,10 @@ export default function App({
                         {...sessionPaneProps}
                         session={session}
                         nextStepGeneration={nextStepGenerations[session.id]}
+                        nextStepDismissedGeneration={
+                          dismissedNextStepGenerations[session.id]
+                        }
+                        onDismissNextStep={dismissNextStep}
                         visible={visible}
                         focused={visible}
                         inSplit={false}

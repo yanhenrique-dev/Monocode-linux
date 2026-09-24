@@ -236,6 +236,7 @@ import {
   saveNextStepsCount,
   saveNextStepsEnabled,
   saveNotesEnabled,
+  subscribeNextSteps,
   saveReviewAdoptShell,
   saveTerminalGpu,
   subscribeTerminalGpu,
@@ -1010,6 +1011,15 @@ function ChatPage() {
     loadGridArcadeEnabled,
   );
   const { t } = useLocale();
+
+  useEffect(
+    () =>
+      subscribeNextSteps(() => {
+        setNextStepsEnabled(loadNextStepsEnabled());
+        setNextStepsCount(loadNextStepsCount());
+      }),
+    [],
+  );
 
   useEffect(() => {
     const onAnchor = (event: Event) => {

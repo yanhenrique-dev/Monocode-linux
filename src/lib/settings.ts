@@ -608,9 +608,20 @@ export function saveNextStepsCount(value: NextStepsCount) {
 
 export function subscribeNextSteps(onStoreChange: () => void) {
   if (typeof window === "undefined") return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (
+      event.key === NEXT_STEPS_ENABLED_KEY ||
+      event.key === NEXT_STEPS_COUNT_KEY
+    ) {
+      onStoreChange();
+    }
+  };
   window.addEventListener(NEXT_STEPS_CHANGE_EVENT, onStoreChange);
-  return () =>
+  window.addEventListener("storage", onStorage);
+  return () => {
     window.removeEventListener(NEXT_STEPS_CHANGE_EVENT, onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export type ModelControls = "menu" | "beside";

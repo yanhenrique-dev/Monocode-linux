@@ -106,6 +106,8 @@ type Props = {
   composerFocusToken?: number;
   recents: RecentProject[];
   nextStepGeneration?: number;
+  nextStepDismissedGeneration?: number;
+  onDismissNextStep: (sessionId: string, generation: number) => void;
   hideProjectPicker?: boolean;
   onFocus: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
@@ -196,6 +198,8 @@ const SessionPaneContent = memo(function SessionPaneContent({
   composerFocusToken,
   recents,
   nextStepGeneration,
+  nextStepDismissedGeneration,
+  onDismissNextStep,
   hideProjectPicker,
   onFocus,
   onClose,
@@ -516,15 +520,23 @@ const SessionPaneContent = memo(function SessionPaneContent({
     () => nextStepActions(nextStepsCount),
     [nextStepsCount],
   );
+  const dismissNextSteps = useCallback(() => {
+    if (nextStepGeneration !== undefined) {
+      onDismissNextStep(session.id, nextStepGeneration);
+    }
+  }, [nextStepGeneration, onDismissNextStep, session.id]);
   const handleNextStepJump = useCallback(() => {
+    dismissNextSteps();
     jumpToBottomRef.current?.();
-  }, []);
+  }, [dismissNextSteps]);
   const handleNextStepSearch = useCallback(() => {
+    dismissNextSteps();
     setTranscriptSearchOpen(true);
-  }, []);
+  }, [dismissNextSteps]);
   const handleNextStepReview = useCallback(() => {
+    dismissNextSteps();
     onOpenDiff(undefined, { sessionId: session.id, cwd: workCwd });
-  }, [onOpenDiff, session.id, workCwd]);
+  }, [dismissNextSteps, onOpenDiff, session.id, workCwd]);
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
   const draftRef = useRef<string | undefined>(getLiveDraft(session.id));
@@ -725,6 +737,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
     !managed &&
     nextStepsEnabled &&
     nextStepGeneration !== undefined &&
+    nextStepDismissedGeneration !== nextStepGeneration &&
     !transcriptSearchOpen &&
     !showJumpToBottom &&
     nextStepActionList.length > 0;

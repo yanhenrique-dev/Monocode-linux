@@ -16,7 +16,9 @@ vi.mock("../lib/orchestration", () => ({
   orchestrator: {
     submissionError: vi.fn(),
     forSession: vi.fn(),
+    run: vi.fn(),
     observe: vi.fn(),
+    prompt: vi.fn((_sessionId: string, text: string) => text),
   },
 }));
 
@@ -336,6 +338,7 @@ describe("useComposer.onSubmit guard clauses", () => {
     });
 
     await vi.waitFor(() => expect(onTurnSettled).toHaveBeenCalled());
+    expect(sendHarnessTurn).toHaveBeenCalledOnce();
     expect(onTurnSettled).toHaveBeenCalledWith(
       expect.objectContaining({
         outcome: expect.objectContaining({ status: "failed" }),
