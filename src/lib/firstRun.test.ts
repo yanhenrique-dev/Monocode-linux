@@ -158,11 +158,18 @@ describe("first-run report", () => {
     );
   });
 
-  it("propagates GitHub probe errors for retry", async () => {
+  it("preserves GitHub probe errors without blocking other checks", async () => {
     resetProbes();
     probes.githubStatus.mockRejectedValue(new Error("IPC unavailable"));
 
-    await expect(probeFirstRunReport()).rejects.toThrow("IPC unavailable");
+    const report = await probeFirstRunReport();
+
+    expect(report.github).toEqual({
+      connected: false,
+      installed: false,
+      authenticated: false,
+      error: true,
+    });
   });
 
   it("handles a null GitHub response from browser preview", async () => {

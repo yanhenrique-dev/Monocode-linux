@@ -28,6 +28,7 @@ export type GithubProbe = {
   connected: boolean;
   installed: boolean;
   authenticated: boolean;
+  error?: boolean;
   rateLimited?: boolean;
   retryAfterSecs?: number;
 };
@@ -69,7 +70,9 @@ export async function probeFirstRunReport(): Promise<FirstRunReport> {
   const [version, , github, flatpak, notifications, audio] = await Promise.all([
     readAppVersion(),
     probeHarnessAvailability({ force: true }),
-    githubStatus(),
+    githubStatus()
+      .then((status) => ({ status, failed: false }))
+      .catch(() => ({ status: null, failed: true })),
     isFlatpakSandbox(),
     probeNotificationPermission(),
     audioPlaybackState(),
@@ -88,7 +91,7 @@ export async function probeFirstRunReport(): Promise<FirstRunReport> {
 
   return {
     clis,
-    github: toGithubProbe(github),
+    github: toGithubProbe(github.status, github.failed),
     system: { version, flatpak, notifications, audio },
   };
 }
@@ -101,13 +104,17 @@ function unavailableGithubStatus(): GithubStatus {
   };
 }
 
-function toGithubProbe(status: GithubStatus | null | undefined): GithubProbe {
+function toGithubProbe(
+  status: GithubStatus | null | undefined,
+  failed = false,
+): GithubProbe {
   const value =
     status && typeof status === "object" ? status : unavailableGithubStatus();
   return {
     connected: value.connected === true,
     installed: value.installed === true,
     authenticated: value.authenticated === true,
+    ...(failed ? { error: true } : {}),
     ...(typeof value.rateLimited === "boolean"
       ? { rateLimited: value.rateLimited }
       : {}),

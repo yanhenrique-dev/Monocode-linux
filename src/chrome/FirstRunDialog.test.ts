@@ -241,6 +241,39 @@ describe("FirstRunDialog", () => {
     expect(dialogText).not.toContain("At least one agent CLI is ready.");
   });
 
+  it("keeps setup usable when the initial GitHub probe fails", async () => {
+    probes.probeFirstRunReport.mockResolvedValue({
+      ...report,
+      github: {
+        connected: false,
+        installed: false,
+        authenticated: false,
+        error: true,
+      },
+    });
+    await act(async () => {
+      root.render(
+        createElement(FirstRunDialog, {
+          onClose: vi.fn(),
+          onOpenInbox: vi.fn(),
+          onOpenProviders: vi.fn(),
+        }),
+      );
+    });
+
+    await act(async () => button("Continue").click());
+    await act(async () => button("Continue").click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+      "Could not check GitHub CLI.",
+    );
+    expect(button("Retry").disabled).toBe(false);
+
+    await act(async () => button("Continue").click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+      "Providers",
+    );
+  });
+
   it("shows GitHub rate-limit state without blocking progress", async () => {
     probes.probeFirstRunReport.mockResolvedValue({
       ...report,

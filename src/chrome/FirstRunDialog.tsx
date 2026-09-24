@@ -423,6 +423,7 @@ function GithubStep({
   const { t } = useLocale();
   if (!github) return <Shimmer>{t("welcome.github.checking")}</Shimmer>;
   const connected = github.connected && github.authenticated;
+  const failed = Boolean(error || github.error);
   return (
     <section>
       <div className="flex items-center gap-3">
@@ -445,29 +446,30 @@ function GithubStep({
             <p className="text-sm font-medium text-content">
               {connected
                 ? t("welcome.github.connected")
-                : github.installed
-                  ? t("welcome.github.auth_needed")
-                  : t("welcome.github.not_installed")}
+                : failed
+                  ? t("welcome.errors.github")
+                  : github.installed
+                    ? t("welcome.github.auth_needed")
+                    : t("welcome.github.not_installed")}
             </p>
-            {github.installed && !connected ? (
+            {github.installed && !connected && !failed ? (
               <code className="mt-2 block w-fit rounded bg-content/10 px-2 py-1 font-mono text-xs text-content/80">
                 gh auth login
               </code>
             ) : null}
           </div>
         </div>
-        {github.rateLimited ? (
+        {failed ? (
+          <p className="mt-3 text-xs text-red-300" role="alert">
+            {error ?? t("welcome.errors.github")}
+          </p>
+        ) : github.rateLimited ? (
           <p className="mt-3 text-xs text-amber-300" role="status">
             {github.retryAfterSecs && github.retryAfterSecs > 0
               ? t("welcome.github.rate_limited", {
                   seconds: github.retryAfterSecs,
                 })
               : t("welcome.github.rate_limited_unknown")}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="mt-3 text-xs text-red-300" role="alert">
-            {error}
           </p>
         ) : null}
       </div>
@@ -481,7 +483,7 @@ function GithubStep({
               {t("welcome.github.open_providers")}
             </SecondaryButton>
           </>
-        ) : github.installed ? (
+        ) : failed || github.installed ? (
           <Button disabled={checking} onClick={() => void onRetry()}>
             {checking ? <RefreshCw className="size-3.5 animate-spin" /> : null}
             {checking
@@ -534,9 +536,7 @@ function ProvidersStep({ report }: { report: FirstRunReport }) {
         />
       </div>
       <ul className="mt-5 space-y-2 rounded-xl border border-content/10 p-4 text-xs text-content/65">
-        <li
-          className={`flex gap-2 ${hasReadyCli ? "" : "text-amber-300"}`}
-        >
+        <li className={`flex gap-2 ${hasReadyCli ? "" : "text-amber-300"}`}>
           {hasReadyCli ? (
             <Check className="mt-0.5 size-3.5 shrink-0 text-accent" />
           ) : (

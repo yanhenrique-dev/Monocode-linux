@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/yanhenrique-dev/Monocode-linux/releases/latest">
     <img
-      src="https://img.shields.io/github/download/yanhenrique-dev/Monocode-linux/releases/latest?style=for-the-badge&color=2ea44f&label=Download%20for%20Linux"
+      src="https://img.shields.io/github/downloads/yanhenrique-dev/Monocode-linux/latest/total?style=for-the-badge&color=2ea44f&label=Download%20for%20Linux"
       alt="Download MonoCode for Linux"
     />
   </a>
