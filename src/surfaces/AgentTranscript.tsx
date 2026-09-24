@@ -2437,6 +2437,9 @@ function SubagentPanel({
   const model = subagentModelName(block);
   const state = toolCallState(block);
   const active = live && state === "pending";
+  const mascotColor = active
+    ? tabGroupColor(block.tool?.callId ?? block.id)
+    : undefined;
   const steps = block.agentRun?.steps ?? [];
   // The run's trail as transcript blocks, so the panel groups it the way the
   // main transcript groups the agent's own work: what it said, then the calls
@@ -2494,7 +2497,7 @@ function SubagentPanel({
           name={name}
           state={state}
           active={active}
-          color={active ? tabGroupColor(block.tool?.callId ?? block.id) : undefined}
+          color={mascotColor}
         />
         {label}
         <span className="size-3.5 shrink-0" />
@@ -2520,7 +2523,7 @@ function SubagentPanel({
           name={name}
           state={state}
           active={active}
-          color={active ? tabGroupColor(block.tool?.callId ?? block.id) : undefined}
+          color={mascotColor}
         />
         {label}
         <ChevronRight
