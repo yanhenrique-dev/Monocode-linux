@@ -40,6 +40,7 @@ import {
   saveExpanded,
   saveSelected,
   subscribeDirsChanged,
+  type FileTreeOperation,
 } from "../lib/fileTree";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { dragPointToClient } from "../lib/dragPoint";
@@ -81,6 +82,10 @@ type Props = {
   onOpenTerminal?: (cwd: string) => void;
   onFileMoved?: (from: string, to: string) => void;
   onFileDeleted?: (path: string) => void;
+  onConfirmFileOperation?: (
+    path: string,
+    operation: FileTreeOperation,
+  ) => Promise<boolean>;
   onSearch?: () => void;
   gitStatuses?: GitStatusMap;
   onShowSourceControl?: () => void;
@@ -234,6 +239,7 @@ export const FileTree = memo(function FileTree({
   onOpenTerminal,
   onFileMoved,
   onFileDeleted,
+  onConfirmFileOperation,
   onSearch,
   gitStatuses,
   sourceControlActive = false,
@@ -498,9 +504,21 @@ export const FileTree = memo(function FileTree({
 
   const onRenameCancel = () => setRenaming(null);
 
+  const confirmFileOperation = async (
+    path: string,
+    operation: FileTreeOperation,
+  ) => {
+    if (!onConfirmFileOperation) return true;
+    return onConfirmFileOperation(path, operation);
+  };
+
   const onRenameCommit = async (path: string, raw: string) => {
     const fileName = wellFormedFileName(raw);
     if (!fileName || (fileName === basename(path) && !/[/\\]/.test(raw))) {
+      setRenaming(null);
+      return;
+    }
+    if (!(await confirmFileOperation(path, "rename"))) {
       setRenaming(null);
       return;
     }
@@ -527,6 +545,7 @@ export const FileTree = memo(function FileTree({
         : `Delete “${label}”?`,
     );
     if (!ok) return;
+    if (!(await confirmFileOperation(path, "delete"))) return;
     await deletePath(path);
     await refreshTouched([parentPath(path)], isDir ? [path] : []);
     setSelectedPath((prev) => {
@@ -574,6 +593,9 @@ export const FileTree = memo(function FileTree({
     const from = clip.path;
     const mode = clip.mode;
     const isDir = clip.isDir;
+    if (mode === "cut" && !(await confirmFileOperation(from, "move"))) {
+      return;
+    }
     const created =
       mode === "cut"
         ? await movePath(from, destParent)
