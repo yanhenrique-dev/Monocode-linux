@@ -10,6 +10,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
 }));
+vi.mock("../app/workspaceEvents", () => ({
+  nudgeWorkspace: vi.fn(),
+  scheduleNudge: vi.fn(),
+}));
 vi.mock("../lib/harness/registry", async (original) => ({
   ...((await original()) as object),
   canCompactHarnessContext: () => true,
