@@ -78,6 +78,16 @@ function foldDetails(): Element | null {
   );
 }
 
+function phaseButton(): HTMLButtonElement {
+  return container.querySelector<HTMLButtonElement>(
+    'button[aria-label^="Show the steps for"], button[aria-label^="Hide the steps for"]',
+  )!;
+}
+
+function phaseBody(button = phaseButton()): HTMLElement {
+  return button.parentElement!.querySelector<HTMLElement>(".zen-phase-body")!;
+}
+
 describe("work fold motion", () => {
   it("animates open and closed with experimental animations on", () => {
     localStorage.setItem("monocode.experimentalAnimations", "1");
@@ -142,6 +152,53 @@ describe("work fold motion", () => {
     expect(foldDetails()).toBeNull();
   });
 
+  it("keeps a phase body mounted until its collapse finishes", () => {
+    localStorage.setItem("monocode.experimentalAnimations", "1");
+    renderTranscript();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Show the work"]')!
+        .click();
+    });
+    const openButton = phaseButton();
+    act(() => openButton.click());
+    const body = phaseBody(openButton);
+    expect(body.querySelector(".zen-phase-step")).not.toBeNull();
+
+    const closeButton = phaseButton();
+    act(() => closeButton.click());
+    expect(body.getAttribute("data-open")).toBe("false");
+    expect(body.querySelector(".zen-phase-step")).not.toBeNull();
+
+    act(() => vi.advanceTimersByTime(250));
+    expect(body.querySelector(".zen-phase-step")).toBeNull();
+  });
+
+  it("finishes a phase collapse on transitionend and reopens cleanly", () => {
+    localStorage.setItem("monocode.experimentalAnimations", "1");
+    renderTranscript();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Show the work"]')!
+        .click();
+    });
+    const openButton = phaseButton();
+    act(() => openButton.click());
+    const body = phaseBody(openButton);
+
+    act(() => phaseButton().click());
+    act(() => {
+      body.dispatchEvent(new Event("transitionend", { bubbles: true }));
+    });
+    expect(body.querySelector(".zen-phase-step")).toBeNull();
+
+    act(() => phaseButton().click());
+    expect(body.getAttribute("data-open")).toBe("true");
+    expect(body.querySelector(".zen-phase-step")).not.toBeNull();
+  });
+
   it("snaps open and shut with experimental animations off", () => {
     localStorage.setItem("monocode.experimentalAnimations", "0");
     renderTranscript();
@@ -160,6 +217,23 @@ describe("work fold motion", () => {
         .click();
     });
     expect(foldDetails()).toBeNull();
+  });
+
+  it("snaps a phase shut when experimental animations are off", () => {
+    localStorage.setItem("monocode.experimentalAnimations", "0");
+    renderTranscript();
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Show the work"]')!
+        .click();
+    });
+    const openButton = phaseButton();
+    act(() => openButton.click());
+    const body = phaseBody(openButton);
+
+    act(() => phaseButton().click());
+    expect(body.querySelector(".zen-phase-step")).toBeNull();
   });
 
   it("snaps open and shut under reduced motion even with animations on", () => {
