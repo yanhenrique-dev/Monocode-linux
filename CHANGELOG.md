@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.40] - 2026-09-24
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- First-run setup wizard with version, agent CLI, GitHub, and provider
+  readiness checks, plus optional retry and onboarding paths.
+- Repository onboarding and Linux setup guidance, with expanded first-run,
+  modal, and background-effect test coverage.
+
+### Fixed
+
+- First-run setup stays isolated, transient, and interactive across retry,
+  lifecycle, shortcut, and session-sync flows.
+- Background effects re-probe worker capability and fall back safely when
+  OffscreenCanvas is unavailable.
+- Composer focus remains visible after WebKitGTK background-effect failures.
+- Removed the obsolete loading animation from repository documentation.
+
 ## [0.2.31] - 2026-09-23
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
