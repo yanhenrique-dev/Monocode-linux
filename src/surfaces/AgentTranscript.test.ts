@@ -359,12 +359,21 @@ describe("AgentTranscript collapsed work", () => {
     expect(markup).toContain('stroke-linecap="butt"');
     expect(markup.match(/class="zen-trace-dash"/g) ?? []).toHaveLength(2);
     expect(markup).not.toContain('class="zen-trace ');
-    const traceKeyframes =
-      readFileSync(new URL("../index.css", import.meta.url), "utf8").match(
-        /@keyframes zen-trace \{([\s\S]*?)\n\}/,
-      )?.[1] ?? "";
+    const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+    const traceKeyframes = css.match(
+      /@keyframes zen-trace \{([\s\S]*?)\n\}/,
+    )?.[1] ?? "";
     expect(traceKeyframes).toContain("stroke-dashoffset");
     expect(traceKeyframes).not.toContain("transform");
+    const reducedMotionRule = [
+      ...css.matchAll(
+        /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/g,
+      ),
+    ]
+      .map((match) => match[1])
+      .find((rule) => rule.includes(".zen-trace-dash")) ?? "";
+    expect(reducedMotionRule).toContain(".zen-trace-dash");
+    expect(reducedMotionRule).toContain("animation: none");
     expect(markup).not.toContain("mascot-active");
     expect(markup).not.toContain("are working");
     // A row counts its agent's work; it does not echo the call in flight,
