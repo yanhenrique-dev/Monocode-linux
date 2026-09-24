@@ -512,6 +512,7 @@ function ProvidersStep({ report }: { report: FirstRunReport }) {
   const { t } = useLocale();
   const installed = report.clis.filter((cli) => cli.available);
   const missing = report.clis.filter((cli) => !cli.available);
+  const hasReadyCli = installed.length > 0;
   return (
     <section>
       <h3 className="text-lg font-semibold text-content">
@@ -533,9 +534,22 @@ function ProvidersStep({ report }: { report: FirstRunReport }) {
         />
       </div>
       <ul className="mt-5 space-y-2 rounded-xl border border-content/10 p-4 text-xs text-content/65">
-        <li className="flex gap-2">
-          <Check className="mt-0.5 size-3.5 shrink-0 text-accent" />
-          {t("welcome.providers.checklist_cli")}
+        <li
+          className={`flex gap-2 ${hasReadyCli ? "" : "text-amber-300"}`}
+        >
+          {hasReadyCli ? (
+            <Check className="mt-0.5 size-3.5 shrink-0 text-accent" />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="mt-1.5 size-2 shrink-0 rounded-full bg-current"
+            />
+          )}
+          {t(
+            hasReadyCli
+              ? "welcome.providers.checklist_cli"
+              : "welcome.providers.no_cli_ready",
+          )}
         </li>
         <li className="flex gap-2">
           <Check className="mt-0.5 size-3.5 shrink-0 text-accent" />

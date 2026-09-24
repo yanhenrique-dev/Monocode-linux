@@ -75,6 +75,7 @@ let liveWorkspace: {
   projectTerminals: () => ProjectTerminalDock[];
   projectReturnMemory: () => ProjectReturnMemory;
   flush: () => void;
+  shouldPersist: () => boolean;
 } | null = null;
 
 export function isAppQuitting(): boolean {
@@ -89,6 +90,7 @@ export function setQuitWorkspace(
   projectTerminals: () => ProjectTerminalDock[],
   projectReturnMemory: () => ProjectReturnMemory,
   flush: () => void,
+  shouldPersist: () => boolean = () => true,
 ): () => void {
   liveWorkspace = {
     sessions,
@@ -98,6 +100,7 @@ export function setQuitWorkspace(
     projectTerminals,
     projectReturnMemory,
     flush,
+    shouldPersist,
   };
   bootingResumed = null;
   return () => {
@@ -113,6 +116,7 @@ export async function handleQuitRequested(): Promise<boolean> {
   if (liveWorkspace) {
     liveWorkspace.flush();
     quitting = true;
+    if (!liveWorkspace.shouldPersist()) return true;
     try {
       await persistQuitState(
         liveWorkspace.sessions(),

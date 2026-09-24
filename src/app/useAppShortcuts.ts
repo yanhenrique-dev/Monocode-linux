@@ -298,15 +298,12 @@ export function useAppShortcuts(deps: AppShortcutsDeps) {
           });
         return;
       }
-      if (
-        shouldBlockAppAction(firstRunOpenRef.current) &&
-        (e.metaKey || e.ctrlKey || e.altKey)
-      ) {
+      const cmd = tabCommand(e);
+      if (cmd && shouldBlockAppAction(firstRunOpenRef.current)) {
         e.preventDefault();
         e.stopPropagation();
         return;
       }
-      const cmd = tabCommand(e);
       if (cmd) {
         if (cmd === "archive-session") {
           actions.current.onArchiveFocusedSession(e);
