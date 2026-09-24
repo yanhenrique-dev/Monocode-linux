@@ -366,6 +366,8 @@ struct SessionBeforeRemoval {
     in_flight_cwd: Option<String>,
     in_flight_sort_index: Option<i64>,
     detached_cwd: String,
+    #[serde(default)]
+    revision: i64,
 }
 
 /// Make sessions safe to reopen *before* touching Git. A small metadata journal
@@ -382,7 +384,7 @@ fn prepare_removal(
         let mut session = tx
             .query_row(
                 "SELECT s.cwd, s.worktree_cwd, s.branch, s.provider_session_id,
-                    s.context_used, s.context_window, f.cwd, f.sort_index
+                    s.context_used, s.context_window, f.cwd, f.sort_index, s.revision
              FROM sessions s LEFT JOIN in_flight_sessions f ON f.session_id = s.id
              WHERE s.id = ?1",
                 [id],
@@ -398,6 +400,7 @@ fn prepare_removal(
                         in_flight_cwd: row.get(6)?,
                         in_flight_sort_index: row.get(7)?,
                         detached_cwd: String::new(),
+                        revision: row.get(8)?,
                     })
                 },
             )
@@ -416,6 +419,11 @@ fn prepare_removal(
             rusqlite::params![id, session.detached_cwd],
         )
         .map_err(|e| e.to_string())?;
+        session.revision = tx
+            .query_row("SELECT revision FROM sessions WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .map_err(|e| e.to_string())?;
         tx.execute("DELETE FROM in_flight_sessions WHERE session_id = ?1", [id])
             .map_err(|e| e.to_string())?;
         saved.push(session);
@@ -536,20 +544,13 @@ fn remove_with_sessions(
     if let Err(error) = finish_removal(conn, &tree.path, &[]) {
         eprintln!("Worktree removed; recovery journal cleanup will retry on restart: {error}");
     }
-    let session_revisions = ids
+    let session_revisions = saved
         .iter()
-        .map(|id| {
-            let revision = conn
-                .query_row("SELECT revision FROM sessions WHERE id = ?1", [id], |row| {
-                    row.get(0)
-                })
-                .map_err(|error| error.to_string())?;
-            Ok(SessionRevision {
-                session_id: id.clone(),
-                revision,
-            })
+        .map(|session| SessionRevision {
+            session_id: session.id.clone(),
+            revision: session.revision,
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect();
     Ok(WorktreeRemoval {
         session_ids: ids,
         session_revisions,

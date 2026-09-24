@@ -6,6 +6,7 @@ import { normalizeProjectPath } from "./recents";
 import { ompActiveAssistantTexts, ompSessionInterjections } from "./fs";
 import { backfillOmpInterjections, ompStatusSplitTexts } from "./ompInterjections";
 import { HANDOFF_USER_LINE_CHARS, truncateHead } from "./truncate";
+import { reportError } from "./reportError";
 import type {
   AgentRunMeta,
   AgentStep,
@@ -196,6 +197,35 @@ export function sanitizeSessionForPersist(
 const sessionWriteQueues = new Map<string, Promise<unknown>>();
 const sessionRevisions = new Map<string, number>();
 const deletedSessionIds = new Set<string>();
+const conflictedSessionIds = new Set<string>();
+
+function sessionErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isRevisionConflict(error: unknown): boolean {
+  return sessionErrorMessage(error).includes(
+    "Session changed in another window",
+  );
+}
+
+function conflictedSessionError(sessionId: string): Error {
+  const error = new Error(
+    `Session changed in another window. Reload conversation ${sessionId} before continuing.`,
+  );
+  error.name = "SessionConflictError";
+  return error;
+}
 
 export function applySessionRevisions(
   revisions: readonly SessionRevision[] | undefined,
@@ -248,23 +278,39 @@ export async function upsertSession(
   if (!shouldPersistSession(session) || deletedSessionIds.has(session.id)) {
     return null;
   }
+  if (conflictedSessionIds.has(session.id)) {
+    throw conflictedSessionError(session.id);
+  }
   const payload = sanitizeSessionForPersist(session);
-  const summary = await enqueueSessionWrite(session.id, async () => {
-    if (deletedSessionIds.has(session.id)) return null;
-    const expectedRevision = sessionRevisions.get(session.id) ?? 0;
-    return invoke<SessionSummary>("session_upsert", {
-      session: {
-        ...payload,
-        expectedRevision,
-        blocks: payload.blocks.map((block) =>
-          block.orchestrationLeadId &&
-          deletedSessionIds.has(block.orchestrationLeadId)
-            ? { ...block, orchestrationLeadId: undefined }
-            : block,
-        ),
-      },
+  let summary: SessionSummary | null;
+  try {
+    summary = await enqueueSessionWrite(session.id, async () => {
+      if (deletedSessionIds.has(session.id)) return null;
+      let expectedRevision = sessionRevisions.get(session.id);
+      if (expectedRevision === undefined) {
+        expectedRevision = (await refreshSessionRevision(session.id)) ?? 0;
+      }
+      return invoke<SessionSummary>("session_upsert", {
+        session: {
+          ...payload,
+          expectedRevision,
+          blocks: payload.blocks.map((block) =>
+            block.orchestrationLeadId &&
+            deletedSessionIds.has(block.orchestrationLeadId)
+              ? { ...block, orchestrationLeadId: undefined }
+              : block,
+          ),
+        },
+      });
     });
-  });
+  } catch (error) {
+    if (isRevisionConflict(error)) {
+      conflictedSessionIds.add(session.id);
+      await refreshSessionRevision(session.id).catch(() => undefined);
+      reportError("session-upsert-conflict", error);
+    }
+    throw error;
+  }
   if (!summary) return null;
   const normalized = normalizeSummary(summary);
   rememberSessionRevision(session.id, normalized.revision);
@@ -353,7 +399,11 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   const record = await invoke<SessionRecord | null>("session_get", {
     sessionId,
   });
-  if (!record) return null;
+  if (!record) {
+    conflictedSessionIds.delete(sessionId);
+    return null;
+  }
+  conflictedSessionIds.delete(sessionId);
   rememberSessionRevision(sessionId, record.revision);
   const session = recordToSession(record);
   if (session.harness !== "omp" || !session.providerSessionId) {
@@ -405,6 +455,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
     );
     applySessionRevisions(revisions);
     sessionRevisions.delete(sessionId);
+    conflictedSessionIds.delete(sessionId);
   } catch (error) {
     deletedSessionIds.delete(sessionId);
     throw error;

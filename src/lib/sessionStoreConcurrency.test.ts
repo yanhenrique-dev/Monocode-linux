@@ -44,29 +44,42 @@ describe("session persistence concurrency", () => {
   it("drains worker writes before deleting a lead and strips ownership from later snapshots", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];
+    let upserts = 0;
+    const summary = (revision: number) => ({
+      id: "worker",
+      revision,
+      cwd: "/tmp/project",
+      harness: "cursor",
+      model: "",
+      runtimeMode: "supervised",
+      title: "",
+      createdAt: 1,
+      updatedAt: 1,
+    });
     mocks.invoke.mockImplementation((command: string) => {
       commands.push(command);
-      return command === "session_upsert" && commands.length === 1
-        ? firstWrite.promise
-        : Promise.resolve();
+      if (command !== "session_upsert") return Promise.resolve();
+      upserts += 1;
+      return upserts === 1 ? firstWrite.promise : Promise.resolve(summary(upserts));
     });
     const { deleteSession, upsertSession } = await loadStore();
     const worker = { ...session("worker"), orchestrationLeadId: "lead" };
     const writing = upsertSession(worker);
-    await vi.waitFor(() => expect(commands).toEqual(["session_upsert"]));
+    await vi.waitFor(() => expect(commands).toEqual(["session_get", "session_upsert"]));
     const queued = upsertSession(worker);
     const deleting = deleteSession("lead");
-    expect(commands).toEqual(["session_upsert"]);
-    firstWrite.resolve(undefined);
+    expect(commands).toEqual(["session_get", "session_upsert"]);
+    firstWrite.resolve(summary(1));
     await Promise.all([writing, queued, deleting]);
     expect(commands).toEqual([
+      "session_get",
       "session_upsert",
       "session_upsert",
       "session_delete",
     ]);
     await upsertSession(worker);
     for (const [, args] of mocks.invoke.mock.calls
-      .slice(1)
+      .slice(2)
       .filter(([command]) => command === "session_upsert")) {
       expect(args.session.blocks[0].orchestrationLeadId).toBeUndefined();
     }
@@ -75,21 +88,36 @@ describe("session persistence concurrency", () => {
   it("serializes deletion after an active write and drops a queued late upsert", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];
+    let upserts = 0;
     mocks.invoke.mockImplementation((command: string) => {
       commands.push(command);
-      if (command === "session_upsert") return firstWrite.promise;
-      return Promise.resolve();
+      if (command !== "session_upsert") return Promise.resolve();
+      upserts += 1;
+      return upserts === 1
+        ? firstWrite.promise
+        : Promise.resolve({
+            id: "s1",
+            revision: 2,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          });
     });
     const { deleteSession, upsertSession } = await loadStore();
 
     const writing = upsertSession(session("s1"));
-    await vi.waitFor(() => expect(commands).toEqual(["session_upsert"]));
+    await vi.waitFor(() => expect(commands).toEqual(["session_get", "session_upsert"]));
     const lateWrite = upsertSession({ ...session("s1"), title: "late" });
     const deleting = deleteSession("s1");
 
-    expect(commands).toEqual(["session_upsert"]);
+    expect(commands).toEqual(["session_get", "session_upsert"]);
     firstWrite.resolve({
       id: "s1",
+      revision: 1,
       cwd: "/tmp/project",
       harness: "cursor",
       model: "",
@@ -100,7 +128,11 @@ describe("session persistence concurrency", () => {
     });
     await Promise.all([writing, lateWrite, deleting]);
 
-    expect(commands).toEqual(["session_upsert", "session_delete"]);
+    expect(commands).toEqual([
+      "session_get",
+      "session_upsert",
+      "session_delete",
+    ]);
   });
 
   it("renews the expected revision after a queued write", async () => {
@@ -166,6 +198,78 @@ describe("session persistence concurrency", () => {
     await upsertSession(loaded!);
 
     expect(expectedRevisions).toEqual([7]);
+  });
+
+  it("loads current revision before a transferred session's first write", async () => {
+    const commands: string[] = [];
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        commands.push(command);
+        if (command === "session_get") {
+          return { ...session("s1"), revision: 6 };
+        }
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "s1",
+            revision: 7,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        return undefined;
+      },
+    );
+    const { upsertSession } = await loadStore();
+
+    await upsertSession(session("s1"));
+
+    expect(commands).toEqual(["session_get", "session_upsert"]);
+    expect(expectedRevisions).toEqual([6]);
+  });
+
+  it("does not retry a rejected stale write", async () => {
+    const commands: string[] = [];
+    let lookups = 0;
+    mocks.invoke.mockImplementation(async (command: string) => {
+      commands.push(command);
+      if (command === "session_get") {
+        lookups += 1;
+        return { ...session("s1"), revision: lookups === 1 ? 4 : 5 };
+      }
+      if (command === "session_upsert") {
+        throw new Error(
+          "Session changed in another window (expected revision 4, current 5)",
+        );
+      }
+      return undefined;
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    try {
+      const { upsertSession } = await loadStore();
+
+      await expect(upsertSession(session("s1"))).rejects.toThrow(
+        "Session changed in another window",
+      );
+      expect(lookups).toBe(2);
+      await expect(upsertSession(session("s1"))).rejects.toThrow(
+        "Reload conversation s1",
+      );
+      expect(commands.filter((command) => command === "session_upsert")).toHaveLength(1);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("refreshes revision after an external session update", async () => {
@@ -241,13 +345,16 @@ describe("session persistence concurrency", () => {
   it("archives only after the final active-turn snapshot is durable", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];
+    let upserts = 0;
     mocks.invoke.mockImplementation((command: string) => {
       commands.push(command);
-      if (command === "session_upsert" && commands.length === 1) {
-        return firstWrite.promise;
+      if (command === "session_upsert") {
+        upserts += 1;
+        if (upserts === 1) return firstWrite.promise;
       }
       return Promise.resolve({
         id: "s1",
+        revision: upserts + 1,
         cwd: "/tmp/project",
         harness: "cursor",
         model: "",
@@ -260,7 +367,7 @@ describe("session persistence concurrency", () => {
     const { setSessionArchived, upsertSession } = await loadStore();
 
     const writing = upsertSession(session("s1"));
-    await vi.waitFor(() => expect(commands).toEqual(["session_upsert"]));
+    await vi.waitFor(() => expect(commands).toEqual(["session_get", "session_upsert"]));
     const finalSnapshot = upsertSession({
       ...session("s1"),
       blocks: [
@@ -270,9 +377,10 @@ describe("session persistence concurrency", () => {
     });
     const archiving = setSessionArchived("s1", true);
 
-    expect(commands).toEqual(["session_upsert"]);
+    expect(commands).toEqual(["session_get", "session_upsert"]);
     firstWrite.resolve({
       id: "s1",
+      revision: 1,
       cwd: "/tmp/project",
       harness: "cursor",
       model: "",
@@ -284,11 +392,12 @@ describe("session persistence concurrency", () => {
     await Promise.all([writing, finalSnapshot, archiving]);
 
     expect(commands).toEqual([
+      "session_get",
       "session_upsert",
       "session_upsert",
       "session_set_archived",
     ]);
-    expect(mocks.invoke.mock.calls[1]?.[1]).toMatchObject({
+    expect(mocks.invoke.mock.calls[2]?.[1]).toMatchObject({
       session: {
         blocks: [{ text: "hello" }, { text: "final buffered output" }],
       },
