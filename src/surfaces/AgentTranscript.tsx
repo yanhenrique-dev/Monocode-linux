@@ -2509,9 +2509,8 @@ function SubagentPanel({
 }
 
 /**
- * The pixel mascot standing in for a subagent, hopping while it works. The
- * sprite is hashed off the agent's name, so the same reviewer keeps the same
- * face across a session and two agents in a row are told apart at a glance.
+ * A native trace leads active runs. Settled runs keep their name-hashed mascot,
+ * so two agents in a row remain distinct across a session.
  */
 function SubagentMascot({
   name,
@@ -2522,10 +2521,43 @@ function SubagentMascot({
   state: ToolCallState;
   active?: boolean;
 }) {
+  if (active) {
+    return (
+      <svg
+        aria-hidden="true"
+        className="size-4 shrink-0 text-content/70"
+        data-loading-indicator="trace"
+        fill="none"
+        focusable="false"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        viewBox="0 0 20 20"
+      >
+        <rect
+          height="17.5"
+          rx="4"
+          width="17.5"
+          x="1.25"
+          y="1.25"
+          opacity="0.2"
+        />
+        <rect
+          className="zen-trace-dash"
+          height="17.5"
+          rx="4"
+          width="17.5"
+          x="1.25"
+          y="1.25"
+          strokeDasharray="16 47.133"
+          strokeLinecap="butt"
+        />
+      </svg>
+    );
+  }
+
   return (
     <ProjectMascot
       project={name}
-      active={active}
       className={`size-4 shrink-0 ${
         state === "rejected"
           ? "text-red-400"

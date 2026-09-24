@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -347,12 +348,24 @@ describe("AgentTranscript collapsed work", () => {
       true,
     );
 
-    // A row each, named, hopping while the run is live — no grouped header.
+    // A row each, named, with a native trace loader while the run is live.
     expect(markup).toContain("Correctness review");
     expect(markup).toContain("Quality review");
     expect(markup).toContain("Haiku 4.5");
     expect(markup).toContain("custom-review-model");
-    expect(markup).toContain("mascot-active");
+    expect(markup.match(/data-loading-indicator="trace"/g) ?? []).toHaveLength(
+      2,
+    );
+    expect(markup).toContain('stroke-linecap="butt"');
+    expect(markup.match(/class="zen-trace-dash"/g) ?? []).toHaveLength(2);
+    expect(markup).not.toContain('class="zen-trace ');
+    const traceKeyframes =
+      readFileSync(new URL("../index.css", import.meta.url), "utf8").match(
+        /@keyframes zen-trace \{([\s\S]*?)\n\}/,
+      )?.[1] ?? "";
+    expect(traceKeyframes).toContain("stroke-dashoffset");
+    expect(traceKeyframes).not.toContain("transform");
+    expect(markup).not.toContain("mascot-active");
     expect(markup).not.toContain("are working");
     // A row counts its agent's work; it does not echo the call in flight,
     // which put a second scrolling command line on every row.
