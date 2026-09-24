@@ -198,6 +198,13 @@ pub struct SessionSummary {
     pub linked_work_item: Option<Value>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRevision {
+    pub session_id: String,
+    pub revision: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecord {
@@ -348,13 +355,13 @@ pub fn session_delete(
     app: AppHandle,
     store: State<'_, SessionStore>,
     session_id: String,
-) -> Result<(), String> {
+) -> Result<Vec<SessionRevision>, String> {
     validate_id(&session_id, "session")?;
     let conn = store.conn.lock().map_err(|_| "Session store is locked")?;
-    delete_session(&conn, &session_id).map_err(|e| e.to_string())?;
+    let revisions = delete_session(&conn, &session_id).map_err(|e| e.to_string())?;
     drop(conn);
     let _ = app.emit(crate::reminders::CHANGED, ());
-    Ok(())
+    Ok(revisions)
 }
 
 #[tauri::command(async)]
@@ -1435,7 +1442,7 @@ fn optional_json(raw: Option<String>) -> Option<Value> {
     raw.and_then(|value| serde_json::from_str(&value).ok())
 }
 
-fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
+fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Vec<SessionRevision>> {
     let tx = conn.unchecked_transaction()?;
     let parent = worker_parent(&tx, session_id)?;
     // Ownership is also carried in transcripts for older clients. Release
@@ -1443,6 +1450,7 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
     let workers = tx.prepare("SELECT id, blocks_json FROM sessions WHERE id IN (SELECT session_id FROM orchestration_workers WHERE lead_id = ?1)")?
         .query_map([session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut revisions = Vec::with_capacity(workers.len());
     for (id, raw) in workers {
         let mut blocks: Value = serde_json::from_str(&raw).map_err(|e| {
             rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
@@ -1458,8 +1466,17 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
         }
         tx.execute(
             "UPDATE sessions SET blocks_json = ?1, revision = revision + 1 WHERE id = ?2",
-            params![blocks.to_string(), id],
+            params![blocks.to_string(), &id],
         )?;
+        let revision = tx.query_row(
+            "SELECT revision FROM sessions WHERE id = ?1",
+            [&id],
+            |row| row.get(0),
+        )?;
+        revisions.push(SessionRevision {
+            session_id: id,
+            revision,
+        });
     }
     tx.execute(
         "DELETE FROM orchestration_runs WHERE lead_id = ?1",
@@ -1547,7 +1564,8 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
         "DELETE FROM composer_drafts WHERE session_id = ?1",
         [session_id],
     )?;
-    tx.commit()
+    tx.commit()?;
+    Ok(revisions)
 }
 
 fn set_archived(conn: &Connection, session_id: &str, archived: bool) -> rusqlite::Result<()> {
@@ -2158,7 +2176,17 @@ mod tests {
         let other =
             json!({"status":"active","tasks":[{"id":"other-task","sessionId":"other-worker"}]});
         save_orchestration(&conn, "other-lead", &other).unwrap();
-        delete_session(&conn, "lead").unwrap();
+        let revisions = delete_session(&conn, "lead").unwrap();
+        assert_eq!(revisions.len(), 2);
+        for update in &revisions {
+            assert_eq!(
+                get_session(&conn, &update.session_id)
+                    .unwrap()
+                    .unwrap()
+                    .revision,
+                update.revision
+            );
+        }
 
         for id in ["earlier", "current"] {
             let worker = get_session(&conn, id).unwrap().unwrap();

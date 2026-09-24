@@ -75,6 +75,11 @@ type SessionRecord = {
   updatedAt: number;
 };
 
+export type SessionRevision = {
+  sessionId: string;
+  revision: number;
+};
+
 type SessionUpsertPayload = {
   id: string;
   cwd: string;
@@ -192,6 +197,32 @@ const sessionWriteQueues = new Map<string, Promise<unknown>>();
 const sessionRevisions = new Map<string, number>();
 const deletedSessionIds = new Set<string>();
 
+export function applySessionRevisions(
+  revisions: readonly SessionRevision[] | undefined,
+): void {
+  if (!Array.isArray(revisions)) return;
+  for (const update of revisions) {
+    if (
+      typeof update.sessionId === "string" &&
+      Number.isSafeInteger(update.revision) &&
+      update.revision >= 0
+    ) {
+      sessionRevisions.set(update.sessionId, update.revision);
+    }
+  }
+}
+
+function rememberSessionRevision(sessionId: string, revision: unknown): void {
+  if (
+    typeof revision !== "number" ||
+    !Number.isSafeInteger(revision) ||
+    revision < 0
+  ) {
+    return;
+  }
+  sessionRevisions.set(sessionId, revision);
+}
+
 function enqueueSessionWrite<T>(
   sessionId: string,
   operation: () => Promise<T>,
@@ -236,9 +267,7 @@ export async function upsertSession(
   });
   if (!summary) return null;
   const normalized = normalizeSummary(summary);
-  if (typeof normalized.revision === "number") {
-    sessionRevisions.set(session.id, normalized.revision);
-  }
+  rememberSessionRevision(session.id, normalized.revision);
   return normalized;
 }
 
@@ -325,9 +354,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     sessionId,
   });
   if (!record) return null;
-  if (typeof record.revision === "number") {
-    sessionRevisions.set(sessionId, record.revision);
-  }
+  rememberSessionRevision(sessionId, record.revision);
   const session = recordToSession(record);
   if (session.harness !== "omp" || !session.providerSessionId) {
     return recoverCursorSubagents(session);
@@ -353,15 +380,30 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   return session;
 }
 
+export async function refreshSessionRevision(
+  sessionId: string,
+): Promise<number | null> {
+  const record = await invoke<SessionRecord | null>("session_get", {
+    sessionId,
+  });
+  if (!record) {
+    sessionRevisions.delete(sessionId);
+    return null;
+  }
+  rememberSessionRevision(sessionId, record.revision);
+  return typeof record.revision === "number" ? record.revision : null;
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   deletedSessionIds.add(sessionId);
   try {
     // A lead's workers may still have writes in flight. Finish those before
     // the deletion transaction strips their ownership metadata.
     await Promise.all([...sessionWriteQueues.values()]);
-    await enqueueSessionWrite(sessionId, () =>
-      invoke<void>("session_delete", { sessionId }),
+    const revisions = await enqueueSessionWrite(sessionId, () =>
+      invoke<SessionRevision[]>("session_delete", { sessionId }),
     );
+    applySessionRevisions(revisions);
     sessionRevisions.delete(sessionId);
   } catch (error) {
     deletedSessionIds.delete(sessionId);

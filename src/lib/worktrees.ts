@@ -5,6 +5,7 @@ import { isFilesystemTab, type FilePaneTab } from "./layout";
 import { isEqualOrInside, pathKey } from "./paths";
 import { isBlankSession } from "./projectReturn";
 import { newSessionForSeed, sessionWorkCwd, type Session } from "./session";
+import type { SessionRevision } from "./sessionStore";
 
 export type Worktree = {
   path: string;
@@ -19,6 +20,11 @@ export type Worktree = {
   sessionIds: string[];
 };
 export type Worktrees = { worktrees: Worktree[]; defaultRoot: string };
+export type WorktreeRemoval = {
+  sessionIds: string[];
+  sessionRevisions: SessionRevision[];
+  projectCwd: string;
+};
 
 export const listWorktrees = (cwd: string) =>
   invoke<Worktrees>("git_worktrees", { cwd });
@@ -77,7 +83,7 @@ export async function removeWorktree(
   force = false,
   keepSessions = false,
 ) {
-  const result = await invoke<{ sessionIds: string[]; projectCwd: string }>(
+  const result = await invoke<WorktreeRemoval>(
     "git_worktree_remove",
     { cwd, path, force, keepSessions },
   );
@@ -187,4 +193,4 @@ export type RemoveWorktree = (
   path: string,
   force: boolean,
   keepSessions?: boolean,
-) => Promise<void | { sessionIds: string[]; projectCwd: string }>;
+) => Promise<void | WorktreeRemoval>;

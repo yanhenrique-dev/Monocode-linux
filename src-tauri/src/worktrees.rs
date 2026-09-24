@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::fs::{expand_home, git_checked, path_to_js};
-use crate::session_store::SessionStore;
+use crate::session_store::{SessionRevision, SessionStore};
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -350,6 +350,7 @@ fn remove(root: &Path, path: &Path, force: bool) -> Result<(), String> {
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeRemoval {
     session_ids: Vec<String>,
+    session_revisions: Vec<SessionRevision>,
     project_cwd: String,
 }
 
@@ -535,8 +536,23 @@ fn remove_with_sessions(
     if let Err(error) = finish_removal(conn, &tree.path, &[]) {
         eprintln!("Worktree removed; recovery journal cleanup will retry on restart: {error}");
     }
+    let session_revisions = ids
+        .iter()
+        .map(|id| {
+            let revision = conn
+                .query_row("SELECT revision FROM sessions WHERE id = ?1", [id], |row| {
+                    row.get(0)
+                })
+                .map_err(|error| error.to_string())?;
+            Ok(SessionRevision {
+                session_id: id.clone(),
+                revision,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(WorktreeRemoval {
         session_ids: ids,
+        session_revisions,
         project_cwd: main.path.clone(),
     })
 }
@@ -767,6 +783,18 @@ mod tests {
         let mut removed = remove_with_sessions(&conn, path, path, true, true).unwrap();
         removed.session_ids.sort();
         assert_eq!(removed.session_ids, vec!["archived", "direct", "shared"]);
+        assert_eq!(removed.session_revisions.len(), 3);
+        for update in &removed.session_revisions {
+            assert!(removed.session_ids.contains(&update.session_id));
+            let stored: i64 = conn
+                .query_row(
+                    "SELECT revision FROM sessions WHERE id = ?1",
+                    [&update.session_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, update.revision);
+        }
         // Git omits the verbatim prefix added by canonicalize() on Windows.
         assert!(same_path(Path::new(&removed.project_cwd), &root));
         assert!(!path.exists());

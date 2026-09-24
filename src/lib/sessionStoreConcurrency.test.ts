@@ -168,6 +168,76 @@ describe("session persistence concurrency", () => {
     expect(expectedRevisions).toEqual([7]);
   });
 
+  it("refreshes revision after an external session update", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        if (command === "session_get") return { ...session("s1"), revision: 9 };
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "s1",
+            revision: 10,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        return undefined;
+      },
+    );
+    const { refreshSessionRevision, upsertSession } = await loadStore();
+
+    expect(await refreshSessionRevision("s1")).toBe(9);
+    await upsertSession(session("s1"));
+
+    expect(expectedRevisions).toEqual([9]);
+  });
+
+  it("uses worker revisions returned when a lead is deleted", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "worker",
+            revision: expectedRevisions.length,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        if (command === "session_delete") {
+          return [{ sessionId: "worker", revision: 7 }];
+        }
+        return undefined;
+      },
+    );
+    const { deleteSession, upsertSession } = await loadStore();
+    const worker = { ...session("worker"), orchestrationLeadId: "lead" };
+
+    await upsertSession(worker);
+    await deleteSession("lead");
+    await upsertSession(worker);
+
+    expect(expectedRevisions).toEqual([0, 7]);
+  });
+
   it("archives only after the final active-turn snapshot is durable", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];
