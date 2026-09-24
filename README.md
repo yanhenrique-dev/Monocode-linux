@@ -68,16 +68,6 @@
 > [hardbeat920/monocode](https://github.com/hardbeat920/monocode) and focuses on
 > Linux. See the upstream project and its contributors for the original work.
 
-<p align="center">
-  <a href="docs/monocode-loading.gif">
-    <img
-      src="docs/monocode-loading.gif"
-      alt="MonoCode loading animation"
-      width="420"
-    />
-  </a>
-</p>
-
 ## Start here
 
 - [Download the latest AppImage](https://github.com/yanhenrique-dev/Monocode-linux/releases/latest).
