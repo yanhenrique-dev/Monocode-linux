@@ -3,6 +3,7 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Block } from "../lib/session";
+import { tabGroupColor } from "../lib/tabGroups";
 import { AgentTranscript } from "./AgentTranscript";
 
 function stubExperimentalAnimations(value: string) {
@@ -387,6 +388,30 @@ describe("AgentTranscript collapsed work", () => {
     expect(markup).toContain("Show Correctness review&#x27;s work");
     // The rows sit outside the fold, so they stay put as the work collapses.
     expect(markup).toContain("Both reviewers agree.");
+  });
+
+  it("colors live subagents deterministically and clears color when settled", () => {
+    const blocks: Block[] = [
+      {
+        id: "a1",
+        role: "tool",
+        text: "Correctness review",
+        tool: { callId: "agent-color-1", kind: "agent", status: "in_progress" },
+        agentRun: { name: "Correctness review", steps: [] },
+      },
+    ];
+
+    const liveMarkup = render(blocks, true);
+    expect(liveMarkup).toContain(
+      `style="color:${tabGroupColor("agent-color-1")}"`,
+    );
+    expect(liveMarkup).toContain("mascot-active");
+
+    const settledMarkup = render(blocks);
+    expect(settledMarkup).not.toContain(
+      `style="color:${tabGroupColor("agent-color-1")}"`,
+    );
+    expect(settledMarkup).not.toContain("mascot-active");
   });
 
   it("keeps the turn's status line at the top of the turn above a stack", () => {
