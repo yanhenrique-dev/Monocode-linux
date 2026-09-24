@@ -6,8 +6,8 @@ export type PopoverAnchor =
   | null;
 
 type VirtualAnchorRect = {
-  left: number;
-  top: number;
+  x: number;
+  y: number;
   width: number;
   height: number;
 };
@@ -16,8 +16,8 @@ function virtualAnchor(rect: VirtualAnchorRect) {
   return {
     getBoundingClientRect: () =>
       DOMRect.fromRect({
-        x: rect.left,
-        y: rect.top,
+        x: rect.x,
+        y: rect.y,
         width: rect.width,
         height: rect.height,
       }),
@@ -32,15 +32,15 @@ export function toBaseAnchor(
   if ("current" in anchor) return anchor.current;
   if ("width" in anchor) {
     return virtualAnchor({
-      left: anchor.left,
-      top: anchor.top,
+      x: anchor.x,
+      y: anchor.y,
       width: anchor.width,
       height: anchor.height,
     });
   }
   return virtualAnchor({
-    left: anchor.x,
-    top: anchor.y,
+    x: anchor.x,
+    y: anchor.y,
     width: 0,
     height: 0,
   });

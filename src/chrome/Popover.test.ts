@@ -46,6 +46,27 @@ describe("virtual anchors", () => {
     expect(rect.width).toBe(80);
     expect(rect.height).toBe(24);
   });
+
+  it("keeps x and y when rect dimensions are negative", () => {
+    const source = {
+      x: 420,
+      y: 260,
+      width: -80,
+      height: -24,
+      left: 340,
+      top: 236,
+      right: 420,
+      bottom: 260,
+    } as DOMRect;
+    const resolved = toBaseAnchor(source);
+    if (!resolved) throw new Error("anchor was not resolved");
+
+    const rect = resolved.getBoundingClientRect();
+    expect(rect.x).toBe(420);
+    expect(rect.y).toBe(260);
+    expect(rect.width).toBe(-80);
+    expect(rect.height).toBe(-24);
+  });
 });
 
 describe("Popover exit animation", () => {
