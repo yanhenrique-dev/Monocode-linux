@@ -1349,7 +1349,7 @@ export class Orchestrator {
     return this.cancelTask(run.leadId, task.id);
   }
   /** Drain control writes before the database removes a lead or one of its workers. */
-  deleteSession(id: string, remove: () => Promise<void>): Promise<void> {
+  deleteSession<T>(id: string, remove: () => Promise<T>): Promise<T> {
     const result = this.actions
       .catch(() => undefined)
       .then(async () => {
@@ -1363,9 +1363,9 @@ export class Orchestrator {
           await this.stopRun(run.leadId);
         }
         await this.saves.catch(() => undefined);
-        await remove();
+        const removed = await remove();
         this.deleted.add(id);
-        if (!run) return;
+        if (!run) return removed;
         this.runs = this.runs.filter((entry) => entry.leadId !== run.leadId);
         this.persisted.delete(run.leadId);
         this.blocked.delete(run.leadId);
@@ -1387,8 +1387,12 @@ export class Orchestrator {
             this.emit();
           }
         }
+        return removed;
       });
-    this.actions = result.catch(() => undefined);
+    this.actions = result.then(
+      () => undefined,
+      () => undefined,
+    );
     return result;
   }
   /** `${taskId}:${requestId}` for every worker currently blocked on the lead. */

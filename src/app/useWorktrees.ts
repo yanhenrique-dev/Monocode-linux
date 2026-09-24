@@ -23,8 +23,11 @@ import {
 import { orchestrator } from "../lib/orchestration";
 import {
   applySessionRevisions,
+  applySessionRevisionsToSessions,
   flushSessionWrites,
-  refreshSessionRevision,
+  getSession,
+  markSessionConflicts,
+  samePersistedSession,
   shouldPersistSession,
   upsertSession,
   type SessionSummary,
@@ -216,6 +219,10 @@ export function useWorktrees(deps: WorktreesDeps) {
         checkOpenWorktreeFiles(path);
         const removed = await removeWorktree(cwd, path, force, keepSessions);
         applySessionRevisions(removed.sessionRevisions);
+        sessionsRef.current = applySessionRevisionsToSessions(
+          sessionsRef.current,
+          removed.sessionRevisions,
+        );
         const affected = new Set([...ids, ...removed.sessionIds]);
         if (isEqualOrInside(projectCwdRef.current, path)) {
           setProjectCwd(removed.projectCwd);
@@ -223,15 +230,34 @@ export function useWorktrees(deps: WorktreesDeps) {
         }
         for (const id of affected) {
           invalidateLoadedSession(id);
-          pendingPersist.current.delete(id);
+          const pending = pendingPersist.current.get(id);
+          if (pending) {
+            const detached = detachSessionWorktree(
+              pending,
+              removed.projectCwd,
+              path,
+            );
+            pendingPersist.current.set(
+              id,
+              applySessionRevisionsToSessions(
+                [detached],
+                removed.sessionRevisions,
+              )[0],
+            );
+          } else {
+            pendingPersist.current.delete(id);
+          }
           lastPersisted.current.delete(id);
         }
-        sessionsRef.current = sessionsRef.current.map((session) =>
-          affected.has(session.id)
-            ? detachSessionWorktree(session, removed.projectCwd, path)
-            : session,
-        );
-        setSessions(sessionsRef.current);
+        const detachSessions = (entries: Session[]) =>
+          entries.map((session) =>
+            affected.has(session.id)
+              ? detachSessionWorktree(session, removed.projectCwd, path)
+              : session,
+          );
+        const detached = detachSessions(sessionsRef.current);
+        sessionsRef.current = detached;
+        setSessions((current) => detachSessions(current));
         const patchSummary = (entry: SessionSummary) =>
           affected.has(entry.id)
             ? detachSessionWorktree(entry, removed.projectCwd, path)
@@ -240,14 +266,63 @@ export function useWorktrees(deps: WorktreesDeps) {
         setStoredLinkedSessions((current) => current.map(patchSummary));
         for (const id of affected) notifyReviewChanged(id);
       } catch (error) {
-        await Promise.all(
-          [...lockedIds].map((id) =>
-            refreshSessionRevision(id).catch(() => null),
-          ),
+        const reloaded = await Promise.all(
+          [...lockedIds].map(async (id) => ({
+            id,
+            session: await getSession(id).catch(() => null),
+          })),
         );
-        // Removal may fail after idle agent processes were stopped. Rebind
-        // their saved threads so the unchanged working copy can still resume.
-        const kept = sessionsRef.current.filter(
+        markSessionConflicts(
+          reloaded
+            .filter((entry) => entry.session === null)
+            .map((entry) => entry.id),
+        );
+        const freshById = new Map(
+          reloaded
+            .filter(
+              (entry): entry is { id: string; session: Session } =>
+                entry.session !== null,
+            )
+            .map((entry) => [entry.id, entry.session]),
+        );
+        const mergeFreshSession = (entry: Session, fresh: Session): Session => {
+          if (!samePersistedSession(entry, fresh)) {
+            markSessionConflicts([entry.id]);
+            return entry;
+          }
+          const { revision: freshRevision, ...freshWithoutRevision } = fresh;
+          const merged = {
+            ...entry,
+            ...freshWithoutRevision,
+            blocks: entry.blocks,
+            busy: entry.busy,
+          };
+          return freshRevision === undefined
+            ? merged
+            : applySessionRevisionsToSessions(
+                [merged],
+                [{ sessionId: entry.id, revision: freshRevision }],
+              )[0];
+        };
+        const restoreSessions = (entries: Session[]) =>
+          entries.map((entry) => {
+            const fresh = freshById.get(entry.id);
+            return fresh ? mergeFreshSession(entry, fresh) : entry;
+          });
+        const restored = restoreSessions(sessionsRef.current);
+        sessionsRef.current = restored;
+        setSessions((current) => restoreSessions(current));
+        for (const id of lockedIds) {
+          const pending = pendingPersist.current.get(id);
+          if (!pending) continue;
+          const fresh = freshById.get(id);
+          if (!fresh) {
+            markSessionConflicts([id]);
+            continue;
+          }
+          pendingPersist.current.set(id, mergeFreshSession(pending, fresh));
+        }
+        const kept = restored.filter(
           (session) => forgottenIds.has(session.id) && !session.worktreeRemoved,
         );
         bindResumedSessions(kept);

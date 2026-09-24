@@ -8,7 +8,10 @@ import { message } from "@tauri-apps/plugin-dialog";
 import {
   deleteSession,
   getSession,
+  markSessionConflicts,
   persistFingerprint,
+  samePersistedSession,
+  applySessionRevisionsToSessions,
   setSessionArchived,
   setSessionPinned,
   shouldPersistSession,
@@ -135,7 +138,6 @@ export function useHistory(deps: HistoryDeps) {
     pendingPersist,
     loadedSessionCache,
     removingSessionIds,
-    sessionLoads,
     whatsNewVersionRef,
     settingsOpenRef,
     firstRunOpenRef,
@@ -516,31 +518,106 @@ export function useHistory(deps: HistoryDeps) {
           persist: async (latest) => {
             if (latest) await flushSessionCheckpoint(sessionId);
             if (mode === "delete") {
-              await orchestrator.deleteSession(sessionId, () =>
-                deleteSession(sessionId),
+              const revisions = await orchestrator.deleteSession(
+                sessionId,
+                () => deleteSession(sessionId),
               );
-              const released = sessionsRef.current.map((session) =>
-                releaseOrchestrationWorker(session, sessionId),
+              const revisionById = new Map(
+                revisions.map((entry) => [entry.sessionId, entry.revision]),
               );
+              const freshWorkers = await Promise.all(
+                revisions.map(async (entry) => ({
+                  sessionId: entry.sessionId,
+                  session: await getSession(entry.sessionId).catch(() => null),
+                })),
+              );
+              markSessionConflicts(
+                freshWorkers
+                  .filter((entry) => entry.session === null)
+                  .map((entry) => entry.sessionId),
+              );
+              const freshById = new Map(
+                freshWorkers
+                  .filter(
+                    (entry): entry is { sessionId: string; session: Session } =>
+                      entry.session !== null,
+                  )
+                  .map((entry) => [entry.sessionId, entry.session]),
+              );
+              const withRevision = <
+                T extends { id: string; revision?: number },
+              >(
+                entry: T,
+                revision: number | undefined,
+              ): T =>
+                revision === undefined
+                  ? entry
+                  : applySessionRevisionsToSessions(
+                      [entry],
+                      [{ sessionId: entry.id, revision }],
+                    )[0];
+              const releaseSessions = (entries: Session[]) =>
+                entries.map((session) => {
+                  const released = releaseOrchestrationWorker(
+                    session,
+                    sessionId,
+                  );
+                  const fresh = freshById.get(session.id);
+                  if (!fresh) return released;
+                  if (!samePersistedSession(released, fresh)) {
+                    markSessionConflicts([session.id]);
+                    return released;
+                  }
+                  const { revision: freshRevision, ...freshWithoutRevision } =
+                    fresh;
+                  const merged = {
+                    ...released,
+                    ...freshWithoutRevision,
+                    blocks: released.blocks,
+                    busy: released.busy,
+                  };
+                  return freshRevision === undefined
+                    ? merged
+                    : applySessionRevisionsToSessions(
+                        [merged],
+                        [{ sessionId: session.id, revision: freshRevision }],
+                      )[0];
+                });
+              const released = releaseSessions(sessionsRef.current);
               sessionsRef.current = released;
-              setSessions(released);
+              setSessions((current) => releaseSessions(current));
               for (const [id, cached] of loadedSessionCache.current) {
-                if (releaseOrchestrationWorker(cached, sessionId) !== cached)
+                if (releaseOrchestrationWorker(cached, sessionId) !== cached) {
                   invalidateLoadedSession(id);
+                }
               }
-              // Pending reads may still carry the deleted lead's ownership.
-              for (const id of sessionLoads.current.keys())
+              for (const id of revisionById.keys()) {
                 invalidateLoadedSession(id);
-              for (const [id, pending] of pendingPersist.current) {
-                pendingPersist.current.set(
-                  id,
-                  releaseOrchestrationWorker(pending, sessionId),
-                );
               }
-              const releaseSummary = (entry: SessionSummary) =>
-                entry.orchestrationLeadId === sessionId
-                  ? { ...entry, orchestrationLeadId: undefined }
-                  : entry;
+              for (const [id, pending] of pendingPersist.current) {
+                const releasedPending = releaseOrchestrationWorker(
+                  pending,
+                  sessionId,
+                );
+                const fresh = freshById.get(id);
+                if (!revisionById.has(id)) {
+                  pendingPersist.current.set(id, releasedPending);
+                } else if (
+                  fresh &&
+                  samePersistedSession(releasedPending, fresh)
+                ) {
+                  pendingPersist.current.set(id, fresh);
+                } else {
+                  markSessionConflicts([id]);
+                }
+              }
+              const releaseSummary = (entry: SessionSummary) => {
+                const released =
+                  entry.orchestrationLeadId === sessionId
+                    ? { ...entry, orchestrationLeadId: undefined }
+                    : entry;
+                return withRevision(released, revisionById.get(entry.id));
+              };
               setHistory((current) => current.map(releaseSummary));
               setStoredLinkedSessions((current) => current.map(releaseSummary));
               return;

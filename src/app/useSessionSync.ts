@@ -65,8 +65,11 @@ import {
 import {
   listLinkedSessions,
   listSessionsByProject,
+  applySessionRevisionsToSessions,
+  isSessionRevisionConflict,
   persistFingerprint,
   replaceInFlightSessions,
+  sameSessionSnapshot,
   saveWorkspaceSnapshot,
   shouldPersistSession,
   upsertSession,
@@ -183,6 +186,13 @@ export interface SessionSyncDeps {
   projectTerminalsRef: MutableRefObject<import("../lib/projectTerminal").ProjectTerminalDock[]>;
 }
 
+function canClearPendingSnapshot(
+  pending: Session | undefined,
+  completed: Session,
+): boolean {
+  return pending === undefined || sameSessionSnapshot(pending, completed);
+}
+
 /**
  * Session list synchronization (load / transfer / reminders / terminals).
  *
@@ -296,6 +306,11 @@ export function useSessionSync(deps: SessionSyncDeps) {
   const workspaceSyncKey = useRef<string | null>(null);
   const observedSessions = useRef(new Map<string, Session>());
   const pendingPersist = useRef(new Map<string, Session>());
+  const persistingSessionIds = useRef(new Set<string>());
+  const persistRetryCounts = useRef(
+    new Map<string, { fingerprint: string; attempt: number }>(),
+  );
+  const [persistFlushToken, setPersistFlushToken] = useState(0);
   const removingSessionIds = useRef(new Set<string>());
   const loadedSessionCache = useRef(new Map<string, Session>());
   const sessionLoads = useRef(new Map<string, Promise<Session | null>>());
@@ -773,24 +788,107 @@ export function useSessionSync(deps: SessionSyncDeps) {
     prefetchProjectFiles(sidebarCwd);
   }, [sidebarCwd]);
 
-  const persistSession = useCallback((session: Session | undefined) => {
-    if (
-      !session ||
-      !shouldPersistSession(session) ||
-      removingSessionIds.current.has(session.id)
-    )
-      return;
-    const fingerprint = persistFingerprint(session);
-    void upsertSession(session)
-      .then((summary) => {
-        if (!summary) return;
-        lastPersisted.current.set(session.id, fingerprint);
-        if (summary.cwd === sidebarCwdRef.current) {
-          setHistory((current) => mergeProjectHistorySummary(current, summary));
-        }
-      })
-      .catch(() => undefined);
-  }, []);
+  const applyPersistedRevision = useCallback(
+    (sessionId: string, revision: number) => {
+      if (!Number.isSafeInteger(revision) || revision < 0) return;
+      const next = applySessionRevisionsToSessions(sessionsRef.current, [
+        { sessionId, revision },
+      ]);
+      sessionsRef.current = next;
+      setSessions((current) =>
+        applySessionRevisionsToSessions(current, [{ sessionId, revision }]),
+      );
+      const pending = pendingPersist.current.get(sessionId);
+      if (pending) {
+        pendingPersist.current.set(
+          sessionId,
+          applySessionRevisionsToSessions(
+            [pending],
+            [{ sessionId, revision }],
+          )[0],
+        );
+      }
+      const cached = loadedSessionCache.current.get(sessionId);
+      if (cached) {
+        loadedSessionCache.current.set(
+          sessionId,
+          applySessionRevisionsToSessions(
+            [cached],
+            [{ sessionId, revision }],
+          )[0],
+        );
+      }
+    },
+    [setSessions],
+  );
+
+  const persistSession = useCallback(
+    (session: undefined | Session) => {
+      if (
+        !session ||
+        !shouldPersistSession(session) ||
+        removingSessionIds.current.has(session.id)
+      )
+        return;
+      if (persistingSessionIds.current.has(session.id)) {
+        pendingPersist.current.set(session.id, session);
+        setPersistFlushToken((value) => value + 1);
+        return;
+      }
+      const fingerprint = persistFingerprint(session);
+      pendingPersist.current.set(session.id, session);
+      persistingSessionIds.current.add(session.id);
+      void upsertSession(session)
+        .then((summary) => {
+          if (!summary) {
+            const pending = pendingPersist.current.get(session.id);
+            if (canClearPendingSnapshot(pending, session)) {
+              pendingPersist.current.delete(session.id);
+            }
+            return;
+          }
+          persistRetryCounts.current.delete(session.id);
+          if (summary.revision !== undefined) {
+            applyPersistedRevision(session.id, summary.revision);
+          }
+          const pending = pendingPersist.current.get(session.id);
+          if (canClearPendingSnapshot(pending, session)) {
+            pendingPersist.current.delete(session.id);
+            lastPersisted.current.set(session.id, fingerprint);
+          }
+
+          if (summary.cwd === sidebarCwdRef.current) {
+            setHistory((current) =>
+              mergeProjectHistorySummary(current, summary),
+            );
+          }
+        })
+        .catch((error: unknown) => {
+          if (
+            removingSessionIds.current.has(session.id) ||
+            isSessionRevisionConflict(error)
+          )
+            return;
+          const pending = pendingPersist.current.get(session.id);
+          if (canClearPendingSnapshot(pending, session)) {
+            pendingPersist.current.set(session.id, session);
+          }
+          setPersistFlushToken((value) => value + 1);
+        })
+        .finally(() => {
+          persistingSessionIds.current.delete(session.id);
+          const pending = pendingPersist.current.get(session.id);
+          if (
+            pending &&
+            !canClearPendingSnapshot(pending, session) &&
+            !removingSessionIds.current.has(session.id)
+          ) {
+            setPersistFlushToken((value) => value + 1);
+          }
+        });
+    },
+    [applyPersistedRevision, setPersistFlushToken],
+  );
 
   useEffect(() => {
     const liveIds = new Set(sessions.map((session) => session.id));
@@ -834,27 +932,109 @@ export function useSessionSync(deps: SessionSyncDeps) {
     }
     if (pendingPersist.current.size === 0) return;
 
-    const timer = window.setTimeout(() => {
-      const dirty = [...pendingPersist.current.values()];
-      pendingPersist.current.clear();
-      void Promise.all(
-        dirty.map(async (session) => {
-          if (removingSessionIds.current.has(session.id)) return;
+    let disposed = false;
+    const timers = new Set<number>();
+    function schedule(delay: number): void {
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        if (!disposed) void flushPending();
+      }, delay);
+      timers.add(timer);
+    }
+
+    async function flushPending(): Promise<void> {
+      const dirty = [...pendingPersist.current.entries()];
+      await Promise.all(
+        dirty.map(async ([id, queued]) => {
+          if (removingSessionIds.current.has(id)) {
+            pendingPersist.current.delete(id);
+            return;
+          }
+          if (persistingSessionIds.current.has(id)) {
+            schedule(50);
+            return;
+          }
+          const pendingSnapshot = pendingPersist.current.get(id);
+          const session =
+            pendingSnapshot ??
+            sessionsRef.current.find((entry) => entry.id === id) ??
+            queued;
           const fingerprint = persistFingerprint(session);
-          if (lastPersisted.current.get(session.id) === fingerprint) return;
-          const summary = await upsertSession(session).catch(() => null);
-          if (!summary) return;
-          lastPersisted.current.set(session.id, fingerprint);
-          if (summary.cwd === sidebarCwdRef.current) {
-            setHistory((current) =>
-              mergeProjectHistorySummary(current, summary),
-            );
+          const canReusePersisted =
+            session === queued || sameSessionSnapshot(session, queued);
+          if (
+            lastPersisted.current.get(id) === fingerprint &&
+            canReusePersisted
+          ) {
+            persistRetryCounts.current.delete(id);
+            pendingPersist.current.delete(id);
+            return;
+          }
+          persistingSessionIds.current.add(id);
+          const retryState = persistRetryCounts.current.get(id);
+          if (retryState && retryState.fingerprint !== fingerprint) {
+            persistRetryCounts.current.delete(id);
+          }
+          const retryAttempt =
+            retryState?.fingerprint === fingerprint ? retryState.attempt : 0;
+          let saved = false;
+          let retryDelay: number | undefined;
+          try {
+            const summary = await upsertSession(session);
+            if (!summary) {
+              const pending = pendingPersist.current.get(id);
+              if (canClearPendingSnapshot(pending, session)) {
+                pendingPersist.current.delete(id);
+              }
+              return;
+            }
+            saved = true;
+            persistRetryCounts.current.delete(id);
+            if (summary.revision !== undefined) {
+              applyPersistedRevision(id, summary.revision);
+            }
+            const pending = pendingPersist.current.get(id);
+            if (canClearPendingSnapshot(pending, session)) {
+              pendingPersist.current.delete(id);
+              lastPersisted.current.set(id, fingerprint);
+            }
+            if (summary.cwd === sidebarCwdRef.current) {
+              setHistory((current) =>
+                mergeProjectHistorySummary(current, summary),
+              );
+            }
+          } catch (error) {
+            if (isSessionRevisionConflict(error)) {
+              persistRetryCounts.current.delete(id);
+            } else if (retryAttempt < 3) {
+              persistRetryCounts.current.set(id, {
+                fingerprint,
+                attempt: retryAttempt + 1,
+              });
+              retryDelay = Math.min(1000 * 2 ** retryAttempt, 8000);
+            }
+            return;
+          } finally {
+            persistingSessionIds.current.delete(id);
+            const pending = pendingPersist.current.get(id);
+            if (saved) {
+              if (pending && !canClearPendingSnapshot(pending, session)) {
+                schedule(0);
+              }
+            } else if (retryDelay !== undefined && pending) {
+              schedule(retryDelay);
+            }
           }
         }),
       );
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [persistSession, sessions]);
+    }
+
+    schedule(650);
+    return () => {
+      disposed = true;
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [applyPersistedRevision, persistSession, persistFlushToken, sessions]);
 
   useEffect(() => {
     const refs = inFlightRefs(sessions, tabs);
@@ -1052,7 +1232,6 @@ export function useSessionSync(deps: SessionSyncDeps) {
     }
     commitTabVisit(pruneTabVisitHistory(next, openIds, activeTabId));
   }, [activeTabId, commitTabVisit, tabs]);
-
 
   return {
     readProjectReturnMemory,

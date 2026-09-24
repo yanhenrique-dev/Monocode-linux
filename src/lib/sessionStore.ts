@@ -189,6 +189,35 @@ export function sanitizeSessionForPersist(
   };
 }
 
+function stableJson(value: unknown): string {
+  if (value === undefined) return "undefined";
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+    .join(",")}}`;
+}
+
+function persistedSessionForComparison(session: Session): unknown {
+  return {
+    ...sanitizeSessionForPersist(session),
+    branch: undefined,
+  };
+}
+
+export function samePersistedSession(left: Session, right: Session): boolean {
+  return (
+    stableJson(persistedSessionForComparison(left)) ===
+    stableJson(persistedSessionForComparison(right))
+  );
+}
+
 /**
  * `session_upsert` runs off the main thread, so two writes for the same
  * session could otherwise land in either order and let an older transcript
@@ -214,10 +243,16 @@ function sessionErrorMessage(error: unknown): string {
   return String(error);
 }
 
-function isRevisionConflict(error: unknown): boolean {
+export function isSessionRevisionConflict(error: unknown): boolean {
   return sessionErrorMessage(error).includes(
     "Session changed in another window",
   );
+}
+
+export function markSessionConflicts(sessionIds: readonly string[]): void {
+  for (const sessionId of sessionIds) {
+    conflictedSessionIds.add(sessionId);
+  }
 }
 
 function conflictedSessionError(sessionId: string): Error {
@@ -228,6 +263,14 @@ function conflictedSessionError(sessionId: string): Error {
   return error;
 }
 
+function isValidRevision(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function revisionOrZero(value: unknown): number {
+  return isValidRevision(value) ? value : 0;
+}
+
 export function applySessionRevisions(
   revisions: readonly SessionRevision[] | undefined,
 ): void {
@@ -235,23 +278,63 @@ export function applySessionRevisions(
   for (const update of revisions) {
     if (
       typeof update.sessionId === "string" &&
-      Number.isSafeInteger(update.revision) &&
-      update.revision >= 0
+      isValidRevision(update.revision)
     ) {
-      sessionRevisions.set(update.sessionId, update.revision);
+      rememberSessionRevision(update.sessionId, update.revision);
     }
   }
 }
 
-function rememberSessionRevision(sessionId: string, revision: unknown): void {
+function mergeSessionRevision<T extends { id: string; revision?: number }>(
+  session: T,
+  revision: unknown,
+): T {
   if (
-    typeof revision !== "number" ||
-    !Number.isSafeInteger(revision) ||
-    revision < 0
+    !isValidRevision(revision) ||
+    (typeof session.revision === "number" && session.revision >= revision)
   ) {
-    return;
+    return session;
   }
-  sessionRevisions.set(sessionId, revision);
+  return { ...session, revision };
+}
+
+export function applySessionRevisionsToSessions<
+  T extends { id: string; revision?: number },
+>(
+  sessions: readonly T[],
+  revisions: readonly SessionRevision[] | undefined,
+): T[] {
+  if (!Array.isArray(revisions) || revisions.length === 0) {
+    return [...sessions];
+  }
+  const byId = new Map<string, number>();
+  for (const update of revisions) {
+    if (
+      typeof update.sessionId !== "string" ||
+      !isValidRevision(update.revision)
+    ) {
+      continue;
+    }
+    const current = byId.get(update.sessionId);
+    if (current === undefined || update.revision > current) {
+      byId.set(update.sessionId, update.revision);
+    }
+  }
+  let changed = false;
+  const next = sessions.map((session) => {
+    const updated = mergeSessionRevision(session, byId.get(session.id));
+    if (updated !== session) changed = true;
+    return updated;
+  });
+  return changed ? next : [...sessions];
+}
+
+function rememberSessionRevision(sessionId: string, revision: unknown): void {
+  if (!isValidRevision(revision)) return;
+  const current = sessionRevisions.get(sessionId);
+  if (current === undefined || revision >= current) {
+    sessionRevisions.set(sessionId, revision);
+  }
 }
 
 function enqueueSessionWrite<T>(
@@ -287,14 +370,10 @@ export async function upsertSession(
   try {
     summary = await enqueueSessionWrite(session.id, async () => {
       if (deletedSessionIds.has(session.id)) return null;
-      const cached = sessionRevisions.get(session.id) ?? 0;
-      const carried =
-        typeof session.revision === "number" &&
-        Number.isSafeInteger(session.revision) &&
-        session.revision >= 0
-          ? session.revision
-          : 0;
-      const expectedRevision = Math.max(cached, carried);
+      const expectedRevision = Math.max(
+        revisionOrZero(session.revision),
+        revisionOrZero(sessionRevisions.get(session.id)),
+      );
       return invoke<SessionSummary>("session_upsert", {
         session: {
           ...payload,
@@ -309,7 +388,7 @@ export async function upsertSession(
       });
     });
   } catch (error) {
-    if (isRevisionConflict(error)) {
+    if (isSessionRevisionConflict(error)) {
       conflictedSessionIds.add(session.id);
       await refreshSessionRevision(session.id).catch(() => undefined);
       reportError("session-upsert-conflict", error);
@@ -318,8 +397,11 @@ export async function upsertSession(
   }
   if (!summary) return null;
   const normalized = normalizeSummary(summary);
-  session.revision = normalized.revision;
-  rememberSessionRevision(session.id, normalized.revision);
+  const revision = normalized.revision ?? 0;
+  if (typeof session.revision !== "number" || revision > session.revision) {
+    session.revision = revision;
+  }
+  rememberSessionRevision(session.id, revision);
   return normalized;
 }
 
@@ -345,6 +427,14 @@ export function persistFingerprint(session: Session): string {
   return `${JSON.stringify(persistableMeta(session))}|${session.orchestrationLeadId ?? ""}|${session.blocks
     .map(blockToken)
     .join(",")}`;
+}
+
+export function sameSessionSnapshot(left: Session, right: Session): boolean {
+  return (
+    left === right ||
+    (revisionOrZero(left.revision) === revisionOrZero(right.revision) &&
+      persistFingerprint(left) === persistFingerprint(right))
+  );
 }
 
 export async function listSessionsByProject(
@@ -447,10 +537,12 @@ export async function refreshSessionRevision(
     return null;
   }
   rememberSessionRevision(sessionId, record.revision);
-  return typeof record.revision === "number" ? record.revision : null;
+  return isValidRevision(record.revision) ? record.revision : null;
 }
 
-export async function deleteSession(sessionId: string): Promise<void> {
+export async function deleteSession(
+  sessionId: string,
+): Promise<SessionRevision[]> {
   deletedSessionIds.add(sessionId);
   try {
     await discardSessionDraft(sessionId);
@@ -458,11 +550,13 @@ export async function deleteSession(sessionId: string): Promise<void> {
     // the deletion transaction strips their ownership metadata.
     await Promise.all([...sessionWriteQueues.values()]);
     const revisions = await enqueueSessionWrite(sessionId, () =>
-      invoke<SessionRevision[]>("session_delete", { sessionId }),
+      invoke<SessionRevision[] | undefined>("session_delete", { sessionId }),
     );
-    applySessionRevisions(revisions);
+    const applied = Array.isArray(revisions) ? revisions : [];
+    applySessionRevisions(applied);
     sessionRevisions.delete(sessionId);
     conflictedSessionIds.delete(sessionId);
+    return applied;
   } catch (error) {
     deletedSessionIds.delete(sessionId);
     activateSessionDraft(sessionId);
@@ -815,7 +909,7 @@ function normalizeSummary(summary: SessionSummary): SessionSummary {
   const linkedWorkItem = sanitizeLinkedWorkItem(summary.linkedWorkItem);
   return {
     ...summary,
-    revision: typeof summary.revision === "number" ? summary.revision : 0,
+    revision: isValidRevision(summary.revision) ? summary.revision : 0,
     harness: asHarness(summary.harness),
     runtimeMode: asRuntimeMode(summary.runtimeMode),
     ...(summary.providerSessionId
@@ -840,7 +934,7 @@ function recordToSession(record: SessionRecord): Session {
   const linkedWorkItem = sanitizeLinkedWorkItem(record.linkedWorkItem);
   return {
     id: record.id,
-    ...(typeof record.revision === "number" ? { revision: record.revision } : {}),
+    ...(isValidRevision(record.revision) ? { revision: record.revision } : {}),
     cwd: record.cwd,
     harness: asHarness(record.harness),
     model: record.model,

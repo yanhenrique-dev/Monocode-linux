@@ -306,6 +306,37 @@ describe("session persistence concurrency", () => {
     expect(expectedRevisions).toEqual([6]);
   });
 
+  it("uses zero for a malformed runtime revision", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "s1",
+            revision: 1,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        return undefined;
+      },
+    );
+    const { upsertSession } = await loadStore();
+
+    await upsertSession({ ...session("s1"), revision: Number.NaN });
+
+    expect(expectedRevisions).toEqual([0]);
+  });
+
   it("does not retry a rejected stale write", async () => {
     const commands: string[] = [];
     let lookups = 0;
@@ -374,6 +405,102 @@ describe("session persistence concurrency", () => {
     expect(expectedRevisions).toEqual([9]);
   });
 
+  it("applies returned revisions to live snapshots", async () => {
+    const { applySessionRevisionsToSessions } = await loadStore();
+    const sessions = [
+      { id: "s1", revision: 4, title: "stale" },
+      { id: "s2", revision: 2, title: "unchanged" },
+    ];
+
+    expect(
+      applySessionRevisionsToSessions(sessions, [
+        { sessionId: "s1", revision: 7 },
+      ]),
+    ).toEqual([
+      { id: "s1", revision: 7, title: "stale" },
+      { id: "s2", revision: 2, title: "unchanged" },
+    ]);
+    expect(
+      applySessionRevisionsToSessions(sessions, [
+        { sessionId: "s1", revision: 3 },
+      ]),
+    ).toEqual(sessions);
+    expect(
+      applySessionRevisionsToSessions(sessions, [
+        { sessionId: "s1", revision: 3 },
+        { sessionId: "s1", revision: 8 },
+        { sessionId: "s1", revision: 6 },
+      ]),
+    ).toEqual([
+      { id: "s1", revision: 8, title: "stale" },
+      { id: "s2", revision: 2, title: "unchanged" },
+    ]);
+  });
+
+  it("uses the highest known revision for a stale transferred snapshot", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "s1",
+            revision: 9,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        return undefined;
+      },
+    );
+    const { upsertSession } = await loadStore();
+    const first = session("s1");
+
+    await upsertSession(first);
+    await upsertSession({ ...first, revision: 4 });
+
+    expect(expectedRevisions).toEqual([0, 9]);
+    expect(first.revision).toBe(9);
+  });
+
+  it("compares persisted sessions independent of object key order", async () => {
+    const { samePersistedSession } = await loadStore();
+    const left = {
+      ...session("s1"),
+      modelSettings: { first: "1", second: "2" },
+    };
+    const right = {
+      ...session("s1"),
+      modelSettings: { second: "2", first: "1" },
+    };
+
+    expect(samePersistedSession(left, right)).toBe(true);
+  });
+
+  it("ignores native Git branch enrichment when comparing persisted sessions", async () => {
+    const { samePersistedSession } = await loadStore();
+    const live = session("s1");
+    const stored = { ...live, branch: "main" };
+
+    expect(samePersistedSession(live, stored)).toBe(true);
+  });
+
+  it("distinguishes pending snapshots that differ only by revision", async () => {
+    const { sameSessionSnapshot } = await loadStore();
+    const older = session("s1");
+    const newer = { ...older, revision: 2 };
+
+    expect(sameSessionSnapshot(older, newer)).toBe(false);
+  });
+
   it("uses worker revisions returned when a lead is deleted", async () => {
     const expectedRevisions: number[] = [];
     mocks.invoke.mockImplementation(
@@ -405,9 +532,10 @@ describe("session persistence concurrency", () => {
     const worker = { ...session("worker"), orchestrationLeadId: "lead" };
 
     await upsertSession(worker);
-    await deleteSession("lead");
+    const revisions = await deleteSession("lead");
     await upsertSession({ ...worker, revision: 7 });
 
+    expect(revisions).toEqual([{ sessionId: "worker", revision: 7 }]);
     expect(expectedRevisions).toEqual([0, 7]);
   });
 
