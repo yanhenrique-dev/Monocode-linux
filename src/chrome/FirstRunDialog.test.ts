@@ -214,6 +214,33 @@ describe("FirstRunDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("does not claim an agent CLI is ready when none are available", async () => {
+    probes.probeFirstRunReport.mockResolvedValue({
+      ...report,
+      clis: report.clis.map((cli) => ({
+        ...cli,
+        available: false,
+        hint: `${cli.id} is not installed`,
+      })),
+    });
+    await act(async () => {
+      root.render(
+        createElement(FirstRunDialog, {
+          onClose: vi.fn(),
+          onOpenInbox: vi.fn(),
+          onOpenProviders: vi.fn(),
+        }),
+      );
+    });
+
+    await act(async () => button("Continue").click());
+    await act(async () => button("Continue").click());
+    await act(async () => button("Continue").click());
+    const dialogText = document.querySelector('[role="dialog"]')?.textContent;
+    expect(dialogText).toContain("No agent CLI is ready yet.");
+    expect(dialogText).not.toContain("At least one agent CLI is ready.");
+  });
+
   it("shows GitHub rate-limit state without blocking progress", async () => {
     probes.probeFirstRunReport.mockResolvedValue({
       ...report,
