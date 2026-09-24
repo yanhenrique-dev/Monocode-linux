@@ -7,6 +7,7 @@
  * project has a turn in flight — mouths chew, legs shuffle, flames flicker.
  */
 const GRID = 8;
+export const LEGACY_MASCOT_COUNT = 10;
 
 type MascotRows = readonly string[];
 
@@ -332,5 +333,5 @@ export function projectMascot(
   for (let i = 0; i < project.length; i++) {
     hash = (hash * 131 + project.charCodeAt(i)) >>> 0;
   }
-  return PROJECT_MASCOTS[hash % PROJECT_MASCOTS.length];
+  return PROJECT_MASCOTS[hash % LEGACY_MASCOT_COUNT];
 }

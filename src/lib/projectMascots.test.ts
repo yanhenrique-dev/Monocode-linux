@@ -30,6 +30,11 @@ describe("projectMascots", () => {
     expect(mascotPath(["........"])).toBe("");
   });
 
+  it("keeps legacy project hash buckets stable", () => {
+    expect(projectMascot("~/code/monocode").name).toBe("ghost");
+    expect(projectMascot("/some/project").name).toBe("crab");
+  });
+
   it("picks the same mascot for the same project", () => {
     expect(projectMascot("~/code/monocode")).toBe(
       projectMascot("~/code/monocode"),

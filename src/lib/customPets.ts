@@ -1,4 +1,5 @@
 import {
+  LEGACY_MASCOT_COUNT,
   PROJECT_MASCOTS,
   mascotPath,
   type ProjectMascot,
@@ -203,5 +204,5 @@ export function resolveEffectiveMascot(
   for (let i = 0; i < project.length; i++) {
     hash = (hash * 131 + project.charCodeAt(i)) >>> 0;
   }
-  return PROJECT_MASCOTS[hash % PROJECT_MASCOTS.length];
+  return PROJECT_MASCOTS[hash % LEGACY_MASCOT_COUNT];
 }

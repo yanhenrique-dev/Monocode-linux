@@ -414,6 +414,33 @@ describe("AgentTranscript collapsed work", () => {
     expect(settledMarkup).not.toContain("mascot-active");
   });
 
+  it("removes color and animation for terminal subagent states", () => {
+    for (const status of [
+      "completed",
+      "success",
+      "failed",
+      "error",
+      "cancelled",
+    ] as const) {
+      const markup = render(
+        [
+          {
+            id: `agent-${status}`,
+            role: "tool",
+            text: `Agent ${status}`,
+            tool: { callId: `agent-${status}`, kind: "agent", status },
+            agentRun: { name: `Agent ${status}`, steps: [] },
+          },
+        ],
+        true,
+      );
+      expect(markup).not.toContain("mascot-active");
+      expect(markup).not.toContain(
+        `style="color:${tabGroupColor(`agent-${status}`)}"`,
+      );
+    }
+  });
+
   it("keeps the turn's status line at the top of the turn above a stack", () => {
     const markup = render(
       [
