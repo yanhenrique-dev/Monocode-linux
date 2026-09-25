@@ -142,16 +142,49 @@ pub(crate) fn walk_project_files_from_handle(
     root: &Path,
     root_directory: std::fs::File,
 ) -> Vec<ProjectFile> {
+    walk_project_files_from_handle_with_hook(root, root_directory, |_| {})
+}
+
+fn open_relative_dir(
+    root: &std::fs::File,
+    relative: &Path,
+) -> Result<Option<std::fs::File>, secure::SecureError> {
+    let mut dir = root
+        .try_clone()
+        .map_err(|e| secure::SecureError::Message(e.to_string()))?;
+    for component in relative.components() {
+        let name = match component {
+            std::path::Component::Normal(name) => name,
+            std::path::Component::CurDir => continue,
+            _ => return Err(secure::SecureError::Invalid),
+        };
+        match secure::open_child_dir(&dir, name)? {
+            Some(child) => dir = child,
+            None => return Ok(None),
+        }
+    }
+    Ok(Some(dir))
+}
+
+pub(crate) fn walk_project_files_from_handle_with_hook(
+    root: &Path,
+    root_directory: std::fs::File,
+    mut hook: impl FnMut(&Path),
+) -> Vec<ProjectFile> {
     let ignore = Ignore::load(root);
     let mut files = Vec::new();
-    let mut directories = vec![(root_directory, PathBuf::new())];
+    let mut directories = vec![PathBuf::new()];
     let mut visited = 0usize;
 
-    while let Some((directory, relative_directory)) = directories.pop() {
+    while let Some(relative_directory) = directories.pop() {
+        hook(&relative_directory);
         visited += 1;
         if visited > MAX_WALK_DIRS || files.len() >= MAX_PROJECT_FILES {
             break;
         }
+        let Ok(Some(directory)) = open_relative_dir(&root_directory, &relative_directory) else {
+            continue;
+        };
         let result = secure::for_each_dir_entry(&directory, |name, kind| {
             let Some(name) = name.to_str() else {
                 return Ok(());
@@ -166,9 +199,7 @@ pub(crate) fn walk_project_files_from_handle(
                     if skip_walk_dir_name(name) || ignore.matches(name) || is_private_dir(&path) {
                         return Ok(());
                     }
-                    if let Ok(Some(child)) = secure::open_child_dir(&directory, name.as_ref()) {
-                        directories.push((child, relative));
-                    }
+                    directories.push(relative);
                 }
                 secure::EntryKind::File => {
                     if ignore.matches(name) {
@@ -192,9 +223,10 @@ pub(crate) fn walk_project_files_from_handle(
             }
             Ok(())
         });
-        if result.is_err() || files.len() >= MAX_PROJECT_FILES {
+        if files.len() >= MAX_PROJECT_FILES {
             break;
         }
+        let _ = result;
     }
     files
 }

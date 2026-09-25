@@ -456,6 +456,32 @@ fn walk_from_open_directory_does_not_follow_replaced_directory_symlink() {
 
 #[cfg(unix)]
 #[test]
+fn walk_reopens_pending_directories_from_the_root_handle() {
+    let dir = tmp("walk-reopen-pending");
+    let outside = tmp("walk-reopen-pending-outside");
+    std::fs::create_dir(dir.0.join("nested")).unwrap();
+    std::fs::write(dir.0.join("nested/stale.txt"), "stale\n").unwrap();
+    std::fs::create_dir(dir.0.join("good")).unwrap();
+    std::fs::write(dir.0.join("good/current.txt"), "current\n").unwrap();
+    let outside_file = outside.0.join("secret.txt");
+    std::fs::write(&outside_file, "secret\n").unwrap();
+    let root_handle = secure::open_anchor_dir(&dir.0).unwrap();
+
+    let files = walk_project_files_from_handle_with_hook(&dir.0, root_handle, |relative| {
+        if relative.as_os_str().is_empty() {
+            std::fs::remove_dir_all(dir.0.join("nested")).unwrap();
+            std::os::unix::fs::symlink(&outside.0, dir.0.join("nested")).unwrap();
+        }
+    });
+    let paths = relative_paths(&files);
+    assert!(paths.contains(&"good/current.txt"));
+    assert!(!paths.contains(&"nested/stale.txt"));
+    assert!(!paths.iter().any(|path| path.contains("secret.txt")));
+    assert_eq!(std::fs::read_to_string(outside_file).unwrap(), "secret\n");
+}
+
+#[cfg(unix)]
+#[test]
 fn unknown_directory_entry_type_falls_back_to_nofollow_stat() {
     let dir = tmp("unknown-directory-entry");
     std::fs::write(dir.0.join("file.txt"), "content\n").unwrap();
@@ -498,6 +524,49 @@ fn create_path_rejects_a_symlinked_parent() {
         dir.0.to_string_lossy().into_owned(),
         "escape/new.txt".into(),
         false,
+    )
+    .unwrap_err();
+    assert!(err.contains("symlink") || err.contains("path"));
+    assert!(!outside.0.join("new.txt").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn trusted_symlinked_base_allows_file_operations() {
+    let dir = tmp("trusted-symlink-base");
+    let real = dir.0.join("real");
+    let alias = dir.0.join("alias");
+    std::fs::create_dir(&real).unwrap();
+    std::os::unix::fs::symlink(&real, &alias).unwrap();
+    let alias_s = alias.to_string_lossy().into_owned();
+
+    write_text_file_sync(&alias.join("notes.txt").to_string_lossy(), "notes\n").unwrap();
+    let renamed =
+        rename_path_sync(&alias.join("notes.txt").to_string_lossy(), "renamed.txt").unwrap();
+    let created = create_path(alias_s.clone(), "created.txt".into(), false).unwrap();
+    let copied = copy_path_sync(&renamed, &alias_s).unwrap();
+    create_path(alias_s.clone(), "nested".into(), true).unwrap();
+    let moved = move_path_sync(&copied, &alias.join("nested").to_string_lossy()).unwrap();
+
+    assert!(Path::new(&created).exists());
+    assert!(Path::new(&moved).exists());
+    delete_path_sync(&renamed).unwrap();
+    delete_path_sync(&alias.join("nested").to_string_lossy()).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn trusted_base_still_rejects_symlinks_inside_a_project() {
+    let dir = tmp("trusted-project-symlink");
+    let project = dir.0.join("project");
+    let outside = tmp("trusted-project-outside");
+    std::fs::create_dir(&project).unwrap();
+    std::fs::write(project.join(".gitignore"), "*.tmp\n").unwrap();
+    std::os::unix::fs::symlink(&outside.0, project.join("escape")).unwrap();
+
+    let err = write_text_file_sync(
+        &project.join("escape/new.txt").to_string_lossy(),
+        "secret\n",
     )
     .unwrap_err();
     assert!(err.contains("symlink") || err.contains("path"));
@@ -557,7 +626,7 @@ fn rename_and_delete_reject_a_symlinked_parent() {
 
 #[cfg(unix)]
 #[test]
-fn git_file_diff_rejects_a_symlink_to_outside_the_repo() {
+fn git_file_diff_reads_symlink_target_without_following_it() {
     let repo = tmp("git-symlink-read");
     let outside = tmp("git-symlink-outside");
     if !init_git(&repo.0, "main", None) {
@@ -567,8 +636,24 @@ fn git_file_diff_rejects_a_symlink_to_outside_the_repo() {
     std::fs::write(&outside_file, "secret\n").unwrap();
     std::os::unix::fs::symlink(&outside_file, repo.0.join("secret-link.txt")).unwrap();
 
-    let err = git_file_diff_for(&repo.0, "secret-link.txt", false).unwrap_err();
-    assert!(err.contains("outside") || err.contains("path") || err.contains("symlink"));
+    let diff = git_file_diff_for(&repo.0, "secret-link.txt", false).unwrap();
+    assert_eq!(diff.current, outside_file.to_string_lossy());
+    assert_eq!(std::fs::read_to_string(outside_file).unwrap(), "secret\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn git_file_diff_treats_a_directory_as_no_current_file() {
+    let repo = tmp("git-submodule-directory");
+    if !init_git_commit(&repo.0, &[("module", "tracked\n")]) {
+        return;
+    }
+    std::fs::remove_file(repo.0.join("module")).unwrap();
+    std::fs::create_dir(repo.0.join("module")).unwrap();
+
+    let diff = git_file_diff_for(&repo.0, "module", false).unwrap();
+    assert_eq!(diff.current, "");
+    assert_eq!(diff.status, "deleted");
 }
 
 #[cfg(unix)]

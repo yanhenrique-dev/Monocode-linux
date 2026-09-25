@@ -752,7 +752,7 @@ pub(crate) fn git_file_diff_for(
         let head_spec = format!("HEAD:{prefix}{relative}");
         (git_blob(root, &head_spec), git_blob(root, &index_spec))
     } else {
-        let current = secure::read_relative_file_from_handle(&root_directory, &relative)
+        let current = secure::read_relative_entry_for_git(&root_directory, &relative)
             .map_err(|error| error.to_string())?;
         (git_blob(root, &index_spec), current)
     };

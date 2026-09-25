@@ -294,6 +294,51 @@ pub(crate) fn open_relative_file(root: &File, relative: &str) -> Result<Option<F
     Err(SecureError::Invalid)
 }
 
+pub(crate) fn read_relative_entry_for_git(
+    root: &File,
+    relative: &str,
+) -> Result<Option<Vec<u8>>, SecureError> {
+    if relative.is_empty()
+        || relative.starts_with('/')
+        || relative
+            .split('/')
+            .any(|part| part.is_empty() || part == "..")
+    {
+        return Err(SecureError::Invalid);
+    }
+    let mut directory = root
+        .try_clone()
+        .map_err(|error| from_io("clone repository directory", error))?;
+    let mut parts: Vec<&str> = relative.split('/').collect();
+    let name = parts.pop().ok_or(SecureError::Invalid)?;
+    for part in parts {
+        match open_child_dir(&directory, std::ffi::OsStr::new(part))? {
+            Some(child) => directory = child,
+            None => return Ok(None),
+        }
+    }
+    let name_os = std::ffi::OsStr::new(name);
+    match classify_entry(&directory, name_os, EntryKind::Unknown) {
+        Ok(EntryKind::Symlink) => {
+            let target = fs::readlinkat(&directory, name_os, Vec::new())
+                .map_err(|error| from_errno("read symlink target", error))?;
+            Ok(Some(target.into_bytes()))
+        }
+        Ok(EntryKind::Directory) | Err(SecureError::NotFound) => Ok(None),
+        Ok(_) => match open_child_file(&directory, name_os)? {
+            Some(mut file) => {
+                let mut bytes = Vec::new();
+                file.read_to_end(&mut bytes)
+                    .map_err(|error| from_io("read current Git file", error))?;
+                Ok(Some(bytes))
+            }
+            None => Ok(None),
+        },
+        Err(error) => Err(error),
+    }
+}
+
+#[allow(dead_code)]
 pub(crate) fn read_relative_file_from_handle(
     root: &File,
     relative: &str,
