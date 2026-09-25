@@ -26,4 +26,16 @@ describe("project search result labels", () => {
       "2 results in 2 files",
     );
   });
+
+  it("translates the limited suffix without changing pluralization", () => {
+    expect(projectSearchResultLabel(2, 1, english, true)).toBe(
+      "2 results in 1 file (limited)",
+    );
+    expect(projectSearchResultLabel(1, 2, portuguese, true)).toBe(
+      "1 resultado em 2 arquivos (limitado)",
+    );
+    expect(projectSearchResultLabel(2, 1, portuguese, false)).toBe(
+      "2 resultados em 1 arquivo",
+    );
+  });
 });
