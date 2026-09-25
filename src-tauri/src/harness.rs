@@ -22,6 +22,9 @@ const STDERR_EVENT: &str = "harness-stderr";
 const EXIT_EVENT: &str = "harness-exit";
 const SSE_EVENT: &str = "harness-sse";
 const SSE_END_EVENT: &str = "harness-sse-end";
+const MAX_HARNESS_HTTP_BODY_BYTES: usize = 8 * 1024 * 1024;
+const MAX_HARNESS_SSE_LINE_BYTES: usize = 256 * 1024;
+const MAX_HARNESS_SSE_EVENT_BYTES: usize = 2 * 1024 * 1024;
 
 const DEFAULT_PROVIDER_ACCOUNT_ID: &str = "default";
 
@@ -632,6 +635,36 @@ pub fn harness_kill_all(host: State<'_, HarnessHost>) -> Result<(), String> {
     Ok(())
 }
 
+fn http_agent(timeout: Duration) -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout(timeout)
+        .redirects(0)
+        .build()
+}
+
+fn sse_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(10))
+        .timeout_read(Duration::from_secs(60 * 60 * 6))
+        .timeout_write(Duration::from_secs(30))
+        .redirects(0)
+        .build()
+}
+
+const HARNESS_HTTP_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+fn assert_http_method(method: &str) -> Result<(), String> {
+    if HARNESS_HTTP_METHODS.contains(&method) {
+        Ok(())
+    } else {
+        Err("OpenCode HTTP method is not allowed".into())
+    }
+}
+
+fn is_success_status(status: u16) -> bool {
+    (200..300).contains(&status)
+}
+
 #[tauri::command]
 pub async fn harness_http(
     url: String,
@@ -641,12 +674,10 @@ pub async fn harness_http(
     timeout_ms: Option<u64>,
 ) -> Result<HarnessHttpResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        assert_http_method(&method)?;
         assert_loopback(&url)?;
         let timeout = Duration::from_millis(timeout_ms.unwrap_or(30_000).max(1));
-        let agent = ureq::AgentBuilder::new()
-            .timeout(timeout)
-            .redirects(0)
-            .build();
+        let agent = http_agent(timeout);
         let mut request = agent.request(&method, &url);
         if let Some(headers) = &headers {
             for (key, value) in headers {
@@ -660,7 +691,7 @@ pub async fn harness_http(
         match result {
             Ok(response) => read_http_response(response),
             Err(ureq::Error::Status(status, response)) => {
-                let body = response.into_string().unwrap_or_default();
+                let body = read_limited_body(response.into_reader(), MAX_HARNESS_HTTP_BODY_BYTES)?;
                 Ok(HarnessHttpResponse { status, body })
             }
             Err(error) => Err(format!("OpenCode HTTP failed: {error}")),
@@ -689,12 +720,7 @@ pub fn harness_sse_open(
     );
 
     thread::spawn(move || {
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(Duration::from_secs(10))
-            .timeout_read(Duration::from_secs(60 * 60 * 6))
-            .timeout_write(Duration::from_secs(30))
-            .redirects(0)
-            .build();
+        let agent = sse_agent();
         let mut request = agent.get(&url).set("Accept", "text/event-stream");
         if let Some(headers) = &headers {
             for (key, value) in headers {
@@ -707,10 +733,23 @@ pub fn harness_sse_open(
             return;
         }
         match result {
+            Ok(response) if !is_success_status(response.status()) => {
+                emit_sse_end(
+                    &app,
+                    &session_id,
+                    Some(format!(
+                        "OpenCode event stream returned HTTP {}",
+                        response.status()
+                    )),
+                );
+            }
             Ok(response) => {
                 let reader = BufReader::new(response.into_reader());
-                read_sse(reader, &app, &session_id, &stop);
-                emit_sse_end(&app, &session_id, None);
+                if let Err(error) = read_sse(reader, &app, &session_id, &stop) {
+                    emit_sse_end(&app, &session_id, Some(error));
+                } else {
+                    emit_sse_end(&app, &session_id, None);
+                }
             }
             Err(error) => {
                 emit_sse_end(
@@ -731,21 +770,64 @@ pub fn harness_sse_close(host: State<HarnessHost>, session_id: String) -> Result
     Ok(())
 }
 
+fn read_limited_body(mut response: impl Read, limit: usize) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    response
+        .by_ref()
+        .take(limit.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("Failed to read OpenCode response: {error}"))?;
+    if bytes.len() > limit {
+        return Err("OpenCode response exceeded the size limit".into());
+    }
+    String::from_utf8(bytes).map_err(|_| "OpenCode response was not valid UTF-8".into())
+}
+
 fn read_http_response(response: ureq::Response) -> Result<HarnessHttpResponse, String> {
     let status = response.status();
-    let body = response
-        .into_string()
-        .map_err(|e| format!("Failed to read OpenCode response: {e}"))?;
+    let body = read_limited_body(response.into_reader(), MAX_HARNESS_HTTP_BODY_BYTES)?;
     Ok(HarnessHttpResponse { status, body })
 }
 
-fn read_sse<R: BufRead>(reader: R, app: &AppHandle, session_id: &str, stop: &AtomicBool) {
+fn read_sse_line<R: BufRead>(reader: &mut R, line: &mut Vec<u8>) -> Result<bool, String> {
+    line.clear();
+    loop {
+        let available = reader
+            .fill_buf()
+            .map_err(|error| format!("Failed to read OpenCode event stream: {error}"))?;
+        if available.is_empty() {
+            return Ok(!line.is_empty());
+        }
+        let newline = available.iter().position(|byte| *byte == b'\n');
+        let take = newline.map_or(available.len(), |index| index + 1);
+        if line.len().saturating_add(take) > MAX_HARNESS_SSE_LINE_BYTES {
+            return Err("OpenCode event stream line exceeded the size limit".into());
+        }
+        line.extend_from_slice(&available[..take]);
+        reader.consume(take);
+        if newline.is_some() {
+            return Ok(true);
+        }
+    }
+}
+
+fn read_sse<R: BufRead>(
+    mut reader: R,
+    app: &AppHandle,
+    session_id: &str,
+    stop: &AtomicBool,
+) -> Result<(), String> {
     let mut data = String::new();
-    for line in reader.lines() {
+    let mut line = Vec::new();
+    loop {
         if stop.load(Ordering::SeqCst) {
             break;
         }
-        let Ok(line) = line else { break };
+        if !read_sse_line(&mut reader, &mut line)? {
+            break;
+        }
+        let line = String::from_utf8_lossy(&line);
+        let line = line.trim_end_matches(['\r', '\n']);
         if line.starts_with(':') {
             continue;
         }
@@ -765,12 +847,22 @@ fn read_sse<R: BufRead>(reader: R, app: &AppHandle, session_id: &str, stop: &Ato
         }
         if let Some(rest) = line.strip_prefix("data:") {
             let piece = rest.strip_prefix(' ').unwrap_or(rest);
+            let separator_bytes = usize::from(!data.is_empty());
+            if data
+                .len()
+                .saturating_add(separator_bytes)
+                .saturating_add(piece.len())
+                > MAX_HARNESS_SSE_EVENT_BYTES
+            {
+                return Err("OpenCode event exceeded the size limit".into());
+            }
             if !data.is_empty() {
                 data.push('\n');
             }
             data.push_str(piece);
         }
     }
+    Ok(())
 }
 
 fn emit_sse_end(app: &AppHandle, session_id: &str, error: Option<String>) {
@@ -805,7 +897,14 @@ fn assert_loopback(raw_url: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod loopback_tests {
-    use super::assert_loopback;
+    use super::{
+        assert_http_method, assert_loopback, http_agent, is_success_status, read_limited_body,
+        read_sse_line, MAX_HARNESS_HTTP_BODY_BYTES, MAX_HARNESS_SSE_LINE_BYTES,
+    };
+    use std::io::{Cursor, Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn accepts_parsed_loopback_hosts() {
@@ -832,6 +931,58 @@ mod loopback_tests {
         ] {
             assert!(assert_loopback(url).is_err(), "{url}");
         }
+    }
+
+    #[test]
+    fn rejects_http_methods_with_request_smuggling_characters() {
+        assert!(assert_http_method("POST").is_ok());
+        assert!(assert_http_method("POST\r\nX-Test: injected").is_err());
+        assert!(assert_http_method("CONNECT").is_err());
+    }
+
+    #[test]
+    fn only_accepts_success_status_for_sse() {
+        assert!(is_success_status(200));
+        assert!(is_success_status(204));
+        assert!(!is_success_status(302));
+    }
+
+    #[test]
+    fn http_agent_does_not_follow_redirects() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0_u8; 1024];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(
+                    b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:9/redirected\r\nContent-Length: 0\r\n\r\n",
+                )
+                .unwrap();
+        });
+
+        let result = http_agent(Duration::from_secs(1))
+            .get(&format!("http://{address}/"))
+            .call();
+
+        let response = result.expect("redirect response");
+        assert_eq!(response.status(), 302);
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn rejects_oversized_http_body() {
+        let body = vec![b'x'; MAX_HARNESS_HTTP_BODY_BYTES + 1];
+        assert!(read_limited_body(Cursor::new(body), MAX_HARNESS_HTTP_BODY_BYTES).is_err());
+    }
+
+    #[test]
+    fn rejects_oversized_sse_line() {
+        let line = vec![b'x'; MAX_HARNESS_SSE_LINE_BYTES + 1];
+        let mut reader = Cursor::new(line);
+        let mut buffer = Vec::new();
+        assert!(read_sse_line(&mut reader, &mut buffer).is_err());
     }
 }
 
