@@ -40,22 +40,33 @@ export function tabGroupLogoDisplayRevision(): number {
   return logoDisplayRevision;
 }
 
-function readRecord(key: string): Record<string, string> {
+function readRecordWithStatus(
+  key: string,
+): { value: Record<string, string>; ok: boolean } {
   migrateProjectAppearanceKeys();
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return {};
+    if (raw === null) return { value: {}, ok: true };
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
-    return Object.fromEntries(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, string] =>
-          typeof entry[0] === "string" && typeof entry[1] === "string",
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { value: {}, ok: false };
+    }
+    return {
+      value: Object.fromEntries(
+        Object.entries(parsed).filter(
+          (entry): entry is [string, string] =>
+            typeof entry[0] === "string" && typeof entry[1] === "string",
+        ),
       ),
-    );
+      ok: true,
+    };
   } catch {
-    return {};
+    return { value: {}, ok: false };
   }
+}
+
+function readRecord(key: string): Record<string, string> {
+  return readRecordWithStatus(key).value;
 }
 
 function writeRecord(key: string, value: Record<string, string>): boolean {
@@ -255,7 +266,9 @@ export function loadTabGroupMascots(): Record<string, string> {
 export function migrateTabGroupMascotNames(
   renames: Readonly<Record<string, string>>,
 ): boolean {
-  const next = loadTabGroupMascots();
+  const read = readRecordWithStatus(MASCOT_KEY);
+  if (!read.ok) return false;
+  const next = read.value;
   let changed = false;
   for (const [project, name] of Object.entries(next)) {
     if (!Object.prototype.hasOwnProperty.call(renames, name)) continue;
