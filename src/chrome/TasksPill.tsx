@@ -6,8 +6,8 @@ import {
   taskListProgressLabel,
 } from "../lib/taskList";
 import { useReducedMotion } from "../lib/motion";
-import { Check, ChevronRight, CircleDot, ListEnd } from "./icons";
-import { TerminalSpinner } from "./TerminalSpinner";
+import { Check, ChevronRight, CircleDot } from "./icons";
+import { TraceLoader } from "./TraceLoader";
 import { Tooltip } from "../components/ui/tooltip";
 
 type Props = {
@@ -155,12 +155,8 @@ function StripButton({
         onClick={onReveal}
         className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
       >
-        <ListEnd
-          className="size-3.5 shrink-0 text-content/50"
-          strokeWidth={1.75}
-        />
         {working ? (
-          <TerminalSpinner className="inline-block w-3.5 shrink-0 select-none text-center text-[11px] leading-none text-accent" />
+          <TraceLoader className="size-3.5 shrink-0 text-accent" />
         ) : (
           <StatusIcon
             className="size-3.5 shrink-0 text-emerald-400"
