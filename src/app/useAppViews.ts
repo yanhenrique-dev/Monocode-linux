@@ -126,6 +126,7 @@ export function useAppViews(deps: AppViewsDeps) {
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setSettingsOpen(false);
     setFilePickerInitialQuery("");
     setFilePickerResetToken((token) => token + 1);
     setFilePickerOpen(true);
@@ -135,6 +136,7 @@ export function useAppViews(deps: AppViewsDeps) {
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setSettingsOpen(false);
     setFilePickerInitialQuery(">");
     setFilePickerResetToken((token) => token + 1);
     setFilePickerOpen(true);
@@ -158,6 +160,7 @@ export function useAppViews(deps: AppViewsDeps) {
     setSearchViewOpen(false);
     setInboxViewOpen(false);
     setNotesViewOpen(false);
+    setSettingsOpen(false);
     setSidebarTab("files");
     setFilesSearchOpen(true);
     setSearchFocusToken((token) => token + 1);
