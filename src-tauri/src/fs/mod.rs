@@ -12,6 +12,7 @@ pub(crate) mod github;
 pub(crate) mod omp;
 pub(crate) mod path;
 pub(crate) mod read;
+pub(crate) mod secure;
 pub(crate) mod write;
 
 #[cfg(test)]

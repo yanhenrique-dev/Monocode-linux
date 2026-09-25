@@ -2227,6 +2227,7 @@ dependencies = [
  "libc",
  "notify-rust",
  "rusqlite",
+ "rustix",
  "serde",
  "serde_json",
  "tauri",

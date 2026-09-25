@@ -30,6 +30,7 @@ tauri-plugin-process = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+rustix = { version = "1.1", features = ["fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 notify-rust = "4.18"

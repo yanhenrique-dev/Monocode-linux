@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use super::constants::MAX_TEXT_FILE_BYTES;
-use super::path::{canonicalize_with_missing, expand_home, path_to_js, reject_symlink_components};
+use super::path::{canonicalize_with_missing, expand_home, path_to_js};
+use super::secure;
 use super::write::git_url_repo_name;
 
 #[derive(Debug, Clone, Default)]
@@ -649,25 +650,26 @@ fn add_untracked_map(root: &Path, files: &mut HashMap<String, FileAcc>) {
         let entry = files.entry(relative.clone()).or_default();
         entry.untracked = true;
         if entry.additions == 0 {
-            entry.additions = text_line_count(&root.join(rel));
+            entry.additions = text_line_count(root, &relative);
         }
     }
 }
 
-fn text_line_count(path: &Path) -> i64 {
-    if reject_symlink_components(path).is_err() {
+fn text_line_count(root: &Path, relative: &str) -> i64 {
+    let Ok(root_directory) = secure::open_anchor_dir(root) else {
         return 0;
-    }
-    let Ok(meta) = std::fs::symlink_metadata(path) else {
+    };
+    let Ok(Some(mut file)) = secure::open_relative_file(&root_directory, relative) else {
+        return 0;
+    };
+    let Ok(meta) = file.metadata() else {
         return 0;
     };
     if !meta.is_file() || meta.len() == 0 || meta.len() > MAX_UNTRACKED_BYTES {
         return 0;
     }
-    let Ok(bytes) = std::fs::read(path) else {
-        return 0;
-    };
-    if bytes.contains(&0) {
+    let mut bytes = Vec::new();
+    if file.read_to_end(&mut bytes).is_err() || bytes.contains(&0) {
         return 0;
     }
     let mut lines = 1i64;
@@ -736,7 +738,8 @@ pub(crate) fn git_file_diff_for(
     relative: &str,
     staged: bool,
 ) -> Result<GitFileDiff, String> {
-    let relative = resolve_repo_path(root, relative)?;
+    let root_directory = secure::open_anchor_dir(root).map_err(|error| error.to_string())?;
+    let relative = validate_repo_relative_path(relative)?;
     let abs = root.join(&relative);
     if !git_is_work_tree(root) {
         return Err("Not a git repository".into());
@@ -745,10 +748,12 @@ pub(crate) fn git_file_diff_for(
     let prefix = git_stdout(root, &["rev-parse", "--show-prefix"]).unwrap_or_default();
     let index_spec = format!(":{prefix}{relative}");
     let (original, current) = if staged {
+        let _ = resolve_repo_path(root, &relative)?;
         let head_spec = format!("HEAD:{prefix}{relative}");
         (git_blob(root, &head_spec), git_blob(root, &index_spec))
     } else {
-        let current = read_worktree_file_nofollow(&abs);
+        let current = secure::read_relative_file_from_handle(&root_directory, &relative)
+            .map_err(|error| error.to_string())?;
         (git_blob(root, &index_spec), current)
     };
     let had_original = original.is_some();
