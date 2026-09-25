@@ -192,6 +192,14 @@ export function getUpdateChannel(): UpdateChannel {
   }
 }
 
+/**
+ * Channel limitation: the Tauri updater plugin resolves `check()` against
+ * endpoints compiled into tauri.conf.json at build time, so the runtime
+ * channel preference cannot switch the manifest URL. The preference is
+ * persisted for a future build-time channel overlay (tauri.beta.conf.json
+ * pointing at latest-beta.json); until then every check uses latest.json.
+ */
+
 export function setUpdateChannel(channel: UpdateChannel): void {
   try {
     window.localStorage.setItem(UPDATE_CHANNEL_KEY, channel);
@@ -301,9 +309,15 @@ export async function probeForUpdate(
   delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
 ): Promise<Update | null> {
   if (await isFlatpakSandbox()) return null;
-  const update = await sharedCheck(delaysMs, DEFAULT_CHECK_TIMEOUT_MS);
+  // Record the attempt even on failure: otherwise an offline machine keeps
+  // shouldBackgroundCheck() true and every focus event fires a full retry.
+  let update: Update | null;
+  try {
+    update = await sharedCheck(delaysMs, DEFAULT_CHECK_TIMEOUT_MS);
+  } finally {
+    markCheckedNow();
+  }
   pendingUpdate = update;
-  markCheckedNow();
   if (update) {
     setCachedManifest(update.version);
     announceUpdateAvailable(update.version);
@@ -342,8 +356,13 @@ export async function runUpdateFlow(
   onProgress?.(base);
 
   try {
-    const update = await sharedCheck(opts?.retryDelaysMs, opts?.checkTimeoutMs);
-    markCheckedNow();
+    let update: Update | null;
+    try {
+      update = await sharedCheck(opts?.retryDelaysMs, opts?.checkTimeoutMs);
+    } finally {
+      // Attempt timestamp even on failure: bounds background retries.
+      markCheckedNow();
+    }
     if (!update) {
       pendingUpdate = null;
       const current: UpdaterSnapshot = { phase: "current", currentVersion };
@@ -450,17 +469,17 @@ export async function installPendingUpdate(
     }
     try {
       await downloadOnce(update, currentVersion, onProgress, attempt + 1);
-      if (cancelRequested) {
-        const idle: UpdaterSnapshot = {
-          phase: "available",
-          currentVersion,
-          availableVersion: update.version,
-        };
-        onProgress?.(idle);
-        return idle;
-      }
+      // downloadAndInstall already staged the binary: record the install
+      // before honoring cancel, and skip only relaunch. Returning
+      // "available" here would reinstall the same version on next click.
       rememberInstalledUpdate(update.version);
       pendingUpdate = null;
+      if (cancelRequested) {
+        return {
+          phase: "current",
+          currentVersion: update.version,
+        };
+      }
       await relaunch();
       return {
         phase: "current",

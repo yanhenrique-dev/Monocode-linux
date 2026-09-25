@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   UPDATE_POLL_INTERVAL_MS,
   probeForUpdate,
+  readAppVersion,
   shouldBackgroundCheck,
   type UpdaterSnapshot,
 } from "../lib/updater";
@@ -13,6 +14,11 @@ import {
  * concurrent callers across components.
  */
 export function useAutoUpdateCheck(onSnapshot?: (snapshot: UpdaterSnapshot) => void): void {
+  // Ref: inline callbacks change identity per render; the effect must not
+  // restart its startup timer because of that.
+  const onSnapshotRef = useRef(onSnapshot);
+  onSnapshotRef.current = onSnapshot;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -22,9 +28,11 @@ export function useAutoUpdateCheck(onSnapshot?: (snapshot: UpdaterSnapshot) => v
         const update = await probeForUpdate([0, 1000]);
         if (cancelled) return;
         if (!update) return;
-        onSnapshot?.({
+        const currentVersion = await readAppVersion();
+        if (cancelled) return;
+        onSnapshotRef.current?.({
           phase: "available",
-          currentVersion: "",
+          currentVersion,
           availableVersion: update.version,
         });
       } catch {
@@ -54,5 +62,5 @@ export function useAutoUpdateCheck(onSnapshot?: (snapshot: UpdaterSnapshot) => v
       window.removeEventListener("focus", focusHandler);
       document.removeEventListener("visibilitychange", focusHandler);
     };
-  }, [onSnapshot]);
+  }, []);
 }

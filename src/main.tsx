@@ -1,6 +1,7 @@
 import React, { useLayoutEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import App from "./App";
 import { ErrorBoundary } from "./chrome/ErrorBoundary";
@@ -67,8 +68,18 @@ void listen("quit_aborted", () => {
 });
 
 void loadBootWorkspace().then(
-  ({ windowTransfer, resumed, isFirstRun, history, historyCwd }) => {
-    const installedUpdate = windowTransfer ? null : consumeInstalledUpdate();
+  async ({ windowTransfer, resumed, isFirstRun, history, historyCwd }) => {
+    // Running version validates the post-install marker: without it a stale
+    // marker from another version would show a wrong "updated" notice.
+    let currentVersion: string | undefined;
+    try {
+      currentVersion = await getVersion();
+    } catch {
+      currentVersion = undefined;
+    }
+    const installedUpdate = windowTransfer
+      ? null
+      : consumeInstalledUpdate(undefined, currentVersion);
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
         <BootGate>

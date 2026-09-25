@@ -18,17 +18,33 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 const REPO = "yanhenrique-dev/Monocode-linux";
 
 const argv = process.argv.slice(2);
-const positional = argv.filter((a) => !a.startsWith("--"));
-const flags = argv.filter((a) => a.startsWith("--"));
+// Sequential parse: `--flag value` (space form) consumes the next arg, so it
+// never leaks into positionals and `--channel beta` can't silently stay stable.
+const positional = [];
+const flagMap = new Map();
+for (let i = 0; i < argv.length; i += 1) {
+  const a = argv[i];
+  if (!a.startsWith("--")) {
+    positional.push(a);
+    continue;
+  }
+  const eq = a.indexOf("=");
+  if (eq >= 0) {
+    flagMap.set(a.slice(2, eq), a.slice(eq + 1));
+    continue;
+  }
+  const next = argv[i + 1];
+  if (next !== undefined && !next.startsWith("--")) {
+    flagMap.set(a.slice(2), next);
+    i += 1;
+  } else {
+    flagMap.set(a.slice(2), "");
+  }
+}
 const [version, appimagePath, sigPath, outPath] = positional;
 
 function flagValue(name) {
-  const prefix = `--${name}=`;
-  const hit = flags.find((f) => f.startsWith(prefix));
-  if (hit) return hit.slice(prefix.length);
-  const idx = flags.indexOf(`--${name}`);
-  if (idx >= 0 && flags[idx + 1] && !flags[idx + 1].startsWith("--")) return flags[idx + 1];
-  return undefined;
+  return flagMap.get(name);
 }
 
 if (!version || !appimagePath || !sigPath || !outPath) {
@@ -64,7 +80,10 @@ function changelogNotes(ver) {
     const notesFile = flagValue("notes-file") ?? "CHANGELOG.md";
     if (!existsSync(notesFile)) return null;
     const text = readFileSync(notesFile, "utf8");
-    const re = new RegExp(`^## \\[${ver}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|\\Z)`, "m");
+    // JS has no \Z anchor (\Z matches a literal Z); escape ver so dots in
+    // versions can't act as regex wildcards.
+    const escaped = ver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|$(?![\\s\\S]))`, "m");
     const m = text.match(re);
     if (!m) return null;
     const body = m[1].trim().split("\n").slice(0, 40).join("\n").trim();
