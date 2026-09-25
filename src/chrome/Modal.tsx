@@ -102,7 +102,7 @@ export function ModalPanel({
         initialFocus={false}
         finalFocus={false}
         onMouseDown={(event) => event.stopPropagation()}
-        className={`relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
+        className={`relative isolate flex max-h-[calc(100vh-48px)] flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
       >
         <GlassBackdrop className="popover-backdrop bg-background-base/55" />
         <div
