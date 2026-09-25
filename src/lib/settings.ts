@@ -317,6 +317,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     keywords: "tasks todo pill near chat composer fixar tarefas",
   },
   {
+    id: "tasks-loading-style",
+    section: "chat",
+    label: "settings.chat.tasks_loading.label",
+    keywords:
+      "tasks loading spinner square trace classic indicator carregamento quadrado classico",
+  },
+  {
     id: "experimental-animations",
     section: "chat",
     label: "settings.chat.experimental_animations.label",

@@ -77,6 +77,7 @@ import {
   loadTranscriptLayout,
   loadTranscriptAnchor,
   loadTasksPill,
+  loadTasksLoadingStyle,
   loadExperimentalAnimations,
   loadUiBlur,
   previewSidebarBlur,
@@ -97,6 +98,7 @@ import {
   saveTranscriptLayout,
   saveTranscriptAnchor,
   saveTasksPill,
+  saveTasksLoadingStyle,
   saveExperimentalAnimations,
   saveUiBlur,
   subscribeAppearance,
@@ -119,6 +121,7 @@ import {
   type ThemePreference,
   type ChatBackgroundScope,
   type NewThreadBackgroundEffect,
+  type TasksLoadingStyle,
   type TranscriptLayout,
 } from "../lib/appearance";
 import {
@@ -992,6 +995,8 @@ function ChatPage() {
   const [transcriptAnchor, setTranscriptAnchor] =
     useState(loadTranscriptAnchor);
   const [tasksPill, setTasksPill] = useState(loadTasksPill);
+  const [tasksLoadingStyle, setTasksLoadingStyle] =
+    useState<TasksLoadingStyle>(loadTasksLoadingStyle);
   const [experimentalAnimations, setExperimentalAnimations] = useState(
     loadExperimentalAnimations,
   );
@@ -1044,6 +1049,11 @@ function ChatPage() {
   const onTasksPill = (next: boolean) => {
     saveTasksPill(next);
     setTasksPill(next);
+  };
+
+  const onTasksLoadingStyle = (next: TasksLoadingStyle) => {
+    saveTasksLoadingStyle(next);
+    setTasksLoadingStyle(next);
   };
 
   const onExperimentalAnimations = (next: boolean) => {
@@ -1133,6 +1143,27 @@ function ChatPage() {
             label={t("settings.chat.tasks_pill.toggle")}
             on={tasksPill}
             onChange={onTasksPill}
+          />
+        </Row>
+        <Row
+          id="tasks-loading-style"
+          label={t("settings.chat.tasks_loading.label")}
+          description={t("settings.chat.tasks_loading.description")}
+        >
+          <Segmented
+            label={t("settings.chat.tasks_loading.selector")}
+            value={tasksLoadingStyle}
+            options={[
+              {
+                value: "classic",
+                label: t("settings.chat.tasks_loading.classic"),
+              },
+              {
+                value: "square",
+                label: t("settings.chat.tasks_loading.square"),
+              },
+            ]}
+            onChange={onTasksLoadingStyle}
           />
         </Row>
         <Row

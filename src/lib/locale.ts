@@ -457,6 +457,12 @@ const en = {
   "settings.chat.tasks_pill.description":
     "Pin a compact task summary above the composer while the task list is scrolled out of view. Clicking it jumps back to the full list.",
   "settings.chat.tasks_pill.toggle": "Tasks near chat",
+  "settings.chat.tasks_loading.label": "Tasks loading indicator",
+  "settings.chat.tasks_loading.description":
+    "Classic spinner or the square trace for in-progress tasks, in the pill and in the task list.",
+  "settings.chat.tasks_loading.selector": "Tasks loading indicator",
+  "settings.chat.tasks_loading.classic": "Classic",
+  "settings.chat.tasks_loading.square": "Square",
   "settings.chat.experimental_animations.label": "Experimental animations",
   "settings.chat.experimental_animations.description":
     "Smooth enter/exit for sidebars, the file pane, popovers, modals and work folds (180ms in, 150ms out). Off by default; off keeps the instant show and hide.",
@@ -1487,6 +1493,12 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.tasks_pill.description":
     "Fixa um resumo compacto das tarefas acima do composer enquanto a lista está fora da visão. Clicar volta para a lista completa.",
   "settings.chat.tasks_pill.toggle": "Tarefas perto do chat",
+  "settings.chat.tasks_loading.label": "Indicador de carregamento das tarefas",
+  "settings.chat.tasks_loading.description":
+    "Spinner clássico ou o traço quadrado para tarefas em progresso, na pill e na lista de tarefas.",
+  "settings.chat.tasks_loading.selector": "Indicador de carregamento das tarefas",
+  "settings.chat.tasks_loading.classic": "Clássico",
+  "settings.chat.tasks_loading.square": "Quadrado",
   "settings.chat.experimental_animations.label": "Animações experimentais",
   "settings.chat.experimental_animations.description":
     "Entrada/saída suave para sidebars, painel de arquivos, popovers, modais e dobras de trabalho (180ms entrando, 150ms saindo). Desligado por padrão; desligado mantém mostrar e esconder na hora.",

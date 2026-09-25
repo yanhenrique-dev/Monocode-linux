@@ -16,6 +16,7 @@ import {
   loadChatBackgroundScope,
   loadNewThreadBackgroundEffect,
   loadTranscriptLayout,
+  loadTasksLoadingStyle,
   loadUiBlur,
   saveChatBackgroundBlur,
   saveChatBackgroundOpacity,
@@ -24,8 +25,10 @@ import {
   saveChatBackgroundScope,
   saveNewThreadBackgroundEffect,
   saveTranscriptLayout,
+  saveTasksLoadingStyle,
   saveUiBlur,
   TRANSCRIPT_LAYOUT_DEFAULT,
+  TASKS_LOADING_STYLE_DEFAULT,
   loadTranscriptAnchor,
   saveTranscriptAnchor,
   TRANSCRIPT_ANCHOR_DEFAULT,
@@ -148,6 +151,32 @@ describe("transcript layout setting", () => {
   it("ignores unknown stored values", () => {
     localStorage.setItem(KEY, "bubbles");
     expect(loadTranscriptLayout()).toBe("full");
+  });
+});
+
+describe("tasks loading style setting", () => {
+  const STYLE_KEY = "monocode.tasksLoadingStyle";
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    localStorage.removeItem(STYLE_KEY);
+  });
+
+  it("defaults to the square trace", () => {
+    expect(TASKS_LOADING_STYLE_DEFAULT).toBe("square");
+    expect(loadTasksLoadingStyle()).toBe("square");
+  });
+
+  it("persists the classic spinner", () => {
+    saveTasksLoadingStyle("classic");
+    expect(localStorage.getItem(STYLE_KEY)).toBe("classic");
+    expect(loadTasksLoadingStyle()).toBe("classic");
+    saveTasksLoadingStyle("square");
+    expect(loadTasksLoadingStyle()).toBe("square");
+  });
+
+  it("ignores unknown stored values", () => {
+    localStorage.setItem(STYLE_KEY, "dots");
+    expect(loadTasksLoadingStyle()).toBe("square");
   });
 });
 

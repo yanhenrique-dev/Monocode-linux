@@ -1,5 +1,6 @@
-import { Check, Minus } from "./icons";
+import { Check, LoaderCircle, Minus } from "./icons";
 import { TraceLoader } from "./TraceLoader";
+import { useTasksLoadingStyle } from "../hooks/useTasksLoadingStyle";
 import type { TaskListItem, TaskListItemStatus } from "../lib/session";
 import { taskListProgressLabel } from "../lib/taskList";
 
@@ -59,6 +60,7 @@ export function TaskListPreview({ items, explanation }: Props) {
 }
 
 function TaskState({ status }: { status: TaskListItemStatus }) {
+  const loadingStyle = useTasksLoadingStyle();
   if (status === "completed") {
     return (
       <span
@@ -75,7 +77,11 @@ function TaskState({ status }: { status: TaskListItemStatus }) {
         aria-label="In progress"
         className="mt-px grid size-4 shrink-0 place-items-center text-sky-300"
       >
-        <TraceLoader className="size-4" />
+        {loadingStyle === "square" ? (
+          <TraceLoader className="size-4" />
+        ) : (
+          <LoaderCircle className="size-4 motion-safe:animate-spin" />
+        )}
       </span>
     );
   }

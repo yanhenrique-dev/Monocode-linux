@@ -111,6 +111,42 @@ describe("TasksPill", () => {
     }
   });
 
+  it("uses the square trace while working by default", () => {
+    const { root } = renderPill();
+    try {
+      setIntersecting(false);
+      const pill = container.querySelector<HTMLButtonElement>(
+        "[data-tasks-pill]",
+      )!;
+      expect(
+        pill.querySelector('[data-loading-indicator="trace"]'),
+      ).not.toBeNull();
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+
+  it("uses the classic spinner when the classic style is picked", () => {
+    localStorage.setItem("monocode.tasksLoadingStyle", "classic");
+    try {
+      const { root } = renderPill();
+      try {
+        setIntersecting(false);
+        const pill = container.querySelector<HTMLButtonElement>(
+          "[data-tasks-pill]",
+        )!;
+        expect(
+          pill.querySelector('[data-loading-indicator="trace"]'),
+        ).toBeNull();
+        expect(pill.textContent).toContain("1 of 3");
+      } finally {
+        act(() => root.unmount());
+      }
+    } finally {
+      localStorage.removeItem("monocode.tasksLoadingStyle");
+    }
+  });
+
   it("renders the counter as plain text, not a pill badge", () => {
     const { root } = renderPill();
     try {
