@@ -368,8 +368,8 @@ fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
 
 #[cfg(unix)]
 fn copy_recursive_inner(fd_path: &Path, display: &Path, dest: &Path) -> Result<(), String> {
-    let meta = std::fs::symlink_metadata(fd_path)
-        .map_err(|e| format!("{}: {e}", display.display()))?;
+    let meta =
+        std::fs::symlink_metadata(fd_path).map_err(|e| format!("{}: {e}", display.display()))?;
     if meta.file_type().is_symlink() {
         return Err("Cannot copy a symbolic link".into());
     }
