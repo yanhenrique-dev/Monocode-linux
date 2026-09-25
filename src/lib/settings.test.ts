@@ -7,6 +7,8 @@ import {
   MODEL_CONTROLS_DEFAULT,
   DIFF_VIEWER_DEFAULT,
   FOLLOW_UP_BEHAVIOR_DEFAULT,
+  NEXT_STEPS_COUNT_DEFAULT,
+  NEXT_STEPS_ENABLED_DEFAULT,
   GRID_ARCADE_ENABLED_DEFAULT,
   KEYBINDINGS,
   LIVE_AGENTS_ENABLED_DEFAULT,
@@ -17,6 +19,8 @@ import {
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
   loadModelControls,
+  loadNextStepsCount,
+  loadNextStepsEnabled,
   loadNotesEnabled,
   loadTerminalGpu,
   NOTES_ENABLED_DEFAULT,
@@ -26,6 +30,8 @@ import {
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
+  saveNextStepsCount,
+  saveNextStepsEnabled,
   saveNotesEnabled,
   saveTerminalGpu,
   subscribeTerminalGpu,
@@ -42,6 +48,8 @@ const LIVE_AGENTS_KEY = "monocode.liveAgentsEnabled";
 const GRID_ARCADE_KEY = "monocode.gridArcadeEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
 const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
+const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
+const NEXT_STEPS_COUNT_KEY = "monocode.nextStepsCount";
 const TERMINAL_GPU_KEY = "monocode.terminalGpu";
 
 describe("follow-up behavior setting", () => {
@@ -63,6 +71,35 @@ describe("follow-up behavior setting", () => {
   it("ignores unknown stored values", () => {
     localStorage.setItem(FOLLOW_UP_BEHAVIOR_KEY, "interrupt");
     expect(loadFollowUpBehavior()).toBe("queue");
+  });
+});
+
+describe("next-step suggestions setting", () => {
+  beforeEach(mockLocalStorage);
+  afterEach(() => {
+    localStorage.removeItem(NEXT_STEPS_ENABLED_KEY);
+    localStorage.removeItem(NEXT_STEPS_COUNT_KEY);
+  });
+
+  it("stays disabled with two actions by default", () => {
+    expect(NEXT_STEPS_ENABLED_DEFAULT).toBe(false);
+    expect(NEXT_STEPS_COUNT_DEFAULT).toBe(2);
+    expect(loadNextStepsEnabled()).toBe(false);
+    expect(loadNextStepsCount()).toBe(2);
+  });
+
+  it("persists the experimental switch and action count", () => {
+    saveNextStepsEnabled(true);
+    saveNextStepsCount(3);
+    expect(localStorage.getItem(NEXT_STEPS_ENABLED_KEY)).toBe("1");
+    expect(localStorage.getItem(NEXT_STEPS_COUNT_KEY)).toBe("3");
+    expect(loadNextStepsEnabled()).toBe(true);
+    expect(loadNextStepsCount()).toBe(3);
+  });
+
+  it("ignores an invalid stored action count", () => {
+    localStorage.setItem(NEXT_STEPS_COUNT_KEY, "4");
+    expect(loadNextStepsCount()).toBe(2);
   });
 });
 

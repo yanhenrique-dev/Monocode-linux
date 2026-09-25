@@ -464,12 +464,23 @@ const en = {
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "What the composer does with what you type.",
+  "next_steps.toolbar": "Next steps",
+  "next_steps.jump_to_bottom": "Jump to latest",
+  "next_steps.search_transcript": "Find in transcript",
+  "next_steps.review_changes": "Review changes",
   "settings.chat.follow_up.label": "Follow-up behavior",
   "settings.chat.follow_up.description":
     "Queue follow-ups until the active turn finishes, or steer the active turn immediately.",
   "settings.chat.follow_up.selector": "Follow-up behavior",
   "settings.chat.follow_up.queue": "Queue",
   "settings.chat.follow_up.steer": "Steer",
+  "settings.chat.next_steps.label": "Next-step shortcuts (experimental)",
+  "settings.chat.next_steps.description":
+    "Show a small action bar above the composer after an agent finishes. Choose two or three shortcuts.",
+  "settings.chat.next_steps.toggle": "Next-step shortcuts",
+  "settings.chat.next_steps.selector": "Number of next-step shortcuts",
+  "settings.chat.next_steps.two": "2 shortcuts",
+  "settings.chat.next_steps.three": "3 shortcuts",
   "settings.chat.model_controls.label": "Model controls",
   "settings.chat.model_controls.description":
     "Show model options beside the picker instead of inside the model menu.",
@@ -1483,12 +1494,23 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "O que o composer faz com o que você digita.",
+  "next_steps.toolbar": "Próximos passos",
+  "next_steps.jump_to_bottom": "Ir para o final",
+  "next_steps.search_transcript": "Pesquisar na transcrição",
+  "next_steps.review_changes": "Revisar alterações",
   "settings.chat.follow_up.label": "Comportamento de acompanhamento",
   "settings.chat.follow_up.description":
     "Enfileire acompanhamentos até o turno atual terminar ou redirecione o turno atual na hora.",
   "settings.chat.follow_up.selector": "Comportamento de acompanhamento",
   "settings.chat.follow_up.queue": "Enfileirar",
   "settings.chat.follow_up.steer": "Redirecionar",
+  "settings.chat.next_steps.label": "Atalhos de próximos passos (experimental)",
+  "settings.chat.next_steps.description":
+    "Mostra uma barra de ações acima do composer depois que o agente termina. Escolha dois ou três atalhos.",
+  "settings.chat.next_steps.toggle": "Atalhos de próximos passos",
+  "settings.chat.next_steps.selector": "Quantidade de atalhos",
+  "settings.chat.next_steps.two": "2 atalhos",
+  "settings.chat.next_steps.three": "3 atalhos",
   "settings.chat.model_controls.label": "Controles do modelo",
   "settings.chat.model_controls.description":
     "Mostra as opções do modelo ao lado do seletor em vez de dentro do menu.",

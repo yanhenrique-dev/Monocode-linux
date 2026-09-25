@@ -63,6 +63,9 @@ type Shared = {
   composerFocused: boolean;
   composerFocusToken?: number;
   recents: RecentProject[];
+  nextStepGenerations: Readonly<Record<string, number>>;
+  dismissedNextStepGenerations: Readonly<Record<string, number>>;
+  onDismissNextStep: (sessionId: string, generation: number) => void;
   hideProjectPicker?: boolean;
   onFocus: (paneId: string) => void;
   onClose: (sessionId: string) => void;
@@ -179,6 +182,9 @@ function PaneTreeComponent({
   composerFocused,
   composerFocusToken,
   recents,
+  nextStepGenerations,
+  dismissedNextStepGenerations,
+  onDismissNextStep,
   hideProjectPicker,
   onFocus,
   onClose,
@@ -496,6 +502,11 @@ function PaneTreeComponent({
                 composerFocused={composerFocused}
                 composerFocusToken={composerFocusToken}
                 recents={recents}
+                nextStepGeneration={nextStepGenerations[session.id]}
+                nextStepDismissedGeneration={
+                  dismissedNextStepGenerations[session.id]
+                }
+                onDismissNextStep={onDismissNextStep}
                 hideProjectPicker={hideProjectPicker}
                 onFocus={onFocus}
                 onClose={onClose}

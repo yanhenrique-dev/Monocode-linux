@@ -100,9 +100,11 @@ const NotesView = lazy(() =>
 );
 import {
   loadLiveAgentsEnabled,
+  loadNextStepsEnabled,
   loadNotesEnabled,
   loadSettingsSection,
   subscribeLiveAgentsEnabled,
+  subscribeNextSteps,
   subscribeNotesEnabled,
   type SettingsSectionId,
 } from "./lib/settings";
@@ -116,7 +118,8 @@ import { useWorkspaceTabs } from "./app/useWorkspaceTabs";
 import { useSessions } from "./app/useSessions";
 import { useHistory } from "./app/useHistory";
 import { useProjects } from "./app/useProjects";
-import { useComposer } from "./app/useComposer";
+import { useComposer, type ComposerTurnSettlement } from "./app/useComposer";
+import { isNextStepCompletionEligible } from "./lib/nextSteps";
 import { useTurnActions } from "./app/useTurnActions";
 import { useSessionBootstrap } from "./app/useSessionBootstrap";
 import { registerBuiltinHarnesses } from "./lib/harness";
@@ -870,6 +873,105 @@ export default function App({
     setProjectTerminals,
     onSelectHistorySession,
   });
+  const [nextStepGenerations, setNextStepGenerations] = useState<
+    Record<string, number>
+  >({});
+  const [dismissedNextStepGenerations, setDismissedNextStepGenerations] =
+    useState<Record<string, number>>({});
+  const nextStepsEnabled = useSyncExternalStore(
+    subscribeNextSteps,
+    loadNextStepsEnabled,
+    () => false,
+  );
+  useEffect(() => {
+    if (nextStepsEnabled) return;
+    setNextStepGenerations((previous) =>
+      Object.keys(previous).length === 0 ? previous : {},
+    );
+    setDismissedNextStepGenerations((previous) =>
+      Object.keys(previous).length === 0 ? previous : {},
+    );
+  }, [nextStepsEnabled]);
+  const clearNextStep = useCallback(
+    (sessionId: string, expectedGeneration?: number) => {
+      setNextStepGenerations((previous) => {
+        if (
+          expectedGeneration !== undefined &&
+          previous[sessionId] > expectedGeneration
+        ) {
+          return previous;
+        }
+        if (!(sessionId in previous)) return previous;
+        const next = { ...previous };
+        delete next[sessionId];
+        return next;
+      });
+      setDismissedNextStepGenerations((previous) => {
+        if (
+          expectedGeneration !== undefined &&
+          previous[sessionId] > expectedGeneration
+        ) {
+          return previous;
+        }
+        if (!(sessionId in previous)) return previous;
+        const next = { ...previous };
+        delete next[sessionId];
+        return next;
+      });
+    },
+    [],
+  );
+  const dismissNextStep = useCallback(
+    (sessionId: string, generation: number) => {
+      setDismissedNextStepGenerations((previous) => {
+        if (previous[sessionId] === generation) return previous;
+        return { ...previous, [sessionId]: generation };
+      });
+    },
+    [],
+  );
+  const onTurnSettled = useCallback(
+    (settlement: ComposerTurnSettlement) => {
+      const currentGeneration = turnGen.current.get(settlement.sessionId);
+      if (currentGeneration !== settlement.generation) {
+        if (
+          currentGeneration !== undefined &&
+          currentGeneration > settlement.generation &&
+          settlement.outcome.status === "cancelled"
+        ) {
+          clearNextStep(settlement.sessionId, settlement.generation);
+        }
+        return;
+      }
+      const eligible = isNextStepCompletionEligible({
+        status: settlement.outcome.status,
+        intent: settlement.intent,
+        managed: settlement.managed,
+        nativeCommand: settlement.nativeCommand,
+        enabled: loadNextStepsEnabled(),
+      });
+      if (eligible) {
+        setNextStepGenerations((previous) => {
+          if (previous[settlement.sessionId] === settlement.generation) {
+            return previous;
+          }
+          return {
+            ...previous,
+            [settlement.sessionId]: settlement.generation,
+          };
+        });
+        setDismissedNextStepGenerations((previous) => {
+          if (!(settlement.sessionId in previous)) return previous;
+          const next = { ...previous };
+          delete next[settlement.sessionId];
+          return next;
+        });
+      } else {
+        clearNextStep(settlement.sessionId);
+      }
+    },
+    [clearNextStep, turnGen],
+  );
   const {
     onModelChange,
     onModelSettingsChange,
@@ -883,6 +985,7 @@ export default function App({
     setSessions,
     enqueueHarnessEvent,
     flushHarnessEvents,
+    onTurnSettled,
     dismissNoticesForContinuedSession,
   });
   const {
@@ -922,6 +1025,7 @@ export default function App({
     enqueueHarnessEvent,
     flushHarnessEvents,
     onSubmit,
+    onTurnInvalidated: clearNextStep,
     focusOpenSession,
     onSelectHistorySession,
     ensureOpenSession,
@@ -1143,6 +1247,9 @@ export default function App({
   const sessionPaneProps = useMemo(
     () => ({
       recents,
+      nextStepGenerations,
+      dismissedNextStepGenerations,
+      onDismissNextStep: dismissNextStep,
       hideProjectPicker: true,
       onFocus: onFocusPane,
       onClose: onClosePane,
@@ -1184,6 +1291,9 @@ export default function App({
     }),
     [
       recents,
+      nextStepGenerations,
+      dismissedNextStepGenerations,
+      dismissNextStep,
       onFocusPane,
       onClosePane,
       onCwdChange,
@@ -1550,6 +1660,11 @@ export default function App({
                       <SessionPane
                         {...sessionPaneProps}
                         session={session}
+                        nextStepGeneration={nextStepGenerations[session.id]}
+                        nextStepDismissedGeneration={
+                          dismissedNextStepGenerations[session.id]
+                        }
+                        onDismissNextStep={dismissNextStep}
                         visible={visible}
                         focused={visible}
                         inSplit={false}

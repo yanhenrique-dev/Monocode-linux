@@ -110,6 +110,7 @@ export interface TurnActionsDeps {
   enqueueHarnessEvent: (sessionId: string, event: import("../lib/harness").HarnessEvent) => void;
   flushHarnessEvents: () => void;
   onSubmit: ReturnType<typeof import("./useComposer").useComposer>["onSubmit"];
+  onTurnInvalidated?: (sessionId: string) => void;
   focusOpenSession: (sessionId: string) => boolean;
   appendTab: (tab: import("../lib/layout").WorkspaceTab, cwd?: string) => void;
   projectTerminalFocusedRef: MutableRefObject<boolean>;
@@ -137,6 +138,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
     enqueueHarnessEvent,
     flushHarnessEvents,
     onSubmit,
+    onTurnInvalidated,
     focusOpenSession,
     onSelectHistorySession,
     appendTab,
@@ -534,6 +536,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
 
       const gen = (turnGen.current.get(sessionId) ?? 0) + 1;
       turnGen.current.set(sessionId, gen);
+      onTurnInvalidated?.(sessionId);
       const workCwd = sessionWorkCwd(current);
       // The meter reports the last prompt's level, so it would keep showing
       // the pre-compaction number until the next turn. Hide it while the
@@ -603,7 +606,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       })();
       return true;
     },
-    [enqueueHarnessEvent, flushHarnessEvents],
+    [enqueueHarnessEvent, flushHarnessEvents, onTurnInvalidated],
   );
 
   const onStop = useCallback(
@@ -614,6 +617,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       }
       const session = sessionsRef.current.find((s) => s.id === sessionId);
       turnGen.current.set(sessionId, (turnGen.current.get(sessionId) ?? 0) + 1);
+      onTurnInvalidated?.(sessionId);
       flushHarnessEvents();
       if (session) {
         for (const id of sessionChildHarnesses(session)) {
@@ -643,7 +647,7 @@ export function useTurnActions(deps: TurnActionsDeps) {
       }
       return Promise.resolve();
     },
-    [flushHarnessEvents],
+    [flushHarnessEvents, onTurnInvalidated],
   );
 
   useEffect(() => {

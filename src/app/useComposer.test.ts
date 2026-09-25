@@ -16,7 +16,9 @@ vi.mock("../lib/orchestration", () => ({
   orchestrator: {
     submissionError: vi.fn(),
     forSession: vi.fn(),
+    run: vi.fn(),
     observe: vi.fn(),
+    prompt: vi.fn((_sessionId: string, text: string) => text),
   },
 }));
 
@@ -28,6 +30,7 @@ vi.mock("../lib/harness", async (importOriginal) => {
     isLiveHarness: () => true,
     canSteerHarness: () => true,
     steerHarnessTurn: asyncMocks.steerHarnessTurn,
+    sendHarnessTurn: vi.fn(),
   };
 });
 
@@ -45,7 +48,7 @@ vi.mock("../lib/promptPreparation", () => ({
 }));
 
 import { orchestrator } from "../lib/orchestration";
-import type { HarnessEvent } from "../lib/harness";
+import { sendHarnessTurn, type HarnessEvent } from "../lib/harness";
 import type { Session } from "../lib/session";
 import { useComposer, type ComposerDeps } from "./useComposer";
 
@@ -101,6 +104,7 @@ beforeEach(() => {
   asyncMocks.prepareAttachments.mockResolvedValue([]);
   asyncMocks.preparePrompt.mockImplementation(async (text: string) => text);
   asyncMocks.steerHarnessTurn.mockResolvedValue(undefined);
+  vi.mocked(sendHarnessTurn).mockReset();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -310,5 +314,35 @@ describe("useComposer.onSubmit guard clauses", () => {
       },
     ]);
     expect(flushed()).toBe(true);
+  });
+
+  it("collects provider failure text for central settlement", async () => {
+    const session = makeSession({
+      blocks: [
+        { id: "user-1", role: "user", text: "previous" },
+      ] as unknown as Session["blocks"],
+    });
+    const onTurnSettled = vi.fn();
+    vi.mocked(sendHarnessTurn).mockImplementation(async ({ onEvent }) => {
+      onEvent({
+        type: "message.delta",
+        text: "Upgrade your plan to continue",
+      });
+      onEvent({ type: "message.completed" });
+    });
+    const { deps } = makeDeps([session], { onTurnSettled });
+    const api = renderApi(deps);
+
+    act(() => {
+      api.current!.onSubmit("s1", "hello");
+    });
+
+    await vi.waitFor(() => expect(onTurnSettled).toHaveBeenCalled());
+    expect(sendHarnessTurn).toHaveBeenCalledOnce();
+    expect(onTurnSettled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: expect.objectContaining({ status: "failed" }),
+      }),
+    );
   });
 });

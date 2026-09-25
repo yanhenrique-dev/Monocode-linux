@@ -10,6 +10,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async () => () => {}),
 }));
+vi.mock("../app/workspaceEvents", () => ({
+  nudgeWorkspace: vi.fn(),
+  scheduleNudge: vi.fn(),
+}));
 vi.mock("../lib/harness/registry", async (original) => ({
   ...((await original()) as object),
   canCompactHarnessContext: () => true,
@@ -43,6 +47,7 @@ function makeDeps(session: Session): {
   events: HarnessEvent[];
   sessionsRef: MutableRefObject<Session[]>;
   setSessions: ReturnType<typeof vi.fn>;
+  onTurnInvalidated: ReturnType<typeof vi.fn>;
 } {
   const sessionsRef: MutableRefObject<Session[]> = { current: [session] };
   const events: HarnessEvent[] = [];
@@ -54,6 +59,7 @@ function makeDeps(session: Session): {
           : action;
     },
   );
+  const onTurnInvalidated = vi.fn();
   const noop = () => {};
   const deps: TurnActionsDeps = {
     sessions: [session],
@@ -78,13 +84,14 @@ function makeDeps(session: Session): {
     },
     flushHarnessEvents: noop,
     onSubmit: (() => false) as never,
+    onTurnInvalidated,
     focusOpenSession: () => false,
     appendTab: noop as never,
     projectTerminalFocusedRef: { current: false },
     onSelectHistorySession: async () => {},
     ensureOpenSession: async () => null,
   };
-  return { deps, events, sessionsRef, setSessions };
+  return { deps, events, sessionsRef, setSessions, onTurnInvalidated };
 }
 
 function Probe({ api }: { api: { current: unknown } }) {
@@ -128,7 +135,7 @@ describe("manual context compaction", () => {
     const session = makeSession({
       context: { used: 150_000, window: 200_000 },
     });
-    const { sessionsRef, events } = mount(session);
+    const { sessionsRef, events, onTurnInvalidated } = mount(session);
 
     let started: unknown;
     act(() => {
@@ -137,6 +144,7 @@ describe("manual context compaction", () => {
       ).onCompactContext("s1");
     });
     expect(started).toBe(true);
+    expect(onTurnInvalidated).toHaveBeenCalledWith("s1");
     // Level unknown mid-flight: busy, meter cleared, status announced. The
     // start status folds straight into the transcript blocks (it is not an
     // enqueued harness event).
@@ -167,7 +175,7 @@ describe("manual context compaction", () => {
     const session = makeSession({
       context: { used: 150_000, window: 200_000 },
     });
-    const { sessionsRef, events } = mount(session);
+    const { sessionsRef, events, onTurnInvalidated } = mount(session);
 
     act(() => {
       (
@@ -188,5 +196,16 @@ describe("manual context compaction", () => {
       type: "session.error",
       message: "boom",
     });
+    expect(onTurnInvalidated).toHaveBeenCalledWith("s1");
+  });
+
+  it("invalidates next steps when stopping a turn", async () => {
+    const { onTurnInvalidated } = mount(makeSession());
+
+    await act(async () => {
+      await (api.current as ReturnType<typeof useTurnActions>).onStop("s1");
+    });
+
+    expect(onTurnInvalidated).toHaveBeenCalledWith("s1");
   });
 });

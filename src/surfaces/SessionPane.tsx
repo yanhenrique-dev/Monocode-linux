@@ -68,7 +68,16 @@ import {
 } from "../lib/composerDraft";
 import { createNote, noteTitle } from "../lib/notes";
 import { canEditLastTurn, lastTurnRecall } from "../lib/editLastTurn";
-import { loadNotesEnabled, subscribeNotesEnabled } from "../lib/settings";
+import {
+  loadNextStepsCount,
+  loadNextStepsEnabled,
+  loadNotesEnabled,
+  subscribeNextSteps,
+  subscribeNotesEnabled,
+  type NextStepsCount,
+} from "../lib/settings";
+import { nextStepActions } from "../lib/nextSteps";
+import { NextStepsBar } from "./NextStepsBar";
 import { resolveModel } from "../lib/models";
 import { isAstraModel } from "../lib/astraWelcome";
 import { AstraWelcome } from "./AstraWelcome";
@@ -96,6 +105,9 @@ type Props = {
   composerFocused: boolean;
   composerFocusToken?: number;
   recents: RecentProject[];
+  nextStepGeneration?: number;
+  nextStepDismissedGeneration?: number;
+  onDismissNextStep: (sessionId: string, generation: number) => void;
   hideProjectPicker?: boolean;
   onFocus: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
@@ -185,6 +197,9 @@ const SessionPaneContent = memo(function SessionPaneContent({
   composerFocused,
   composerFocusToken,
   recents,
+  nextStepGeneration,
+  nextStepDismissedGeneration,
+  onDismissNextStep,
   hideProjectPicker,
   onFocus,
   onClose,
@@ -491,6 +506,40 @@ const SessionPaneContent = memo(function SessionPaneContent({
     return () => window.removeEventListener(ADD_TO_CHAT_EVENT, onAdd);
   }, [addSelectionToChat, addToChatTarget]);
   const workCwd = sessionWorkCwd(session);
+  const nextStepsEnabled = useSyncExternalStore(
+    subscribeNextSteps,
+    loadNextStepsEnabled,
+    () => false,
+  );
+  const nextStepsCount = useSyncExternalStore<NextStepsCount>(
+    subscribeNextSteps,
+    loadNextStepsCount,
+    () => 2,
+  );
+  const nextStepActionList = useMemo(
+    () =>
+      nextStepActions(nextStepsCount).filter(
+        (action) => showJumpToBottom || action !== "jump-to-bottom",
+      ),
+    [nextStepsCount, showJumpToBottom],
+  );
+  const dismissNextSteps = useCallback(() => {
+    if (nextStepGeneration !== undefined) {
+      onDismissNextStep(session.id, nextStepGeneration);
+    }
+  }, [nextStepGeneration, onDismissNextStep, session.id]);
+  const handleNextStepJump = useCallback(() => {
+    dismissNextSteps();
+    jumpToBottomRef.current?.();
+  }, [dismissNextSteps]);
+  const handleNextStepSearch = useCallback(() => {
+    dismissNextSteps();
+    setTranscriptSearchOpen(true);
+  }, [dismissNextSteps]);
+  const handleNextStepReview = useCallback(() => {
+    dismissNextSteps();
+    onOpenDiff(undefined, { sessionId: session.id, cwd: workCwd });
+  }, [dismissNextSteps, onOpenDiff, session.id, workCwd]);
   const showDeckProjectPicker = isEmpty && !looksLikeProject(session.cwd);
   const dockComposer = !isEmpty || inSplit || !!session.inboxAsk;
   const draftRef = useRef<string | undefined>(getLiveDraft(session.id));
@@ -680,6 +729,20 @@ const SessionPaneContent = memo(function SessionPaneContent({
       turnRecall,
     ],
   );
+
+  const showNextSteps =
+    dockComposer &&
+    visible &&
+    !session.busy &&
+    !session.inboxAsk &&
+    !session.worktreeRemoved &&
+    !session.pendingQuestion &&
+    !managed &&
+    nextStepsEnabled &&
+    nextStepGeneration !== undefined &&
+    nextStepDismissedGeneration !== nextStepGeneration &&
+    !transcriptSearchOpen &&
+    nextStepActionList.length > 0;
 
   return (
     <div
@@ -889,7 +952,15 @@ const SessionPaneContent = memo(function SessionPaneContent({
           )}
         </div>
         {dockComposer ? (
-          <div className="mx-auto w-full max-w-4xl shrink-0">
+          <div className="relative mx-auto w-full max-w-4xl shrink-0">
+            {showNextSteps ? (
+              <NextStepsBar
+                actions={nextStepActionList}
+                onJumpToBottom={handleNextStepJump}
+                onSearchTranscript={handleNextStepSearch}
+                onReviewChanges={handleNextStepReview}
+              />
+            ) : null}
             <MessageQueue
               messages={session.queuedMessages ?? []}
               status={session.queueStatus}

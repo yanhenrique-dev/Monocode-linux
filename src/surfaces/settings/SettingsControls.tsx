@@ -36,7 +36,7 @@ export const Toggle = memo(function Toggle({
   );
 });
 
-export function Segmented<T extends string>({
+export function Segmented<T extends string | number>({
   label,
   value,
   options,
@@ -62,7 +62,7 @@ export function Segmented<T extends string>({
         <button
           id={
             optionIdPrefix
-              ? `${optionIdPrefix}-${option.value.toLowerCase()}`
+              ? `${optionIdPrefix}-${String(option.value).toLowerCase()}`
               : undefined
           }
           key={option.value}
