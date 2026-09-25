@@ -11,12 +11,11 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "happy-dom",
-    // icons.test.ts reads source files via fileURLToPath: needs node, not DOM.
-    environmentMatchGlobs: [
-      ["src/chrome/icons.test.ts", "node"],
-      ["src/**/*.test.{ts,tsx}", "happy-dom"],
-    ],
+    // Repo convention: DOM only via per-file `// @vitest-environment happy-dom`
+    // pragmas. Tests without pragma (e.g. AgentTranscript.test.ts reading CSS
+    // via import.meta.url) require node: happy-dom rewrites import.meta.url
+    // to a non-file scheme and breaks file reads.
+    environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
     testTimeout: 10_000,
   },
