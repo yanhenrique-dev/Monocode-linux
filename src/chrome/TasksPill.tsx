@@ -6,7 +6,9 @@ import {
   taskListProgressLabel,
 } from "../lib/taskList";
 import { useReducedMotion } from "../lib/motion";
-import { ChevronRight, ListEnd } from "./icons";
+import { Check, ChevronRight, CircleDot, ListEnd } from "./icons";
+import { TerminalSpinner } from "./TerminalSpinner";
+import { Tooltip } from "../components/ui/tooltip";
 
 type Props = {
   blocks: readonly Block[];
@@ -44,9 +46,8 @@ export function TasksPill({
       return;
     }
     if (typeof IntersectionObserver === "undefined") return;
-    const scroller = scope.current?.querySelector<HTMLElement>(
-      ".agent-transcript",
-    );
+    const scroller =
+      scope.current?.querySelector<HTMLElement>(".agent-transcript");
     const anchor = scroller?.querySelector<HTMLElement>(
       `[data-task-anchor="${lastId}"]`,
     );
@@ -85,9 +86,8 @@ export function TasksPill({
     // is found, otherwise leave it up for another try.
     const scroller = scope.current;
     const query = () =>
-      scroller?.querySelector<HTMLElement>(
-        `[data-task-anchor="${last.id}"]`,
-      ) ?? null;
+      scroller?.querySelector<HTMLElement>(`[data-task-anchor="${last.id}"]`) ??
+      null;
     const anchor = query();
     if (anchor) {
       anchor.scrollIntoView({ block: "center" });
@@ -139,36 +139,49 @@ function StripButton({
   onReveal: () => void;
 }) {
   const activeLabel = taskListActiveLabel(items);
+  const working = items.some((item) => item.status === "in_progress");
+  const progress = taskListProgressLabel(items);
+  const StatusIcon = progress === "Complete" ? Check : CircleDot;
   return (
-    <button
-      type="button"
-      title={activeLabel ? `Show tasks — ${activeLabel}` : "Show tasks"}
-      aria-label={
-        activeLabel
-          ? `Show tasks (${taskListProgressLabel(items)}: ${activeLabel})`
-          : `Show tasks (${taskListProgressLabel(items)})`
-      }
-      data-tasks-pill
-      onClick={onReveal}
-      className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
-    >
-      <ListEnd
-        className="size-3.5 shrink-0 text-content/50"
-        strokeWidth={1.75}
-      />
-      <span className="shrink-0 text-[12px]">Tasks</span>
-      <span className="shrink-0 font-mono text-[10px] text-content/50">
-        {taskListProgressLabel(items)}
-      </span>
-      {activeLabel ? (
-        <span className="min-w-0 flex-1 truncate text-[12px] text-content/60">
-          {activeLabel}
+    <Tooltip content={activeLabel ? `${progress}: ${activeLabel}` : progress}>
+      <button
+        type="button"
+        aria-label={
+          activeLabel
+            ? `Show tasks (${working ? "In progress, " : ""}${progress}: ${activeLabel})`
+            : `Show tasks (${working ? "In progress, " : ""}${progress})`
+        }
+        data-tasks-pill
+        onClick={onReveal}
+        className="flex w-full items-center gap-2 rounded-t-lg border border-b border-content/10 bg-background-base/95 px-3 py-1.5 text-left text-content hover:bg-content/5"
+      >
+        <ListEnd
+          className="size-3.5 shrink-0 text-content/50"
+          strokeWidth={1.75}
+        />
+        {working ? (
+          <TerminalSpinner className="inline-block w-3.5 shrink-0 select-none text-center text-[11px] leading-none text-accent" />
+        ) : (
+          <StatusIcon
+            className="size-3.5 shrink-0 text-emerald-400"
+            strokeWidth={2.25}
+          />
+        )}
+        {activeLabel ? (
+          <span className="min-w-0 flex-1 truncate text-[12px] text-content/60">
+            {activeLabel}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1" />
+        )}
+        <span className="shrink-0 font-mono text-[10px] text-content/50">
+          {progress}
         </span>
-      ) : null}
-      <ChevronRight
-        className="ml-auto size-3.5 shrink-0 text-content/35"
-        strokeWidth={1.75}
-      />
-    </button>
+        <ChevronRight
+          className="size-3.5 shrink-0 text-content/35"
+          strokeWidth={1.75}
+        />
+      </button>
+    </Tooltip>
   );
 }
