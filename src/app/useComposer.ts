@@ -407,14 +407,17 @@ export function useComposer(deps: ComposerDeps) {
             return appendSteerUser(next, submittedText, visible, cards);
           }),
         );
+        const steerGeneration = turnGen.current.get(sessionId) ?? 0;
         void (async () => {
           try {
             const prepared = await prepareAttachments(attachments);
+            if (turnGen.current.get(sessionId) !== steerGeneration) return;
             const prompt = await preparePrompt(harnessText, {
               harness: current.harness,
               sessionId,
               cwd: workCwd,
             });
+            if (turnGen.current.get(sessionId) !== steerGeneration) return;
             await steerHarnessTurn({
               harness: current.harness,
               sessionId,
@@ -428,6 +431,7 @@ export function useComposer(deps: ComposerDeps) {
               attachments: prepared,
             });
           } catch (error: unknown) {
+            if (turnGen.current.get(sessionId) !== steerGeneration) return;
             const message =
               error instanceof Error
                 ? error.message
