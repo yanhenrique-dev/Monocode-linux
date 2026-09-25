@@ -100,7 +100,10 @@ export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
  */
 export const OVERLAY_OPEN_CHANGE_EVENT = "monocode:overlay-open-change";
 
+let overlayOpen = false;
+
 export function notifyOverlayOpenChanged(open: boolean) {
+  overlayOpen = open;
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent<boolean>(OVERLAY_OPEN_CHANGE_EVENT, { detail: open }));
 }
@@ -112,6 +115,7 @@ export function subscribeOverlayOpenChanged(
   const listener = (event: Event) =>
     onChange((event as CustomEvent<boolean>).detail ?? false);
   window.addEventListener(OVERLAY_OPEN_CHANGE_EVENT, listener);
+  onChange(overlayOpen);
   return () => window.removeEventListener(OVERLAY_OPEN_CHANGE_EVENT, listener);
 }
 
