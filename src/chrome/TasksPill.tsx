@@ -6,7 +6,7 @@ import {
   taskListProgressLabel,
 } from "../lib/taskList";
 import { useReducedMotion } from "../lib/motion";
-import { Check, ChevronRight, ListEnd } from "./icons";
+import { Check, ChevronRight, CircleDot, ListEnd } from "./icons";
 import { TerminalSpinner } from "./TerminalSpinner";
 import { Tooltip } from "../components/ui/tooltip";
 
@@ -141,14 +141,15 @@ function StripButton({
   const activeLabel = taskListActiveLabel(items);
   const working = items.some((item) => item.status === "in_progress");
   const progress = taskListProgressLabel(items);
+  const StatusIcon = progress === "Complete" ? Check : CircleDot;
   return (
     <Tooltip content={activeLabel ? `${progress}: ${activeLabel}` : progress}>
       <button
         type="button"
         aria-label={
           activeLabel
-            ? `Show tasks (${progress}: ${activeLabel})`
-            : `Show tasks (${progress})`
+            ? `Show tasks (${working ? "In progress, " : ""}${progress}: ${activeLabel})`
+            : `Show tasks (${working ? "In progress, " : ""}${progress})`
         }
         data-tasks-pill
         onClick={onReveal}
@@ -161,7 +162,7 @@ function StripButton({
         {working ? (
           <TerminalSpinner className="inline-block w-3.5 shrink-0 select-none text-center text-[11px] leading-none text-accent" />
         ) : (
-          <Check
+          <StatusIcon
             className="size-3.5 shrink-0 text-emerald-400"
             strokeWidth={2.25}
           />
