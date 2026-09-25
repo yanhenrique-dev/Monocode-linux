@@ -510,7 +510,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
     void loadSessionDraft(session.id).then((text) => {
       if (cancelled) return;
       if (liveDraft === undefined) {
-        draftRef.current = text;
+        if (text) draftRef.current = text;
         setRestoredDraft(text);
       }
       setDraftReady(true);

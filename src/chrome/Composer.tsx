@@ -401,7 +401,11 @@ export const Composer = memo(function Composer({
     const next = initialText;
     setDraft(next);
     setHasValue(
-      next.trim().length > 0 || !!inboxCard || !!noteCard || !!handoffCard,
+      next.trim().length > 0 ||
+        attachmentsRef.current.length > 0 ||
+        !!inboxCard ||
+        !!noteCard ||
+        !!handoffCard,
     );
     if (ref.current) {
       ref.current.value = next;
@@ -735,7 +739,11 @@ export const Composer = memo(function Composer({
     }
     setDraft((current) => (current === next ? current : next));
     setHasValue(
-      next.trim().length > 0 || !!inboxCard || !!noteCard || !!handoffCard,
+      next.trim().length > 0 ||
+        attachmentsRef.current.length > 0 ||
+        !!inboxCard ||
+        !!noteCard ||
+        !!handoffCard,
     );
   }, [draftReady, handoffCard, inboxCard, initialText, noteCard]);
 
