@@ -168,6 +168,20 @@ function tabLabel(tab: SidebarTab, t: Translate): string {
   return t(TAB_LABEL_KEYS[tab]);
 }
 
+export function changesTabAriaLabel(
+  additions: number,
+  deletions: number,
+  t: Translate,
+): string {
+  return [
+    t("shell.sidebar.changes"),
+    additions > 0 ? `+${additions}` : "",
+    deletions > 0 ? `-${deletions}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function projectPathBusy(
   paths: Iterable<string> | undefined,
   cwd: string,
@@ -1222,15 +1236,7 @@ function SidebarComponent({
           aria-selected={active}
           aria-label={
             isChangesTab
-              ? hasChangeStats
-                ? [
-                    tabLabel(itemId, t),
-                    changeAdditions > 0 ? `+${changeAdditions}` : "",
-                    changeDeletions > 0 ? `-${changeDeletions}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-                : tabLabel(itemId, t)
+              ? changesTabAriaLabel(changeAdditions, changeDeletions, t)
               : undefined
           }
           data-tauri-drag-region="false"

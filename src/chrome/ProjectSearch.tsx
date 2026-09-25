@@ -19,7 +19,7 @@ import {
   type ProjectSearchMatch,
 } from "../lib/search";
 import { FileTypeIcon } from "./FileTypeIcon";
-import { useLocale } from "../lib/locale";
+import { useLocale, type Translate } from "../lib/locale";
 
 type Props = {
   cwd: string;
@@ -34,6 +34,30 @@ type MatchGroup = {
   name: string;
   matches: ProjectSearchMatch[];
 };
+
+export function projectSearchResultLabel(
+  matchCount: number,
+  fileCount: number,
+  t: Translate,
+  truncated = false,
+): string {
+  let result: string;
+  if (matchCount === 0) {
+    result = t("shell.search.no_results");
+  } else if (matchCount === 1 && fileCount === 1) {
+    result = t("shell.search.results_one");
+  } else if (matchCount === 1) {
+    result = t("shell.search.results_one_many_files", { files: fileCount });
+  } else if (fileCount === 1) {
+    result = t("shell.search.results_many_one_file", { count: matchCount });
+  } else {
+    result = t("shell.search.results_many", {
+      count: matchCount,
+      files: fileCount,
+    });
+  }
+  return truncated ? `${result} (${t("shell.search.limited")})` : result;
+}
 
 export function ProjectSearch({
   cwd,
@@ -120,6 +144,12 @@ export function ProjectSearch({
   const groups = useMemo(() => groupMatches(matches), [matches]);
   const matchCount = matches.length;
   const fileCount = groups.length;
+  const resultLabel = projectSearchResultLabel(
+    matchCount,
+    fileCount,
+    t,
+    truncated,
+  );
 
   const openMatch = (match: ProjectSearchMatch) => {
     onOpenFile(
@@ -140,20 +170,6 @@ export function ProjectSearch({
       openMatch(matches[0]);
     }
   };
-
-  const resultLabel =
-    matchCount === 0
-      ? t("shell.search.no_results")
-      : matchCount === 1 && fileCount === 1
-        ? t("shell.search.results_one")
-        : matchCount === 1
-          ? t("shell.search.results_one_many_files", { files: fileCount })
-          : fileCount === 1
-            ? t("shell.search.results_many_one_file", { count: matchCount })
-            : t("shell.search.results_many", {
-                count: matchCount,
-                files: fileCount,
-              });
 
   if (!cwd || cwd === "~") {
     return (
@@ -247,10 +263,7 @@ export function ProjectSearch({
         ) : error ? (
           <span className="text-red-400">{error}</span>
         ) : query.trim() ? (
-          <span>
-            {resultLabel}
-            {truncated ? t("shell.search.limited") : ""}
-          </span>
+          <span>{resultLabel}</span>
         ) : (
           <span>{t("shell.search.type_to_search")}</span>
         )}
