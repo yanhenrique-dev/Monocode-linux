@@ -34,7 +34,11 @@ export function AlertDialogPopup({
     <BaseAlertDialog.Popup
       {...props}
       className={cn(
+<<<<<<< Updated upstream
         "absolute left-1/2 top-[22%] w-[min(420px,calc(100vw-24px))] -translate-x-1/2",
+=======
+        "absolute left-1/2 top-1/2 flex w-[min(420px,calc(100vw-24px))] max-h-[calc(100vh-48px)] flex-col -translate-x-1/2 -translate-y-1/2",
+>>>>>>> Stashed changes
         className,
       )}
     />
@@ -50,7 +54,7 @@ export function AlertDialogPanel({
     <div
       {...props}
       className={cn(
-        "relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl",
+        "relative isolate flex min-h-0 flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl",
         className,
       )}
     >
