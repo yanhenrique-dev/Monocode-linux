@@ -546,6 +546,46 @@ describe("session persistence concurrency", () => {
     expect(expectedRevisions).toEqual([0, 7]);
   });
 
+  it("prefers cached revision over a stale snapshot copy", async () => {
+    const expectedRevisions: number[] = [];
+    mocks.invoke.mockImplementation(
+      async (
+        command: string,
+        args: { session?: { expectedRevision: number } },
+      ) => {
+        if (command === "session_upsert" && args.session) {
+          expectedRevisions.push(args.session.expectedRevision);
+          return {
+            id: "worker",
+            revision: expectedRevisions.length,
+            cwd: "/tmp/project",
+            harness: "cursor",
+            model: "",
+            runtimeMode: "supervised",
+            title: "",
+            createdAt: 1,
+            updatedAt: 1,
+          };
+        }
+        if (command === "session_delete") {
+          return [{ sessionId: "worker", revision: 7 }];
+        }
+        return undefined;
+      },
+    );
+    const { applySessionRevisions, deleteSession, upsertSession } =
+      await loadStore();
+    const worker = { ...session("worker"), orchestrationLeadId: "lead" };
+
+    await upsertSession(worker);
+    const staleCopy = { ...worker, revision: 0 };
+    await deleteSession("lead");
+    applySessionRevisions([{ sessionId: "worker", revision: 7 }]);
+    await upsertSession(staleCopy);
+
+    expect(expectedRevisions).toEqual([0, 7]);
+  });
+
   it("archives only after the final active-turn snapshot is durable", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];

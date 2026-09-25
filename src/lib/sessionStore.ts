@@ -287,8 +287,14 @@ export async function upsertSession(
   try {
     summary = await enqueueSessionWrite(session.id, async () => {
       if (deletedSessionIds.has(session.id)) return null;
-      const expectedRevision =
-        session.revision ?? sessionRevisions.get(session.id) ?? 0;
+      const cached = sessionRevisions.get(session.id) ?? 0;
+      const carried =
+        typeof session.revision === "number" &&
+        Number.isSafeInteger(session.revision) &&
+        session.revision >= 0
+          ? session.revision
+          : 0;
+      const expectedRevision = Math.max(cached, carried);
       return invoke<SessionSummary>("session_upsert", {
         session: {
           ...payload,
