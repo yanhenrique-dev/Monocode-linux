@@ -22,11 +22,6 @@ const WIDTH: Record<ModalSize, string> = {
   md: "w-[min(560px,calc(100vw-24px))]",
 };
 
-const TOP: Record<ModalSize, string> = {
-  sm: "top-[22%]",
-  md: "top-[10%]",
-};
-
 type Props = {
   onClose: () => void;
   title: string;
@@ -101,14 +96,14 @@ export function ModalPanel({
 
   return (
     <div
-      className={`absolute left-1/2 ${TOP[size]} ${WIDTH[size]} -translate-x-1/2`}
+      className={`absolute left-1/2 top-1/2 ${WIDTH[size]} max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2`}
     >
       <DialogPopup
         aria-modal="true"
         initialFocus={false}
         finalFocus={false}
         onMouseDown={(event) => event.stopPropagation()}
-        className={`relative isolate flex flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
+        className={`relative isolate flex max-h-[calc(100vh-48px)] flex-col overflow-hidden rounded-2xl border border-content/10 shadow-2xl ${className ?? ""}`}
       >
         <GlassBackdrop className="popover-backdrop bg-background-base/55" />
         <div
