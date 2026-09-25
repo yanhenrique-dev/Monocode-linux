@@ -1702,6 +1702,16 @@ html.is-resizing .glass-blur {
   animation: zen-step-in 180ms ease-out both;
 }
 
+@keyframes zen-trace {
+  to {
+    stroke-dashoffset: -63.133;
+  }
+}
+
+.zen-trace-dash {
+  animation: zen-trace 2s linear infinite;
+}
+
 @keyframes zen-thinking-pulse {
   0%,
   100% {
@@ -1730,6 +1740,7 @@ html.is-resizing .glass-blur {
 
 @media (prefers-reduced-motion: reduce) {
   .zen-step-in,
+  .zen-trace-dash,
   .zen-tool-spin,
   .zen-thinking-pulse {
     animation: none;
