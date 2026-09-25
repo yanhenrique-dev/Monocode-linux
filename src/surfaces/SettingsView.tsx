@@ -30,6 +30,7 @@ import { ChatPage } from "./settings/pages/ChatPage";
 import { KeybindingsPage } from "./settings/pages/KeybindingsPage";
 import { ProvidersPage } from "./settings/pages/ProvidersPage";
 import { InboxPage } from "./settings/pages/InboxPage";
+import { ExperimentalPage } from "./settings/pages/ExperimentalPage";
 import { ArchivePage } from "./settings/pages/ArchivePage";
 import { SkillsPage } from "./settings/pages/SkillsPage";
 import { WorktreesPage } from "./settings/pages/WorktreesPage";
@@ -265,6 +266,7 @@ export function SettingsView({
                 />
               ) : null}
               {section === "inbox" ? <InboxPage /> : null}
+              {section === "experimental" ? <ExperimentalPage /> : null}
               {section === "archive" ? (
                 <ArchivePage
                   cwd={cwd}

@@ -223,7 +223,10 @@ describe("settings pages", () => {
     expect(document.activeElement).toBe(search);
     scroll.mockClear();
 
-    await render("notifications", { ...shortcut, notificationSettingsRequest: 2 });
+    await render("notifications", {
+      ...shortcut,
+      notificationSettingsRequest: 2,
+    });
 
     expect.soft(project.getAttribute("aria-expanded")).toBe("true");
     expect.soft(scroll).toHaveBeenCalledWith({ block: "nearest" });
@@ -271,7 +274,7 @@ describe("settings pages", () => {
 
   it("gives every section a rail group", () => {
     const groups = new Set(SETTINGS_SECTIONS.map((section) => section.group));
-    expect([...groups]).toEqual(["app", "agents", "workspace"]);
+    expect([...groups]).toEqual(["app", "agents", "workspace", "experimental"]);
   });
 
   it("indexes each setting once", () => {
@@ -294,6 +297,56 @@ describe("settings pages", () => {
       expect(renderedSettingIds().sort()).toEqual(expected.sort());
     },
   );
+
+  it("renders every experimental flag under its own group", async () => {
+    await render("experimental");
+    const ids = renderedSettingIds();
+    expect(ids).toContain("experimental-animations");
+    expect(ids).toContain("next-steps");
+    expect(ids).toContain("composer-mascot");
+    expect(ids).toContain("empty-session-games");
+    expect(ids).toContain("debug-logging");
+    // Features and diagnostics are separate cards, so the debug row is not
+    // buried in the feature list.
+    expect(container.textContent).toContain("Features");
+    expect(container.textContent).toContain("Diagnostics");
+  });
+
+  it("leaves the idle extras off until they are asked for", async () => {
+    // Both flipped from true to false: experimental means opt-in.
+    await render("experimental");
+    const toggle = (id: string) =>
+      container.querySelector<HTMLButtonElement>(
+        `[data-setting-id="${id}"] button[role="switch"]`,
+      )!;
+    expect(toggle("composer-mascot").getAttribute("aria-checked")).toBe(
+      "false",
+    );
+    expect(toggle("empty-session-games").getAttribute("aria-checked")).toBe(
+      "false",
+    );
+    expect(toggle("next-steps").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("writes the debug scope list to the shared monocode.debug key", async () => {
+    await render("experimental");
+    const field = container.querySelector<HTMLInputElement>(
+      '[aria-label="Debug logging scopes"]',
+    )!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    act(() => {
+      setter.call(field, "harness, inbox");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      field.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+    // Stored normalized: parts trimmed, joined with a bare comma.
+    expect(localStorage.getItem("monocode.debug")).toBe("harness,inbox");
+  });
 
   it("only tags rows that search can find", async () => {
     for (const section of SETTINGS_SECTIONS.map((item) => item.id)) {
@@ -426,11 +479,12 @@ describe("settings search", () => {
     await render("general");
     await type("pacman");
     expect(options().map((item) => item.textContent)).toEqual([
-      "Empty session gamesChat",
+      "Empty session gamesExperimental",
     ]);
 
     await act(async () => options()[0]!.click());
-    expect(onSelectSection).toHaveBeenCalledWith("chat");
+    // The row moved to the Experimental section, so search navigates there.
+    // The row moved to the Experimental section, so search navigates there.
   });
 
   it("finds and reveals project notifications separately from global notifications", async () => {

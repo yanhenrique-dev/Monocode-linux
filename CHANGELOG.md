@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Settings gains an Experimental section, its own group at the foot of the
+  rail. Experimental animations, next-step shortcuts, the composer mascot,
+  and the empty-session games move there from Chat, and the section says so
+  plainly: these can change or disappear between releases.
+- **The composer mascot and the empty-session games now default to off.**
+  They were on by default, which does not match what "experimental" means.
+  If you liked them, turn them back on in Settings › Experimental.
+- The two debug flags are now one. `monocode.debug` (a scope list) and
+  `monocode:debug` (a plain "1") were unrelated keys, so enabling one did
+  nothing for the other, and neither was reachable from the UI. Settings ›
+  Experimental › Diagnostics edits the shared list directly. A stored
+  `monocode:debug` is ignored.
+
 - The boot splash holds for a 600ms minimum so a fast boot no longer
   flashes the logo for a couple of frames. A boot that already takes
   longer than that is not delayed again, so slower machines are

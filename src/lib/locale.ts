@@ -296,6 +296,41 @@ const en = {
   "settings.search.results_aria": "Settings search results",
   "settings.search.empty": "No matching settings",
   "settings.search.page_badge": "Page",
+  "settings.group.experimental": "Experimental",
+  "settings.section.experimental.label": "Experimental",
+  "settings.section.experimental.description":
+    "Unstable features. These can change or disappear between releases.",
+  "settings.experimental.features.title": "Features",
+  "settings.experimental.features.description":
+    "Off unless you turn them on. Each one is opt-in.",
+  "settings.experimental.experimental_animations.label":
+    "Experimental animations",
+  "settings.experimental.experimental_animations.description":
+    "Enter and exit motion for panels, rows, and folds. Off keeps the workspace still.",
+  "settings.experimental.experimental_animations.toggle":
+    "Experimental animations",
+  "settings.experimental.next_steps.label": "Next-step shortcuts",
+  "settings.experimental.next_steps.description":
+    "Show a small action bar above the composer after an agent finishes. Choose two or three shortcuts.",
+  "settings.experimental.next_steps.toggle": "Next-step shortcuts",
+  "settings.experimental.next_steps.selector": "Number of next-step shortcuts",
+  "settings.experimental.next_steps.two": "2 shortcuts",
+  "settings.experimental.next_steps.three": "3 shortcuts",
+  "settings.experimental.composer_mascot.label": "Composer mascot",
+  "settings.experimental.composer_mascot.description":
+    "When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin.",
+  "settings.experimental.composer_mascot.toggle": "Composer mascot",
+  "settings.experimental.empty_session_games.label": "Empty session games",
+  "settings.experimental.empty_session_games.description":
+    "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
+  "settings.experimental.empty_session_games.toggle": "Empty session games",
+  "settings.experimental.diagnostics.title": "Diagnostics",
+  "settings.experimental.diagnostics.description":
+    "For reporting a problem. Everything here is off by default.",
+  "settings.experimental.diagnostics.debug_scopes.label": "Debug logging",
+  "settings.experimental.diagnostics.debug_scopes.description":
+    "Comma-separated scopes, or * for everything. Scopes prefix their log lines, so the list narrows what reaches the console. Leave empty to silence debug output.",
+  "settings.experimental.diagnostics.debug_scopes.aria": "Debug logging scopes",
   "settings.group.app": "App",
   "settings.group.agents": "Agents",
   "settings.group.workspace": "Workspace",
@@ -457,10 +492,6 @@ const en = {
   "settings.chat.tasks_pill.description":
     "Pin a compact task summary above the composer while the task list is scrolled out of view. Clicking it jumps back to the full list.",
   "settings.chat.tasks_pill.toggle": "Tasks near chat",
-  "settings.chat.experimental_animations.label": "Experimental animations",
-  "settings.chat.experimental_animations.description":
-    "Smooth enter/exit for sidebars, the file pane, popovers, modals and work folds (180ms in, 150ms out). Off by default; off keeps the instant show and hide.",
-  "settings.chat.experimental_animations.toggle": "Experimental animations",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "What the composer does with what you type.",
@@ -474,13 +505,6 @@ const en = {
   "settings.chat.follow_up.selector": "Follow-up behavior",
   "settings.chat.follow_up.queue": "Queue",
   "settings.chat.follow_up.steer": "Steer",
-  "settings.chat.next_steps.label": "Next-step shortcuts (experimental)",
-  "settings.chat.next_steps.description":
-    "Show a small action bar above the composer after an agent finishes. Choose two or three shortcuts.",
-  "settings.chat.next_steps.toggle": "Next-step shortcuts",
-  "settings.chat.next_steps.selector": "Number of next-step shortcuts",
-  "settings.chat.next_steps.two": "2 shortcuts",
-  "settings.chat.next_steps.three": "3 shortcuts",
   "settings.chat.model_controls.label": "Model controls",
   "settings.chat.model_controls.description":
     "Show model options beside the picker instead of inside the model menu.",
@@ -659,17 +683,6 @@ const en = {
   "settings.chat.diff_view.selector": "Diff view",
   "settings.chat.diff_view.editor": "Editor",
   "settings.chat.diff_view.unified": "Unified",
-  "settings.chat.extras.title": "Extras",
-  "settings.chat.extras.description":
-    "Idle animation, and nothing else. Turn both off for a still workspace.",
-  "settings.chat.composer_mascot.label": "Composer mascot",
-  "settings.chat.composer_mascot.description":
-    "When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin.",
-  "settings.chat.composer_mascot.toggle": "Composer mascot",
-  "settings.chat.empty_session_games.label": "Empty session games",
-  "settings.chat.empty_session_games.description":
-    "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
-  "settings.chat.empty_session_games.toggle": "Empty session games",
   "settings.inbox.github.title": "GitHub",
   "settings.inbox.github.description":
     "Pull requests, reviews, and issues, read through the GitHub CLI.",
@@ -1271,6 +1284,42 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.search.results_aria": "Resultados da pesquisa",
   "settings.search.empty": "Nenhuma configuração encontrada",
   "settings.search.page_badge": "Página",
+  "settings.group.experimental": "Experimental",
+  "settings.section.experimental.label": "Experimental",
+  "settings.section.experimental.description":
+    "Recursos instáveis. Podem mudar ou sumir entre versões.",
+  "settings.experimental.features.title": "Recursos",
+  "settings.experimental.features.description":
+    "Desligados até você ativar. Cada um é opt-in.",
+  "settings.experimental.experimental_animations.label":
+    "Animações experimentais",
+  "settings.experimental.experimental_animations.description":
+    "Movimento de entrada e saída em painéis, linhas e dobras. Desligado mantém o espaço de trabalho estático.",
+  "settings.experimental.experimental_animations.toggle":
+    "Animações experimentais",
+  "settings.experimental.next_steps.label": "Atalhos de próximos passos",
+  "settings.experimental.next_steps.description":
+    "Mostra uma barra de ações acima do composer depois que o agente termina. Escolha dois ou três atalhos.",
+  "settings.experimental.next_steps.toggle": "Atalhos de próximos passos",
+  "settings.experimental.next_steps.selector": "Quantidade de atalhos",
+  "settings.experimental.next_steps.two": "2 atalhos",
+  "settings.experimental.next_steps.three": "3 atalhos",
+  "settings.experimental.composer_mascot.label": "Mascote do composer",
+  "settings.experimental.composer_mascot.description":
+    "Quando um turno está rodando, o mascote do projeto corre pelo composer, esbarra no botão de rolar para o mais recente na primeira vez, depois o salta e às vezes pega uma moeda.",
+  "settings.experimental.composer_mascot.toggle": "Mascote do composer",
+  "settings.experimental.empty_session_games.label": "Jogos da sessão vazia",
+  "settings.experimental.empty_session_games.description":
+    "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
+  "settings.experimental.empty_session_games.toggle": "Jogos da sessão vazia",
+  "settings.experimental.diagnostics.title": "Diagnóstico",
+  "settings.experimental.diagnostics.description":
+    "Para reportar um problema. Tudo aqui começa desligado.",
+  "settings.experimental.diagnostics.debug_scopes.label": "Log de depuração",
+  "settings.experimental.diagnostics.debug_scopes.description":
+    "Escopos separados por vírgula, ou * para tudo. Os escopos prefixam suas linhas de log, então a lista restringe o que chega ao console. Deixe vazio para silenciar a saída de depuração.",
+  "settings.experimental.diagnostics.debug_scopes.aria":
+    "Escopos do log de depuração",
   "settings.group.app": "App",
   "settings.group.agents": "Agentes",
   "settings.group.workspace": "Espaço de trabalho",
@@ -1436,10 +1485,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.tasks_pill.description":
     "Fixa um resumo compacto das tarefas acima do composer enquanto a lista está fora da visão. Clicar volta para a lista completa.",
   "settings.chat.tasks_pill.toggle": "Tarefas perto do chat",
-  "settings.chat.experimental_animations.label": "Animações experimentais",
-  "settings.chat.experimental_animations.description":
-    "Entrada/saída suave para sidebars, painel de arquivos, popovers, modais e dobras de trabalho (180ms entrando, 150ms saindo). Desligado por padrão; desligado mantém mostrar e esconder na hora.",
-  "settings.chat.experimental_animations.toggle": "Animações experimentais",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "O que o composer faz com o que você digita.",
@@ -1453,13 +1498,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.follow_up.selector": "Comportamento de acompanhamento",
   "settings.chat.follow_up.queue": "Enfileirar",
   "settings.chat.follow_up.steer": "Redirecionar",
-  "settings.chat.next_steps.label": "Atalhos de próximos passos (experimental)",
-  "settings.chat.next_steps.description":
-    "Mostra uma barra de ações acima do composer depois que o agente termina. Escolha dois ou três atalhos.",
-  "settings.chat.next_steps.toggle": "Atalhos de próximos passos",
-  "settings.chat.next_steps.selector": "Quantidade de atalhos",
-  "settings.chat.next_steps.two": "2 atalhos",
-  "settings.chat.next_steps.three": "3 atalhos",
   "settings.chat.model_controls.label": "Controles do modelo",
   "settings.chat.model_controls.description":
     "Mostra as opções do modelo ao lado do seletor em vez de dentro do menu.",
@@ -1640,17 +1678,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.diff_view.selector": "Visualização de diff",
   "settings.chat.diff_view.editor": "Editor",
   "settings.chat.diff_view.unified": "Unificada",
-  "settings.chat.extras.title": "Extras",
-  "settings.chat.extras.description":
-    "Animação de inatividade, e nada mais. Desative ambas para um espaço de trabalho estático.",
-  "settings.chat.composer_mascot.label": "Mascote do composer",
-  "settings.chat.composer_mascot.description":
-    "Quando um turno está rodando, o mascote do projeto corre pelo composer, esbarra no botão de rolar para o mais recente na primeira vez, depois o salta e às vezes pega uma moeda.",
-  "settings.chat.composer_mascot.toggle": "Mascote do composer",
-  "settings.chat.empty_session_games.label": "Jogos da sessão vazia",
-  "settings.chat.empty_session_games.description":
-    "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
-  "settings.chat.empty_session_games.toggle": "Jogos da sessão vazia",
   "settings.inbox.github.title": "GitHub",
   "settings.inbox.github.description":
     "Pull requests, revisões e issues, lidos via GitHub CLI.",

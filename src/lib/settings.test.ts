@@ -133,9 +133,9 @@ describe("composer runner setting", () => {
     localStorage.removeItem(KEY);
   });
 
-  it("defaults to on", () => {
-    expect(COMPOSER_RUNNER_DEFAULT).toBe(true);
-    expect(loadComposerRunner()).toBe(true);
+  it("defaults to off, because it is experimental", () => {
+    expect(COMPOSER_RUNNER_DEFAULT).toBe(false);
+    expect(loadComposerRunner()).toBe(false);
   });
 
   it("persists an off switch", () => {
@@ -227,9 +227,9 @@ describe("grid arcade enabled setting", () => {
     localStorage.removeItem(GRID_ARCADE_KEY);
   });
 
-  it("defaults to on", () => {
-    expect(GRID_ARCADE_ENABLED_DEFAULT).toBe(true);
-    expect(loadGridArcadeEnabled()).toBe(true);
+  it("defaults to off, because it is experimental", () => {
+    expect(GRID_ARCADE_ENABLED_DEFAULT).toBe(false);
+    expect(loadGridArcadeEnabled()).toBe(false);
   });
 
   it("persists an off switch", () => {
@@ -279,9 +279,7 @@ describe("terminal gpu setting", () => {
       configurable: true,
     });
     try {
-      const unsubscribe = subscribeTerminalGpu((enabled) =>
-        seen.push(enabled),
-      );
+      const unsubscribe = subscribeTerminalGpu((enabled) => seen.push(enabled));
       saveTerminalGpu(false);
       unsubscribe();
     } finally {
@@ -398,6 +396,7 @@ describe("settings navigation", () => {
       "settings.group.app",
       "settings.group.agents",
       "settings.group.workspace",
+      "settings.group.experimental",
     ]);
     expect(groups.flatMap((group) => group.sections.map((s) => s.id))).toEqual([
       "general",
@@ -411,6 +410,7 @@ describe("settings navigation", () => {
       "inbox",
       "archive",
       "worktrees",
+      "experimental",
     ]);
   });
 
@@ -473,9 +473,7 @@ describe("settings search", () => {
       searchSettings("transcricao", 8, "pt-BR").map((result) => result.label),
     ).toContain("Layout da transcrição");
     expect(
-      searchSettings("NOTIFICACOES", 8, "pt-BR").map(
-        (result) => result.label,
-      ),
+      searchSettings("NOTIFICACOES", 8, "pt-BR").map((result) => result.label),
     ).toContain("Notificações");
   });
 
