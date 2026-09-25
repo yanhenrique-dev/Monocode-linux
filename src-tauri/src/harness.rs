@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
+use url::{Host, Url};
 
 use crate::dirs_home;
 use crate::fs::expand_home;
@@ -642,7 +643,10 @@ pub async fn harness_http(
     tauri::async_runtime::spawn_blocking(move || {
         assert_loopback(&url)?;
         let timeout = Duration::from_millis(timeout_ms.unwrap_or(30_000).max(1));
-        let agent = ureq::AgentBuilder::new().timeout(timeout).build();
+        let agent = ureq::AgentBuilder::new()
+            .timeout(timeout)
+            .redirects(0)
+            .build();
         let mut request = agent.request(&method, &url);
         if let Some(headers) = &headers {
             for (key, value) in headers {
@@ -689,6 +693,7 @@ pub fn harness_sse_open(
             .timeout_connect(Duration::from_secs(10))
             .timeout_read(Duration::from_secs(60 * 60 * 6))
             .timeout_write(Duration::from_secs(30))
+            .redirects(0)
             .build();
         let mut request = agent.get(&url).set("Accept", "text/event-stream");
         if let Some(headers) = &headers {
@@ -778,16 +783,56 @@ fn emit_sse_end(app: &AppHandle, session_id: &str, error: Option<String>) {
     );
 }
 
-fn assert_loopback(url: &str) -> Result<(), String> {
-    let lower = url.to_ascii_lowercase();
-    if lower.starts_with("http://127.0.0.1:")
-        || lower.starts_with("http://127.0.0.1/")
-        || lower.starts_with("http://localhost:")
-        || lower.starts_with("http://localhost/")
-    {
-        return Ok(());
+fn assert_loopback(raw_url: &str) -> Result<(), String> {
+    let url =
+        Url::parse(raw_url).map_err(|_| "OpenCode HTTP is limited to localhost".to_string())?;
+    if url.scheme() != "http" || !url.username().is_empty() || url.password().is_some() {
+        return Err("OpenCode HTTP is limited to localhost".into());
     }
-    Err("OpenCode HTTP is limited to localhost".into())
+
+    let allowed = match url.host() {
+        Some(Host::Ipv4(host)) => host.is_loopback(),
+        Some(Host::Ipv6(host)) => host.is_loopback(),
+        Some(Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        None => false,
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err("OpenCode HTTP is limited to localhost".into())
+    }
+}
+
+#[cfg(test)]
+mod loopback_tests {
+    use super::assert_loopback;
+
+    #[test]
+    fn accepts_parsed_loopback_hosts() {
+        for url in [
+            "http://127.0.0.1",
+            "http://127.0.0.1:4096/path",
+            "http://localhost:4096",
+            "http://[::1]:4096",
+        ] {
+            assert!(assert_loopback(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn rejects_prefix_and_userinfo_bypasses() {
+        for url in [
+            "http://127.0.0.1:80@evil.example/",
+            "http://localhost:80@evil.example/",
+            "http://127.0.0.1.evil.example/",
+            "http://localhost.evil.example/",
+            "http://user@127.0.0.1:4096",
+            "https://127.0.0.1:4096",
+            "file:///tmp",
+        ] {
+            assert!(assert_loopback(url).is_err(), "{url}");
+        }
+    }
 }
 
 const EXEC_ALLOWED_ARGS: &[&[&str]] = &[
