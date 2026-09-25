@@ -40,16 +40,16 @@ afterEach(async () => {
   await killAllPtys();
 });
 
-function emitPtyData(id: string, data: string) {
+function emitPtyData(id: string, data: string, generation?: string) {
   const handler = listen.mock.calls.find(([event]) => event === "pty-data")?.[1];
   if (!handler) throw new Error("pty-data listener not registered");
-  handler({ payload: { id, data } });
+  handler({ payload: { id, data, generation } });
 }
 
-function emitPtyExit(id: string, code: number | null) {
+function emitPtyExit(id: string, code: number | null, generation?: string) {
   const handler = listen.mock.calls.find(([event]) => event === "pty-exit")?.[1];
   if (!handler) throw new Error("pty-exit listener not registered");
-  handler({ payload: { id, code } });
+  handler({ payload: { id, code, generation } });
 }
 
 describe("trimReplay", () => {
@@ -141,16 +141,15 @@ describe("spawn failure cleanup", () => {
 
     const secondData = vi.fn();
     const unsubscribeSecond = subscribePty("shared", secondData, vi.fn());
-    await expect(spawnPty("shared", "/tmp", 80, 24)).resolves.toEqual(
-      expect.any(String),
-    );
+    const secondGeneration = await spawnPty("shared", "/tmp", 80, 24);
+    expect(secondGeneration).toEqual(expect.any(String));
 
     const firstError = new Error("first failed");
     rejectFirst(firstError);
     await expect(firstResult).resolves.toBe(firstError);
     unsubscribeFirst();
 
-    emitPtyData("shared", btoa("replacement"));
+    emitPtyData("shared", btoa("replacement"), secondGeneration);
     unsubscribeSecond();
     expect(firstData).not.toHaveBeenCalled();
     expect(secondData).toHaveBeenCalledOnce();
@@ -180,8 +179,8 @@ describe("pty generation ownership", () => {
       id,
       generation: firstGeneration,
     });
-    emitPtyData(id, btoa("second"));
-    emitPtyExit(id, 0);
+    emitPtyData(id, btoa("second"), secondGeneration);
+    emitPtyExit(id, 0, secondGeneration);
     expect(firstData).not.toHaveBeenCalled();
     expect(firstExit).not.toHaveBeenCalled();
     expect(secondData).toHaveBeenCalledOnce();
@@ -189,7 +188,7 @@ describe("pty generation ownership", () => {
 
     unsubscribeFirst();
     unsubscribeSecond();
-    emitPtyData(id, btoa("detached"));
+    emitPtyData(id, btoa("detached"), secondGeneration);
     const probeData = vi.fn();
     const unsubscribeProbe = subscribePty(id, probeData, vi.fn());
     expect(probeData).toHaveBeenCalledOnce();
@@ -197,5 +196,28 @@ describe("pty generation ownership", () => {
       "detached",
     );
     unsubscribeProbe();
+  });
+
+  it("drops stale data and exit after a replacement", async () => {
+    const id = "event-replacement";
+    const onData = vi.fn();
+    const onExit = vi.fn();
+    const unsubscribe = subscribePty(id, onData, onExit);
+
+    const firstGeneration = await spawnPty(id, "/tmp", 80, 24);
+    const secondGeneration = await spawnPty(id, "/tmp", 80, 24);
+
+    emitPtyData(id, btoa("old"), firstGeneration);
+    emitPtyExit(id, 1, firstGeneration);
+    expect(onData).not.toHaveBeenCalled();
+    expect(onExit).not.toHaveBeenCalled();
+
+    emitPtyData(id, btoa("new"), secondGeneration);
+    emitPtyExit(id, 0, secondGeneration);
+    expect(onData).toHaveBeenCalledOnce();
+    expect(new TextDecoder().decode(onData.mock.calls[0]![0])).toBe("new");
+    expect(onExit).toHaveBeenCalledWith(0);
+
+    unsubscribe();
   });
 });

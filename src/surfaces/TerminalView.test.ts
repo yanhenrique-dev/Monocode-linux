@@ -138,7 +138,7 @@ describe("TerminalView pty lifecycle", () => {
     try {
       const pty = await import("../lib/pty");
       const first = await pty.spawnPty("t9", "/tmp", 80, 24);
-      await pty.spawnPty("t9", "/tmp", 80, 24);
+      const second = await pty.spawnPty("t9", "/tmp", 80, 24);
       const onData = vi.fn();
       const onExit = vi.fn();
       pty.subscribePty("t9", onData, onExit);
@@ -146,10 +146,12 @@ describe("TerminalView pty lifecycle", () => {
       // Stale cleanup must not touch the replacement generation.
       await pty.killPty("t9", first);
       captured.get("pty-data")?.({
-        payload: { id: "t9", data: btoa("hello") },
+        payload: { id: "t9", data: btoa("hello"), generation: second },
       });
       expect(onData).toHaveBeenCalledTimes(1);
-      captured.get("pty-exit")?.({ payload: { id: "t9", code: 0 } });
+      captured.get("pty-exit")?.({
+        payload: { id: "t9", code: 0, generation: second },
+      });
       expect(onExit).toHaveBeenCalledWith(0);
     } finally {
       vi.mocked(listen).mockReset();

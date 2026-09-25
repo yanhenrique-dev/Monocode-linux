@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-type DataPayload = { id: string; data: string };
-type ExitPayload = { id: string; code: number | null };
+type DataPayload = { id: string; data: string; generation?: string };
+type ExitPayload = {
+  id: string;
+  code: number | null;
+  generation?: string;
+};
 
 type DataHandler = (data: Uint8Array) => void;
 type ExitHandler = (code: number | null) => void;
@@ -88,6 +92,11 @@ function clearBuffered(id: string) {
   dataBufferBytes.delete(id);
 }
 
+function isCurrentPtyEvent(id: string, generation?: string) {
+  const current = ptyGenerations.get(id);
+  return current === undefined || generation === current;
+}
+
 function clearPtyState(id: string) {
   dataHandlers.delete(id);
   exitHandlers.delete(id);
@@ -100,7 +109,8 @@ function ensureBridge() {
   if (bridge) return;
   bridge = Promise.all([
     listen<DataPayload>("pty-data", (event) => {
-      const { id, data } = event.payload;
+      const { id, data, generation } = event.payload;
+      if (!isCurrentPtyEvent(id, generation)) return;
       const handler = dataHandlers.get(id);
       if (!handler && !openedPtys.has(id)) return;
       const chunk = decodePtyChunk(data);
@@ -109,7 +119,8 @@ function ensureBridge() {
       else pushBuffered(id, chunk);
     }),
     listen<ExitPayload>("pty-exit", (event) => {
-      const { id, code } = event.payload;
+      const { id, code, generation } = event.payload;
+      if (!isCurrentPtyEvent(id, generation)) return;
       exitHandlers.get(id)?.(code);
     }),
   ]);
@@ -143,6 +154,7 @@ export async function spawnPty(
   rows: number,
 ): Promise<string> {
   const generation = crypto.randomUUID();
+  clearBuffered(id);
   ptyGenerations.set(id, generation);
   try {
     await invoke("pty_spawn", { id, cwd, cols, rows, generation });

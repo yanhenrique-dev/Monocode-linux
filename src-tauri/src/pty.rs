@@ -24,6 +24,7 @@ const KILL_ESCALATE: Duration = Duration::from_secs(1);
 #[serde(rename_all = "camelCase")]
 struct PtyData {
     id: String,
+    generation: String,
     data: String,
 }
 
@@ -31,6 +32,7 @@ struct PtyData {
 #[serde(rename_all = "camelCase")]
 struct PtyExit {
     id: String,
+    generation: String,
     code: Option<i32>,
 }
 
@@ -271,12 +273,13 @@ fn spawn_unix(
     let reader = unsafe { File::from_raw_fd(dup_fd(master)?) };
     let writer = unsafe { File::from_raw_fd(dup_fd(master)?) };
 
+    let data_generation = generation.clone();
     let live = Arc::new(LivePty {
         cwd: workdir.clone(),
         writer: Mutex::new(Box::new(writer)),
         master_fd: master,
         pid,
-        generation,
+        generation: generation.clone(),
     });
     host.insert(id.clone(), live);
 
@@ -301,7 +304,7 @@ fn spawn_unix(
             } else if pty_should_flush(acc.len(), last_emit.elapsed())
                 || !wait_readable(fd, PTY_COALESCE.saturating_sub(last_emit.elapsed()))
             {
-                emit_pty_data(&data_app, &data_id, &acc);
+                emit_pty_data(&data_app, &data_id, &data_generation, &acc);
                 acc.clear();
                 last_emit = Instant::now();
             } else {
@@ -312,11 +315,12 @@ fn spawn_unix(
                 }
             }
         }
-        emit_pty_data(&data_app, &data_id, &acc);
+        emit_pty_data(&data_app, &data_id, &data_generation, &acc);
     });
 
     let wait_app = app;
     let wait_id = id;
+    let wait_generation = generation;
     thread::spawn(move || {
         let code = child.wait().ok().and_then(|status| status.code());
         // Only announce this child. A remount/respawn reuses the id, and the
@@ -333,7 +337,14 @@ fn spawn_unix(
             false
         };
         if emit {
-            let _ = wait_app.emit(EXIT_EVENT, PtyExit { id: wait_id, code });
+            let _ = wait_app.emit(
+                EXIT_EVENT,
+                PtyExit {
+                    id: wait_id,
+                    generation: wait_generation,
+                    code,
+                },
+            );
         }
     });
 
@@ -511,7 +522,7 @@ fn os_err(ctx: &str) -> String {
     format!("{ctx}: {}", std::io::Error::last_os_error())
 }
 
-fn emit_pty_data(app: &AppHandle, id: &str, bytes: &[u8]) {
+fn emit_pty_data(app: &AppHandle, id: &str, generation: &str, bytes: &[u8]) {
     if bytes.is_empty() {
         return;
     }
@@ -520,6 +531,7 @@ fn emit_pty_data(app: &AppHandle, id: &str, bytes: &[u8]) {
         DATA_EVENT,
         PtyData {
             id: id.to_string(),
+            generation: generation.to_string(),
             data,
         },
     );
