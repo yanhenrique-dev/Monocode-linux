@@ -40,11 +40,7 @@ import {
   resolveFileOpenRequest,
 } from "../lib/fileIndex";
 import { rememberLoadedSession } from "../lib/sessionCache";
-import {
-  isEqualOrInside,
-  projectName,
-  rebasePath,
-} from "../lib/paths";
+import { isEqualOrInside, projectName } from "../lib/paths";
 import { notifyGitChanged, pickFolder } from "../lib/fs";
 import type { OpenFileFn } from "../lib/search";
 import type { EditorNavigationTarget } from "../lib/search";
@@ -64,7 +60,7 @@ import { removeProjectData } from "../lib/projectData";
 import { removeTabFromGroup, tabGroupProject } from "../lib/tabGroups";
 import { sessionChildHarnesses } from "../lib/handoff";
 import { shouldPersistSession } from "../lib/sessionStore";
-import { dropOpenFiles } from "./tabHelpers";
+import { dropOpenFiles, rebaseOpenFiles } from "./tabHelpers";
 import { confirmDiscardUnsaved } from "./workspaceEvents";
 import { filterTabsForProject } from "../lib/workspaceTabGroups";
 import type { FileTreeOperation } from "../lib/fileTree";
@@ -528,28 +524,17 @@ export function useProjects(deps: ProjectsDeps) {
 
   const onFileMoved = useCallback((from: string, to: string) => {
     invalidateProjectFiles();
-    setTabs((prev) =>
-      prev.map((tab) => {
-        return {
-          ...tab,
-          editorPanes: tab.editorPanes.map((pane) => ({
-            ...pane,
-            files: pane.files.map((file) =>
-              isFilesystemTab(file)
-                ? { ...file, path: rebasePath(file.path, from, to) }
-                : file,
-            ),
-          })),
-        };
-      }),
-    );
+    setTabs((prev) => prev.map((tab) => rebaseOpenFiles(tab, from, to)));
   }, []);
 
   const onFileDeleted = useCallback((path: string) => {
     invalidateProjectFiles();
     const dropped = new Set<string>();
     for (const tab of tabsRef.current) {
-      for (const pane of tab.editorPanes) {
+      for (const pane of [
+        ...tab.editorPanes,
+        ...(tab.terminalPanes ?? []),
+      ]) {
         for (const file of pane.files) {
           if (isFilesystemTab(file) && isEqualOrInside(file.path, path)) {
             dropped.add(file.id);

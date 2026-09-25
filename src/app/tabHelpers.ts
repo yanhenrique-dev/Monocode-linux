@@ -23,7 +23,7 @@ import {
 } from "../lib/session";
 import { releaseNotesTitle } from "../lib/releaseNotes";
 import { terminalTabLabel } from "../lib/terminalTab";
-import { displayPath, projectName } from "../lib/paths";
+import { displayPath, projectName, rebasePath } from "../lib/paths";
 
 export function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -246,34 +246,60 @@ export function toTitleTab(
   };
 }
 
+export function rebaseOpenFiles(
+  tab: WorkspaceTab,
+  from: string,
+  to: string,
+): WorkspaceTab {
+  const rebasePanes = (panes: EditorPane[]): EditorPane[] =>
+    panes.map((pane) => ({
+      ...pane,
+      files: pane.files.map((file) =>
+        isFilesystemTab(file)
+          ? { ...file, path: rebasePath(file.path, from, to) }
+          : file,
+      ),
+    }));
+  return {
+    ...tab,
+    editorPanes: rebasePanes(tab.editorPanes),
+    terminalPanes: rebasePanes(tab.terminalPanes ?? []),
+  };
+}
+
 export function dropOpenFiles(
   tab: WorkspaceTab,
   shouldDrop: (path: string) => boolean,
 ): WorkspaceTab {
   let layout = tab.layout;
   let focusedId = tab.focusedId;
-  const editorPanes: EditorPane[] = [];
-  for (const pane of tab.editorPanes) {
-    const files = pane.files.filter(
-      (file) => !isFilesystemTab(file) || !shouldDrop(file.path),
-    );
-    if (files.length === 0) {
-      const sibling = siblingLeafId(layout, pane.id);
-      const withoutPane = removePane(layout, pane.id);
-      if (withoutPane) {
-        layout = withoutPane;
-        if (focusedId === pane.id)
-          focusedId = sibling ?? firstLeafId(withoutPane);
+  const keepPanes = (panes: EditorPane[]): EditorPane[] => {
+    const kept: EditorPane[] = [];
+    for (const pane of panes) {
+      const files = pane.files.filter(
+        (file) => !isFilesystemTab(file) || !shouldDrop(file.path),
+      );
+      if (files.length === 0) {
+        const sibling = siblingLeafId(layout, pane.id);
+        const withoutPane = removePane(layout, pane.id);
+        if (withoutPane) {
+          layout = withoutPane;
+          if (focusedId === pane.id)
+            focusedId = sibling ?? firstLeafId(withoutPane);
+        }
+        continue;
       }
-      continue;
+      kept.push({
+        ...pane,
+        files,
+        activeFileId: files.some((file) => file.id === pane.activeFileId)
+          ? pane.activeFileId
+          : files[0].id,
+      });
     }
-    editorPanes.push({
-      ...pane,
-      files,
-      activeFileId: files.some((file) => file.id === pane.activeFileId)
-        ? pane.activeFileId
-        : files[0].id,
-    });
-  }
-  return { ...tab, layout, focusedId, editorPanes };
+    return kept;
+  };
+  const editorPanes = keepPanes(tab.editorPanes);
+  const terminalPanes = keepPanes(tab.terminalPanes ?? []);
+  return { ...tab, layout, focusedId, editorPanes, terminalPanes };
 }
