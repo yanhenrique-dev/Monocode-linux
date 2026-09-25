@@ -72,6 +72,49 @@ describe("session persistence concurrency", () => {
     }
   });
 
+  it("waits for an in-flight draft write before deleting its session", async () => {
+    const draftWrite = deferred<void>();
+    const commands: string[] = [];
+    mocks.invoke.mockImplementation((command: string) => {
+      commands.push(command);
+      return command === "composer_draft_set"
+        ? draftWrite.promise
+        : Promise.resolve();
+    });
+    const { deleteSession } = await loadStore();
+    const { flushSessionDraft, saveSessionDraft } = await import(
+      "./composerDraft"
+    );
+    saveSessionDraft("s-draft", "stale");
+    const flushing = flushSessionDraft();
+    await vi.waitFor(() => expect(commands).toEqual(["composer_draft_set"]));
+    const deleting = deleteSession("s-draft");
+    await Promise.resolve();
+    expect(commands).toEqual(["composer_draft_set"]);
+    draftWrite.resolve();
+    await Promise.all([flushing, deleting]);
+    expect(commands).toEqual(["composer_draft_set", "session_delete"]);
+  });
+
+  it("reactivates draft persistence when session deletion fails", async () => {
+    const commands: string[] = [];
+    mocks.invoke.mockImplementation((command: string) => {
+      commands.push(command);
+      return command === "session_delete"
+        ? Promise.reject(new Error("delete failed"))
+        : Promise.resolve();
+    });
+    const { deleteSession } = await loadStore();
+    const { flushSessionDraft, saveSessionDraft } = await import(
+      "./composerDraft"
+    );
+    saveSessionDraft("s-failed", "stale");
+    await expect(deleteSession("s-failed")).rejects.toThrow("delete failed");
+    saveSessionDraft("s-failed", "new");
+    await flushSessionDraft();
+    expect(commands).toEqual(["session_delete", "composer_draft_set"]);
+  });
+
   it("serializes deletion after an active write and drops a queued late upsert", async () => {
     const firstWrite = deferred<unknown>();
     const commands: string[] = [];

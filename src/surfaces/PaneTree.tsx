@@ -478,6 +478,7 @@ function PaneTreeComponent({
               </FilePanePresence>
             ) : session ? (
               <SessionPane
+                key={session.id}
                 session={session}
                 reviewUndoLocked={sessions.some(
                   (other) =>
