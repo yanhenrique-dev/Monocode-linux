@@ -105,6 +105,16 @@ describe("custom pet store", () => {
     expect(loadCustomPets()).toEqual([pet]);
   });
 
+  it("keeps the first custom when duplicate names are stored", () => {
+    const pet: CustomPet = { name: "blob", rest: REST, talk: TALK };
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([pet, { ...pet }]),
+    );
+
+    expect(loadCustomPets()).toEqual([pet]);
+  });
+
   it("renames colliding custom pets and saved mascot selections", () => {
     localStorage.setItem(
       "monocode.pets.custom",
