@@ -124,7 +124,7 @@ export function hasDirtyFileUnderPath(
   path: string,
 ): boolean {
   for (const tab of tabs) {
-    for (const pane of tab.editorPanes) {
+    for (const pane of [...tab.editorPanes, ...(tab.terminalPanes ?? [])]) {
       for (const file of pane.files) {
         if (
           isFilesystemTab(file) &&

@@ -39,4 +39,27 @@ describe("hasDirtyFileUnderPath", () => {
       hasDirtyFileUnderPath([workspace], new Set(["file-1"]), "/repo/src-2"),
     ).toBe(false);
   });
+
+  it("matches dirty files open in terminal panes", () => {
+    const workspace = tab([file("file-1", "/repo/src/app.ts")]);
+    workspace.terminalPanes = [
+      { id: "term-1", files: [file("file-2", "/repo/src/term.ts")], activeFileId: "file-2" },
+    ];
+
+    expect(
+      hasDirtyFileUnderPath([workspace], new Set(["file-2"]), "/repo/src"),
+    ).toBe(true);
+    expect(
+      hasDirtyFileUnderPath([workspace], new Set(["file-2"]), "/repo/other"),
+    ).toBe(false);
+  });
+
+  it("tolerates tabs without terminal panes", () => {
+    const workspace = tab([file("file-1", "/repo/src/app.ts")]);
+    delete (workspace as Partial<WorkspaceTab>).terminalPanes;
+
+    expect(
+      hasDirtyFileUnderPath([workspace], new Set(["file-1"]), "/repo/src"),
+    ).toBe(true);
+  });
 });
