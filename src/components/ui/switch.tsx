@@ -18,7 +18,7 @@ export function Switch({
         <button
           type="button"
           className={cn(
-            "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 data-[unchecked]:bg-content/20 data-[checked]:bg-accent",
+            "relative h-5 w-9 shrink-0 rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 data-[unchecked]:bg-content/20 data-[checked]:bg-accent",
             className,
           )}
         />

@@ -9,7 +9,7 @@ import { cn } from "../../lib/utils";
  * `secondary` mirrors the old SecondaryButton; `destructive` its danger.
  */
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium whitespace-nowrap transition-colors disabled:cursor-default disabled:opacity-40 [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-[12px] font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-default disabled:opacity-40 [&_svg]:size-3.5 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
