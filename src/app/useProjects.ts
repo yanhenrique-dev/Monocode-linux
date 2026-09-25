@@ -65,7 +65,9 @@ import { removeTabFromGroup, tabGroupProject } from "../lib/tabGroups";
 import { sessionChildHarnesses } from "../lib/handoff";
 import { shouldPersistSession } from "../lib/sessionStore";
 import { dropOpenFiles } from "./tabHelpers";
+import { confirmDiscardUnsaved } from "./workspaceEvents";
 import { filterTabsForProject } from "../lib/workspaceTabGroups";
+import type { FileTreeOperation } from "../lib/fileTree";
 
 export interface ProjectsDeps {
   activeTab: WorkspaceTab | undefined;
@@ -73,6 +75,7 @@ export interface ProjectsDeps {
   sidebarCwd: string;
   sessions: Session[];
   tabs: import("../lib/layout").WorkspaceTab[];
+  dirtyFiles: Set<string>;
   sessionsRef: MutableRefObject<Session[]>;
   tabsRef: MutableRefObject<WorkspaceTab[]>;
   activeTabIdRef: MutableRefObject<string>;
@@ -115,9 +118,32 @@ export interface ProjectsDeps {
   onSelectHistorySession: (sessionId: string) => Promise<void>;
 }
 
+export function hasDirtyFileUnderPath(
+  tabs: readonly WorkspaceTab[],
+  dirtyFiles: ReadonlySet<string>,
+  path: string,
+): boolean {
+  for (const tab of tabs) {
+    for (const pane of [...tab.editorPanes, ...(tab.terminalPanes ?? [])]) {
+      for (const file of pane.files) {
+        if (
+          isFilesystemTab(file) &&
+          dirtyFiles.has(file.id) &&
+          isEqualOrInside(file.path, path)
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 export function useProjects(deps: ProjectsDeps) {
   const {
     activeTab,
+    tabs,
+    dirtyFiles,
     sessionsRef,
     tabsRef,
     activeTabIdRef,
@@ -484,6 +510,22 @@ export function useProjects(deps: ProjectsDeps) {
     [onSelectProject],
   );
 
+  const onConfirmFileOperation = useCallback(
+    async (path: string, operation: FileTreeOperation) => {
+      if (!hasDirtyFileUnderPath(tabs, dirtyFiles, path)) return true;
+      const action =
+        operation === "rename"
+          ? "Rename"
+          : operation === "delete"
+            ? "Delete"
+            : "Move";
+      return confirmDiscardUnsaved(
+        `This operation affects unsaved changes. ${action} anyway?`,
+      );
+    },
+    [dirtyFiles, tabs],
+  );
+
   const onFileMoved = useCallback((from: string, to: string) => {
     invalidateProjectFiles();
     setTabs((prev) =>
@@ -643,6 +685,7 @@ export function useProjects(deps: ProjectsDeps) {
     pickProject,
     onRemoveProject,
     onRestoreProject,
+    onConfirmFileOperation,
     onFileMoved,
     onFileDeleted,
     onOpenFile,

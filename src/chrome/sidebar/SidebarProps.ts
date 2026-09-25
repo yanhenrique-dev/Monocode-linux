@@ -10,6 +10,7 @@ import type { SessionSummary } from "../../lib/sessionStore";
 import type { SettingsSectionId } from "../../lib/settings";
 import type { SidebarTabId } from "../../lib/appearance";
 import type { PaneEdge } from "../../lib/layout";
+import type { FileTreeOperation } from "../../lib/fileTree";
 
 /** Callbacks that operate on sessions: select, navigate, prefetch, mutate. */
 export type SessionActions = {
@@ -39,6 +40,10 @@ export type WorkspaceActions = {
   onOpenTerminal?: (cwd: string) => void;
   onFileMoved?: (from: string, to: string) => void;
   onFileDeleted?: (path: string) => void;
+  onConfirmFileOperation?: (
+    path: string,
+    operation: FileTreeOperation,
+  ) => Promise<boolean>;
   onOpenDiff?: (path: string, kind?: GitFileDiffKind) => void;
   onOpenAllChanges?: () => void;
   onOpenCommit?: (commit: GitHistoryCommit) => void;

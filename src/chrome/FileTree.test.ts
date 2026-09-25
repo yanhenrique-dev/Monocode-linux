@@ -16,12 +16,24 @@ import {
 } from "../lib/drag";
 import { FileTree } from "./FileTree";
 
-const { iconRender, directories, clipboardFiles, copied, dragDrop } =
+const {
+  iconRender,
+  directories,
+  clipboardFiles,
+  copied,
+  renamed,
+  deleted,
+  moved,
+  dragDrop,
+} =
   vi.hoisted(() => ({
     iconRender: vi.fn(),
     directories: new Map<string, FsEntry[]>(),
     clipboardFiles: [] as string[],
     copied: [] as { from: string; destParent: string }[],
+    renamed: [] as string[],
+    deleted: [] as string[],
+    moved: [] as string[],
     dragDrop: {
       handler: null as null | ((event: { payload: unknown }) => void),
     },
@@ -33,6 +45,18 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "clipboard_file_paths") return [...clipboardFiles];
     if (command === "copy_path") {
       copied.push({ from: args.from, destParent: args.destParent });
+      return `${args.destParent}/${args.from.split("/").pop()}`;
+    }
+    if (command === "rename_path") {
+      renamed.push(args.path);
+      return `${args.path.split("/").slice(0, -1).join("/")}/${args.name}`;
+    }
+    if (command === "delete_path") {
+      deleted.push(args.path);
+      return undefined;
+    }
+    if (command === "move_path") {
+      moved.push(args.from);
       return `${args.destParent}/${args.from.split("/").pop()}`;
     }
     throw new Error(`Unexpected command: ${command}`);
@@ -102,6 +126,11 @@ function row(name: string): HTMLButtonElement {
   return container.querySelector(`[role="treeitem"][title="${cwd}/${name}"]`)!;
 }
 
+function menuItem(label: string): HTMLButtonElement {
+  return [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+    .find((item) => item.textContent?.trim().startsWith(label))!;
+}
+
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   cwd = `/project-${++project}`;
@@ -121,6 +150,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
   clipboardFiles.length = 0;
   copied.length = 0;
+  renamed.length = 0;
+  deleted.length = 0;
+  moved.length = 0;
 });
 
 describe("FileTree render isolation", () => {
@@ -174,6 +206,82 @@ describe("FileTree render isolation", () => {
     });
     expect(row("added.ts")).not.toBeNull();
     expect(row("first.ts")).toBeNull();
+  });
+});
+
+describe("FileTree protects dirty file mutations", () => {
+  it("does not rename when confirmation is declined", async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+    props = {
+      ...props,
+      onConfirmFileOperation: confirm,
+    } as ComponentProps<typeof FileTree>;
+    await act(async () => render());
+    await act(async () => {
+      row("first.ts").dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    });
+    await act(async () => menuItem("Rename").click());
+
+    const input = document.querySelector<HTMLInputElement>(
+      'input[aria-label^="Type file name"]',
+    )!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      setter?.call(input, "renamed.ts");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+
+    expect(confirm).toHaveBeenCalledWith(`${cwd}/first.ts`, "rename");
+    expect(renamed).toEqual([]);
+  });
+
+  it("does not delete when confirmation is declined", async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+    const nativeConfirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    props = {
+      ...props,
+      onConfirmFileOperation: confirm,
+    } as ComponentProps<typeof FileTree>;
+    await act(async () => render());
+    await act(async () => {
+      row("first.ts").dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    });
+    await act(async () => menuItem("Delete").click());
+
+    expect(confirm).toHaveBeenCalledWith(`${cwd}/first.ts`, "delete");
+    expect(deleted).toEqual([]);
+    nativeConfirm.mockRestore();
+  });
+
+  it("does not move when confirmation is declined", async () => {
+    const confirm = vi.fn().mockResolvedValue(false);
+    props = {
+      ...props,
+      onConfirmFileOperation: confirm,
+    } as ComponentProps<typeof FileTree>;
+    await act(async () => render());
+    await act(async () => {
+      row("first.ts").dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    });
+    await act(async () => menuItem("Cut").click());
+    await pressPaste(row("first.ts"));
+
+    expect(confirm).toHaveBeenCalledWith(`${cwd}/first.ts`, "move");
+    expect(moved).toEqual([]);
   });
 });
 

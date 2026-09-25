@@ -819,6 +819,7 @@ export default function App({
     pickProject,
     onRemoveProject,
     onRestoreProject,
+    onConfirmFileOperation,
     onFileMoved,
     onFileDeleted,
     onOpenFile,
@@ -829,6 +830,7 @@ export default function App({
     sidebarCwd,
     sessions,
     tabs,
+    dirtyFiles,
     sessionsRef,
     tabsRef,
     activeTabIdRef,
@@ -1261,6 +1263,7 @@ export default function App({
             onOpenTerminal={onOpenTerminal}
             onFileMoved={onFileMoved}
             onFileDeleted={onFileDeleted}
+            onConfirmFileOperation={onConfirmFileOperation}
             canGoBack={
               tabVisitNav.canBack ||
               searchViewOpen ||

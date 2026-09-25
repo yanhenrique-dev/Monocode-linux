@@ -8,6 +8,9 @@ const dirs = new Map<string, FsEntry[]>();
 const listeners = new Set<() => void>();
 
 const REFRESH_MS = 150;
+
+export type FileTreeOperation = "rename" | "delete" | "move";
+
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let refreshing = false;
 let refreshAgain = false;

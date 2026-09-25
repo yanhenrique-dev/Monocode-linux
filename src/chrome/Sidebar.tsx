@@ -125,6 +125,7 @@ import { ColorPickerPopover, ColorSwatchRow } from "./ColorPickerPopover";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import { Tooltip } from "../components/ui/tooltip";
 import { FileTree } from "./FileTree";
+import type { FileTreeOperation } from "../lib/fileTree";
 import { HarnessIcon } from "./HarnessIcon";
 import { LiveAgentsPreview } from "./LiveAgentsPreview";
 import { ProjectRail } from "./ProjectRail";
@@ -214,6 +215,10 @@ type Props = {
   onOpenTerminal?: (cwd: string) => void;
   onFileMoved?: (from: string, to: string) => void;
   onFileDeleted?: (path: string) => void;
+  onConfirmFileOperation?: (
+    path: string,
+    operation: FileTreeOperation,
+  ) => Promise<boolean>;
   tab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   filesSearchOpen: boolean;
@@ -297,6 +302,7 @@ function SidebarComponent({
   onOpenTerminal,
   onFileMoved,
   onFileDeleted,
+  onConfirmFileOperation,
   tab,
   onTabChange,
   filesSearchOpen,
@@ -1326,6 +1332,7 @@ function SidebarComponent({
                 onOpenTerminal={onOpenTerminal}
                 onFileMoved={onFileMoved}
                 onFileDeleted={onFileDeleted}
+                onConfirmFileOperation={onConfirmFileOperation}
                 onSearch={onOpenFilesSearch}
                 gitStatuses={gitStatuses}
                 sourceControlActive={open && tab === "changes"}
