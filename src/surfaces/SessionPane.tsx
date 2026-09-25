@@ -69,12 +69,13 @@ import {
 import { createNote, noteTitle } from "../lib/notes";
 import { canEditLastTurn, lastTurnRecall } from "../lib/editLastTurn";
 import {
-  loadNextStepsCount,
+  loadNextStepSelectionRaw,
   loadNextStepsEnabled,
   loadNotesEnabled,
   subscribeNextSteps,
   subscribeNotesEnabled,
-  type NextStepsCount,
+  parseNextStepSelection,
+  NEXT_STEP_ACTION_DEFAULTS_RAW,
 } from "../lib/settings";
 import { nextStepActions } from "../lib/nextSteps";
 import { NextStepsBar } from "./NextStepsBar";
@@ -330,7 +331,10 @@ const SessionPaneContent = memo(function SessionPaneContent({
     };
     window.addEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
     return () => {
-      window.removeEventListener(EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT, onChange);
+      window.removeEventListener(
+        EXPERIMENTAL_ANIMATIONS_CHANGE_EVENT,
+        onChange,
+      );
     };
   }, []);
   const reduceMotion = useReducedMotion();
@@ -511,17 +515,27 @@ const SessionPaneContent = memo(function SessionPaneContent({
     loadNextStepsEnabled,
     () => false,
   );
-  const nextStepsCount = useSyncExternalStore<NextStepsCount>(
+  // The snapshot is the raw bit string, not an object: useSyncExternalStore
+  // compares with Object.is, so a fresh object per read re-renders forever.
+  const nextStepSelectionRaw = useSyncExternalStore(
     subscribeNextSteps,
-    loadNextStepsCount,
-    () => 2,
+    loadNextStepSelectionRaw,
+    () => NEXT_STEP_ACTION_DEFAULTS_RAW,
   );
+  const nextStepSelection = useMemo(
+    () => parseNextStepSelection(nextStepSelectionRaw),
+    [nextStepSelectionRaw],
+  );
+  // The bar renders what the toggles selected, minus jump-to-bottom while the
+  // transcript is already at the bottom -- the floating button owns that case.
+  // Filtering here, after selection, is the whole point: the old code sliced a
+  // count first and then filtered, so "2 shortcuts" rendered one.
   const nextStepActionList = useMemo(
     () =>
-      nextStepActions(nextStepsCount).filter(
+      nextStepActions(nextStepSelection).filter(
         (action) => showJumpToBottom || action !== "jump-to-bottom",
       ),
-    [nextStepsCount, showJumpToBottom],
+    [nextStepSelection, showJumpToBottom],
   );
   const dismissNextSteps = useCallback(() => {
     if (nextStepGeneration !== undefined) {
@@ -586,100 +600,100 @@ const SessionPaneContent = memo(function SessionPaneContent({
         focusToken={composerFocusToken}
         hotkeys={focused}
         shell={!dockComposer}
-      harness={session.harness}
-      model={session.model}
-      modelSettings={session.modelSettings}
-      runtimeMode={session.runtimeMode}
-      cwd={session.cwd}
-      executionCwd={workCwd}
-      sessionId={session.id}
-      draftReady={draftReady}
-      compactSupported={canCompactHarnessContext(session.harness)}
-      recents={recents}
-      chrome={{
-        hideProjectPicker:
-          !!session.inboxAsk ||
-          (hideProjectPicker ? !showDeckProjectPicker : false),
-        hideBranchPicker: !!session.inboxAsk || managed,
-        hideTopBar: !!session.inboxAsk,
-      }}
-      context={session.context}
-      quoteRequest={quoteRequest}
-      initialDraft={
-        draftRef.current ??
-        (session.inboxCard || session.noteCard || session.handoffCard
-          ? undefined
-          : (session.composerSeed ?? restoredDraft))
-      }
-      onDraftChange={(text) => {
-        draftRef.current = text;
-        setLiveDraft(session.id, text);
-        saveSessionDraft(session.id, text);
-      }}
-      inboxCard={session.inboxCard}
-      noteCard={session.noteCard}
-      handoffCard={session.handoffCard}
-      question={session.pendingQuestion}
-      onQuoteRequestConsumed={acknowledgeQuote}
-      onInboxCardDismiss={() => onInboxCardDismiss?.(session.id)}
-      onNoteCardDismiss={() => onNoteCardDismiss?.(session.id)}
-      onHandoffCardDismiss={() => onHandoffCardDismiss?.(session.id)}
-      onQuestionReply={replyQuestion}
-      onQuestionInteraction={(id) => onQuestionInteraction?.(session.id, id)}
-      onFocus={() => onFocus(session.id)}
-      onCwdChange={(cwd) => onCwdChange(session.id, cwd)}
-      onBranchChange={() => onBranchChange(session.id)}
-      onWorktreeChange={
-        onWorktreeChange
-          ? (tree) => onWorktreeChange(session.id, tree)
-          : undefined
-      }
-      draftWorkspace={
-        !session.inboxAsk &&
-        !session.worktreeRemoved &&
-        !managed &&
-        ((isEmpty && !session.worktreeCwd) ||
-          (!!session.workspaceMode && !session.worktreeCwd))
-      }
-      workspaceMode={session.workspaceMode}
-      worktreeBase={session.worktreeBase}
-      onWorkspaceModeChange={(mode, base) =>
-        onWorkspaceModeChange(session.id, mode, base)
-      }
-      onWorktreeBaseChange={(base) => onWorktreeBaseChange(session.id, base)}
-      worktreeRemoved={session.worktreeRemoved}
-      onManageWorktrees={onManageWorktrees}
-      onNewTerminal={() => onNewTerminal(session.id)}
-      onModelChange={(harness, model) => {
-        onModelChange(session.id, harness, model);
-        const selected = resolveModel(harness, model);
-        // A new key restarts the animation and its cleanup timer on every pick.
-        setAstraWelcomeRun(
-          isAstraModel(selected) ? ++astraWelcomeSequence.current : null,
-        );
-      }}
-      onModelSettingsChange={(settings) =>
-        onModelSettingsChange(session.id, settings)
-      }
-      onRuntimeModeChange={(mode) => onRuntimeModeChange(session.id, mode)}
-      onSubmit={(text, attachments, options) =>
-        onSubmit(session.id, text, attachments, options)
-      }
-      onStop={() =>
-        void onStop(session.id).catch(
-          reportError("SessionPane.stop", { sessionId: session.id }),
-        )
-      }
-      onCompactContext={() => onCompactContext(session.id)}
-      onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
-      onOpenFile={onOpenFile}
-      busy={!!session.busy}
-      editLastTurnSupported={editLastTurnSupported}
-      lastTurnRecall={turnRecall}
-      onRecallLastTurnReady={(recall) => {
-        recallLastTurnRef.current = recall;
-      }}
-      onEditingLastTurnChange={setEditingLastTurn}
+        harness={session.harness}
+        model={session.model}
+        modelSettings={session.modelSettings}
+        runtimeMode={session.runtimeMode}
+        cwd={session.cwd}
+        executionCwd={workCwd}
+        sessionId={session.id}
+        draftReady={draftReady}
+        compactSupported={canCompactHarnessContext(session.harness)}
+        recents={recents}
+        chrome={{
+          hideProjectPicker:
+            !!session.inboxAsk ||
+            (hideProjectPicker ? !showDeckProjectPicker : false),
+          hideBranchPicker: !!session.inboxAsk || managed,
+          hideTopBar: !!session.inboxAsk,
+        }}
+        context={session.context}
+        quoteRequest={quoteRequest}
+        initialDraft={
+          draftRef.current ??
+          (session.inboxCard || session.noteCard || session.handoffCard
+            ? undefined
+            : (session.composerSeed ?? restoredDraft))
+        }
+        onDraftChange={(text) => {
+          draftRef.current = text;
+          setLiveDraft(session.id, text);
+          saveSessionDraft(session.id, text);
+        }}
+        inboxCard={session.inboxCard}
+        noteCard={session.noteCard}
+        handoffCard={session.handoffCard}
+        question={session.pendingQuestion}
+        onQuoteRequestConsumed={acknowledgeQuote}
+        onInboxCardDismiss={() => onInboxCardDismiss?.(session.id)}
+        onNoteCardDismiss={() => onNoteCardDismiss?.(session.id)}
+        onHandoffCardDismiss={() => onHandoffCardDismiss?.(session.id)}
+        onQuestionReply={replyQuestion}
+        onQuestionInteraction={(id) => onQuestionInteraction?.(session.id, id)}
+        onFocus={() => onFocus(session.id)}
+        onCwdChange={(cwd) => onCwdChange(session.id, cwd)}
+        onBranchChange={() => onBranchChange(session.id)}
+        onWorktreeChange={
+          onWorktreeChange
+            ? (tree) => onWorktreeChange(session.id, tree)
+            : undefined
+        }
+        draftWorkspace={
+          !session.inboxAsk &&
+          !session.worktreeRemoved &&
+          !managed &&
+          ((isEmpty && !session.worktreeCwd) ||
+            (!!session.workspaceMode && !session.worktreeCwd))
+        }
+        workspaceMode={session.workspaceMode}
+        worktreeBase={session.worktreeBase}
+        onWorkspaceModeChange={(mode, base) =>
+          onWorkspaceModeChange(session.id, mode, base)
+        }
+        onWorktreeBaseChange={(base) => onWorktreeBaseChange(session.id, base)}
+        worktreeRemoved={session.worktreeRemoved}
+        onManageWorktrees={onManageWorktrees}
+        onNewTerminal={() => onNewTerminal(session.id)}
+        onModelChange={(harness, model) => {
+          onModelChange(session.id, harness, model);
+          const selected = resolveModel(harness, model);
+          // A new key restarts the animation and its cleanup timer on every pick.
+          setAstraWelcomeRun(
+            isAstraModel(selected) ? ++astraWelcomeSequence.current : null,
+          );
+        }}
+        onModelSettingsChange={(settings) =>
+          onModelSettingsChange(session.id, settings)
+        }
+        onRuntimeModeChange={(mode) => onRuntimeModeChange(session.id, mode)}
+        onSubmit={(text, attachments, options) =>
+          onSubmit(session.id, text, attachments, options)
+        }
+        onStop={() =>
+          void onStop(session.id).catch(
+            reportError("SessionPane.stop", { sessionId: session.id }),
+          )
+        }
+        onCompactContext={() => onCompactContext(session.id)}
+        onPlaceInFolder={(target) => onPlaceSessionInFolder(session.id, target)}
+        onOpenFile={onOpenFile}
+        busy={!!session.busy}
+        editLastTurnSupported={editLastTurnSupported}
+        lastTurnRecall={turnRecall}
+        onRecallLastTurnReady={(recall) => {
+          recallLastTurnRef.current = recall;
+        }}
+        onEditingLastTurnChange={setEditingLastTurn}
       />
     ),
     [
@@ -879,9 +893,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
                     : undefined
                 }
                 onHandoff={
-                  !session.inboxAsk &&
-                  !session.worktreeRemoved &&
-                  onHandoff
+                  !session.inboxAsk && !session.worktreeRemoved && onHandoff
                     ? onHandoffForTranscript
                     : undefined
                 }
@@ -919,9 +931,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
                     onJump={() => jumpToBottomRef.current?.()}
                   />
                   <TranscriptSearchButton
-                    onToggle={() =>
-                      setTranscriptSearchOpen((open) => !open)
-                    }
+                    onToggle={() => setTranscriptSearchOpen((open) => !open)}
                   />
                 </div>
               ) : showJumpToBottom || transcriptSearchOpen ? (
@@ -930,9 +940,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
                     onJump={() => jumpToBottomRef.current?.()}
                   />
                   <TranscriptSearchButton
-                    onToggle={() =>
-                      setTranscriptSearchOpen((open) => !open)
-                    }
+                    onToggle={() => setTranscriptSearchOpen((open) => !open)}
                   />
                 </div>
               ) : null}

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsView } from "./SettingsView";
 import { rememberNotificationProjects } from "../lib/notificationProjects";
 import type { SessionSummary } from "../lib/sessionStore";
+import { loadNextStepAction } from "../lib/settings";
 import {
   SETTINGS_INDEX,
   SETTINGS_SECTIONS,
@@ -326,6 +327,80 @@ describe("settings pages", () => {
       "false",
     );
     expect(toggle("next-steps").getAttribute("aria-checked")).toBe("false");
+  });
+
+  const nextStepToggle = (id: string) =>
+    container.querySelector<HTMLButtonElement>(
+      `[data-setting-id="${id}"] button[role="switch"]`,
+    )!;
+
+  it("offers one toggle per next-step action, dimmed while the master is off", async () => {
+    await render("experimental");
+    const master = container.querySelector<HTMLButtonElement>(
+      '[data-setting-id="next-steps"] button[role="switch"]',
+    )!;
+    // Off by default, so the child toggles show the stored value but refuse input.
+    expect(master.getAttribute("aria-checked")).toBe("false");
+    for (const action of [
+      "jump-to-bottom",
+      "search-transcript",
+      "review-changes",
+    ]) {
+      const child = container.querySelector<HTMLButtonElement>(
+        `[data-setting-id="next-step-${action}"] button[role="switch"]`,
+      );
+      expect(child, action).not.toBeNull();
+      expect(child!.disabled, action).toBe(true);
+    }
+    // Defaults keep the two the old count selector could reach.
+    expect(
+      container
+        .querySelector(
+          '[data-setting-id="next-step-jump-to-bottom"] button[role="switch"]',
+        )!
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      container
+        .querySelector(
+          '[data-setting-id="next-step-review-changes"] button[role="switch"]',
+        )!
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+  });
+
+  it("never lets the last next-step action be switched off", async () => {
+    await render("experimental");
+    // Defaults: jump-to-bottom and search-transcript on, review-changes off.
+    await act(async () => nextStepToggle("next-steps").click());
+    // jump-to-bottom defaults on, review-changes defaults off.
+    await act(async () => nextStepToggle("next-step-jump-to-bottom").click());
+    expect(localStorage.getItem("monocode.nextSteps.jumpToBottom")).toBe("0");
+    // review-changes was never written: it still resolves to its default.
+    expect(loadNextStepAction("review-changes")).toBe(false);
+
+    // search-transcript is the only one left, so it refuses to go and stays
+    // on its default -- nothing is written.
+    await act(async () =>
+      nextStepToggle("next-step-search-transcript").click(),
+    );
+    expect(localStorage.getItem("monocode.nextSteps.searchTranscript")).toBe(
+      null,
+    );
+    expect(loadNextStepAction("search-transcript")).toBe(true);
+  });
+
+  it("switches the review-changes action on once the master is on", async () => {
+    await render("experimental");
+    // Disabled while the master is off, so the click lands nowhere.
+    expect(nextStepToggle("next-step-review-changes").disabled).toBe(true);
+    await act(async () => nextStepToggle("next-step-review-changes").click());
+    expect(localStorage.getItem("monocode.nextSteps.reviewChanges")).toBe(null);
+
+    await act(async () => nextStepToggle("next-steps").click());
+    expect(nextStepToggle("next-step-review-changes").disabled).toBe(false);
+    await act(async () => nextStepToggle("next-step-review-changes").click());
+    expect(localStorage.getItem("monocode.nextSteps.reviewChanges")).toBe("1");
   });
 
   it("writes the debug scope list to the shared monocode.debug key", async () => {

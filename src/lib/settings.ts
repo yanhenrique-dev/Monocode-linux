@@ -1,8 +1,10 @@
 import { ALT, MOD, SHIFT } from "./platform";
-import type { NextStepsCount } from "./nextSteps";
+import {
+  NEXT_STEP_ACTIONS,
+  type NextStepAction,
+  type NextStepSelection,
+} from "./nextSteps";
 import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
-
-export type { NextStepsCount };
 
 const SECTION_KEY = "monocode.settingsSection";
 
@@ -363,6 +365,27 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
       "next steps suggestions shortcuts experimental composer proximos passos sugestoes atalhos",
   },
   {
+    id: "next-step-jump-to-bottom",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.jump-to-bottom.label",
+    keywords:
+      "next step jump latest scroll bottom scroll to end proximos passos pular final rolar",
+  },
+  {
+    id: "next-step-search-transcript",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.search-transcript.label",
+    keywords:
+      "next step find search transcript text next steps pesquisar buscar transcricao texto",
+  },
+  {
+    id: "next-step-review-changes",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.review-changes.label",
+    keywords:
+      "next step review diff changes working tree proximos passos revisar diff alteracoes",
+  },
+  {
     id: "model-controls",
     section: "chat",
     label: "settings.chat.model_controls.label",
@@ -592,48 +615,100 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
 }
 
 const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
-const NEXT_STEPS_COUNT_KEY = "monocode.nextStepsCount";
+
+/**
+ * One flag per action. The previous `monocode.nextStepsCount` was a `2 | 3`
+ * number that the caller then filtered down from, so the number lied; naming
+ * the actions directly makes the choice explicit and reachable.
+ */
+const NEXT_STEP_ACTION_KEYS = {
+  "jump-to-bottom": "monocode.nextSteps.jumpToBottom",
+  "search-transcript": "monocode.nextSteps.searchTranscript",
+  "review-changes": "monocode.nextSteps.reviewChanges",
+} as const satisfies Record<NextStepAction, string>;
+
+/**
+ * Defaults keep the two actions the old count selector could actually show,
+ * and leave `review-changes` off: at a count of 2 it was unreachable, and at 3
+ * it required jump-to-bottom to be visible at the same time.
+ */
+export const NEXT_STEP_ACTION_DEFAULTS: NextStepSelection = {
+  "jump-to-bottom": true,
+  "search-transcript": true,
+  "review-changes": false,
+};
+
+/** The same defaults in snapshot form, for the server/client fallback. */
+export const NEXT_STEP_ACTION_DEFAULTS_RAW = NEXT_STEP_ACTIONS.map((action) =>
+  NEXT_STEP_ACTION_DEFAULTS[action] ? "1" : "0",
+).join("");
+
 export const NEXT_STEPS_CHANGE_EVENT = "monocode:next-steps-change";
 export const NEXT_STEPS_ENABLED_DEFAULT = false;
-export const NEXT_STEPS_COUNT_DEFAULT: NextStepsCount = 2;
 
-export function loadNextStepsEnabled(): boolean {
+function readFlag(key: string, fallback: boolean): boolean {
   try {
-    const raw = localStorage.getItem(NEXT_STEPS_ENABLED_KEY);
-    if (raw == null) return NEXT_STEPS_ENABLED_DEFAULT;
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
     return raw === "1" || raw === "true";
   } catch {
-    return NEXT_STEPS_ENABLED_DEFAULT;
+    return fallback;
   }
+}
+
+function writeFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // private mode / quota
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+}
+
+export function loadNextStepsEnabled(): boolean {
+  return readFlag(NEXT_STEPS_ENABLED_KEY, NEXT_STEPS_ENABLED_DEFAULT);
 }
 
 export function saveNextStepsEnabled(value: boolean) {
-  try {
-    localStorage.setItem(NEXT_STEPS_ENABLED_KEY, value ? "1" : "0");
-  } catch {
-    return;
-  }
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+  writeFlag(NEXT_STEPS_ENABLED_KEY, value);
 }
 
-export function loadNextStepsCount(): NextStepsCount {
-  try {
-    const raw = localStorage.getItem(NEXT_STEPS_COUNT_KEY);
-    return raw === "2" ? 2 : raw === "3" ? 3 : NEXT_STEPS_COUNT_DEFAULT;
-  } catch {
-    return NEXT_STEPS_COUNT_DEFAULT;
-  }
+export function loadNextStepAction(action: NextStepAction): boolean {
+  return readFlag(
+    NEXT_STEP_ACTION_KEYS[action],
+    NEXT_STEP_ACTION_DEFAULTS[action],
+  );
 }
 
-export function saveNextStepsCount(value: NextStepsCount) {
-  try {
-    localStorage.setItem(NEXT_STEPS_COUNT_KEY, String(value));
-  } catch {
-    return;
-  }
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+export function saveNextStepAction(action: NextStepAction, value: boolean) {
+  writeFlag(NEXT_STEP_ACTION_KEYS[action], value);
+}
+
+/**
+ * Store snapshot: one character per action, in `NEXT_STEP_ACTIONS` order.
+ *
+ * A primitive on purpose. Handing `useSyncExternalStore` a fresh object per
+ * read means `Object.is` never matches and the view re-renders forever;
+ * callers derive the object with `parseNextStepSelection`.
+ */
+export function loadNextStepSelectionRaw(): string {
+  return NEXT_STEP_ACTIONS.map((action) =>
+    readFlag(NEXT_STEP_ACTION_KEYS[action], NEXT_STEP_ACTION_DEFAULTS[action])
+      ? "1"
+      : "0",
+  ).join("");
+}
+
+/** Inverse of `loadNextStepSelectionRaw`, with defaults for a short string. */
+export function parseNextStepSelection(raw: string): NextStepSelection {
+  const selection = { ...NEXT_STEP_ACTION_DEFAULTS };
+  NEXT_STEP_ACTIONS.forEach((action, index) => {
+    const bit = raw[index];
+    if (bit === "1") selection[action] = true;
+    else if (bit === "0") selection[action] = false;
+  });
+  return selection;
 }
 
 export function subscribeNextSteps(onStoreChange: () => void) {
@@ -641,7 +716,9 @@ export function subscribeNextSteps(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
     if (
       event.key === NEXT_STEPS_ENABLED_KEY ||
-      event.key === NEXT_STEPS_COUNT_KEY
+      NEXT_STEP_ACTIONS.some(
+        (action) => event.key === NEXT_STEP_ACTION_KEYS[action],
+      )
     ) {
       onStoreChange();
     }

@@ -1,9 +1,5 @@
 export type NextStepAction =
-  | "jump-to-bottom"
-  | "search-transcript"
-  | "review-changes";
-
-export type NextStepsCount = 2 | 3;
+  "jump-to-bottom" | "search-transcript" | "review-changes";
 
 export type NextStepCompletion = {
   status: "completed" | "failed" | "cancelled";
@@ -13,14 +9,38 @@ export type NextStepCompletion = {
   enabled: boolean;
 };
 
+/** Bar order. Fixed, so the toggles choose membership and never rearrange it. */
 export const NEXT_STEP_ACTIONS: readonly NextStepAction[] = [
   "jump-to-bottom",
   "search-transcript",
   "review-changes",
 ];
 
-export function nextStepActions(count: NextStepsCount): NextStepAction[] {
-  return NEXT_STEP_ACTIONS.slice(0, count);
+export type NextStepSelection = Readonly<Record<NextStepAction, boolean>>;
+
+/**
+ * The actions to render, in bar order.
+ *
+ * This used to take a `2 | 3` count and slice, and the caller then filtered
+ * `jump-to-bottom` out when the transcript was already at the bottom. Slicing
+ * first made that pair wrong: "2 shortcuts" rendered one, "3" rendered two,
+ * and `review-changes` was unreachable at the default. The filter has to
+ * happen before any count, and membership is now explicit anyway.
+ */
+export function nextStepActions(
+  selection: NextStepSelection,
+): NextStepAction[] {
+  return NEXT_STEP_ACTIONS.filter((action) => selection[action]);
+}
+
+/**
+ * True when the selection can render a bar. All-off is not a valid state:
+ * the master switch would be on with nothing to show.
+ */
+export function isNextStepSelectionUsable(
+  selection: NextStepSelection,
+): boolean {
+  return NEXT_STEP_ACTIONS.some((action) => selection[action]);
 }
 
 export function isNextStepCompletionEligible(

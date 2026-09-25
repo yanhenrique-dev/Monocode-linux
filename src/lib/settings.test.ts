@@ -19,7 +19,8 @@ import {
   loadGridArcadeEnabled,
   loadLiveAgentsEnabled,
   loadModelControls,
-  loadNextStepsCount,
+  loadNextStepAction,
+  loadNextStepSelectionRaw,
   loadNextStepsEnabled,
   loadNotesEnabled,
   loadTerminalGpu,
@@ -30,7 +31,9 @@ import {
   saveFollowUpBehavior,
   saveGridArcadeEnabled,
   saveLiveAgentsEnabled,
-  saveNextStepsCount,
+  parseNextStepSelection,
+  saveNextStepAction,
+  NEXT_STEP_ACTION_DEFAULTS,
   saveNextStepsEnabled,
   saveNotesEnabled,
   saveTerminalGpu,
@@ -49,7 +52,6 @@ const GRID_ARCADE_KEY = "monocode.gridArcadeEnabled";
 const DIFF_VIEWER_KEY = "monocode.diffViewer";
 const FOLLOW_UP_BEHAVIOR_KEY = "monocode.followUpBehavior";
 const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
-const NEXT_STEPS_COUNT_KEY = "monocode.nextStepsCount";
 const TERMINAL_GPU_KEY = "monocode.terminalGpu";
 
 describe("follow-up behavior setting", () => {
@@ -78,28 +80,66 @@ describe("next-step suggestions setting", () => {
   beforeEach(mockLocalStorage);
   afterEach(() => {
     localStorage.removeItem(NEXT_STEPS_ENABLED_KEY);
-    localStorage.removeItem(NEXT_STEPS_COUNT_KEY);
   });
 
-  it("stays disabled with two actions by default", () => {
+  it("stays disabled by default, with the two reachable actions on", () => {
     expect(NEXT_STEPS_ENABLED_DEFAULT).toBe(false);
-    expect(NEXT_STEPS_COUNT_DEFAULT).toBe(2);
+    expect(NEXT_STEP_ACTION_DEFAULTS).toEqual({
+      "jump-to-bottom": true,
+      "search-transcript": true,
+      "review-changes": false,
+    });
     expect(loadNextStepsEnabled()).toBe(false);
-    expect(loadNextStepsCount()).toBe(2);
+    // review-changes was unreachable at the old count of 2, and needed
+    // jump-to-bottom visible at count 3. It is now simply a named toggle.
+    expect(parseNextStepSelection(loadNextStepSelectionRaw())).toEqual({
+      "jump-to-bottom": true,
+      "search-transcript": true,
+      "review-changes": false,
+    });
   });
 
-  it("persists the experimental switch and action count", () => {
+  it("persists the master switch and each action separately", () => {
     saveNextStepsEnabled(true);
-    saveNextStepsCount(3);
+    saveNextStepAction("review-changes", true);
+    saveNextStepAction("jump-to-bottom", false);
     expect(localStorage.getItem(NEXT_STEPS_ENABLED_KEY)).toBe("1");
-    expect(localStorage.getItem(NEXT_STEPS_COUNT_KEY)).toBe("3");
-    expect(loadNextStepsEnabled()).toBe(true);
-    expect(loadNextStepsCount()).toBe(3);
+    expect(localStorage.getItem("monocode.nextSteps.reviewChanges")).toBe("1");
+    expect(localStorage.getItem("monocode.nextSteps.jumpToBottom")).toBe("0");
+    expect(parseNextStepSelection(loadNextStepSelectionRaw())).toEqual({
+      "jump-to-bottom": false,
+      "search-transcript": true,
+      "review-changes": true,
+    });
   });
 
-  it("ignores an invalid stored action count", () => {
-    localStorage.setItem(NEXT_STEPS_COUNT_KEY, "4");
-    expect(loadNextStepsCount()).toBe(2);
+  it("reads the selection in bar order, not write order", () => {
+    saveNextStepAction("review-changes", true);
+    saveNextStepAction("search-transcript", false);
+    // search-transcript was stored, jump-to-bottom falls back to its default
+    // of on. Order in the string is jump-to-bottom, search-transcript,
+    // review-changes.
+    expect(loadNextStepSelectionRaw()).toBe("101");
+  });
+
+  it("falls back per action when a stored flag is missing", () => {
+    localStorage.setItem("monocode.nextSteps.reviewChanges", "1");
+    localStorage.removeItem("monocode.nextSteps.jumpToBottom");
+    const selection = parseNextStepSelection(loadNextStepSelectionRaw());
+    expect(selection["review-changes"]).toBe(true);
+    expect(selection["jump-to-bottom"]).toBe(true);
+  });
+
+  it("ignores a short selection string and keeps the defaults", () => {
+    expect(parseNextStepSelection("")).toEqual(NEXT_STEP_ACTION_DEFAULTS);
+    expect(parseNextStepSelection("1")).toEqual(NEXT_STEP_ACTION_DEFAULTS);
+  });
+
+  it("is referentially stable, so useSyncExternalStore can compare it", () => {
+    saveNextStepAction("review-changes", true);
+    // A fresh object per read would re-render forever; the raw string is a
+    // primitive, so Object.is settles.
+    expect(loadNextStepSelectionRaw()).toBe(loadNextStepSelectionRaw());
   });
 });
 

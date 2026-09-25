@@ -324,6 +324,18 @@ const en = {
   "settings.experimental.empty_session_games.description":
     "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
   "settings.experimental.empty_session_games.toggle": "Empty session games",
+  "settings.experimental.next_steps.action.jump-to-bottom.label":
+    "Jump to latest",
+  "settings.experimental.next_steps.action.jump-to-bottom.description":
+    "Only offered when you have scrolled up, so the floating button is already there. Turn it off and the bar skips it.",
+  "settings.experimental.next_steps.action.search-transcript.label":
+    "Find in transcript",
+  "settings.experimental.next_steps.action.search-transcript.description":
+    "Open full-text search over this conversation.",
+  "settings.experimental.next_steps.action.review-changes.label":
+    "Review changes",
+  "settings.experimental.next_steps.action.review-changes.description":
+    "Open the diff for this session.",
   "settings.experimental.diagnostics.title": "Diagnostics",
   "settings.experimental.diagnostics.description":
     "For reporting a problem. Everything here is off by default.",
@@ -1312,6 +1324,18 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.experimental.empty_session_games.description":
     "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
   "settings.experimental.empty_session_games.toggle": "Jogos da sessão vazia",
+  "settings.experimental.next_steps.action.jump-to-bottom.label":
+    "Ir para o final",
+  "settings.experimental.next_steps.action.jump-to-bottom.description":
+    "Só aparece quando você rolou para cima, então o botão flutuante já está lá. Desative e a barra pula esta ação.",
+  "settings.experimental.next_steps.action.search-transcript.label":
+    "Pesquisar na transcrição",
+  "settings.experimental.next_steps.action.search-transcript.description":
+    "Abre a busca de texto completo nesta conversa.",
+  "settings.experimental.next_steps.action.review-changes.label":
+    "Revisar alterações",
+  "settings.experimental.next_steps.action.review-changes.description":
+    "Abre o diff desta sessão.",
   "settings.experimental.diagnostics.title": "Diagnóstico",
   "settings.experimental.diagnostics.description":
     "Para reportar um problema. Tudo aqui começa desligado.",

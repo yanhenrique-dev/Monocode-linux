@@ -13,17 +13,19 @@ import {
 import {
   loadComposerRunner,
   loadGridArcadeEnabled,
-  loadNextStepsCount,
+  loadNextStepSelectionRaw,
   loadNextStepsEnabled,
   saveComposerRunner,
   saveGridArcadeEnabled,
-  saveNextStepsCount,
+  saveNextStepAction,
   saveNextStepsEnabled,
   subscribeNextSteps,
-  type NextStepsCount,
+  parseNextStepSelection,
+  NEXT_STEP_ACTION_DEFAULTS_RAW,
 } from "../../../lib/settings";
+import { NEXT_STEP_ACTIONS, type NextStepAction } from "../../../lib/nextSteps";
 import { Group, Row } from "../SettingsChrome";
-import { Segmented, Toggle } from "../SettingsControls";
+import { Toggle } from "../SettingsControls";
 
 /**
  * Unstable features. Nothing here is a stable surface: a flag can change
@@ -47,14 +49,31 @@ export function ExperimentalPage() {
     setNextStepsEnabled(next);
   }, []);
 
-  const nextStepsCount = useSyncExternalStore<NextStepsCount>(
+  // Primitive snapshot: useSyncExternalStore compares with Object.is, so a
+  // fresh object per read re-renders forever.
+  const nextStepSelectionRaw = useSyncExternalStore(
     subscribeNextSteps,
-    loadNextStepsCount,
-    () => 2,
+    loadNextStepSelectionRaw,
+    () => NEXT_STEP_ACTION_DEFAULTS_RAW,
   );
-  const onNextStepsCount = useCallback((next: NextStepsCount) => {
-    saveNextStepsCount(next);
-  }, []);
+  const nextStepSelection = useMemo(
+    () => parseNextStepSelection(nextStepSelectionRaw),
+    [nextStepSelectionRaw],
+  );
+  const onNextStepAction = useCallback(
+    (action: NextStepAction, next: boolean) => {
+      if (!next) {
+        // The last one standing refuses to switch off: an all-off selection
+        // makes the master toggle a lie, since the bar could never render.
+        const others = NEXT_STEP_ACTIONS.filter(
+          (other) => other !== action && nextStepSelection[other],
+        );
+        if (others.length === 0) return;
+      }
+      saveNextStepAction(action, next);
+    },
+    [nextStepSelection],
+  );
 
   const [composerRunner, setComposerRunner] = useState(loadComposerRunner);
   const onComposerRunner = useCallback((next: boolean) => {
@@ -94,26 +113,31 @@ export function ExperimentalPage() {
           label={t("settings.experimental.next_steps.label")}
           description={t("settings.experimental.next_steps.description")}
         >
-          <div className="flex items-center gap-3">
-            <Toggle
-              label={t("settings.experimental.next_steps.toggle")}
-              on={nextStepsEnabled}
-              onChange={onNextStepsEnabled}
-            />
-            <Segmented
-              label={t("settings.experimental.next_steps.selector")}
-              value={nextStepsCount}
-              options={[
-                { value: 2, label: t("settings.experimental.next_steps.two") },
-                {
-                  value: 3,
-                  label: t("settings.experimental.next_steps.three"),
-                },
-              ]}
-              onChange={onNextStepsCount}
-            />
-          </div>
+          <Toggle
+            label={t("settings.experimental.next_steps.toggle")}
+            on={nextStepsEnabled}
+            onChange={onNextStepsEnabled}
+          />
         </Row>
+        {NEXT_STEP_ACTIONS.map((action) => (
+          <Row
+            key={action}
+            id={`next-step-${action}`}
+            label={t(`settings.experimental.next_steps.action.${action}.label`)}
+            description={t(
+              `settings.experimental.next_steps.action.${action}.description`,
+            )}
+          >
+            <Toggle
+              label={t(
+                `settings.experimental.next_steps.action.${action}.label`,
+              )}
+              on={nextStepSelection[action]}
+              disabled={!nextStepsEnabled}
+              onChange={(next) => onNextStepAction(action, next)}
+            />
+          </Row>
+        ))}
         <Row
           id="composer-mascot"
           label={t("settings.experimental.composer_mascot.label")}

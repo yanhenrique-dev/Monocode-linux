@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The composer mascot and the empty-session games now default to off.**
   They were on by default, which does not match what "experimental" means.
   If you liked them, turn them back on in Settings › Experimental.
+- Next-step shortcuts are chosen by naming them. The `2 | 3` count selector
+  is gone, replaced by one toggle per action, dimmed while the master switch
+  is off. This also fixes a real bug: the bar sliced the count first and
+  then dropped "Jump to latest" when the transcript was already at the
+  bottom, so "2 shortcuts" rendered one button, "3" rendered two, and
+  "Review changes" was unreachable at the default. The last enabled action
+  cannot be switched off, since an all-off selection makes the master
+  switch meaningless.
 - The two debug flags are now one. `monocode.debug` (a scope list) and
   `monocode:debug` (a plain "1") were unrelated keys, so enabling one did
   nothing for the other, and neither was reachable from the UI. Settings ›
