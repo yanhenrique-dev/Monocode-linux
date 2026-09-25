@@ -730,16 +730,32 @@ export function InboxView({
   useLayoutEffect(() => {
     itemsRef.current = items;
   }, [items]);
-  const handleSelectCard = useCallback((key: string, updatedAt: string) => {
-    // The card may render a stale snapshot while a poll is in flight: resolve
-    // the freshest known updatedAt so the next forced poll cannot resurrect
-    // the unread dot.
-    const fresh = itemsRef.current.find(
-      (entry) => inboxItemKey(entry) === key,
-    )?.updatedAt;
-    markInboxItemSeen({ key, updatedAt: resolveSeenMark(updatedAt, fresh) });
-    setSelectedKey(key);
-  }, []);
+  const handleSelectCard = useCallback(
+    (key: string, updatedAt: string) => {
+      // The card may render a stale snapshot while a poll is in flight: resolve
+      // the freshest known updatedAt so the next forced poll cannot resurrect
+      // the unread dot.
+      const item =
+        itemsRef.current.find((entry) => inboxItemKey(entry) === key) ??
+        (targetItem && inboxItemKey(targetItem) === key ? targetItem : undefined);
+      const fresh = item?.updatedAt;
+      const seenMark = resolveSeenMark(updatedAt, fresh);
+      markInboxItemSeen({ key, updatedAt: seenMark });
+      // Reading here also clears the owning sessions' dots: no extra click
+      // in the sidebar needed.
+      if (item) {
+        const stamp = Date.parse(item.updatedAt);
+        const seenStamp = Date.parse(seenMark);
+        if (Number.isFinite(stamp) && Number.isFinite(seenStamp)) {
+          for (const session of relatedSessionsForInboxItem(item, sessions)) {
+            markLinkedSessionUpdateSeen(session.id, seenStamp);
+          }
+        }
+      }
+      setSelectedKey(key);
+    },
+    [sessions, targetItem],
+  );
 
   useEffect(() => {
     setListLimit(LIST_PAGE_SIZE);
