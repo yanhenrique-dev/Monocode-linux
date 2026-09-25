@@ -361,6 +361,66 @@ fn validate_copy_tree(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
+    copy_recursive_inner(from, from, to)
+}
+
+#[cfg(unix)]
+fn copy_recursive_inner(fd_path: &Path, display: &Path, dest: &Path) -> Result<(), String> {
+    let meta = std::fs::symlink_metadata(fd_path)
+        .map_err(|e| format!("{}: {e}", display.display()))?;
+    if meta.file_type().is_symlink() {
+        return Err("Cannot copy a symbolic link".into());
+    }
+    if meta.is_dir() {
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::io::AsRawFd;
+        let dir = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(fd_path)
+            .map_err(|e| format!("{}: {e}", display.display()))?;
+        std::fs::create_dir(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+        let proc = PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd()));
+        let entries =
+            std::fs::read_dir(&proc).map_err(|e| format!("{}: {e}", display.display()))?;
+        for ent in entries {
+            let ent = ent.map_err(|e| e.to_string())?;
+            let name = ent.file_name();
+            let child_fd = proc.join(&name);
+            let child_display = display.join(&name);
+            let child_dest = dest.join(&name);
+            copy_recursive_inner(&child_fd, &child_display, &child_dest)?;
+        }
+        Ok(())
+    } else if meta.is_file() {
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut src = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(fd_path)
+            .map_err(|e| format!("{}: {e}", display.display()))?;
+        let src_meta = src
+            .metadata()
+            .map_err(|e| format!("{}: {e}", display.display()))?;
+        if !src_meta.is_file() {
+            return Err(format!("{}: not a regular file", display.display()));
+        }
+        let mut dst = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(dest)
+            .map_err(|e| format!("{}: {e}", dest.display()))?;
+        std::io::copy(&mut src, &mut dst).map_err(|e| format!("{}: {e}", dest.display()))?;
+        let _ = std::fs::set_permissions(dest, src_meta.permissions());
+        Ok(())
+    } else {
+        Err(format!("{}: not a regular file", display.display()))
+    }
+}
+
+#[cfg(not(unix))]
 fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
     let meta = std::fs::symlink_metadata(from).map_err(|e| format!("{}: {e}", from.display()))?;
     if meta.file_type().is_symlink() {
@@ -482,7 +542,21 @@ pub(crate) fn copy_path_sync(from: &str, dest_parent: &str) -> Result<String, St
         &file_label(&from, from.to_str().unwrap_or("copy")),
     );
     let dest = dest_parent.join(&name);
-    copy_recursive(&from, &dest)?;
+    let dest_existed = std::fs::symlink_metadata(&dest).is_ok();
+    if let Err(error) = copy_recursive(&from, &dest) {
+        if !dest_existed {
+            if std::fs::symlink_metadata(&dest)
+                .map(|m| m.is_dir() && !m.file_type().is_symlink())
+                .unwrap_or(false)
+            {
+                let _ = std::fs::remove_dir_all(&dest);
+            } else {
+                let _ = std::fs::remove_file(&dest);
+                let _ = std::fs::remove_dir_all(&dest);
+            }
+        }
+        return Err(error);
+    }
     Ok(dest.to_string_lossy().into_owned())
 }
 

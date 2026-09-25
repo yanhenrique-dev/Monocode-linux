@@ -704,6 +704,33 @@ fn mark_cached_and_unstaged(root: &Path, files: &mut HashMap<String, FileAcc>) {
     }
 }
 
+#[cfg(unix)]
+fn read_worktree_file_nofollow(abs: &Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(abs)
+        .ok()?;
+    let meta = file.metadata().ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
+
+#[cfg(not(unix))]
+fn read_worktree_file_nofollow(abs: &Path) -> Option<Vec<u8>> {
+    if abs.is_file() {
+        Some(std::fs::read(abs).unwrap_or_default())
+    } else {
+        None
+    }
+}
+
 pub(crate) fn git_file_diff_for(
     root: &Path,
     relative: &str,
@@ -721,11 +748,7 @@ pub(crate) fn git_file_diff_for(
         let head_spec = format!("HEAD:{prefix}{relative}");
         (git_blob(root, &head_spec), git_blob(root, &index_spec))
     } else {
-        let current = if abs.is_file() {
-            Some(std::fs::read(&abs).unwrap_or_default())
-        } else {
-            None
-        };
+        let current = read_worktree_file_nofollow(&abs);
         (git_blob(root, &index_spec), current)
     };
     let had_original = original.is_some();
