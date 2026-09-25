@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ExplorerMenu, type ExplorerMenuItem } from "./ExplorerMenu";
 import { ALT, MOD, SHIFT } from "../lib/platform";
 import { runUpdateFlow } from "../lib/updater";
+import { useLocale } from "../lib/locale";
 
 type MenuKey = "file" | "view" | "terminal";
 
@@ -49,9 +50,12 @@ export function MenuBar({
   onZoomOut,
   onZoomReset,
 }: Props) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuKey | null>(null);
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const barRef = useRef<HTMLDivElement>(null);
 
   // Toggle with standalone Alt key tap
@@ -207,52 +211,156 @@ export function MenuBar({
     switch (key) {
       case "file":
         return [
-          { kind: "item", id: "new_tab", label: "New Tab", shortcut: `${MOD}T` },
-          { kind: "item", id: "new_terminal", label: "New Terminal", shortcut: `${MOD}\`` },
-          { kind: "item", id: "new_window", label: "New Window", shortcut: `${MOD}${SHIFT}N` },
+          {
+            kind: "item",
+            id: "new_tab",
+            label: t("shell.menu.new_tab"),
+            shortcut: `${MOD}T`,
+          },
+          {
+            kind: "item",
+            id: "new_terminal",
+            label: t("shell.menu.new_terminal"),
+            shortcut: `${MOD}\``,
+          },
+          {
+            kind: "item",
+            id: "new_window",
+            label: t("shell.menu.new_window"),
+            shortcut: `${MOD}${SHIFT}N`,
+          },
           { kind: "sep" },
-          { kind: "item", id: "open_project", label: "Open Project…", shortcut: `${MOD}O` },
-          { kind: "item", id: "open_search", label: "Search…", shortcut: `${MOD}K` },
-          { kind: "item", id: "go_to_file", label: "Go to File…", shortcut: `${MOD}P` },
-          { kind: "item", id: "open_command_palette", label: "Command Palette…", shortcut: `${MOD}${SHIFT}P` },
-          { kind: "item", id: "find_in_project", label: "Find in Files…", shortcut: `${MOD}${SHIFT}F` },
+          {
+            kind: "item",
+            id: "open_project",
+            label: t("shell.menu.open_project"),
+            shortcut: `${MOD}O`,
+          },
+          {
+            kind: "item",
+            id: "open_search",
+            label: t("shell.menu.search"),
+            shortcut: `${MOD}K`,
+          },
+          {
+            kind: "item",
+            id: "go_to_file",
+            label: t("shell.menu.go_to_file"),
+            shortcut: `${MOD}P`,
+          },
+          {
+            kind: "item",
+            id: "open_command_palette",
+            label: t("shell.menu.command_palette"),
+            shortcut: `${MOD}${SHIFT}P`,
+          },
+          {
+            kind: "item",
+            id: "find_in_project",
+            label: t("shell.menu.find_in_files"),
+            shortcut: `${MOD}${SHIFT}F`,
+          },
           { kind: "sep" },
-          { kind: "item", id: "close_tab", label: "Close Pane", shortcut: `${MOD}W` },
+          {
+            kind: "item",
+            id: "close_tab",
+            label: t("shell.menu.close_pane"),
+            shortcut: `${MOD}W`,
+          },
           {
             kind: "item",
             id: "close_other_tabs",
-            label: "Close Other Tabs",
+            label: t("shell.menu.close_other_tabs"),
             shortcut: `${MOD}${ALT}T`,
           },
           {
             kind: "item",
             id: "close_all_tabs",
-            label: "Close All Tabs",
+            label: t("shell.menu.close_all_tabs"),
             shortcut: `${MOD}${SHIFT}W`,
           },
           { kind: "sep" },
-          { kind: "item", id: "check_for_updates", label: "Check for Updates…" },
+          {
+            kind: "item",
+            id: "check_for_updates",
+            label: t("shell.menu.check_for_updates"),
+          },
         ];
       case "view":
         return [
-          { kind: "item", id: "toggle_sidebar", label: "Toggle Sidebar", shortcut: `${MOD}B` },
-          { kind: "item", id: "open_inbox", label: "Inbox" },
+          {
+            kind: "item",
+            id: "toggle_sidebar",
+            label: t("shell.menu.toggle_sidebar"),
+            shortcut: `${MOD}B`,
+          },
+          { kind: "item", id: "open_inbox", label: t("shell.menu.inbox") },
           ...(onOpenNotes
-            ? [{ kind: "item" as const, id: "open_notes", label: "Notes" }]
+            ? [
+                {
+                  kind: "item" as const,
+                  id: "open_notes",
+                  label: t("shell.menu.notes"),
+                },
+              ]
             : []),
-          { kind: "item", id: "toggle_terminal", label: "Toggle Terminal", shortcut: `${MOD}J` },
-          { kind: "item", id: "open_model_picker", label: "Switch Model…", shortcut: `${MOD}.` },
-          { kind: "item", id: "toggle_diff", label: "Toggle Changes" },
+          {
+            kind: "item",
+            id: "toggle_terminal",
+            label: t("shell.menu.toggle_terminal"),
+            shortcut: `${MOD}J`,
+          },
+          {
+            kind: "item",
+            id: "open_model_picker",
+            label: t("shell.menu.switch_model"),
+            shortcut: `${MOD}.`,
+          },
+          {
+            kind: "item",
+            id: "toggle_diff",
+            label: t("shell.menu.toggle_changes"),
+          },
           { kind: "sep" },
-          { kind: "item", id: "zoom_in", label: "Zoom In", shortcut: `${MOD}+` },
-          { kind: "item", id: "zoom_out", label: "Zoom Out", shortcut: `${MOD}-` },
-          { kind: "item", id: "zoom_reset", label: "Reset Zoom", shortcut: `${MOD}0` },
-          { kind: "item", id: "reload", label: "Reload", shortcut: `${MOD}${SHIFT}R` },
+          {
+            kind: "item",
+            id: "zoom_in",
+            label: t("shell.menu.zoom_in"),
+            shortcut: `${MOD}+`,
+          },
+          {
+            kind: "item",
+            id: "zoom_out",
+            label: t("shell.menu.zoom_out"),
+            shortcut: `${MOD}-`,
+          },
+          {
+            kind: "item",
+            id: "zoom_reset",
+            label: t("shell.menu.zoom_reset"),
+            shortcut: `${MOD}0`,
+          },
+          {
+            kind: "item",
+            id: "reload",
+            label: t("shell.menu.reload"),
+            shortcut: `${MOD}${SHIFT}R`,
+          },
         ];
       case "terminal":
         return [
-          { kind: "item", id: "new_terminal", label: "New Terminal", shortcut: `${MOD}\`` },
-          { kind: "item", id: "toggle_terminal", label: "Toggle Terminal", shortcut: `${MOD}J` },
+          {
+            kind: "item",
+            id: "new_terminal",
+            label: t("shell.menu.new_terminal"),
+            shortcut: `${MOD}\``,
+          },
+          {
+            kind: "item",
+            id: "toggle_terminal",
+            label: t("shell.menu.toggle_terminal"),
+            shortcut: `${MOD}J`,
+          },
         ];
     }
   };
@@ -262,9 +370,9 @@ export function MenuBar({
   }
 
   const MENUS: { key: MenuKey; label: string }[] = [
-    { key: "file", label: "File" },
-    { key: "view", label: "View" },
-    { key: "terminal", label: "Terminal" },
+    { key: "file", label: t("shell.menu.file") },
+    { key: "view", label: t("shell.menu.view") },
+    { key: "terminal", label: t("shell.menu.terminal") },
   ];
 
   return (
@@ -308,7 +416,14 @@ export function MenuBar({
           x={menuAnchor.x}
           y={menuAnchor.y}
           items={getMenuItems(activeMenu)}
-          ariaLabel={`${activeMenu} menu`}
+          ariaLabel={
+            activeMenu === "file"
+              ? t("shell.menu.file_menu")
+              : activeMenu === "view"
+                ? t("shell.menu.view_menu")
+                : t("shell.menu.terminal_menu")
+          }
+
           onPick={handlePick}
           onClose={closeMenu}
         />

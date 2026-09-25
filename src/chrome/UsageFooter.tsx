@@ -33,6 +33,7 @@ import {
   type RunningTerminal,
 } from "../lib/terminalTab";
 import { MOD } from "../lib/platform";
+import { useLocale } from "../lib/locale";
 import { UsageProviderChip } from "./UsageProviderChip";
 import {
   ProviderSignInPanel,
@@ -85,6 +86,7 @@ export function UsageFooter({
   projectTerminalActive?: boolean;
   onSelectAccount?: (provider: RateLimitProvider, accountId: string) => void;
 }) {
+  const { t } = useLocale();
   const wantClaude = providers.includes("claude");
   const wantCodex = providers.includes("codex");
   const wantOpencode = providers.includes("opencode");
@@ -131,70 +133,71 @@ export function UsageFooter({
 
   // The return annotation is required: the queued-force retry below refers to
   // start from inside its own body.
-  const start = useCallback(function start(
-    force: boolean,
-    scope?: RefreshScope,
-  ): Promise<void> | undefined {
-    const visible = document.visibilityState === "visible";
-    const wants = (provider: RateLimitProvider, limits: ProviderRateLimits) =>
-      (!scope?.providers || scope.providers.includes(provider)) &&
-      shouldFetchProvider(limits, {
-        force,
-        visible,
-        minAgeMs: scope?.minAgeMs,
-      });
-    const fetchClaude =
-      wantClaude && wants("claude", claudeRef.current);
-    const fetchCodex =
-      wantCodex && wants("codex", codexRef.current);
-    const fetchOpencode =
-      wantOpencode && wants("opencode", opencodeRef.current);
-    if (!fetchClaude && !fetchCodex && !fetchOpencode) {
-      setRefreshing(false);
-      return;
-    }
-    if (force) setRefreshing(true);
-    const jobs: Promise<void>[] = [];
-    if (fetchClaude) {
-      const accountId = claudeAccountId;
-      setClaude((current) => fetchingRateLimits("claude", current));
-      jobs.push(
-        fetchClaudeRateLimits(accountId).then((value) => {
-          if (accountId === claudeAccountRef.current) setClaude(value);
-        }),
-      );
-    }
-    if (fetchCodex) {
-      const accountId = codexAccountId;
-      setCodex((current) => fetchingRateLimits("codex", current));
-      jobs.push(
-        fetchCodexRateLimits(accountId).then((value) => {
-          if (accountId === codexAccountRef.current) setCodex(value);
-        }),
-      );
-    }
-    if (fetchOpencode) {
-      setOpencode((current) => fetchingRateLimits("opencode", current));
-      jobs.push(
-        fetchOpencodeGoRateLimits().then((value) => {
-          setOpencode(value);
-        }),
-      );
-    }
-    const run = Promise.allSettled(jobs)
-      .then(() => undefined)
-      .finally(() => {
-        inflight.current = null;
-        if (!pendingForce.current) {
-          setRefreshing(false);
-          return;
-        }
-        pendingForce.current = false;
-        void start(true);
-      });
-    inflight.current = run;
-    return run;
-  }, [claudeAccountId, codexAccountId, wantClaude, wantCodex, wantOpencode]);
+  const start = useCallback(
+    function start(
+      force: boolean,
+      scope?: RefreshScope,
+    ): Promise<void> | undefined {
+      const visible = document.visibilityState === "visible";
+      const wants = (provider: RateLimitProvider, limits: ProviderRateLimits) =>
+        (!scope?.providers || scope.providers.includes(provider)) &&
+        shouldFetchProvider(limits, {
+          force,
+          visible,
+          minAgeMs: scope?.minAgeMs,
+        });
+      const fetchClaude = wantClaude && wants("claude", claudeRef.current);
+      const fetchCodex = wantCodex && wants("codex", codexRef.current);
+      const fetchOpencode =
+        wantOpencode && wants("opencode", opencodeRef.current);
+      if (!fetchClaude && !fetchCodex && !fetchOpencode) {
+        setRefreshing(false);
+        return;
+      }
+      if (force) setRefreshing(true);
+      const jobs: Promise<void>[] = [];
+      if (fetchClaude) {
+        const accountId = claudeAccountId;
+        setClaude((current) => fetchingRateLimits("claude", current));
+        jobs.push(
+          fetchClaudeRateLimits(accountId).then((value) => {
+            if (accountId === claudeAccountRef.current) setClaude(value);
+          }),
+        );
+      }
+      if (fetchCodex) {
+        const accountId = codexAccountId;
+        setCodex((current) => fetchingRateLimits("codex", current));
+        jobs.push(
+          fetchCodexRateLimits(accountId).then((value) => {
+            if (accountId === codexAccountRef.current) setCodex(value);
+          }),
+        );
+      }
+      if (fetchOpencode) {
+        setOpencode((current) => fetchingRateLimits("opencode", current));
+        jobs.push(
+          fetchOpencodeGoRateLimits().then((value) => {
+            setOpencode(value);
+          }),
+        );
+      }
+      const run = Promise.allSettled(jobs)
+        .then(() => undefined)
+        .finally(() => {
+          inflight.current = null;
+          if (!pendingForce.current) {
+            setRefreshing(false);
+            return;
+          }
+          pendingForce.current = false;
+          void start(true);
+        });
+      inflight.current = run;
+      return run;
+    },
+    [claudeAccountId, codexAccountId, wantClaude, wantCodex, wantOpencode],
+  );
 
   const refresh = useCallback(
     (force = false, scope?: RefreshScope) => {
@@ -234,7 +237,10 @@ export function UsageFooter({
     };
     document.addEventListener("visibilitychange", onVisible);
     const stopTurns = subscribeUsageStale((provider) => {
-      void refresh(false, { providers: [provider], minAgeMs: TURN_MIN_REFETCH_MS });
+      void refresh(false, {
+        providers: [provider],
+        minAgeMs: TURN_MIN_REFETCH_MS,
+      });
     });
     return () => {
       window.clearInterval(poll);
@@ -265,7 +271,7 @@ export function UsageFooter({
           const message =
             error instanceof Error
               ? error.message
-              : "Could not use Codex reset";
+              : t("shell.usage.codex_reset_error");
           setCodex((current) => errorRateLimits("codex", message, current));
           throw error;
         }
@@ -278,7 +284,7 @@ export function UsageFooter({
       await tracked;
       return outcome!;
     },
-    [codexAccountId],
+    [codexAccountId, t],
   );
 
   const reconnectProvider = useCallback(
@@ -301,14 +307,16 @@ export function UsageFooter({
           if (value.status !== "ok") {
             throw new Error(
               value.error ||
-                `${HARNESS_TITLE[provider]} sign-in could not be verified`,
+                t("shell.usage.sign_in_unverified", {
+                  provider: HARNESS_TITLE[provider],
+                }),
             );
           }
         } catch (error) {
           const message =
             error instanceof Error
               ? error.message
-              : "Could not complete sign-in";
+              : t("shell.usage.sign_in_error");
           setLimits((current) => errorRateLimits(provider, message, current));
           throw error;
         }
@@ -320,7 +328,7 @@ export function UsageFooter({
       inflight.current = tracked.catch(() => undefined);
       await tracked;
     },
-    [],
+    [t],
   );
 
   const reconnectClaude = useCallback(
@@ -364,23 +372,22 @@ export function UsageFooter({
     [selectAccount],
   );
 
-  const showOpencodeChip =
-    wantOpencode && opencode.status !== "unavailable";
+  const showOpencodeChip = wantOpencode && opencode.status !== "unavailable";
   const showUsage = wantClaude || wantCodex || showOpencodeChip;
   const showTerminals = terminals.length > 0;
   const showTerminalButton = Boolean(onNewTerminal || onShowTerminal);
   const terminalLabel = projectTerminalActive
-    ? "Terminal"
-    : `New Terminal (${MOD}\`)`;
+    ? t("shell.usage.terminal")
+    : `${t("shell.usage.new_terminal")} (${MOD}\`)`;
   const onTerminalClick = projectTerminalActive
     ? (onShowTerminal ?? onNewTerminal)
     : (onNewTerminal ?? onShowTerminal);
   const ariaLabel = showUsage
-    ? "Provider usage"
+    ? t("shell.usage.provider_usage")
     : showTerminals || showTerminalButton
-      ? "Terminals"
+      ? t("shell.usage.terminals")
       : session
-        ? "Session"
+        ? t("shell.usage.session")
         : undefined;
 
   return (
@@ -422,8 +429,8 @@ export function UsageFooter({
           <button
             type="button"
             className="grid size-4.5 shrink-0 place-items-center rounded text-content/40 hover:bg-content/10 hover:text-content disabled:opacity-50"
-            aria-label="Refresh usage"
-            title="Refresh usage"
+            aria-label={t("shell.usage.refresh")}
+            title={t("shell.usage.refresh")}
             disabled={refreshing}
             onClick={() => void refresh(true)}
           >
@@ -459,7 +466,7 @@ export function UsageFooter({
               onClick={onTerminalClick}
             >
               <Terminal className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span>Terminal</span>
+              <span>{t("shell.usage.terminal")}</span>
             </button>
           ) : null}
         </div>
@@ -479,6 +486,7 @@ function TerminalLiveMark() {
 }
 
 function SessionChip({ session }: { session: UsageFooterSession }) {
+  const { t } = useLocale();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [loginState, setLoginState] = useState<ProviderSignInState>("idle");
@@ -510,7 +518,7 @@ function SessionChip({ session }: { session: UsageFooterSession }) {
       setLoginState("complete");
     } catch (error) {
       setLoginError(
-        error instanceof Error ? error.message : "Could not complete sign-in",
+        error instanceof Error ? error.message : t("shell.usage.sign_in_error"),
       );
       setLoginState("error");
     }
@@ -534,17 +542,22 @@ function SessionChip({ session }: { session: UsageFooterSession }) {
         ref={trigger}
         type="button"
         className="-mx-1 inline-flex h-5 min-w-0 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-1 text-content/55 transition-[background-color,color,transform] duration-150 ease-out hover:bg-content/10 hover:text-content focus-visible:outline-2 focus-visible:outline-accent active:scale-[0.97]"
-        aria-label={`${HARNESS_TITLE[session.harness]} sign-in required`}
+        aria-label={t("shell.usage.sign_in_required", {
+          provider: HARNESS_TITLE[session.harness],
+        })}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title={`${HARNESS_TITLE[session.harness]} sign-in required`}
+        title={t("shell.usage.sign_in_required", {
+          provider: HARNESS_TITLE[session.harness],
+        })}
         onClick={() => setOpen((value) => !value)}
       >
         <HarnessIcon harness={session.harness} className="size-3 shrink-0" />
         <span>{HARNESS_LABEL[session.harness]}</span>
         {authRequired ? (
           <span className="text-[10px] text-amber-600 dark:text-amber-300">
-            sign in
+            {" "}
+            {t("shell.usage.sign_in")}
           </span>
         ) : null}
       </button>
@@ -558,7 +571,10 @@ function SessionChip({ session }: { session: UsageFooterSession }) {
           autoFocus
           onDismiss={dismiss}
           role="dialog"
-          aria-label={`${HARNESS_TITLE[session.harness]} sign-in`}
+          aria-label={t("shell.usage.sign_in_dialog", {
+            provider: HARNESS_TITLE[session.harness],
+          })}
+
           tabIndex={-1}
           className="text-content"
         >
@@ -583,6 +599,7 @@ function RunningTerminalChip({
   open: boolean;
   onToggle?: (fileId: string) => void;
 }) {
+  const { t } = useLocale();
   const root = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const label = runningTerminalChipLabel(terminals);
@@ -593,11 +610,15 @@ function RunningTerminalChip({
   const ariaLabel =
     terminals.length === 1
       ? panelOpen
-        ? `Hide ${terminals[0]?.process}`
-        : `Show ${terminals[0]?.process}`
+        ? t("shell.usage.hide_terminal", {
+            process: terminals[0]?.process ?? "",
+          })
+        : t("shell.usage.show_terminal", {
+            process: terminals[0]?.process ?? "",
+          })
       : panelOpen
-        ? "Hide running terminals"
-        : `${terminals.length} terminals are running processes`;
+        ? t("shell.usage.hide_terminals")
+        : t("shell.usage.terminals_running", { count: terminals.length });
 
   const toggle = (fileId: string) => {
     setMenuOpen(false);
@@ -637,7 +658,8 @@ function RunningTerminalChip({
           autoFocus
           onDismiss={() => setMenuOpen(false)}
           role="menu"
-          aria-label="Running terminals"
+          aria-label={t("shell.usage.running_terminals")}
+
           className="min-w-[12rem] p-1"
         >
           {terminals.map((terminal) => (

@@ -1422,6 +1422,10 @@ html.is-resizing .glass-blur {
   transition: grid-template-rows var(--motion-fold-in) var(--motion-ease-out);
 }
 
+.zen-phase-body[data-animated="false"] {
+  transition: none;
+}
+
 .zen-phase-body[data-open="false"] {
   grid-template-rows: 0fr;
 }

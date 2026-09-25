@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type TransitionEvent,
 } from "react";
 import { AttachmentChip } from "../chrome/AttachmentChip";
 import { ErrorBoundary } from "../chrome/ErrorBoundary";
@@ -80,7 +81,10 @@ import {
   type TurnMetrics,
 } from "../lib/session";
 import { HarnessIcon } from "../chrome/HarnessIcon";
-import { useExperimentalAnimations } from "../hooks/useExitAnimation";
+import {
+  useExperimentalAnimations,
+  useExitAnimation,
+} from "../hooks/useExitAnimation";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
 import { useTranscriptLayout } from "../hooks/useTranscriptLayout";
 import { useTranscriptAnchor } from "../hooks/useTranscriptAnchor";
@@ -2116,6 +2120,54 @@ function useLivePhaseScroll(
   }, [el, enabled]);
 }
 
+const PHASE_BODY_TRANSITION_MS = 220;
+
+function PhaseBody({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: ReactNode;
+}) {
+  const animated = useExperimentalAnimations();
+  const [mounted, setMounted] = useState(open);
+  const { closing, requestClose, handleAnimationEnd, cancelClose } =
+    useExitAnimation({
+      enabled: animated,
+      durationMs: PHASE_BODY_TRANSITION_MS,
+      onExit: () => setMounted(false),
+    });
+
+  useEffect(() => {
+    if (open) {
+      cancelClose();
+      setMounted(true);
+      return;
+    }
+    if (mounted) requestClose();
+  }, [open, mounted, requestClose, cancelClose]);
+
+  const onTransitionEnd = useCallback(
+    (event: TransitionEvent<HTMLDivElement>) => {
+      if (closing) handleAnimationEnd(event);
+    },
+    [closing, handleAnimationEnd],
+  );
+
+  return (
+    <div
+      className="zen-phase-body"
+      data-open={open}
+      data-animated={animated ? undefined : false}
+      aria-hidden={!open || undefined}
+      inert={!open || undefined}
+      onTransitionEnd={onTransitionEnd}
+    >
+      {open || (mounted && animated) ? children : null}
+    </div>
+  );
+}
+
 /**
  * One phase: a header the whole group hangs off, and the steps under it on a
  * rail. Folding is automatic — the group opens while it is the live one and
@@ -2240,47 +2292,45 @@ function ActivityPhaseGroup({
         </span>
         {label}
       </button>
-      <div className="zen-phase-body" data-open={open}>
-        {open ? (
-          <div
-            ref={setLiveScroller}
-            className={active || !open ? "zen-phase-live" : undefined}
-          >
-            <div className="flex min-w-0 flex-col">
-              {headline ? (
-                <div className="zen-phase-step py-1">
-                  <AgentMarkdown
-                    className={
-                      headline.role === "reasoning"
-                        ? "agent-reasoning"
-                        : undefined
-                    }
-                    text={headline.text}
-                    cwd={cwd}
-                    onOpenFile={onOpenFile}
-                  />
-                </div>
-              ) : null}
-              {steps.map((block, index) => (
-                <div
-                  key={block.id}
-                  className={`zen-phase-step${active ? " zen-step-in" : ""}`}
-                >
-                  <ActivityRow
-                    block={block}
-                    cwd={cwd}
-                    live={active}
-                    liveTail={active && index === steps.length - 1}
-                    onApproval={onApproval}
-                    onOpenFile={onOpenFile}
-                    onOpenDiff={onOpenDiff}
-                  />
-                </div>
-              ))}
-            </div>
+      <PhaseBody open={open}>
+        <div
+          ref={setLiveScroller}
+          className={active || !open ? "zen-phase-live" : undefined}
+        >
+          <div className="flex min-w-0 flex-col">
+            {headline ? (
+              <div className="zen-phase-step py-1">
+                <AgentMarkdown
+                  className={
+                    headline.role === "reasoning"
+                      ? "agent-reasoning"
+                      : undefined
+                  }
+                  text={headline.text}
+                  cwd={cwd}
+                  onOpenFile={onOpenFile}
+                />
+              </div>
+            ) : null}
+            {steps.map((block, index) => (
+              <div
+                key={block.id}
+                className={`zen-phase-step${active ? " zen-step-in" : ""}`}
+              >
+                <ActivityRow
+                  block={block}
+                  cwd={cwd}
+                  live={active}
+                  liveTail={active && index === steps.length - 1}
+                  onApproval={onApproval}
+                  onOpenFile={onOpenFile}
+                  onOpenDiff={onOpenDiff}
+                />
+              </div>
+            ))}
           </div>
-        ) : null}
-      </div>
+        </div>
+      </PhaseBody>
     </div>
   );
 }
@@ -2469,41 +2519,39 @@ function SubagentPanel({
           strokeWidth={1.75}
         />
       </button>
-      <div className="zen-phase-body" data-open={open}>
-        {open ? (
-          /*
-           * No scroll window of its own. Each phase inside already keeps the
-           * group the run is working in to a short pinned window; wrapping a
-           * second window around them nests one 17.5rem scroller inside
-           * another, and the inner one can never reach its own last row.
-           */
-          <div className="flex min-w-0 flex-col pb-1">
-            <ActivityPhases
-              blocks={stepBlocks}
-              cwd={cwd}
-              done={!active}
-              padded={false}
-              onOpenFile={onOpenFile}
-              onOpenDiff={onOpenDiff}
-            />
-            {report ? (
-              <div className="zen-phase-step py-1">
-                {failed ? (
-                  <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-red-400/80">
-                    {report}
-                  </pre>
-                ) : (
-                  <AgentMarkdown
-                    text={report}
-                    cwd={cwd}
-                    onOpenFile={onOpenFile}
-                  />
-                )}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+      <PhaseBody open={open}>
+        {/*
+         * No scroll window of its own. Each phase inside already keeps the
+         * group the run is working in to a short pinned window; wrapping a
+         * second window around them nests one 17.5rem scroller inside
+         * another, and the inner one can never reach its own last row.
+         */}
+        <div className="flex min-w-0 flex-col pb-1">
+          <ActivityPhases
+            blocks={stepBlocks}
+            cwd={cwd}
+            done={!active}
+            padded={false}
+            onOpenFile={onOpenFile}
+            onOpenDiff={onOpenDiff}
+          />
+          {report ? (
+            <div className="zen-phase-step py-1">
+              {failed ? (
+                <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-red-400/80">
+                  {report}
+                </pre>
+              ) : (
+                <AgentMarkdown
+                  text={report}
+                  cwd={cwd}
+                  onOpenFile={onOpenFile}
+                />
+              )}
+            </div>
+          ) : null}
+        </div>
+      </PhaseBody>
     </div>
   );
 }
