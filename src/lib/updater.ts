@@ -14,6 +14,11 @@ export type UpdateFlowOptions = {
    * otherwise (menu / shortcut with no inline surface).
    */
   showDialog?: boolean;
+  /**
+   * Backoff between `check()` retries, in ms. Defaults to [1000, 2000]
+   * (3 attempts total). Tests pass [0, 0].
+   */
+  retryDelaysMs?: number[];
 };
 
 export type UpdaterPhase =
@@ -72,10 +77,71 @@ export function isSystemInstallPermissionError(error: unknown): boolean {
 }
 
 export function friendlyUpdateError(error: unknown, locale: Locale): string {
+  if (isNoSpaceError(error)) {
+    return t(locale, "updater.no_space_hint");
+  }
   if (isSystemInstallPermissionError(error)) {
     return t(locale, "updater.permission_hint");
   }
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The download stages next to the running binary, so a full disk aborts the
+ * install mid-write with ENOSPC instead of a version mismatch later.
+ */
+export function isNoSpaceError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /no space left|enospc|disk (full|quota)|sem espa[cç]o|espacio insuficiente/i.test(
+    text,
+  );
+}
+
+const DEFAULT_RETRY_DELAYS_MS = [1000, 2000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * The release manifest has no entry for this build's target
+ * (`the platform ... was not found in the response platforms object`).
+ * Retrying cannot make the entry appear: fail fast.
+ */
+function isMissingPlatformError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /was not found in the response `platforms` object|none of the fallback platforms .* were found/i.test(
+    text,
+  );
+}
+
+/**
+ * `check()` with exponential backoff for transient failures (offline boot,
+ * flaky wifi). Config, disk-full, permission and missing-platform errors are
+ * permanent: no retry.
+ */
+export async function checkWithRetry(
+  delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
+): Promise<Update | null> {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await check();
+    } catch (err) {
+      if (
+        isUpdaterNotConfiguredError(err) ||
+        isNoSpaceError(err) ||
+        isSystemInstallPermissionError(err) ||
+        isMissingPlatformError(err) ||
+        attempt >= delaysMs.length
+      ) {
+        throw err;
+      }
+      const base = delaysMs[attempt] ?? 0;
+      await sleep(base + Math.floor(Math.random() * 250));
+      attempt += 1;
+    }
+  }
 }
 
 export async function readAppVersion(): Promise<string> {
@@ -86,9 +152,11 @@ export async function readAppVersion(): Promise<string> {
   }
 }
 
-export async function probeForUpdate(): Promise<Update | null> {
+export async function probeForUpdate(
+  delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
+): Promise<Update | null> {
   if (await isFlatpakSandbox()) return null;
-  const update = await check();
+  const update = await checkWithRetry(delaysMs);
   pendingUpdate = update;
   if (update) announceUpdateAvailable(update.version);
   return update;
@@ -125,7 +193,7 @@ export async function runUpdateFlow(
   onProgress?.(base);
 
   try {
-    const update = await check();
+    const update = await checkWithRetry(opts?.retryDelaysMs);
     if (!update) {
       pendingUpdate = null;
       const current: UpdaterSnapshot = { phase: "current", currentVersion };
