@@ -4,6 +4,7 @@ import {
   mascotPath,
   type ProjectMascot,
 } from "./projectMascots";
+import { migrateTabGroupMascotNames } from "./tabGroups";
 
 /**
  * User-created pets and visibility of the built-in roster.
@@ -61,6 +62,15 @@ function writeJson(key: string, value: unknown) {
   notifyPetsChanged();
 }
 
+function writeJsonArray(key: string, value: unknown[]): boolean {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const GRID_SIZE = 8;
 
 /** Normalizes a pet name to a slug, or null when unusable or taken. */
@@ -109,15 +119,51 @@ export function customPetNames(pets: readonly CustomPet[]): Set<string> {
   return new Set(pets.map((pet) => pet.name));
 }
 
+function availableCustomName(
+  base: string,
+  taken: ReadonlySet<string>,
+): string | null {
+  const stem = base.slice(0, 18);
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const candidate =
+      suffix === 1 ? `${stem}-custom` : `${stem}-custom-${suffix}`;
+    if (candidate.length <= 24 && !taken.has(candidate)) return candidate;
+  }
+  return null;
+}
+
+function normalizedEntryName(entry: unknown): string | null {
+  if (!entry || typeof entry !== "object") return null;
+  const name = (entry as Record<string, unknown>).name;
+  return typeof name === "string" ? validatePetName(name, new Set()) : null;
+}
+
 export function loadCustomPets(): CustomPet[] {
   const raw = readJsonArray(CUSTOM_PETS_KEY);
   const valid: CustomPet[] = [];
   const taken = new Set(PROJECT_MASCOTS.map((mascot) => mascot.name));
+  const renames: Record<string, string> = {};
   for (const entry of raw) {
-    const pet = validateCustomPet(entry, taken);
+    const normalizedName = normalizedEntryName(entry);
+    const collides = normalizedName !== null && taken.has(normalizedName);
+    const candidate =
+      collides && normalizedName
+        ? {
+            ...(entry as Record<string, unknown>),
+            name: availableCustomName(normalizedName, taken),
+          }
+        : entry;
+    const pet = validateCustomPet(candidate, taken);
     if (!pet) continue;
+    if (collides && normalizedName) renames[normalizedName] = pet.name;
     taken.add(pet.name);
     valid.push(pet);
+  }
+  if (
+    Object.keys(renames).length > 0 &&
+    writeJsonArray(CUSTOM_PETS_KEY, valid)
+  ) {
+    migrateTabGroupMascotNames(renames);
   }
   return valid;
 }
