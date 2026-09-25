@@ -6,16 +6,21 @@ function file(id: string, path: string): FilePaneTab {
   return { id, path, cwd: "/repo" };
 }
 
-function tab(files: FilePaneTab[]): WorkspaceTab {
+function tab(
+  editorFiles: FilePaneTab[],
+  terminalFiles: FilePaneTab[] = [],
+): WorkspaceTab {
   return {
     kind: "session",
     id: "tab-1",
     layout: { type: "leaf", id: "session-1" },
     focusedId: "session-1",
     editorPanes: [
-      { id: "pane-1", files, activeFileId: files[0]?.id ?? "" },
+      { id: "editor-pane", files: editorFiles, activeFileId: editorFiles[0]?.id ?? "" },
     ],
-    terminalPanes: [],
+    terminalPanes: [
+      { id: "terminal-pane", files: terminalFiles, activeFileId: terminalFiles[0]?.id ?? "" },
+    ],
   };
 }
 
@@ -31,6 +36,14 @@ describe("hasDirtyFileUnderPath", () => {
     ).toBe(true);
   });
 
+  it("matches dirty files restored into terminal panes", () => {
+    const workspace = tab([], [file("file-2", "/repo/src/terminal.ts")]);
+
+    expect(
+      hasDirtyFileUnderPath([workspace], new Set(["file-2"]), "/repo/src"),
+    ).toBe(true);
+  });
+
   it("ignores clean files and sibling path prefixes", () => {
     const workspace = tab([file("file-1", "/repo/src/app.ts")]);
 
@@ -39,7 +52,6 @@ describe("hasDirtyFileUnderPath", () => {
       hasDirtyFileUnderPath([workspace], new Set(["file-1"]), "/repo/src-2"),
     ).toBe(false);
   });
-
   it("matches dirty files open in terminal panes", () => {
     const workspace = tab([file("file-1", "/repo/src/app.ts")]);
     workspace.terminalPanes = [
