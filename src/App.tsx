@@ -26,6 +26,7 @@ import { UsageFooter } from "./chrome/UsageFooter";
 import {
   loadProjectRailOpen,
   loadSidebarTabOrder,
+  notifyOverlayOpenChanged,
   type SidebarTabId,
 } from "./lib/appearance";
 import {
@@ -424,6 +425,13 @@ export default function App({
   notesViewOpenRef.current = notesViewOpen;
   const settingsOpenRef = useRef(settingsOpen);
   settingsOpenRef.current = settingsOpen;
+  // Body-portaled chrome (composer runner pet) hides under fullscreen
+  // overlays instead of roaming over settings/search/inbox/notes.
+  useEffect(() => {
+    notifyOverlayOpenChanged(
+      searchViewOpen || settingsOpen || inboxViewOpen || notesViewOpen,
+    );
+  }, [searchViewOpen, settingsOpen, inboxViewOpen, notesViewOpen]);
   const sessionNavigationIdsRef = useRef<readonly string[]>([]);
   const filePickerOpenRef = useRef(filePickerOpen);
   filePickerOpenRef.current = filePickerOpen;

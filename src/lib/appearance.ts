@@ -93,6 +93,32 @@ export const TASKS_PILL_DEFAULT = true;
 /** Fired on `window` whenever the tasks pill flips (detail: boolean). */
 export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
 
+/**
+ * Fired on `window` when a fullscreen overlay (settings/search/inbox/notes)
+ * opens or closes (detail: boolean). Chrome portaled to the body — like the
+ * composer runner pet — hides while one is open.
+ */
+export const OVERLAY_OPEN_CHANGE_EVENT = "monocode:overlay-open-change";
+
+let overlayOpen = false;
+
+export function notifyOverlayOpenChanged(open: boolean) {
+  overlayOpen = open;
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<boolean>(OVERLAY_OPEN_CHANGE_EVENT, { detail: open }));
+}
+
+export function subscribeOverlayOpenChanged(
+  onChange: (open: boolean) => void,
+) {
+  if (typeof window === "undefined") return () => {};
+  const listener = (event: Event) =>
+    onChange((event as CustomEvent<boolean>).detail ?? false);
+  window.addEventListener(OVERLAY_OPEN_CHANGE_EVENT, listener);
+  onChange(overlayOpen);
+  return () => window.removeEventListener(OVERLAY_OPEN_CHANGE_EVENT, listener);
+}
+
 export const EXPERIMENTAL_ANIMATIONS_DEFAULT = false;
 
 /** Fired on `window` whenever experimental animations flip (detail: boolean). */
