@@ -463,7 +463,7 @@ fn watch_stage(app: &AppHandle, id: u32, stage: Stage, wait: Duration) {
         std::thread::sleep(wait);
         let stalled = QUIT_RUN
             .lock()
-            .unwrap()
+            .unwrap_or_else(|poison| poison.into_inner())
             .as_ref()
             .is_some_and(|run| run.id == id && run.stage == stage);
         if !stalled {
