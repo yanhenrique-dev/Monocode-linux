@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::constants::{MAX_ATTACHMENT_EMBED_BYTES, MAX_TEXT_FILE_BYTES};
 use super::git::git_cmd;
 use super::path::{canonicalize_with_missing, expand_home, reject_symlink_components};
+use super::secure;
 
 fn resolve_under(parent: &Path, name: &str) -> Result<PathBuf, String> {
     if name.starts_with('/') || name.starts_with('\\') {
@@ -347,97 +348,14 @@ fn unique_name_in(dir: &Path, name: &str) -> String {
     }
 }
 
-fn validate_copy_tree(path: &Path) -> Result<(), String> {
-    let meta = std::fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    if meta.file_type().is_symlink() {
-        return Err("Cannot copy a symbolic link".into());
-    }
-    if meta.is_dir() {
-        for entry in std::fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            validate_copy_tree(&entry.path())?;
-        }
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
 fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
-    copy_recursive_inner(from, from, to)
-}
-
-#[cfg(unix)]
-fn copy_recursive_inner(fd_path: &Path, display: &Path, dest: &Path) -> Result<(), String> {
-    let meta =
-        std::fs::symlink_metadata(fd_path).map_err(|e| format!("{}: {e}", display.display()))?;
-    if meta.file_type().is_symlink() {
-        return Err("Cannot copy a symbolic link".into());
-    }
-    if meta.is_dir() {
-        use std::os::unix::fs::OpenOptionsExt;
-        use std::os::unix::io::AsRawFd;
-        let dir = std::fs::OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(fd_path)
-            .map_err(|e| format!("{}: {e}", display.display()))?;
-        std::fs::create_dir(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
-        let proc = PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd()));
-        let entries =
-            std::fs::read_dir(&proc).map_err(|e| format!("{}: {e}", display.display()))?;
-        for ent in entries {
-            let ent = ent.map_err(|e| e.to_string())?;
-            let name = ent.file_name();
-            let child_fd = proc.join(&name);
-            let child_display = display.join(&name);
-            let child_dest = dest.join(&name);
-            copy_recursive_inner(&child_fd, &child_display, &child_dest)?;
-        }
-        Ok(())
-    } else if meta.is_file() {
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut src = std::fs::OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(fd_path)
-            .map_err(|e| format!("{}: {e}", display.display()))?;
-        let src_meta = src
-            .metadata()
-            .map_err(|e| format!("{}: {e}", display.display()))?;
-        if !src_meta.is_file() {
-            return Err(format!("{}: not a regular file", display.display()));
-        }
-        let mut dst = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(dest)
-            .map_err(|e| format!("{}: {e}", dest.display()))?;
-        std::io::copy(&mut src, &mut dst).map_err(|e| format!("{}: {e}", dest.display()))?;
-        let _ = std::fs::set_permissions(dest, src_meta.permissions());
-        Ok(())
-    } else {
-        Err(format!("{}: not a regular file", display.display()))
-    }
-}
-
-#[cfg(not(unix))]
-fn copy_recursive(from: &Path, to: &Path) -> Result<(), String> {
-    let meta = std::fs::symlink_metadata(from).map_err(|e| format!("{}: {e}", from.display()))?;
-    if meta.file_type().is_symlink() {
-        return Err("Cannot copy a symbolic link".into());
-    }
-    if meta.is_dir() {
-        std::fs::create_dir(to).map_err(|e| format!("{}: {e}", to.display()))?;
-        for ent in std::fs::read_dir(from).map_err(|e| format!("{}: {e}", from.display()))? {
-            let ent = ent.map_err(|e| e.to_string())?;
-            copy_recursive(&ent.path(), &to.join(ent.file_name()))?;
-        }
-        Ok(())
-    } else {
-        std::fs::copy(from, to)
-            .map(|_| ())
-            .map_err(|e| format!("{}: {e}", to.display()))
-    }
+    let parent = to
+        .parent()
+        .ok_or_else(|| "Destination has no parent directory.".to_string())?;
+    let name = to
+        .file_name()
+        .ok_or_else(|| "Invalid destination name.".to_string())?;
+    secure::copy_path(from, parent, name).map_err(|error| error.to_string())
 }
 
 pub(crate) fn rename_path_sync(path: &str, name: &str) -> Result<String, String> {
@@ -531,12 +449,13 @@ pub(crate) fn copy_path_sync(from: &str, dest_parent: &str) -> Result<String, St
     if !dest_parent.is_dir() {
         return Err(format!("{} is not a folder", dest_parent.display()));
     }
-    if from.is_dir() && dir_contains(&from, &dest_parent) {
+    if secure::directory_contains(&from, &dest_parent).map_err(|error| error.to_string())?
+        == Some(true)
+    {
         return Err("Cannot paste a folder into itself.".into());
     }
     reject_symlink_components(&from_path)?;
     reject_symlink_components(&dest_parent_path)?;
-    validate_copy_tree(&from)?;
     let name = unique_name_in(
         &dest_parent,
         &file_label(&from, from.to_str().unwrap_or("copy")),

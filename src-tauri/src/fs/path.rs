@@ -27,16 +27,65 @@ pub(crate) fn reject_symlink_components(path: &Path) -> Result<(), String> {
     let mut current = PathBuf::new();
     for component in path.components() {
         current.push(component.as_os_str());
-        match std::fs::symlink_metadata(&current) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err("Path contains a symlink".into());
+        let Ok(metadata) = std::fs::symlink_metadata(&current) else {
+            // Missing components (e.g. new file name) carry no symlink risk.
+            // Other I/O errors surface on the actual operation.
+            match std::fs::symlink_metadata(&current) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(format!("{}: {error}", current.display())),
+                Ok(_) => {}
             }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(format!("{}: {error}", current.display())),
+            continue;
+        };
+        if !metadata.file_type().is_symlink() {
+            continue;
         }
+        // Allow symlinks whose target stays inside the immediate parent
+        // (system ancestors like /var -> /private/var, /home -> var/home,
+        // and an explicitly chosen aliased base pointing at a sibling dir).
+        // Reject symlinks escaping outside (project escape -> outside).
+        if symlink_target_stays_under_parent(&current) {
+            continue;
+        }
+        return Err("Path contains a symlink".into());
     }
     Ok(())
+}
+
+fn symlink_target_stays_under_parent(link: &Path) -> bool {
+    let Some(parent) = link.parent() else {
+        return false;
+    };
+    let Ok(target) = std::fs::read_link(link) else {
+        return false;
+    };
+    let abs_target = if target.is_absolute() {
+        target
+    } else {
+        parent.join(target)
+    };
+    // Canonicalize parent (resolves system ancestors) and target when possible.
+    // Fall back to lexical normalization for dangling/missing targets.
+    let canon_parent = std::fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
+    if let Ok(canon_target) = std::fs::canonicalize(&abs_target) {
+        return canon_target.starts_with(&canon_parent);
+    }
+    let normalized = normalize_lexically(&abs_target);
+    normalized.starts_with(&canon_parent)
+}
+
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 pub(crate) fn canonicalize_with_missing(path: &Path) -> Result<PathBuf, String> {

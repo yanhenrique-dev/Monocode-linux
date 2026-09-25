@@ -7,6 +7,7 @@ use serde::Serialize;
 use super::constants::{MAX_ATTACHMENT_EMBED_BYTES, MAX_PREVIEW_BYTES, MAX_TEXT_FILE_BYTES};
 use super::git::git_cmd;
 use super::path::{expand_home, path_to_js};
+use super::secure;
 use super::write::project_root;
 use crate::dirs_home;
 
@@ -131,55 +132,101 @@ fn git_ls_files(root: &Path) -> Option<Vec<ProjectFile>> {
 }
 
 pub(crate) fn walk_project_files(root: &Path) -> Vec<ProjectFile> {
+    let Ok(root_directory) = secure::open_anchor_dir(root) else {
+        return Vec::new();
+    };
+    walk_project_files_from_handle(root, root_directory)
+}
+
+pub(crate) fn walk_project_files_from_handle(
+    root: &Path,
+    root_directory: std::fs::File,
+) -> Vec<ProjectFile> {
+    walk_project_files_from_handle_with_hook(root, root_directory, |_| {})
+}
+
+fn open_relative_dir(
+    root: &std::fs::File,
+    relative: &Path,
+) -> Result<Option<std::fs::File>, secure::SecureError> {
+    let mut dir = root
+        .try_clone()
+        .map_err(|e| secure::SecureError::Message(e.to_string()))?;
+    for component in relative.components() {
+        let name = match component {
+            std::path::Component::Normal(name) => name,
+            std::path::Component::CurDir => continue,
+            _ => return Err(secure::SecureError::Invalid),
+        };
+        match secure::open_child_dir(&dir, name)? {
+            Some(child) => dir = child,
+            None => return Ok(None),
+        }
+    }
+    Ok(Some(dir))
+}
+
+pub(crate) fn walk_project_files_from_handle_with_hook(
+    root: &Path,
+    root_directory: std::fs::File,
+    mut hook: impl FnMut(&Path),
+) -> Vec<ProjectFile> {
     let ignore = Ignore::load(root);
     let mut files = Vec::new();
-    let mut dirs = vec![root.to_path_buf()];
+    let mut directories = vec![PathBuf::new()];
     let mut visited = 0usize;
 
-    while let Some(dir) = dirs.pop() {
+    while let Some(relative_directory) = directories.pop() {
+        hook(&relative_directory);
         visited += 1;
         if visited > MAX_WALK_DIRS || files.len() >= MAX_PROJECT_FILES {
             break;
         }
-        let Ok(reader) = std::fs::read_dir(&dir) else {
+        let Ok(Some(directory)) = open_relative_dir(&root_directory, &relative_directory) else {
             continue;
         };
-        for ent in reader {
-            let Ok(ent) = ent else { continue };
-            let name = ent.file_name();
-            let Some(name) = name.to_str() else { continue };
+        let result = secure::for_each_dir_entry(&directory, |name, kind| {
+            let Some(name) = name.to_str() else {
+                return Ok(());
+            };
             if name == ".DS_Store" {
-                continue;
+                return Ok(());
             }
-            let path = ent.path();
-            let is_dir = match ent.file_type() {
-                Ok(t) if t.is_symlink() => continue,
-                Ok(t) => t.is_dir(),
-                Err(_) => path.is_dir(),
-            };
-            if is_dir {
-                if skip_walk_dir_name(name) || ignore.matches(name) || is_private_dir(&path) {
-                    continue;
+            let relative = relative_directory.join(name);
+            let path = root.join(&relative);
+            match kind {
+                secure::EntryKind::Directory => {
+                    if skip_walk_dir_name(name) || ignore.matches(name) || is_private_dir(&path) {
+                        return Ok(());
+                    }
+                    directories.push(relative);
                 }
-                dirs.push(path);
-                continue;
+                secure::EntryKind::File => {
+                    if ignore.matches(name) {
+                        return Ok(());
+                    }
+                    if secure::open_child_file(&directory, name.as_ref())
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        files.push(ProjectFile {
+                            name: name.to_string(),
+                            path: path_to_js(&path),
+                            relative: path_to_js(&relative),
+                        });
+                    }
+                }
+                secure::EntryKind::Symlink
+                | secure::EntryKind::Other
+                | secure::EntryKind::Unknown => {}
             }
-            if ignore.matches(name) {
-                continue;
-            }
-            let Ok(relative) = path.strip_prefix(root) else {
-                continue;
-            };
-            let relative = path_to_js(relative);
-            files.push(ProjectFile {
-                name: name.to_string(),
-                path: path_to_js(&path),
-                relative,
-            });
-            if files.len() >= MAX_PROJECT_FILES {
-                break;
-            }
+            Ok(())
+        });
+        if files.len() >= MAX_PROJECT_FILES {
+            break;
         }
+        let _ = result;
     }
     files
 }
