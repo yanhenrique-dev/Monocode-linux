@@ -57,6 +57,55 @@ describe("updater", () => {
       error: "network failed",
     });
     expect(message).toHaveBeenCalledOnce();
+    expect(check).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries transient check failures within the configured bound", async () => {
+    getVersion.mockResolvedValue("0.1.23");
+    check
+      .mockRejectedValueOnce(new Error("network failed"))
+      .mockRejectedValueOnce(new Error("network failed"))
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      runUpdateFlow(false, undefined, { retryDelaysMs: [0, 0] }),
+    ).resolves.toEqual({
+      phase: "current",
+      currentVersion: "0.1.23",
+    });
+    expect(check).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    "No space left on device (os error 28) at path /usr/local/bin/tauri_current_abc",
+    "ENOSPC (os error 28)",
+  ])("classifies ENOSPC before permission hints and does not retry it: %s", async (errorMessage) => {
+    getVersion.mockResolvedValue("0.2.31");
+    check.mockRejectedValue(new Error(errorMessage));
+
+    const result = await runUpdateFlow(true, undefined, {
+      retryDelaysMs: [0, 0],
+    });
+
+    expect(result).toMatchObject({
+      phase: "error",
+      error: expect.stringMatching(/not enough disk space|sem espaço em disco/i),
+    });
+    expect(result.error).not.toContain("~/.local/bin");
+    expect(check).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "TargetsNotFound",
+    'None of the fallback platforms ["linux-x86_64"] were found in the response `platforms` object',
+  ])("does not retry permanent target errors: %s", async (errorMessage) => {
+    getVersion.mockResolvedValue("0.1.23");
+    check.mockRejectedValue(new Error(errorMessage));
+
+    await expect(
+      runUpdateFlow(false, undefined, { retryDelaysMs: [0, 0] }),
+    ).resolves.toMatchObject({ phase: "error" });
+    expect(check).toHaveBeenCalledOnce();
   });
 
   it("retries transient check failures before reporting", async () => {

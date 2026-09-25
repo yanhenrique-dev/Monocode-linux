@@ -59,9 +59,12 @@ function flatpakIdle(currentVersion: string): UpdaterSnapshot {
   return { phase: "idle", currentVersion };
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function isUpdaterNotConfiguredError(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error);
-  return /updater does not have any endpoints set/i.test(text);
+  return /updater does not have any endpoints set/i.test(errorText(error));
 }
 
 /**
@@ -70,9 +73,29 @@ function isUpdaterNotConfiguredError(error: unknown): boolean {
  * with EACCES (os error 13) even during `check()`.
  */
 export function isSystemInstallPermissionError(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error);
   return /os error 13|permission denied|permiss[aã]o negada|insufficient permissions|tauri_current_/i.test(
-    text,
+    errorText(error),
+  );
+}
+
+export function isNoSpaceError(error: unknown): boolean {
+  return /no space left|enospc|os error 28|disk (full|quota)|sem espa[cç]o|espacio insuficiente/i.test(
+    errorText(error),
+  );
+}
+
+function isTargetsNotFoundError(error: unknown): boolean {
+  return /targets?notfound|(?:targets?|platforms?).*(?:not|was|were) found/i.test(
+    errorText(error),
+  );
+}
+
+function isPermanentUpdaterCheckError(error: unknown): boolean {
+  return (
+    isUpdaterNotConfiguredError(error) ||
+    isNoSpaceError(error) ||
+    isTargetsNotFoundError(error) ||
+    isSystemInstallPermissionError(error)
   );
 }
 
@@ -83,18 +106,7 @@ export function friendlyUpdateError(error: unknown, locale: Locale): string {
   if (isSystemInstallPermissionError(error)) {
     return t(locale, "updater.permission_hint");
   }
-  return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * The download stages next to the running binary, so a full disk aborts the
- * install mid-write with ENOSPC instead of a version mismatch later.
- */
-export function isNoSpaceError(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error);
-  return /no space left|enospc|disk (full|quota)|sem espa[cç]o|espacio insuficiente/i.test(
-    text,
-  );
+  return errorText(error);
 }
 
 const DEFAULT_RETRY_DELAYS_MS = [1000, 2000];
@@ -103,23 +115,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * The release manifest has no entry for this build's target
- * (`the platform ... was not found in the response platforms object`).
- * Retrying cannot make the entry appear: fail fast.
- */
-function isMissingPlatformError(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error);
-  return /was not found in the response `platforms` object|none of the fallback platforms .* were found/i.test(
-    text,
-  );
-}
-
-/**
- * `check()` with exponential backoff for transient failures (offline boot,
- * flaky wifi). Config, disk-full, permission and missing-platform errors are
- * permanent: no retry.
- */
 export async function checkWithRetry(
   delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
 ): Promise<Update | null> {
@@ -128,13 +123,7 @@ export async function checkWithRetry(
     try {
       return await check();
     } catch (err) {
-      if (
-        isUpdaterNotConfiguredError(err) ||
-        isNoSpaceError(err) ||
-        isSystemInstallPermissionError(err) ||
-        isMissingPlatformError(err) ||
-        attempt >= delaysMs.length
-      ) {
+      if (isPermanentUpdaterCheckError(err) || attempt >= delaysMs.length) {
         throw err;
       }
       const base = delaysMs[attempt] ?? 0;
