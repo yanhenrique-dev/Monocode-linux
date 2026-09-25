@@ -135,6 +135,12 @@ export function settingsSectionsByGroup(): {
 }
 
 /**
+ * The `data-setting-id` Settings should reveal when it opens: one of the ids in
+ * `SETTINGS_INDEX`. Inbox integrations pass their provider id.
+ */
+export type SettingsAnchor = string;
+
+/**
  * One searchable control. `id` is the row's `data-setting-id` in SettingsView,
  * which is also what Settings scrolls to when it opens on an anchor.
  */

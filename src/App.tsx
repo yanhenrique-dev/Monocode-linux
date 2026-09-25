@@ -71,7 +71,7 @@ import { SessionPane } from "./surfaces/SessionPane";
 import { SessionSurface } from "./surfaces/SessionSurface";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
 import { LinkedWorkItemPanel } from "./surfaces/InboxView";
-import type { SettingsAnchor } from "./surfaces/SettingsView";
+import type { SettingsAnchor } from "./lib/settings";
 import type { InboxSessionPortal } from "./surfaces/InboxDiscussionPanel";
 import type { LinkedSessionUpdate } from "./lib/linkedSessionUpdates";
 

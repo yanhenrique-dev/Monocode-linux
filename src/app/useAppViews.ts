@@ -15,7 +15,7 @@ import {
   saveSettingsSection,
   type SettingsSectionId,
 } from "../lib/settings";
-import type { SettingsAnchor } from "../surfaces/SettingsView";
+import type { SettingsAnchor } from "../lib/settings";
 import type { ConnectableInboxSource } from "../lib/inboxFilters";
 import type { LinkedWorkItem, Session } from "../lib/session";
 import type { SessionSummary } from "../lib/sessionStore";

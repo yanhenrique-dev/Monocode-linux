@@ -58,7 +58,7 @@ import { CreateWorktreeDialog } from "./CreateWorktreeDialog";
 import { FolderTree, GitBranch } from "./icons";
 import { DeleteWorktreeDialog } from "./DeleteWorktreeDialog";
 import { DeleteSessionDialog } from "./DeleteSessionDialog";
-import { WorktreesPage } from "../surfaces/WorktreesPage";
+import { WorktreesPage } from "../surfaces/settings/pages/WorktreesPage";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -583,9 +583,9 @@ it("uses the shared project picker without leaking late worktree responses", asy
   )!;
   expect(refresh.textContent).toBe("Refresh");
   expect(refresh.className).toContain("bg-content/10");
-  expect(
-    container.querySelector("section")?.textContent,
-  ).toContain("Deleting one keeps its sessions by default");
+  expect(container.querySelector("section")?.textContent).toContain(
+    "Deleting one keeps its sessions by default",
+  );
   await act(async () => picker.click());
   expect(
     document.querySelector('input[placeholder="Search projects..."]'),
