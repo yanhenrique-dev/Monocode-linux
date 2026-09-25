@@ -735,24 +735,26 @@ export function InboxView({
       // The card may render a stale snapshot while a poll is in flight: resolve
       // the freshest known updatedAt so the next forced poll cannot resurrect
       // the unread dot.
-      const item = itemsRef.current.find(
-        (entry) => inboxItemKey(entry) === key,
-      );
+      const item =
+        itemsRef.current.find((entry) => inboxItemKey(entry) === key) ??
+        (targetItem && inboxItemKey(targetItem) === key ? targetItem : undefined);
       const fresh = item?.updatedAt;
-      markInboxItemSeen({ key, updatedAt: resolveSeenMark(updatedAt, fresh) });
+      const seenMark = resolveSeenMark(updatedAt, fresh);
+      markInboxItemSeen({ key, updatedAt: seenMark });
       // Reading here also clears the owning sessions' dots: no extra click
       // in the sidebar needed.
       if (item) {
         const stamp = Date.parse(item.updatedAt);
-        if (Number.isFinite(stamp)) {
+        const seenStamp = Date.parse(seenMark);
+        if (Number.isFinite(stamp) && Number.isFinite(seenStamp)) {
           for (const session of relatedSessionsForInboxItem(item, sessions)) {
-            markLinkedSessionUpdateSeen(session.id, stamp);
+            markLinkedSessionUpdateSeen(session.id, seenStamp);
           }
         }
       }
       setSelectedKey(key);
     },
-    [sessions],
+    [sessions, targetItem],
   );
 
   useEffect(() => {
