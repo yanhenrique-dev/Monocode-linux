@@ -1,7 +1,56 @@
-import { describe, expect, it } from "vitest";
-import { decodePtyChunk, trimReplay } from "./pty";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const invoke = vi.hoisted(() =>
+  vi.fn(
+    async (
+      _command: string,
+      _args?: Record<string, unknown>,
+    ): Promise<unknown> => undefined,
+  ),
+);
+const listen = vi.hoisted(() =>
+  vi.fn(
+    async (
+      _event: string,
+      _handler: (event: { payload: unknown }) => void,
+    ) => () => {},
+  ),
+);
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/event", () => ({ listen }));
+
+import {
+  decodePtyChunk,
+  killAllPtys,
+  killPty,
+  spawnPty,
+  subscribePty,
+  trimReplay,
+} from "./pty";
 
 const KB = 1024;
+
+beforeEach(() => {
+  invoke.mockReset();
+  invoke.mockResolvedValue(undefined);
+});
+
+afterEach(async () => {
+  await killAllPtys();
+});
+
+function emitPtyData(id: string, data: string, generation?: string) {
+  const handler = listen.mock.calls.find(([event]) => event === "pty-data")?.[1];
+  if (!handler) throw new Error("pty-data listener not registered");
+  handler({ payload: { id, data, generation } });
+}
+
+function emitPtyExit(id: string, code: number | null, generation?: string) {
+  const handler = listen.mock.calls.find(([event]) => event === "pty-exit")?.[1];
+  if (!handler) throw new Error("pty-exit listener not registered");
+  handler({ payload: { id, code, generation } });
+}
 
 describe("trimReplay", () => {
   it("keeps a small buffer whole", () => {
@@ -45,5 +94,130 @@ describe("decodePtyChunk", () => {
 
   it("drops malformed payloads instead of throwing", () => {
     expect(decodePtyChunk("!!!not-base64!!!")).toBeNull();
+  });
+});
+
+describe("spawn failure cleanup", () => {
+  it("clears current local state when pty_spawn rejects", async () => {
+    invoke.mockRejectedValueOnce(new Error("spawn failed"));
+    const onData = vi.fn();
+    const unsubscribe = subscribePty("failed", onData, vi.fn());
+
+    await expect(spawnPty("failed", "/tmp", 80, 24)).rejects.toThrow(
+      "spawn failed",
+    );
+    emitPtyData("failed", btoa("handler"));
+    unsubscribe();
+
+    expect(onData).not.toHaveBeenCalled();
+    emitPtyData("failed", btoa("stale"));
+    const replacementData = vi.fn();
+    const unsubscribeReplacement = subscribePty(
+      "failed",
+      replacementData,
+      vi.fn(),
+    );
+    unsubscribeReplacement();
+
+    expect(replacementData).not.toHaveBeenCalled();
+  });
+
+  it("preserves second-generation handlers when first spawn rejects", async () => {
+    let spawnCount = 0;
+    let rejectFirst: (error: Error) => void = () => {};
+    invoke.mockImplementation((command: string) => {
+      if (command !== "pty_spawn") return Promise.resolve(undefined);
+      spawnCount += 1;
+      if (spawnCount > 1) return Promise.resolve(undefined);
+      return new Promise<undefined>((_, reject) => {
+        rejectFirst = reject;
+      });
+    });
+
+    const firstData = vi.fn();
+    const unsubscribeFirst = subscribePty("shared", firstData, vi.fn());
+    const firstSpawn = spawnPty("shared", "/tmp", 80, 24);
+    const firstResult = firstSpawn.catch((error: unknown) => error);
+
+    const secondData = vi.fn();
+    const unsubscribeSecond = subscribePty("shared", secondData, vi.fn());
+    const secondGeneration = await spawnPty("shared", "/tmp", 80, 24);
+    expect(secondGeneration).toEqual(expect.any(String));
+
+    const firstError = new Error("first failed");
+    rejectFirst(firstError);
+    await expect(firstResult).resolves.toBe(firstError);
+    unsubscribeFirst();
+
+    emitPtyData("shared", btoa("replacement"), secondGeneration);
+    unsubscribeSecond();
+    expect(firstData).not.toHaveBeenCalled();
+    expect(secondData).toHaveBeenCalledOnce();
+    expect(new TextDecoder().decode(secondData.mock.calls[0]![0])).toBe(
+      "replacement",
+    );
+  });
+});
+
+describe("pty generation ownership", () => {
+  it("preserves replacement state when first-generation kill is stale", async () => {
+    const id = "stale-kill";
+    const firstData = vi.fn();
+    const firstExit = vi.fn();
+    const unsubscribeFirst = subscribePty(id, firstData, firstExit);
+    const firstGeneration = await spawnPty(id, "/tmp", 80, 24);
+
+    const secondData = vi.fn();
+    const secondExit = vi.fn();
+    const unsubscribeSecond = subscribePty(id, secondData, secondExit);
+    const secondGeneration = await spawnPty(id, "/tmp", 80, 24);
+    expect(secondGeneration).not.toBe(firstGeneration);
+
+    await killPty(id, firstGeneration);
+
+    expect(invoke).toHaveBeenCalledWith("pty_kill", {
+      id,
+      generation: firstGeneration,
+    });
+    emitPtyData(id, btoa("second"), secondGeneration);
+    emitPtyExit(id, 0, secondGeneration);
+    expect(firstData).not.toHaveBeenCalled();
+    expect(firstExit).not.toHaveBeenCalled();
+    expect(secondData).toHaveBeenCalledOnce();
+    expect(secondExit).toHaveBeenCalledWith(0);
+
+    unsubscribeFirst();
+    unsubscribeSecond();
+    emitPtyData(id, btoa("detached"), secondGeneration);
+    const probeData = vi.fn();
+    const unsubscribeProbe = subscribePty(id, probeData, vi.fn());
+    expect(probeData).toHaveBeenCalledOnce();
+    expect(new TextDecoder().decode(probeData.mock.calls[0]![0])).toBe(
+      "detached",
+    );
+    unsubscribeProbe();
+  });
+
+  it("drops stale data and exit after a replacement", async () => {
+    const id = "event-replacement";
+    const onData = vi.fn();
+    const onExit = vi.fn();
+    const unsubscribe = subscribePty(id, onData, onExit);
+
+    const firstGeneration = await spawnPty(id, "/tmp", 80, 24);
+    const secondGeneration = await spawnPty(id, "/tmp", 80, 24);
+
+    emitPtyData(id, btoa("old"), firstGeneration);
+    emitPtyExit(id, 1, firstGeneration);
+    expect(onData).not.toHaveBeenCalled();
+    expect(onExit).not.toHaveBeenCalled();
+
+    emitPtyData(id, btoa("new"), secondGeneration);
+    emitPtyExit(id, 0, secondGeneration);
+    expect(onData).toHaveBeenCalledOnce();
+    expect(new TextDecoder().decode(onData.mock.calls[0]![0])).toBe("new");
+    expect(onExit).toHaveBeenCalledWith(0);
+
+    unsubscribe();
   });
 });
