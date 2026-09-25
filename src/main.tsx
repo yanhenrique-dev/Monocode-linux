@@ -16,8 +16,16 @@ import {
   reportQuitPoll,
 } from "./lib/appLifecycle";
 import { consumeInstalledUpdate } from "./lib/updateNotice";
-import { SPLASH_REMOVE_MS } from "./lib/uiTimings";
+import { SPLASH_REMOVE_MS, splashFadeDelay } from "./lib/uiTimings";
 import "./index.css";
+
+// Stamped here rather than in the inline script in index.html: those live in
+// <head> and run before #boot-splash exists in the DOM, so they cannot stamp
+// it. This module is a deferred module script, so the body is already parsed.
+// The splash is the first child of <body>, which puts this at most a frame
+// after its first paint -- counting from here can only undercount, and
+// undercounting is the safe direction: it never makes the splash flash.
+const splashShownAt = performance.now();
 
 initAppearance();
 initHardwareAcceleration();
@@ -28,6 +36,7 @@ function dismissBootSplash() {
   const splash = document.getElementById("boot-splash");
   if (!splash || splash.dataset.dismissed === "1") return;
   splash.dataset.dismissed = "1";
+  const delay = splashFadeDelay(splashShownAt, performance.now());
   const fade = () => {
     activateWindowAppearance();
     splash.classList.add("boot-splash-out");
@@ -36,7 +45,13 @@ function dismissBootSplash() {
   // useLayoutEffect runs before paint. Two frames later the app is on
   // screen, so the fade reveals UI instead of the desktop blur.
   requestAnimationFrame(() => {
-    requestAnimationFrame(fade);
+    requestAnimationFrame(() => {
+      // A fast boot would otherwise flash the logo for a couple of frames and
+      // read as a glitch. Holding it here reads as intentional; a boot that
+      // already outlasted the minimum pays nothing.
+      if (delay === 0) fade();
+      else window.setTimeout(fade, delay);
+    });
   });
 }
 

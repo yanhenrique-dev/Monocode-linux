@@ -176,6 +176,14 @@
           if (isMac) {
             root.classList.add("is-mac");
           }
+          // Splash motion is opt-in, matching EXPERIMENTAL_ANIMATIONS_DEFAULT
+          // being false: the static splash is the resting state and this class
+          // only adds the breath and the sweep. Strict "1" because the flag is
+          // a feature toggle, not a truthy string. The prefers-reduced-motion
+          // block in the boot stylesheet still wins over this.
+          if (storeGet("monocode.experimentalAnimations") === "1") {
+            root.classList.add("boot-motion");
+          }
         } catch (_) {}
       })();
     </script>
@@ -224,6 +232,68 @@
         height: 72px;
         object-fit: contain;
         display: block;
+      }
+
+      /* Indeterminate load bar under the logo. Deliberately NOT a
+         determinate 0->100%: the boot has no real progress to report, and a
+         fake percentage is a lie. The static state is the resting state and
+         the animation is opt-in (html.boot-motion), so the base rules above
+         are already correct with no JavaScript at all. */
+      #boot-splash::after {
+        content: "";
+        position: absolute;
+        bottom: 30%;
+        left: 50%;
+        width: 120px;
+        height: 2px;
+        border-radius: 2px;
+        opacity: 0.5;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--user-accent-color, var(--color-accent)),
+          transparent
+        );
+      }
+
+      html.boot-motion #boot-splash img {
+        animation: boot-breathe 1.2s var(--motion-ease) infinite alternate;
+      }
+
+      html.boot-motion #boot-splash::after {
+        animation: boot-sweep 1.1s var(--motion-ease) infinite;
+      }
+
+      @keyframes boot-breathe {
+        from {
+          opacity: 0.55;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes boot-sweep {
+        0% {
+          transform: translateX(-50%) scaleX(0);
+          opacity: 0;
+        }
+        40% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateX(-50%) scaleX(1);
+          opacity: 0;
+        }
+      }
+
+      /* Last, and matching html.boot-motion specificity on purpose: the OS
+         preference has to beat the opt-in. */
+      @media (prefers-reduced-motion: reduce) {
+        html.boot-motion #boot-splash img,
+        html.boot-motion #boot-splash::after {
+          animation: none;
+        }
       }
     </style>
   </head>

@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The boot splash holds for a 600ms minimum so a fast boot no longer
+  flashes the logo for a couple of frames. A boot that already takes
+  longer than that is not delayed again, so slower machines are
+  unaffected and boot-time regressions stay visible.
+- The splash gains an indeterminate progress bar and a breathing logo.
+  The bar is deliberately not a 0→100% determinate one: the boot has no
+  real progress to report. Both animations are opt-in behind the
+  existing experimental-animations setting and are disabled by
+  `prefers-reduced-motion`.
+
 ## [0.2.50] - 2026-09-25
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
