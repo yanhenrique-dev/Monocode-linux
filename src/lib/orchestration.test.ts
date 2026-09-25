@@ -121,12 +121,14 @@ describe("local orchestration", () => {
     await f.delegate(["src"]);
     await vi.waitFor(() => expect(f.tasks()[0].status).toBe("running"));
     const task = f.tasks()[0];
+    const removed = { sessionId: task.sessionId, revision: 4 };
     const remove = vi.fn(async () => {
       expect(f.lead.busy).toBe(false);
       expect(f.manager.run("lead")?.status).toBe("stopped");
       f.saved.delete("lead");
+      return removed;
     });
-    await f.manager.deleteSession("lead", remove);
+    expect(await f.manager.deleteSession("lead", remove)).toEqual(removed);
     expect(remove).toHaveBeenCalledOnce();
     expect(f.host.stop).toHaveBeenCalledWith(task.sessionId);
     expect(f.manager.snapshot()).toEqual([]);
