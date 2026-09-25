@@ -794,7 +794,16 @@ export function InboxView({
     ) {
       return;
     }
-    if (key !== selectedKey) setSelectedKey(key);
+    if (key === selectedKey) return;
+    // Auto-select is reading too: the detail pane already shows this item,
+    // so clear its dot without demanding another click. The click path marks
+    // with the same stamp and the store keeps the max, so this stays
+    // idempotent when a click follows the auto-select.
+    markInboxItemSeen({
+      key,
+      updatedAt: resolveSeenMark(selected.updatedAt, selected.updatedAt),
+    });
+    setSelectedKey(key);
   }, [selected, selectedKey, targetSelectionKey]);
 
   const onFiltersChange = (next: InboxFilters) => {
