@@ -216,13 +216,17 @@ it("archives the flushed transcript after cancellation, with streaming stopped",
     });
   });
   await f.run();
-  const [command, args] = mocks.invoke.mock.calls[0];
-  expect(command).toBe("session_upsert");
+  const upsertCall = mocks.invoke.mock.calls.find(
+    ([name]) => name === "session_upsert",
+  );
+  if (!upsertCall) throw new Error("session upsert was not called");
+  const [, args] = upsertCall;
   expect(args.session.blocks.at(-1)).toMatchObject({
     text: "last buffered output",
   });
   expect(args.session.blocks.at(-1).streaming).toBeFalsy();
   expect(mocks.invoke.mock.calls.map(([name]) => name)).toEqual([
+    "session_get",
     "session_upsert",
     "session_set_archived",
   ]);

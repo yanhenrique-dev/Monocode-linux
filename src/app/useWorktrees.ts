@@ -22,7 +22,9 @@ import {
 } from "../lib/layout";
 import { orchestrator } from "../lib/orchestration";
 import {
+  applySessionRevisions,
   flushSessionWrites,
+  refreshSessionRevision,
   shouldPersistSession,
   upsertSession,
   type SessionSummary,
@@ -213,6 +215,7 @@ export function useWorktrees(deps: WorktreesDeps) {
         await flushSessionWrites();
         checkOpenWorktreeFiles(path);
         const removed = await removeWorktree(cwd, path, force, keepSessions);
+        applySessionRevisions(removed.sessionRevisions);
         const affected = new Set([...ids, ...removed.sessionIds]);
         if (isEqualOrInside(projectCwdRef.current, path)) {
           setProjectCwd(removed.projectCwd);
@@ -237,6 +240,11 @@ export function useWorktrees(deps: WorktreesDeps) {
         setStoredLinkedSessions((current) => current.map(patchSummary));
         for (const id of affected) notifyReviewChanged(id);
       } catch (error) {
+        await Promise.all(
+          [...lockedIds].map((id) =>
+            refreshSessionRevision(id).catch(() => null),
+          ),
+        );
         // Removal may fail after idle agent processes were stopped. Rebind
         // their saved threads so the unchanged working copy can still resume.
         const kept = sessionsRef.current.filter(

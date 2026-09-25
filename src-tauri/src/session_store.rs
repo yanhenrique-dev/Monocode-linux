@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -22,7 +23,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   provider_session_id TEXT,
   blocks_json TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS sessions_cwd_updated_idx
@@ -99,10 +101,45 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug)]
+enum SessionWriteError {
+    Sql(rusqlite::Error),
+    Conflict { expected: i64, actual: Option<i64> },
+    Invalid(String),
+}
+
+impl fmt::Display for SessionWriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Sql(error) => error.fmt(formatter),
+            Self::Conflict { expected, actual } => {
+                let current = actual
+                    .map(|revision| revision.to_string())
+                    .unwrap_or_else(|| "missing".into());
+                write!(
+                    formatter,
+                    "Session changed in another window (expected revision {expected}, current {current})"
+                )
+            }
+            Self::Invalid(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for SessionWriteError {}
+
+impl From<rusqlite::Error> for SessionWriteError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Sql(error)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionUpsert {
     pub id: String,
+    #[serde(default)]
+    pub expected_revision: Option<i64>,
     pub cwd: String,
     pub harness: String,
     pub model: String,
@@ -133,6 +170,7 @@ pub struct SessionUpsert {
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub id: String,
+    pub revision: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orchestration_lead_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -160,10 +198,18 @@ pub struct SessionSummary {
     pub linked_work_item: Option<Value>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRevision {
+    pub session_id: String,
+    pub revision: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecord {
     pub id: String,
+    pub revision: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orchestration_lead_id: Option<String>,
     pub cwd: String,
@@ -199,6 +245,12 @@ pub fn session_upsert(
     session: SessionUpsert,
 ) -> Result<SessionSummary, String> {
     validate_id(&session.id, "session")?;
+    let Some(expected_revision) = session.expected_revision else {
+        return Err("expectedRevision is required".into());
+    };
+    if expected_revision < 0 {
+        return Err("expectedRevision must not be negative".into());
+    }
     if session.cwd.trim().is_empty() {
         return Err("cwd is required".into());
     }
@@ -303,13 +355,13 @@ pub fn session_delete(
     app: AppHandle,
     store: State<'_, SessionStore>,
     session_id: String,
-) -> Result<(), String> {
+) -> Result<Vec<SessionRevision>, String> {
     validate_id(&session_id, "session")?;
     let conn = store.conn.lock().map_err(|_| "Session store is locked")?;
-    delete_session(&conn, &session_id).map_err(|e| e.to_string())?;
+    let revisions = delete_session(&conn, &session_id).map_err(|e| e.to_string())?;
     drop(conn);
     let _ = app.emit(crate::reminders::CHANGED, ());
-    Ok(())
+    Ok(revisions)
 }
 
 #[tauri::command(async)]
@@ -551,6 +603,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ("pinned", "INTEGER NOT NULL DEFAULT 0"),
         ("linked_work_item_json", "TEXT"),
         ("provider_account_id", "TEXT"),
+        ("revision", "INTEGER NOT NULL DEFAULT 1"),
     ] {
         ensure_session_column(conn, column, decl)?;
     }
@@ -639,6 +692,21 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         ensure_session_column(conn, "worktree_removed", "INTEGER NOT NULL DEFAULT 0")?;
         conn.execute(
             "INSERT INTO schema_migrations (version, applied_at) VALUES (15, ?1)",
+            params![now_millis()],
+        )?;
+    }
+    if current < 16 {
+        ensure_session_column(conn, "revision", "INTEGER NOT NULL DEFAULT 1")?;
+        conn.execute_batch(
+            "DROP INDEX IF EXISTS sessions_cwd_cover_idx;
+             CREATE INDEX IF NOT EXISTS sessions_cwd_cover_idx
+               ON sessions (cwd, has_user_message, updated_at DESC, id, harness,
+                            model, runtime_mode, title, provider_session_id,
+                            created_at, branch, archived, pinned,
+                            linked_work_item_json, revision);",
+        )?;
+        conn.execute(
+            "INSERT INTO schema_migrations (version, applied_at) VALUES (16, ?1)",
             params![now_millis()],
         )?;
     }
@@ -794,18 +862,29 @@ fn orchestration_summary(conn: &Connection, id: &str) -> rusqlite::Result<Option
     ))
 }
 
-fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Result<SessionSummary> {
+fn upsert_session(
+    conn: &Connection,
+    session: &SessionUpsert,
+) -> Result<SessionSummary, SessionWriteError> {
+    if session
+        .expected_revision
+        .is_some_and(|revision| revision < 0)
+    {
+        return Err(SessionWriteError::Invalid(
+            "expectedRevision must not be negative".into(),
+        ));
+    }
     let now = now_millis();
     let model_settings = serde_json::to_string(&session.model_settings)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
     let blocks_json = serde_json::to_string(&session.blocks)
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
     let linked_work_item_json = session
         .linked_work_item
         .as_ref()
         .map(serde_json::to_string)
         .transpose()
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
     let provider_session_id = session
         .provider_session_id
         .as_ref()
@@ -828,88 +907,165 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty());
-
     let has_user_message = has_user_block(&session.blocks);
 
-    let existing: Option<(i64, i64, String, i64, i64)> = conn
+    let tx = conn.unchecked_transaction()?;
+    let existing: Option<(i64, i64, String, i64, i64, i64)> = tx
         .query_row(
-            "SELECT created_at, updated_at, blocks_json, archived, pinned FROM sessions WHERE id = ?1",
+            "SELECT created_at, updated_at, blocks_json, archived, pinned, revision
+             FROM sessions WHERE id = ?1",
             params![session.id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            },
         )
         .optional()?;
-    let created_at = existing
-        .as_ref()
-        .map(|(value, _, _, _, _)| *value)
-        .unwrap_or(now);
+    let actual_revision = existing.as_ref().map(|row| row.5);
+    if let Some(expected_revision) = session.expected_revision {
+        if expected_revision != actual_revision.unwrap_or(0) {
+            return Err(SessionWriteError::Conflict {
+                expected: expected_revision,
+                actual: actual_revision,
+            });
+        }
+    }
+
+    let created_at = existing.as_ref().map(|row| row.0).unwrap_or(now);
     let updated_at = match &existing {
-        Some((_, prev_updated, prev_blocks, _, _)) if json_eq(prev_blocks, &session.blocks) => {
-            *prev_updated
+        Some((_, previous_updated, previous_blocks, _, _, _))
+            if json_eq(previous_blocks, &session.blocks) =>
+        {
+            *previous_updated
         }
         _ => now,
     };
-    let archived = existing
-        .as_ref()
-        .map(|(_, _, _, value, _)| *value != 0)
-        .unwrap_or(false);
-    let pinned = existing
-        .as_ref()
-        .map(|(_, _, _, _, value)| *value != 0)
-        .unwrap_or(false);
+    let archived = existing.as_ref().map(|row| row.3 != 0).unwrap_or(false);
+    let pinned = existing.as_ref().map(|row| row.4 != 0).unwrap_or(false);
+    let next_revision = actual_revision.unwrap_or(0).saturating_add(1);
 
-    conn.execute(
-        "INSERT INTO sessions (
-           id, cwd, harness, model, model_settings, runtime_mode, title,
-           provider_session_id, blocks_json, created_at, updated_at, branch,
-           context_used, context_window, worktree_cwd, has_user_message,
-           linked_work_item_json, provider_account_id, worktree_removed
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
-         ON CONFLICT(id) DO UPDATE SET
-           cwd = excluded.cwd,
-           harness = excluded.harness,
-           model = excluded.model,
-           model_settings = excluded.model_settings,
-           runtime_mode = excluded.runtime_mode,
-           title = excluded.title,
-           provider_session_id = excluded.provider_session_id,
-           blocks_json = excluded.blocks_json,
-           updated_at = excluded.updated_at,
-           branch = excluded.branch,
-           context_used = excluded.context_used,
-           context_window = excluded.context_window,
-           worktree_cwd = excluded.worktree_cwd,
-           has_user_message = excluded.has_user_message,
-           linked_work_item_json = excluded.linked_work_item_json,
-           provider_account_id = excluded.provider_account_id,
-           worktree_removed = excluded.worktree_removed",
-        params![
-            session.id,
-            session.cwd,
-            session.harness,
-            session.model,
-            model_settings,
-            session.runtime_mode,
-            session.title,
-            provider_session_id,
-            blocks_json,
-            created_at,
-            updated_at,
-            branch,
-            session.context_used,
-            session.context_window,
-            worktree_cwd,
-            i64::from(has_user_message),
-            linked_work_item_json,
-            provider_account_id,
-            i64::from(session.worktree_removed.unwrap_or(false)),
-        ],
-    )?;
+    if existing.is_some() {
+        let changed = if let Some(expected_revision) = session.expected_revision {
+            tx.execute(
+                "UPDATE sessions SET
+                   cwd = ?2, harness = ?3, model = ?4, model_settings = ?5,
+                   runtime_mode = ?6, title = ?7, provider_session_id = ?8,
+                   blocks_json = ?9, updated_at = ?11, branch = ?12,
+                   context_used = ?13, context_window = ?14, worktree_cwd = ?15,
+                   has_user_message = ?16, linked_work_item_json = ?17,
+                   provider_account_id = ?18, worktree_removed = ?19,
+                   revision = ?20
+                 WHERE id = ?1 AND revision = ?21",
+                params![
+                    session.id,
+                    session.cwd,
+                    session.harness,
+                    session.model,
+                    model_settings,
+                    session.runtime_mode,
+                    session.title,
+                    provider_session_id,
+                    blocks_json,
+                    created_at,
+                    updated_at,
+                    branch,
+                    session.context_used,
+                    session.context_window,
+                    worktree_cwd,
+                    i64::from(has_user_message),
+                    linked_work_item_json,
+                    provider_account_id,
+                    i64::from(session.worktree_removed.unwrap_or(false)),
+                    next_revision,
+                    expected_revision,
+                ],
+            )?
+        } else {
+            tx.execute(
+                "UPDATE sessions SET
+                   cwd = ?2, harness = ?3, model = ?4, model_settings = ?5,
+                   runtime_mode = ?6, title = ?7, provider_session_id = ?8,
+                   blocks_json = ?9, updated_at = ?11, branch = ?12,
+                   context_used = ?13, context_window = ?14, worktree_cwd = ?15,
+                   has_user_message = ?16, linked_work_item_json = ?17,
+                   provider_account_id = ?18, worktree_removed = ?19,
+                   revision = ?20
+                 WHERE id = ?1",
+                params![
+                    session.id,
+                    session.cwd,
+                    session.harness,
+                    session.model,
+                    model_settings,
+                    session.runtime_mode,
+                    session.title,
+                    provider_session_id,
+                    blocks_json,
+                    created_at,
+                    updated_at,
+                    branch,
+                    session.context_used,
+                    session.context_window,
+                    worktree_cwd,
+                    i64::from(has_user_message),
+                    linked_work_item_json,
+                    provider_account_id,
+                    i64::from(session.worktree_removed.unwrap_or(false)),
+                    next_revision,
+                ],
+            )?
+        };
+        if changed != 1 {
+            return Err(SessionWriteError::Conflict {
+                expected: session.expected_revision.unwrap_or(-1),
+                actual: actual_revision,
+            });
+        }
+    } else {
+        tx.execute(
+            "INSERT INTO sessions (
+               id, cwd, harness, model, model_settings, runtime_mode, title,
+               provider_session_id, blocks_json, created_at, updated_at, branch,
+               context_used, context_window, worktree_cwd, has_user_message,
+               linked_work_item_json, provider_account_id, worktree_removed, revision
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            params![
+                session.id,
+                session.cwd,
+                session.harness,
+                session.model,
+                model_settings,
+                session.runtime_mode,
+                session.title,
+                provider_session_id,
+                blocks_json,
+                created_at,
+                updated_at,
+                branch,
+                session.context_used,
+                session.context_window,
+                worktree_cwd,
+                i64::from(has_user_message),
+                linked_work_item_json,
+                provider_account_id,
+                i64::from(session.worktree_removed.unwrap_or(false)),
+                next_revision,
+            ],
+        )?;
+    }
 
-    remember_worker_from_blocks(conn, &session.id, &session.blocks)?;
-    Ok(SessionSummary {
+    remember_worker_from_blocks(&tx, &session.id, &session.blocks)?;
+    let summary = SessionSummary {
         id: session.id.clone(),
-        orchestration_lead_id: worker_parent(conn, &session.id)?,
-        orchestration: orchestration_summary(conn, &session.id)?,
+        revision: next_revision,
+        orchestration_lead_id: worker_parent(&tx, &session.id)?,
+        orchestration: orchestration_summary(&tx, &session.id)?,
         cwd: session.cwd.clone(),
         harness: session.harness.clone(),
         model: session.model.clone(),
@@ -925,7 +1081,9 @@ fn upsert_session(conn: &Connection, session: &SessionUpsert) -> rusqlite::Resul
         archived,
         pinned,
         linked_work_item: session.linked_work_item.clone(),
-    })
+    };
+    tx.commit()?;
+    Ok(summary)
 }
 
 fn search_sessions(
@@ -1179,7 +1337,7 @@ fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<Session
     let mut statement = conn.prepare(
         "SELECT id, cwd, harness, model, runtime_mode, title, provider_session_id,
                 created_at, updated_at, branch, archived, pinned,
-                linked_work_item_json,
+                linked_work_item_json, revision,
                 (SELECT summary FROM orchestration_sidebar WHERE lead_id = sessions.id)
          FROM sessions
          WHERE cwd = ?1
@@ -1195,8 +1353,9 @@ fn list_by_project(conn: &Connection, cwd: &str) -> rusqlite::Result<Vec<Session
         let linked_work_item = optional_json(row.get(12)?);
         Ok(SessionSummary {
             id: row.get(0)?,
+            revision: row.get(13)?,
             orchestration_lead_id: None,
-            orchestration: optional_json(row.get(13)?),
+            orchestration: optional_json(row.get(14)?),
             cwd: row.get(1)?,
             harness: row.get(2)?,
             model: row.get(3)?,
@@ -1221,7 +1380,7 @@ fn list_linked(conn: &Connection) -> rusqlite::Result<Vec<SessionSummary>> {
     let mut statement = conn.prepare(
         "SELECT id, cwd, harness, model, runtime_mode, title, provider_session_id,
                 created_at, updated_at, branch, archived, pinned,
-                linked_work_item_json,
+                linked_work_item_json, revision,
                 (SELECT summary FROM orchestration_sidebar WHERE lead_id = sessions.id)
          FROM sessions
          WHERE has_user_message = 1
@@ -1235,8 +1394,9 @@ fn list_linked(conn: &Connection) -> rusqlite::Result<Vec<SessionSummary>> {
         let pinned: i64 = row.get(11)?;
         Ok(SessionSummary {
             id: row.get(0)?,
+            revision: row.get(13)?,
             orchestration_lead_id: None,
-            orchestration: optional_json(row.get(13)?),
+            orchestration: optional_json(row.get(14)?),
             cwd: row.get(1)?,
             harness: row.get(2)?,
             model: row.get(3)?,
@@ -1282,7 +1442,7 @@ fn optional_json(raw: Option<String>) -> Option<Value> {
     raw.and_then(|value| serde_json::from_str(&value).ok())
 }
 
-fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
+fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Vec<SessionRevision>> {
     let tx = conn.unchecked_transaction()?;
     let parent = worker_parent(&tx, session_id)?;
     // Ownership is also carried in transcripts for older clients. Release
@@ -1290,6 +1450,7 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
     let workers = tx.prepare("SELECT id, blocks_json FROM sessions WHERE id IN (SELECT session_id FROM orchestration_workers WHERE lead_id = ?1)")?
         .query_map([session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut revisions = Vec::with_capacity(workers.len());
     for (id, raw) in workers {
         let mut blocks: Value = serde_json::from_str(&raw).map_err(|e| {
             rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
@@ -1304,9 +1465,18 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
             }
         }
         tx.execute(
-            "UPDATE sessions SET blocks_json = ?1 WHERE id = ?2",
-            params![blocks.to_string(), id],
+            "UPDATE sessions SET blocks_json = ?1, revision = revision + 1 WHERE id = ?2",
+            params![blocks.to_string(), &id],
         )?;
+        let revision = tx.query_row(
+            "SELECT revision FROM sessions WHERE id = ?1",
+            [&id],
+            |row| row.get(0),
+        )?;
+        revisions.push(SessionRevision {
+            session_id: id,
+            revision,
+        });
     }
     tx.execute(
         "DELETE FROM orchestration_runs WHERE lead_id = ?1",
@@ -1394,7 +1564,8 @@ fn delete_session(conn: &Connection, session_id: &str) -> rusqlite::Result<()> {
         "DELETE FROM composer_drafts WHERE session_id = ?1",
         [session_id],
     )?;
-    tx.commit()
+    tx.commit()?;
+    Ok(revisions)
 }
 
 fn set_archived(conn: &Connection, session_id: &str, archived: bool) -> rusqlite::Result<()> {
@@ -1416,10 +1587,10 @@ fn set_pinned(conn: &Connection, session_id: &str, pinned: bool) -> rusqlite::Re
 fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<SessionRecord>> {
     conn.query_row(
         "SELECT id, cwd, harness, model, model_settings, runtime_mode, title,
-                provider_session_id, blocks_json, created_at, updated_at,
-                context_used, context_window, branch, worktree_cwd,
-                linked_work_item_json, provider_account_id, worktree_removed
-         FROM sessions
+                 provider_session_id, blocks_json, created_at, updated_at,
+                 context_used, context_window, branch, worktree_cwd,
+                 linked_work_item_json, provider_account_id, worktree_removed, revision
+          FROM sessions
          WHERE id = ?1 AND inbox_ask IS NULL",
         params![session_id],
         |row| {
@@ -1441,6 +1612,7 @@ fn get_session(conn: &Connection, session_id: &str) -> rusqlite::Result<Option<S
             })?;
             Ok(SessionRecord {
                 id: row.get(0)?,
+                revision: row.get(18)?,
                 orchestration_lead_id: worker_parent(conn, session_id)?,
                 cwd: row.get(1)?,
                 harness: row.get(2)?,
@@ -1560,6 +1732,7 @@ mod tests {
     fn sample(id: &str, cwd: &str, title: &str) -> SessionUpsert {
         SessionUpsert {
             id: id.into(),
+            expected_revision: None,
             cwd: cwd.into(),
             harness: "cursor".into(),
             model: "gpt-5".into(),
@@ -1706,7 +1879,7 @@ mod tests {
                 "EXPLAIN QUERY PLAN
                  SELECT id, cwd, harness, model, runtime_mode, title, provider_session_id,
                         created_at, updated_at, branch, archived, pinned,
-                        linked_work_item_json,
+                        linked_work_item_json, revision,
                         (SELECT summary FROM orchestration_sidebar WHERE lead_id = sessions.id)
                  FROM sessions
                  WHERE cwd = ?1
@@ -1770,6 +1943,46 @@ mod tests {
             )
             .unwrap();
         assert_eq!(branch, 1);
+    }
+
+    #[test]
+    fn stale_upsert_is_rejected_without_overwriting_newer_transcript() {
+        let store = SessionStore::open_in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let mut first = sample("s1", "/tmp/a", "First");
+        first.expected_revision = Some(0);
+        let first_summary = upsert_session(&conn, &first).unwrap();
+
+        let mut newer = sample("s1", "/tmp/a", "Newer");
+        newer.expected_revision = Some(first_summary.revision);
+        newer.blocks = json!([
+            { "id": "b1", "role": "user", "text": "hello" },
+            { "id": "b2", "role": "assistant", "text": "new" }
+        ]);
+        let newer_summary = upsert_session(&conn, &newer).unwrap();
+
+        let mut stale = sample("s1", "/tmp/a", "Stale");
+        stale.expected_revision = Some(first_summary.revision);
+        assert!(upsert_session(&conn, &stale).is_err());
+
+        let stored = get_session(&conn, "s1").unwrap().unwrap();
+        assert_eq!(stored.revision, newer_summary.revision);
+        assert_eq!(stored.blocks, newer.blocks);
+    }
+
+    #[test]
+    fn stale_upsert_cannot_recreate_deleted_session() {
+        let store = SessionStore::open_in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let mut first = sample("s1", "/tmp/a", "First");
+        first.expected_revision = Some(0);
+        let summary = upsert_session(&conn, &first).unwrap();
+        delete_session(&conn, "s1").unwrap();
+
+        let mut stale = sample("s1", "/tmp/a", "Stale");
+        stale.expected_revision = Some(summary.revision);
+        assert!(upsert_session(&conn, &stale).is_err());
+        assert!(get_session(&conn, "s1").unwrap().is_none());
     }
 
     #[test]
@@ -1963,7 +2176,17 @@ mod tests {
         let other =
             json!({"status":"active","tasks":[{"id":"other-task","sessionId":"other-worker"}]});
         save_orchestration(&conn, "other-lead", &other).unwrap();
-        delete_session(&conn, "lead").unwrap();
+        let revisions = delete_session(&conn, "lead").unwrap();
+        assert_eq!(revisions.len(), 2);
+        for update in &revisions {
+            assert_eq!(
+                get_session(&conn, &update.session_id)
+                    .unwrap()
+                    .unwrap()
+                    .revision,
+                update.revision
+            );
+        }
 
         for id in ["earlier", "current"] {
             let worker = get_session(&conn, id).unwrap().unwrap();
@@ -2110,6 +2333,28 @@ mod tests {
         let column: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'worktree_cwd'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(column, 1);
+    }
+
+    #[test]
+    fn migration_v16_adds_revision_column() {
+        let store = SessionStore::open_in_memory().unwrap();
+        let conn = store.conn.lock().unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 16",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+        let column: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'revision'",
                 [],
                 |row| row.get(0),
             )

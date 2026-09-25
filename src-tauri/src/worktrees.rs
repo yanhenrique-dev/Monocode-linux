@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::fs::{expand_home, git_checked, path_to_js};
-use crate::session_store::SessionStore;
+use crate::session_store::{SessionRevision, SessionStore};
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -350,6 +350,7 @@ fn remove(root: &Path, path: &Path, force: bool) -> Result<(), String> {
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeRemoval {
     session_ids: Vec<String>,
+    session_revisions: Vec<SessionRevision>,
     project_cwd: String,
 }
 
@@ -365,6 +366,8 @@ struct SessionBeforeRemoval {
     in_flight_cwd: Option<String>,
     in_flight_sort_index: Option<i64>,
     detached_cwd: String,
+    #[serde(default)]
+    revision: i64,
 }
 
 /// Make sessions safe to reopen *before* touching Git. A small metadata journal
@@ -381,7 +384,7 @@ fn prepare_removal(
         let mut session = tx
             .query_row(
                 "SELECT s.cwd, s.worktree_cwd, s.branch, s.provider_session_id,
-                    s.context_used, s.context_window, f.cwd, f.sort_index
+                    s.context_used, s.context_window, f.cwd, f.sort_index, s.revision
              FROM sessions s LEFT JOIN in_flight_sessions f ON f.session_id = s.id
              WHERE s.id = ?1",
                 [id],
@@ -397,6 +400,7 @@ fn prepare_removal(
                         in_flight_cwd: row.get(6)?,
                         in_flight_sort_index: row.get(7)?,
                         detached_cwd: String::new(),
+                        revision: row.get(8)?,
                     })
                 },
             )
@@ -410,10 +414,16 @@ fn prepare_removal(
             "UPDATE sessions SET worktree_removed = 1,
                worktree_cwd = COALESCE(NULLIF(worktree_cwd, ''), cwd),
                cwd = ?2, branch = NULL, provider_session_id = NULL,
-               context_used = NULL, context_window = NULL WHERE id = ?1",
+               context_used = NULL, context_window = NULL,
+               revision = revision + 1 WHERE id = ?1",
             rusqlite::params![id, session.detached_cwd],
         )
         .map_err(|e| e.to_string())?;
+        session.revision = tx
+            .query_row("SELECT revision FROM sessions WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .map_err(|e| e.to_string())?;
         tx.execute("DELETE FROM in_flight_sessions WHERE session_id = ?1", [id])
             .map_err(|e| e.to_string())?;
         saved.push(session);
@@ -443,7 +453,7 @@ fn finish_removal(
             .execute(
                 "UPDATE sessions SET cwd = ?2, worktree_cwd = ?3, branch = ?4,
                provider_session_id = ?5, context_used = ?6, context_window = ?7,
-               worktree_removed = 0
+               worktree_removed = 0, revision = revision + 1
              WHERE id = ?1 AND worktree_removed = 1 AND cwd = ?8 AND worktree_cwd = ?9",
                 rusqlite::params![
                     session.id,
@@ -534,8 +544,16 @@ fn remove_with_sessions(
     if let Err(error) = finish_removal(conn, &tree.path, &[]) {
         eprintln!("Worktree removed; recovery journal cleanup will retry on restart: {error}");
     }
+    let session_revisions = saved
+        .iter()
+        .map(|session| SessionRevision {
+            session_id: session.id.clone(),
+            revision: session.revision,
+        })
+        .collect();
     Ok(WorktreeRemoval {
         session_ids: ids,
+        session_revisions,
         project_cwd: main.path.clone(),
     })
 }
@@ -766,6 +784,18 @@ mod tests {
         let mut removed = remove_with_sessions(&conn, path, path, true, true).unwrap();
         removed.session_ids.sort();
         assert_eq!(removed.session_ids, vec!["archived", "direct", "shared"]);
+        assert_eq!(removed.session_revisions.len(), 3);
+        for update in &removed.session_revisions {
+            assert!(removed.session_ids.contains(&update.session_id));
+            let stored: i64 = conn
+                .query_row(
+                    "SELECT revision FROM sessions WHERE id = ?1",
+                    [&update.session_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, update.revision);
+        }
         // Git omits the verbatim prefix added by canonicalize() on Windows.
         assert!(same_path(Path::new(&removed.project_cwd), &root));
         assert!(!path.exists());

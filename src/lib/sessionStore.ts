@@ -6,6 +6,7 @@ import { normalizeProjectPath } from "./recents";
 import { ompActiveAssistantTexts, ompSessionInterjections } from "./fs";
 import { backfillOmpInterjections, ompStatusSplitTexts } from "./ompInterjections";
 import { HANDOFF_USER_LINE_CHARS, truncateHead } from "./truncate";
+import { reportError } from "./reportError";
 import type {
   AgentRunMeta,
   AgentStep,
@@ -33,6 +34,7 @@ export type SessionSummary = {
   orchestrationLeadId?: string;
   orchestration?: OrchestrationSummary;
   id: string;
+  revision?: number;
   cwd: string;
   harness: HarnessId;
   model: string;
@@ -55,6 +57,7 @@ export type SessionSummary = {
 type SessionRecord = {
   orchestrationLeadId?: string;
   id: string;
+  revision?: number;
   cwd: string;
   harness: string;
   model: string;
@@ -72,6 +75,11 @@ type SessionRecord = {
   linkedWorkItem?: LinkedWorkItem | null;
   createdAt: number;
   updatedAt: number;
+};
+
+export type SessionRevision = {
+  sessionId: string;
+  revision: number;
 };
 
 type SessionUpsertPayload = {
@@ -188,7 +196,63 @@ export function sanitizeSessionForPersist(
  * write concurrently.
  */
 const sessionWriteQueues = new Map<string, Promise<unknown>>();
+const sessionRevisions = new Map<string, number>();
 const deletedSessionIds = new Set<string>();
+const conflictedSessionIds = new Set<string>();
+
+function sessionErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isRevisionConflict(error: unknown): boolean {
+  return sessionErrorMessage(error).includes(
+    "Session changed in another window",
+  );
+}
+
+function conflictedSessionError(sessionId: string): Error {
+  const error = new Error(
+    `Session changed in another window. Reload conversation ${sessionId} before continuing.`,
+  );
+  error.name = "SessionConflictError";
+  return error;
+}
+
+export function applySessionRevisions(
+  revisions: readonly SessionRevision[] | undefined,
+): void {
+  if (!Array.isArray(revisions)) return;
+  for (const update of revisions) {
+    if (
+      typeof update.sessionId === "string" &&
+      Number.isSafeInteger(update.revision) &&
+      update.revision >= 0
+    ) {
+      sessionRevisions.set(update.sessionId, update.revision);
+    }
+  }
+}
+
+function rememberSessionRevision(sessionId: string, revision: unknown): void {
+  if (
+    typeof revision !== "number" ||
+    !Number.isSafeInteger(revision) ||
+    revision < 0
+  ) {
+    return;
+  }
+  sessionRevisions.set(sessionId, revision);
+}
 
 function enqueueSessionWrite<T>(
   sessionId: string,
@@ -215,22 +279,43 @@ export async function upsertSession(
   if (!shouldPersistSession(session) || deletedSessionIds.has(session.id)) {
     return null;
   }
+  if (conflictedSessionIds.has(session.id)) {
+    throw conflictedSessionError(session.id);
+  }
   const payload = sanitizeSessionForPersist(session);
-  const summary = await enqueueSessionWrite(session.id, async () => {
-    if (deletedSessionIds.has(session.id)) return null;
-    return invoke<SessionSummary>("session_upsert", {
-      session: {
-        ...payload,
-        blocks: payload.blocks.map((block) =>
-          block.orchestrationLeadId &&
-          deletedSessionIds.has(block.orchestrationLeadId)
-            ? { ...block, orchestrationLeadId: undefined }
-            : block,
-        ),
-      },
+  let summary: SessionSummary | null;
+  try {
+    summary = await enqueueSessionWrite(session.id, async () => {
+      if (deletedSessionIds.has(session.id)) return null;
+      let expectedRevision = sessionRevisions.get(session.id);
+      if (expectedRevision === undefined) {
+        expectedRevision = (await refreshSessionRevision(session.id)) ?? 0;
+      }
+      return invoke<SessionSummary>("session_upsert", {
+        session: {
+          ...payload,
+          expectedRevision,
+          blocks: payload.blocks.map((block) =>
+            block.orchestrationLeadId &&
+            deletedSessionIds.has(block.orchestrationLeadId)
+              ? { ...block, orchestrationLeadId: undefined }
+              : block,
+          ),
+        },
+      });
     });
-  });
-  return summary ? normalizeSummary(summary) : null;
+  } catch (error) {
+    if (isRevisionConflict(error)) {
+      conflictedSessionIds.add(session.id);
+      await refreshSessionRevision(session.id).catch(() => undefined);
+      reportError("session-upsert-conflict", error);
+    }
+    throw error;
+  }
+  if (!summary) return null;
+  const normalized = normalizeSummary(summary);
+  rememberSessionRevision(session.id, normalized.revision);
+  return normalized;
 }
 
 /**
@@ -315,7 +400,12 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   const record = await invoke<SessionRecord | null>("session_get", {
     sessionId,
   });
-  if (!record) return null;
+  if (!record) {
+    conflictedSessionIds.delete(sessionId);
+    return null;
+  }
+  conflictedSessionIds.delete(sessionId);
+  rememberSessionRevision(sessionId, record.revision);
   const session = recordToSession(record);
   if (session.harness !== "omp" || !session.providerSessionId) {
     return recoverCursorSubagents(session);
@@ -341,6 +431,20 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   return session;
 }
 
+export async function refreshSessionRevision(
+  sessionId: string,
+): Promise<number | null> {
+  const record = await invoke<SessionRecord | null>("session_get", {
+    sessionId,
+  });
+  if (!record) {
+    sessionRevisions.delete(sessionId);
+    return null;
+  }
+  rememberSessionRevision(sessionId, record.revision);
+  return typeof record.revision === "number" ? record.revision : null;
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   deletedSessionIds.add(sessionId);
   try {
@@ -348,9 +452,12 @@ export async function deleteSession(sessionId: string): Promise<void> {
     // A lead's workers may still have writes in flight. Finish those before
     // the deletion transaction strips their ownership metadata.
     await Promise.all([...sessionWriteQueues.values()]);
-    await enqueueSessionWrite(sessionId, () =>
-      invoke<void>("session_delete", { sessionId }),
+    const revisions = await enqueueSessionWrite(sessionId, () =>
+      invoke<SessionRevision[]>("session_delete", { sessionId }),
     );
+    applySessionRevisions(revisions);
+    sessionRevisions.delete(sessionId);
+    conflictedSessionIds.delete(sessionId);
   } catch (error) {
     deletedSessionIds.delete(sessionId);
     activateSessionDraft(sessionId);
@@ -703,6 +810,7 @@ function normalizeSummary(summary: SessionSummary): SessionSummary {
   const linkedWorkItem = sanitizeLinkedWorkItem(summary.linkedWorkItem);
   return {
     ...summary,
+    revision: typeof summary.revision === "number" ? summary.revision : 0,
     harness: asHarness(summary.harness),
     runtimeMode: asRuntimeMode(summary.runtimeMode),
     ...(summary.providerSessionId
