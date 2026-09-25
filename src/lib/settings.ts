@@ -1115,8 +1115,8 @@ export function keybindingWhenLabel(
 }
 
 /**
- * Mirrors the bindings we actually handle: the native menu accelerators in
- * `src-tauri/src/menu.rs`, `tabCommand`, the window key handler in App, and
+ * Mirrors the bindings we actually handle: the menu items and accelerators in
+ * `src/chrome/MenuBar.tsx`, `tabCommand`, the window key handler in App, and
  * focused surface handlers such as the draft composer workspace toggle.
  */
 export const KEYBINDINGS: KeybindingRow[] = [
