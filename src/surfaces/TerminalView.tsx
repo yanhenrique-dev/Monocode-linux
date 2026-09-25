@@ -448,6 +448,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     if (!wantsMeta) return;
     let lastForeground: string | null = null;
     let inFlight = false;
+    let disposed = false;
     const refresh = () => {
       if (!spawned.current) return;
       // Each status read forks `ps`; an off-screen window has no title to paint.
@@ -456,6 +457,9 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       inFlight = true;
       void getPtyStatus(id)
         .then(({ foreground }) => {
+          // Effect re-armed on active/cwd change: drop late responses so a
+          // stale foreground can't overwrite newer metadata.
+          if (disposed) return;
           const fg = foreground?.trim() || null;
           runningProcessRef.current = fg;
           if (fg === lastForeground) return;
@@ -477,6 +481,7 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     const interval = setInterval(refresh, active ? 2000 : 10_000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      disposed = true;
       clearInterval(interval);
       document.removeEventListener("visibilitychange", refresh);
     };

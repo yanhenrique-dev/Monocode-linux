@@ -27,7 +27,10 @@ export default defineConfig(async ({ mode }) => {
         output: {
           manualChunks: {
             mermaid: ["mermaid"],
-            xterm: ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-webgl"],
+            xterm: ["@xterm/xterm", "@xterm/addon-fit"],
+            // WebGL stays on-demand: TerminalView imports it dynamically and
+            // skips it when GPU is disabled, so it must not ride the xterm chunk.
+            xtermWebgl: ["@xterm/addon-webgl"],
             streamdown: ["streamdown", "@streamdown/code"],
             codemirror: ["codemirror", "@codemirror/state", "@codemirror/view"],
           },
