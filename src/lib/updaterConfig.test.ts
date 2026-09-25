@@ -95,6 +95,41 @@ describe("updater", () => {
     });
   });
 
+  it("prefers the disk-full hint when ENOSPC mentions the staging path", async () => {
+    getVersion.mockResolvedValue("0.2.31");
+    check.mockRejectedValue(
+      new Error(
+        'No space left on device (os error 28) at path "/usr/local/bin/tauri_current_appli25gA"',
+      ),
+    );
+
+    await expect(runUpdateFlow(true)).resolves.toMatchObject({
+      phase: "error",
+      error: expect.stringMatching(/disk space|espaço em disco/),
+    });
+    expect(check).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry disk-full errors", async () => {
+    getVersion.mockResolvedValue("0.2.31");
+    check.mockRejectedValue(new Error("No space left on device (os error 28)"));
+
+    await runUpdateFlow(false);
+    expect(check).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry missing-platform manifest errors", async () => {
+    getVersion.mockResolvedValue("0.2.31");
+    check.mockRejectedValue(
+      new Error(
+        "the platform `linux-x86_64` was not found in the response `platforms` object",
+      ),
+    );
+
+    await runUpdateFlow(false);
+    expect(check).toHaveBeenCalledOnce();
+  });
+
   it("maps system-path permission errors to the reinstall hint", async () => {
     getVersion.mockResolvedValue("0.2.17");
     check.mockRejectedValue(

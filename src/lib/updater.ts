@@ -77,11 +77,11 @@ export function isSystemInstallPermissionError(error: unknown): boolean {
 }
 
 export function friendlyUpdateError(error: unknown, locale: Locale): string {
-  if (isSystemInstallPermissionError(error)) {
-    return t(locale, "updater.permission_hint");
-  }
   if (isNoSpaceError(error)) {
     return t(locale, "updater.no_space_hint");
+  }
+  if (isSystemInstallPermissionError(error)) {
+    return t(locale, "updater.permission_hint");
   }
   return error instanceof Error ? error.message : String(error);
 }
@@ -104,8 +104,21 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * The release manifest has no entry for this build's target
+ * (`the platform ... was not found in the response platforms object`).
+ * Retrying cannot make the entry appear: fail fast.
+ */
+function isMissingPlatformError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /was not found in the response `platforms` object|none of the fallback platforms .* were found/i.test(
+    text,
+  );
+}
+
+/**
  * `check()` with exponential backoff for transient failures (offline boot,
- * flaky wifi). Config and permission errors are permanent: no retry.
+ * flaky wifi). Config, disk-full, permission and missing-platform errors are
+ * permanent: no retry.
  */
 export async function checkWithRetry(
   delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
@@ -117,7 +130,9 @@ export async function checkWithRetry(
     } catch (err) {
       if (
         isUpdaterNotConfiguredError(err) ||
+        isNoSpaceError(err) ||
         isSystemInstallPermissionError(err) ||
+        isMissingPlatformError(err) ||
         attempt >= delaysMs.length
       ) {
         throw err;
