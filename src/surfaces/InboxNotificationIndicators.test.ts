@@ -46,6 +46,12 @@ afterEach(() => {
 });
 
 it("reports a failed mark-all write in Inbox and clears the error after retry", async () => {
+  const first: InboxItem = {
+    provider: "github", kind: "issue", repo: "acme/app", number: 41,
+    title: "First issue", url: "https://github.com/acme/app/issues/41",
+    state: "open", updatedAt: "2030-01-15T11:58:00Z",
+    labels: [], assignees: [], draft: false, projectPath: "/tmp/app",
+  };
   const item: InboxItem = {
     provider: "github", kind: "issue", repo: "acme/app", number: 42,
     title: "Unread issue", url: "https://github.com/acme/app/issues/42",
@@ -53,14 +59,20 @@ it("reports a failed mark-all write in Inbox and clears the error after retry", 
     labels: [], assignees: [], draft: false, projectPath: "/tmp/app",
   };
   const entry = { key: inboxItemKey(item), updatedAt: item.updatedAt };
-  seedInboxSeenIfNeeded([{ ...entry, updatedAt: "2030-01-14T12:00:00Z" }]);
+  seedInboxSeenIfNeeded([
+    { key: inboxItemKey(first), updatedAt: "2030-01-14T12:00:00Z" },
+    { ...entry, updatedAt: "2030-01-14T12:00:00Z" },
+  ]);
   saveInboxConnections({ github: true, gitlab: false, linear: false });
   saveInboxSource("github");
-  listInboxItems.mockResolvedValue({ items: [item], errors: {} });
+  listInboxItems.mockResolvedValue({ items: [first, item], errors: {} });
   await act(async () => root.render(createElement(InboxView, {
     cwd: "/tmp/app", recents: [], onAsk: async () => "", onAskRestart: async () => "",
     onAskMount: () => {}, onOpenIntegrations: () => {},
   })));
+  // Auto-select reads the first row on mount; the second stays unread for
+  // the failed-write path below.
+  expect(isInboxEntryUnseen(entry)).toBe(true);
   const markAll = container.querySelector<HTMLButtonElement>('button[aria-label="Mark all as read"]')!;
   const write = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
     throw new Error("Storage full");
