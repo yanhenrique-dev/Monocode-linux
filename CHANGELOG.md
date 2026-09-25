@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.50] - 2026-09-25
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Added
+
+- Experimental next-step suggestions: intent-filtered bar, settings
+  toggle, workspace nudge lifecycle, jump-to-bottom handling.
+- Native trace loader for active agents with reduced-motion support;
+  active subagent trace tinted with the run's deterministic color.
+- Subagent mascot colors with custom-pet migration and collision
+  handling; settled runs keep name-hashed mascots.
+- PT-BR coverage across the app shell, search/reminder labels, and
+  transcript collapse animation.
+- Context menus open at the click point; composer drafts survive
+  session hydration with stale-steer cancellation.
+- Session revisions propagate across state updates (history, sync,
+  worktrees) with conflict UX instead of silent overwrites.
+
+### Fixed
+
+- Symlink traversal races closed: handle-based fs traversal (rustix),
+  nofollow reads/diffs, pre-copy validation, partial-copy cleanup.
+- PTY generations isolated: stale data/exit events dropped, second
+  generation handlers survive first-generation cleanup.
+- Session concurrency: stale transcript upserts rejected via revision
+  CAS, deletion drains worker writes, transfers carry revisions.
+- Dirty files protected across editor/terminal panes and file
+  operations; history invalidated on project revisit; boot sessions
+  no longer rewritten on launch.
+- Harness loopback validated with redirects disabled; OpenCode
+  transport constrained to loopback.
+- Updater retries transient checks with backoff and fails fast on
+  permanent errors (disk-full, permission, manifest) with hints.
+- Tasks pill layout, vertically centered dialogs, no global focus
+  ring, runner mascot kept out of overlays, inbox read-dot sync.
+
 ## [0.2.31] - 2026-09-23
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
