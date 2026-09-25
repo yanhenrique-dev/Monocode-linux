@@ -4,7 +4,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getExternalTitleTabDrop } from "../lib/paneDrop";
 import type { EditorPane, LayoutNode } from "../lib/layout";
+import type { Session } from "../lib/session";
 import { PaneTree } from "./PaneTree";
+
+const sessionPaneMounts = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock("./FilePane", async () => {
   const { createElement } = await import("react");
@@ -24,7 +27,18 @@ vi.mock("./FilePane", async () => {
   };
 });
 
-vi.mock("./SessionPane", () => ({ SessionPane: () => null }));
+vi.mock("./SessionPane", async () => {
+  const React = await import("react");
+  return {
+    SessionPane: ({ session }: { session: Session }) => {
+      React.useState(() => {
+        sessionPaneMounts.count += 1;
+        return null;
+      });
+      return React.createElement("div", { "data-session-id": session.id });
+    },
+  };
+});
 
 let container: HTMLDivElement;
 let root: Root;
@@ -49,6 +63,7 @@ function pointer(
 }
 
 beforeEach(() => {
+  sessionPaneMounts.count = 0;
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div");
   document.body.append(container);
@@ -159,5 +174,80 @@ describe("pane to title tab dragging", () => {
     );
     expect(getExternalTitleTabDrop()).toBeNull();
     strip.remove();
+  });
+
+  it("remounts the session pane when a pane switches sessions", () => {
+    const sessionA: Session = {
+      id: "session-a",
+      harness: "claude",
+      model: "claude-sonnet",
+      modelSettings: {},
+      runtimeMode: "supervised",
+      title: "A",
+      cwd: "/repo",
+      blocks: [],
+    };
+    const sessionB = { ...sessionA, id: "session-b", title: "B" };
+    const sessions = [sessionA, sessionB];
+    const noop = vi.fn();
+    const asyncNoop = vi.fn(async () => {});
+    const props: ComponentProps<typeof PaneTree> = {
+      visible: true,
+      layout: { type: "leaf", id: sessionA.id },
+      sessions,
+      editorPanes: [],
+      dirtyFileIds: new Set(),
+      fileErrorCounts: new Map(),
+      focusedId: sessionA.id,
+      composerFocused: false,
+      recents: [],
+      nextStepGenerations: {},
+      dismissedNextStepGenerations: {},
+      onFocus: noop,
+      onClose: noop,
+      onSelectFile: noop,
+      onCloseFile: noop,
+      onCloseOtherFiles: noop,
+      onReorderFiles: noop,
+      onFileDirtyChange: noop,
+      onFileErrorCountChange: noop,
+      onRatio: noop,
+      onCwdChange: noop,
+      onBranchChange: noop,
+      onModelChange: noop,
+      onModelSettingsChange: noop,
+      onRuntimeModeChange: noop,
+      onSubmit: noop,
+      onStop: asyncNoop,
+      onCompactContext: () => false,
+      onPlaceSessionInFolder: noop,
+      onDeleteQueuedMessage: noop,
+      onEditQueuedMessage: noop,
+      onQueuedMessageEditingChange: noop,
+      onSteerQueuedMessage: noop,
+      onResumeQueue: noop,
+      onApproval: noop,
+      onQuestionReply: noop,
+      onOpenFile: noop,
+      onOpenDiff: noop,
+      onOpenPlan: noop,
+      onUpdatePlan: noop,
+      onBuildPlan: noop,
+      onMovePane: noop,
+      onDetachPane: noop,
+      onNewTerminal: noop,
+    };
+    act(() => root.render(createElement(PaneTree, props)));
+    expect(sessionPaneMounts.count).toBe(1);
+    act(() =>
+      root.render(
+        createElement(PaneTree, {
+          ...props,
+          layout: { type: "leaf", id: sessionB.id },
+          focusedId: sessionB.id,
+        }),
+      ),
+    );
+    expect(sessionPaneMounts.count).toBe(2);
   });
 });
