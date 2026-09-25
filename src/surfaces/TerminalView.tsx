@@ -270,8 +270,9 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
     );
 
     const starting = spawnPty(id, cwd, term.cols, term.rows)
-      .then(() => {
+      .then((generation) => {
         if (!closed) spawned.current = true;
+        return generation;
       })
       .catch((error) => {
         spawned.current = false;
@@ -424,7 +425,11 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
       renderSub.dispose();
       bufferSub.dispose();
       unsubscribe();
-      void starting.catch(() => undefined).then(() => killPty(id));
+      void starting
+        .catch(() => undefined)
+        .then((generation) =>
+          generation ? killPty(id, generation) : undefined,
+        );
       unsubscribeGpu();
       unsubscribeHw();
       disableGpu();

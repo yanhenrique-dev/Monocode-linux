@@ -39,6 +39,7 @@ struct LivePty {
     writer: Mutex<Box<dyn Write + Send>>,
     master_fd: i32,
     pid: u32,
+    generation: String,
 }
 
 pub struct PtyHost {
@@ -90,6 +91,14 @@ impl PtyHost {
         sessions.remove(id)
     }
 
+    fn remove_if_generation(&self, id: &str, generation: &str) -> Option<Arc<LivePty>> {
+        let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+        if sessions.get(id).map(|live| live.generation.as_str()) != Some(generation) {
+            return None;
+        }
+        sessions.remove(id)
+    }
+
     pub(crate) fn kill_all(&self) {
         let kids: Vec<Arc<LivePty>> = {
             let mut map = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
@@ -121,6 +130,7 @@ pub fn pty_spawn(
     cwd: String,
     cols: u16,
     rows: u16,
+    generation: String,
 ) -> Result<(), String> {
     if let Some(prev) = host.remove(&id) {
         terminate(prev.pid);
@@ -133,7 +143,7 @@ pub fn pty_spawn(
     // (same race `harness_spawn` already guards against).
     let _spawn_guard = crate::worktree_lifecycle::reserve_spawn(&working_dir(&cwd))?;
 
-    spawn_unix(app, host, id, cwd, cols.max(2), rows.max(2))
+    spawn_unix(app, host, id, cwd, cols.max(2), rows.max(2), generation)
 }
 
 #[tauri::command]
@@ -174,8 +184,16 @@ pub fn pty_status(host: State<'_, PtyHost>, id: String) -> Result<PtyStatus, Str
 }
 
 #[tauri::command]
-pub fn pty_kill(host: State<PtyHost>, id: String) -> Result<(), String> {
-    if let Some(live) = host.remove(&id) {
+pub fn pty_kill(
+    host: State<PtyHost>,
+    id: String,
+    generation: Option<String>,
+) -> Result<(), String> {
+    let live = match generation {
+        Some(generation) => host.remove_if_generation(&id, &generation),
+        None => host.remove(&id),
+    };
+    if let Some(live) = live {
         terminate(live.pid);
         close_fd(live.master_fd);
     }
@@ -197,6 +215,7 @@ fn spawn_unix(
     cwd: String,
     cols: u16,
     rows: u16,
+    generation: String,
 ) -> Result<(), String> {
     use std::fs::File;
     use std::os::unix::io::FromRawFd;
@@ -257,6 +276,7 @@ fn spawn_unix(
         writer: Mutex::new(Box::new(writer)),
         master_fd: master,
         pid,
+        generation,
     });
     host.insert(id.clone(), live);
 
@@ -643,6 +663,25 @@ mod tests {
     }
 
     #[test]
+    fn remove_if_generation_ignores_a_replaced_session() {
+        let host = PtyHost::new();
+        host.insert(
+            "term".into(),
+            Arc::new(LivePty {
+                cwd: std::path::PathBuf::from("/test"),
+                writer: Mutex::new(Box::new(std::io::sink())),
+                master_fd: -1,
+                pid: 42,
+                generation: "current".into(),
+            }),
+        );
+        assert!(host.remove_if_generation("term", "old").is_none());
+        assert!(host.get("term").is_some());
+        assert!(host.remove_if_generation("term", "current").is_some());
+        assert!(host.get("term").is_none());
+    }
+
+    #[test]
     fn remove_if_pid_ignores_a_replaced_session() {
         let host = PtyHost::new();
         host.insert(
@@ -652,6 +691,7 @@ mod tests {
                 writer: Mutex::new(Box::new(std::io::sink())),
                 master_fd: -1,
                 pid: 42,
+                generation: "current".into(),
             }),
         );
         assert!(host.remove_if_pid("term", 7).is_none());
