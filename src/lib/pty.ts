@@ -140,7 +140,11 @@ export async function spawnPty(
     await invoke("pty_spawn", { id, cwd, cols, rows, generation });
     return generation;
   } catch (error) {
-    if (ptyGenerations.get(id) === generation) ptyGenerations.delete(id);
+    if (ptyGenerations.get(id) === generation) {
+      ptyGenerations.delete(id);
+      openedPtys.delete(id);
+      clearBuffered(id);
+    }
     if (import.meta.env.DEV) console.debug("[pty] spawn failed", id, error);
     throw error;
   }

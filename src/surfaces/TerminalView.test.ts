@@ -125,4 +125,35 @@ describe("TerminalView pty lifecycle", () => {
     });
     expect(calls("pty_kill")).toHaveLength(1);
   });
+
+  it("keeps second-generation handlers after first-generation cleanup", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.resetModules();
+    const captured = new Map<string, (event: unknown) => void>();
+    const { listen } = await import("@tauri-apps/api/event");
+    vi.mocked(listen).mockImplementation(async (event: string, cb: never) => {
+      captured.set(event, cb as (event: unknown) => void);
+      return () => {};
+    });
+    try {
+      const pty = await import("../lib/pty");
+      const first = await pty.spawnPty("t9", "/tmp", 80, 24);
+      await pty.spawnPty("t9", "/tmp", 80, 24);
+      const onData = vi.fn();
+      const onExit = vi.fn();
+      pty.subscribePty("t9", onData, onExit);
+
+      // Stale cleanup must not touch the replacement generation.
+      await pty.killPty("t9", first);
+      captured.get("pty-data")?.({
+        payload: { id: "t9", data: btoa("hello") },
+      });
+      expect(onData).toHaveBeenCalledTimes(1);
+      captured.get("pty-exit")?.({ payload: { id: "t9", code: 0 } });
+      expect(onExit).toHaveBeenCalledWith(0);
+    } finally {
+      vi.mocked(listen).mockReset();
+      vi.mocked(listen).mockImplementation(async () => () => {});
+    }
+  });
 });
