@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Settings › Inbox. The gate it installed was blocking every keyboard
   shortcut, notification click, and tab command while it was open.
 
+### Fixed
+
+- The Flatpak manifest pointed at `v0.1.95` while the app was at 0.2.50.
+  Its `tag:` and `commit:` pair was last moved together when the version bump
+  script could reach GitHub; every bump since silently skipped both, because
+  a tag that cannot be resolved must not leave a commit that describes a
+  different one. `npm run check:version` now catches it, and the Flatpak
+  build no longer installs 55 releases of stale code.
+
 ### Changed
 
 - Settings gains an Experimental section, its own group at the foot of the

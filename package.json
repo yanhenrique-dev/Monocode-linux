@@ -1,6 +1,6 @@
 {
   "name": "monocode-desktop",
-  "description": "MonoCode Linux — interface desktop para agentes de código, exclusiva para Linux",
+  "description": "MonoCode Linux \u2014 interface desktop para agentes de c\u00f3digo, exclusiva para Linux",
   "repository": {
     "type": "git",
     "url": "https://github.com/yanhenrique-dev/Monocode-linux.git"
@@ -25,6 +25,7 @@
     "knip": "knip",
     "check:rust": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test",
     "set-version": "node scripts/bump-version.mjs",
+    "check:version": "node scripts/check-version.mjs",
     "tauri": "tauri",
     "tauri:stable": "tauri dev --no-watch --config src-tauri/tauri.stable.conf.json",
     "setup:linux": "bash scripts/install-linux-deps.sh",

@@ -30,6 +30,9 @@ jobs:
 
       - run: npm ci
       - run: npm test
+      # Every version pin, not just package.json: a stale AUR or Flatpak pin
+      # ships the wrong build and nothing else in CI would notice.
+      - run: npm run check:version
       - run: npx tsc --noEmit
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
