@@ -59,6 +59,7 @@ import {
 import { copyMessage } from "../lib/clipboard";
 import type { Attachment } from "../lib/session";
 import { visibleUserPrompt } from "../lib/orchestration";
+import { tabGroupColor } from "../lib/tabGroups";
 import { playCue } from "../lib/sounds";
 import { getIntlLocale } from "../lib/locale";
 import { legacyTaskListFromText } from "../lib/taskList";
@@ -2436,6 +2437,9 @@ function SubagentPanel({
   const model = subagentModelName(block);
   const state = toolCallState(block);
   const active = live && state === "pending";
+  const mascotColor = active
+    ? tabGroupColor(block.tool?.callId ?? block.id)
+    : undefined;
   const steps = block.agentRun?.steps ?? [];
   // The run's trail as transcript blocks, so the panel groups it the way the
   // main transcript groups the agent's own work: what it said, then the calls
@@ -2489,7 +2493,12 @@ function SubagentPanel({
         title={brief}
         className="-mx-1.5 flex min-w-0 items-center gap-2 px-1.5 py-1"
       >
-        <SubagentMascot name={name} state={state} active={active} />
+        <SubagentMascot
+          name={name}
+          state={state}
+          active={active}
+          color={mascotColor}
+        />
         {label}
         <span className="size-3.5 shrink-0" />
       </div>
@@ -2510,7 +2519,12 @@ function SubagentPanel({
           open ? "bg-content/8" : ""
         }`}
       >
-        <SubagentMascot name={name} state={state} active={active} />
+        <SubagentMascot
+          name={name}
+          state={state}
+          active={active}
+          color={mascotColor}
+        />
         {label}
         <ChevronRight
           className={`size-3.5 shrink-0 text-content/35 transition-transform duration-200 group-hover:text-content/60 ${
@@ -2564,16 +2578,19 @@ function SubagentMascot({
   name,
   state,
   active = false,
+  color,
 }: {
   name: string;
   state: ToolCallState;
   active?: boolean;
+  color?: string;
 }) {
   if (active) {
     return (
       <svg
         aria-hidden="true"
         className="size-4 shrink-0 text-content/70"
+        style={color ? { color } : undefined}
         data-loading-indicator="trace"
         fill="none"
         focusable="false"
@@ -2606,6 +2623,8 @@ function SubagentMascot({
   return (
     <ProjectMascot
       project={name}
+      color={color}
+      active={active}
       className={`size-4 shrink-0 ${
         state === "rejected"
           ? "text-red-400"

@@ -8,7 +8,10 @@ import {
 
 describe("projectMascots", () => {
   it("keeps every sprite on the shared grid", () => {
-    expect(PROJECT_MASCOTS).toHaveLength(10);
+    expect(PROJECT_MASCOTS).toHaveLength(13);
+    expect(PROJECT_MASCOTS.map((mascot) => mascot.name)).toEqual(
+      expect.arrayContaining(["octopus", "bee", "penguin"]),
+    );
     for (const mascot of PROJECT_MASCOTS) {
       for (const frame of [mascot.rest, mascot.talk]) {
         expect(frame).toHaveLength(MASCOT_GRID);
@@ -25,6 +28,11 @@ describe("projectMascots", () => {
   it("merges filled runs into one rect each", () => {
     expect(mascotPath(["##..###."])).toBe("M0 0h2v1h-2zM4 0h3v1h-3z");
     expect(mascotPath(["........"])).toBe("");
+  });
+
+  it("keeps legacy project hash buckets stable", () => {
+    expect(projectMascot("~/code/monocode").name).toBe("ghost");
+    expect(projectMascot("/some/project").name).toBe("crab");
   });
 
   it("picks the same mascot for the same project", () => {

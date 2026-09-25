@@ -15,6 +15,9 @@ import {
   type CustomPet,
 } from "./customPets";
 import { PROJECT_MASCOTS, projectMascot } from "./projectMascots";
+import { loadTabGroupMascots } from "./tabGroups";
+
+let blockedWrites = new Set<string>();
 
 function mockLocalStorage() {
   const data = new Map<string, string>();
@@ -22,6 +25,7 @@ function mockLocalStorage() {
     value: {
       getItem: (key: string) => data.get(key) ?? null,
       setItem: (key: string, value: string) => {
+        if (blockedWrites.has(key)) throw new Error("storage unavailable");
         data.set(key, value);
       },
       removeItem: (key: string) => {
@@ -56,7 +60,10 @@ const TALK = [
   "........",
 ];
 
-beforeEach(mockLocalStorage);
+beforeEach(() => {
+  blockedWrites = new Set();
+  mockLocalStorage();
+});
 
 describe("pet validation", () => {
   it("slugs names and rejects taken ones", () => {
@@ -102,6 +109,67 @@ describe("custom pet store", () => {
       JSON.stringify([pet, { name: "bad" }, "nope"]),
     );
     expect(loadCustomPets()).toEqual([pet]);
+  });
+
+  it("keeps the first custom when duplicate names are stored", () => {
+    const pet: CustomPet = { name: "blob", rest: REST, talk: TALK };
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([pet, { ...pet }]),
+    );
+
+    expect(loadCustomPets()).toEqual([pet]);
+  });
+
+  it("renames colliding custom pets and saved mascot selections", () => {
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([{ name: "bee", rest: REST, talk: TALK }]),
+    );
+    localStorage.setItem(
+      "monocode:tab-group:mascots",
+      JSON.stringify({ "/repo": "bee" }),
+    );
+
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee-custom");
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+  });
+
+  it("retries selection migration after invalid mascot storage", () => {
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([{ name: "bee", rest: REST, talk: TALK }]),
+    );
+    localStorage.setItem("monocode:tab-group:mascots", "not-json");
+
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+
+    localStorage.setItem(
+      "monocode:tab-group:mascots",
+      JSON.stringify({ "/repo": "bee" }),
+    );
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee-custom");
+  });
+
+  it("retries selection migration after a failed write", () => {
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([{ name: "bee", rest: REST, talk: TALK }]),
+    );
+    localStorage.setItem(
+      "monocode:tab-group:mascots",
+      JSON.stringify({ "/repo": "bee" }),
+    );
+    blockedWrites.add("monocode:tab-group:mascots");
+
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee");
+
+    blockedWrites.delete("monocode:tab-group:mascots");
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee-custom");
   });
 });
 

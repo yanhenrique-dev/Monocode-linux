@@ -7,6 +7,7 @@
  * project has a turn in flight — mouths chew, legs shuffle, flames flicker.
  */
 const GRID = 8;
+export const LEGACY_MASCOT_COUNT = 10;
 
 type MascotRows = readonly string[];
 
@@ -120,6 +121,36 @@ const REST: Record<string, MascotRows> = {
     "##....##",
     "........",
   ],
+  octopus: [
+    "..####..",
+    ".######.",
+    "##.##.##",
+    "########",
+    "########",
+    ".######.",
+    "#.#..#.#",
+    ".##..##.",
+  ],
+  bee: [
+    "..#..#..",
+    ".#....#.",
+    ".######.",
+    "########",
+    "..####..",
+    ".######.",
+    "########",
+    "........",
+  ],
+  penguin: [
+    "...##...",
+    "..####..",
+    ".######.",
+    "##.##.##",
+    "########",
+    ".######.",
+    "..####..",
+    ".#....#.",
+  ],
 };
 
 const TALK: Record<string, MascotRows> = {
@@ -223,6 +254,36 @@ const TALK: Record<string, MascotRows> = {
     "#......#",
     "........",
   ],
+  octopus: [
+    "..####..",
+    ".######.",
+    "##.##.##",
+    "########",
+    "########",
+    ".######.",
+    ".#..#..#",
+    "##.##.##",
+  ],
+  bee: [
+    "..#..#..",
+    ".#....#.",
+    ".######.",
+    "########",
+    "..####..",
+    ".######.",
+    "###..###",
+    "........",
+  ],
+  penguin: [
+    "...##...",
+    "..####..",
+    ".######.",
+    "##.##.##",
+    "########",
+    ".######.",
+    "..####..",
+    ".#..##.#",
+  ],
 };
 
 /** Merges each row's filled runs into one rect so the path stays short. */
@@ -272,5 +333,5 @@ export function projectMascot(
   for (let i = 0; i < project.length; i++) {
     hash = (hash * 131 + project.charCodeAt(i)) >>> 0;
   }
-  return PROJECT_MASCOTS[hash % PROJECT_MASCOTS.length];
+  return PROJECT_MASCOTS[hash % LEGACY_MASCOT_COUNT];
 }
