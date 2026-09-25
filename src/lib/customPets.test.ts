@@ -136,6 +136,23 @@ describe("custom pet store", () => {
     expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
   });
 
+  it("retries selection migration after invalid mascot storage", () => {
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([{ name: "bee", rest: REST, talk: TALK }]),
+    );
+    localStorage.setItem("monocode:tab-group:mascots", "not-json");
+
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+
+    localStorage.setItem(
+      "monocode:tab-group:mascots",
+      JSON.stringify({ "/repo": "bee" }),
+    );
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee-custom");
+  });
+
   it("retries selection migration after a failed write", () => {
     localStorage.setItem(
       "monocode.pets.custom",
