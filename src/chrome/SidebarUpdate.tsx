@@ -114,7 +114,18 @@ export function SidebarUpdate({
   }, [busy, onSnapshot]);
 
   const label = busy
-    ? `Downloading${snapshot.progress != null ? ` ${snapshot.progress}%` : "…"}`
+    ? (() => {
+        const pct = snapshot.progress != null ? ` ${snapshot.progress}%` : "…";
+        const speed =
+          snapshot.speedBps != null && snapshot.speedBps > 0
+            ? ` · ${(snapshot.speedBps / 1024 / 1024).toFixed(1)} MB/s`
+            : "";
+        const eta =
+          snapshot.etaSeconds != null && snapshot.etaSeconds < 3600
+            ? ` · ${snapshot.etaSeconds}s`
+            : "";
+        return `Downloading${pct}${speed}${eta}`;
+      })()
     : `Update to ${snapshot.availableVersion}`;
 
   return (

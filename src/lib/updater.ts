@@ -19,6 +19,17 @@ export type UpdateFlowOptions = {
    * (3 attempts total). Tests pass [0, 0].
    */
   retryDelaysMs?: number[];
+  /**
+   * Backoff between `downloadAndInstall()` retries. Defaults to
+   * [1000, 2000, 5000]. Download is idempotent (staged next to binary),
+   * so retry is safe. Permanent errors (EACCES, ENOSPC) never retry.
+   */
+  downloadRetryDelaysMs?: number[];
+  /**
+   * Timeout per `check()` attempt. Defaults to 15s. Prevents hung UI
+   * when GitHub redirects stall.
+   */
+  checkTimeoutMs?: number;
 };
 
 export type UpdaterPhase =
@@ -29,17 +40,43 @@ export type UpdaterPhase =
   | "downloading"
   | "error";
 
+export type UpdateChannel = "stable" | "beta";
+
 export type UpdaterSnapshot = {
   phase: UpdaterPhase;
   currentVersion: string;
   availableVersion?: string;
   progress?: number;
   error?: string;
+  /** Bytes downloaded so far (when downloading). */
+  downloadedBytes?: number;
+  /** Total bytes when server reports contentLength. */
+  totalBytes?: number;
+  /** Measured throughput bytes/s (smoothed). */
+  speedBps?: number;
+  /** Estimated seconds remaining. */
+  etaSeconds?: number;
+  /** Which check attempt produced this snapshot (1-based). */
+  attempt?: number;
 };
 
 let pendingUpdate: Update | null = null;
 
 let flatpakCache: boolean | null = null;
+
+/** Single-flight for concurrent check() calls across windows/components. */
+let checkInFlight: Promise<Update | null> | null = null;
+
+/** Best-effort cancel flag: plugin download has no abort, but we can skip relaunch. */
+let cancelRequested = false;
+
+export function cancelPendingUpdate(): void {
+  cancelRequested = true;
+}
+
+function resetCancel(): void {
+  cancelRequested = false;
+}
 
 /// True inside the Flatpak sandbox, where the in-app updater is disabled
 /// (Flathub updates the whole package; the backend doesn't even register
@@ -90,6 +127,12 @@ function isTargetsNotFoundError(error: unknown): boolean {
   );
 }
 
+function isTransientCheckError(error: unknown): boolean {
+  return /timeout|timed out|network|fetch failed|failed to fetch|connection|econn|etimedout|socket|429|5\d\d|service unavailable|gateway|offline|ERR_/i.test(
+    errorText(error),
+  );
+}
+
 function isPermanentUpdaterCheckError(error: unknown): boolean {
   return (
     isUpdaterNotConfiguredError(error) ||
@@ -110,20 +153,120 @@ export function friendlyUpdateError(error: unknown, locale: Locale): string {
 }
 
 const DEFAULT_RETRY_DELAYS_MS = [1000, 2000];
+const DEFAULT_DOWNLOAD_RETRY_DELAYS_MS = [1000, 2000, 5000];
+const DEFAULT_CHECK_TIMEOUT_MS = 15_000;
+
+/** Background poll interval: 6h + jitter. */
+export const UPDATE_POLL_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_LAST_CHECK_KEY = "monocode.update.lastCheck";
+const UPDATE_MANIFEST_CACHE_KEY = "monocode.update.lastManifest";
+const UPDATE_CHANNEL_KEY = "monocode.update.channel";
+
+export type CachedManifest = {
+  version: string;
+  pubDate?: string;
+  checkedAt: number;
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  if (ms <= 0) return promise;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
+export function getUpdateChannel(): UpdateChannel {
+  try {
+    const raw = window.localStorage.getItem(UPDATE_CHANNEL_KEY);
+    return raw === "beta" ? "beta" : "stable";
+  } catch {
+    return "stable";
+  }
+}
+
+export function setUpdateChannel(channel: UpdateChannel): void {
+  try {
+    window.localStorage.setItem(UPDATE_CHANNEL_KEY, channel);
+  } catch {
+    // Storage full/blocked: channel preference is non-critical.
+  }
+}
+
+export function getLastCheckAt(): number | null {
+  try {
+    const raw = window.localStorage.getItem(UPDATE_LAST_CHECK_KEY);
+    if (raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export function shouldBackgroundCheck(now = Date.now()): boolean {
+  const last = getLastCheckAt();
+  if (last == null) return true;
+  return now - last >= UPDATE_POLL_INTERVAL_MS;
+}
+
+function markCheckedNow(): void {
+  try {
+    window.localStorage.setItem(UPDATE_LAST_CHECK_KEY, String(Date.now()));
+  } catch {
+    // Non-critical.
+  }
+}
+
+export function getCachedManifest(): CachedManifest | null {
+  try {
+    const raw = window.localStorage.getItem(UPDATE_MANIFEST_CACHE_KEY);
+    if (raw == null) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedManifest>;
+    if (typeof parsed.version !== "string" || !parsed.version.trim()) return null;
+    if (typeof parsed.checkedAt !== "number" || !Number.isFinite(parsed.checkedAt)) return null;
+    return {
+      version: parsed.version.trim(),
+      pubDate: typeof parsed.pubDate === "string" ? parsed.pubDate : undefined,
+      checkedAt: parsed.checkedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setCachedManifest(version: string): void {
+  try {
+    const payload: CachedManifest = { version, checkedAt: Date.now() };
+    window.localStorage.setItem(UPDATE_MANIFEST_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // Non-critical.
+  }
+}
+
 export async function checkWithRetry(
   delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
+  opts?: { timeoutMs?: number },
 ): Promise<Update | null> {
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS;
   let attempt = 0;
   for (;;) {
     try {
-      return await check();
+      return await withTimeout(check(), timeoutMs, "Update check");
     } catch (err) {
       if (isPermanentUpdaterCheckError(err) || attempt >= delaysMs.length) {
+        throw err;
+      }
+      // Permanent-looking errors never retry; transient always retry.
+      // Unknown errors retry while attempts remain (cheap, bounded).
+      if (!isTransientCheckError(err) && attempt >= 1) {
         throw err;
       }
       const base = delaysMs[attempt] ?? 0;
@@ -131,6 +274,19 @@ export async function checkWithRetry(
       attempt += 1;
     }
   }
+}
+
+/** Shared check: concurrent callers await same promise, one network hit. */
+function sharedCheck(
+  delaysMs: number[] | undefined,
+  timeoutMs: number | undefined,
+): Promise<Update | null> {
+  if (!checkInFlight) {
+    checkInFlight = checkWithRetry(delaysMs, { timeoutMs }).finally(() => {
+      checkInFlight = null;
+    });
+  }
+  return checkInFlight;
 }
 
 export async function readAppVersion(): Promise<string> {
@@ -145,9 +301,13 @@ export async function probeForUpdate(
   delaysMs: number[] = DEFAULT_RETRY_DELAYS_MS,
 ): Promise<Update | null> {
   if (await isFlatpakSandbox()) return null;
-  const update = await checkWithRetry(delaysMs);
+  const update = await sharedCheck(delaysMs, DEFAULT_CHECK_TIMEOUT_MS);
   pendingUpdate = update;
-  if (update) announceUpdateAvailable(update.version);
+  markCheckedNow();
+  if (update) {
+    setCachedManifest(update.version);
+    announceUpdateAvailable(update.version);
+  }
   return update;
 }
 
@@ -178,11 +338,12 @@ export async function runUpdateFlow(
     }
     return idle;
   }
-  const base: UpdaterSnapshot = { phase: "checking", currentVersion };
+  const base: UpdaterSnapshot = { phase: "checking", currentVersion, attempt: 1 };
   onProgress?.(base);
 
   try {
-    const update = await checkWithRetry(opts?.retryDelaysMs);
+    const update = await sharedCheck(opts?.retryDelaysMs, opts?.checkTimeoutMs);
+    markCheckedNow();
     if (!update) {
       pendingUpdate = null;
       const current: UpdaterSnapshot = { phase: "current", currentVersion };
@@ -196,6 +357,8 @@ export async function runUpdateFlow(
     }
 
     pendingUpdate = update;
+    resetCancel();
+    setCachedManifest(update.version);
     announceUpdateAvailable(update.version);
     const available: UpdaterSnapshot = {
       phase: "available",
@@ -233,7 +396,14 @@ export async function runUpdateFlow(
     }
 
     const error = friendlyUpdateError(err, locale);
-    const failed: UpdaterSnapshot = { phase: "error", currentVersion, error };
+    const cached = getCachedManifest();
+    const failed: UpdaterSnapshot = {
+      phase: "error",
+      currentVersion,
+      // Surface last known version so offline UI can still hint.
+      availableVersion: cached?.version,
+      error,
+    };
     onProgress?.(failed);
     if (manual && showDialog) {
       await message(t(locale, "updater.dialog.check_failed", { error }), {
@@ -246,8 +416,9 @@ export async function runUpdateFlow(
 
 /**
  * Download and install a previously detected update, then relaunch.
- * Failure is reported through `onProgress`; the native dialog follows the
- * same `showDialog` rule as `runUpdateFlow`.
+ * Retries transient download failures with backoff. Failure is reported
+ * through `onProgress`; the native dialog follows the same `showDialog`
+ * rule as `runUpdateFlow`.
  */
 export async function installPendingUpdate(
   onProgress?: (snapshot: UpdaterSnapshot) => void,
@@ -263,60 +434,136 @@ export async function installPendingUpdate(
     return idle;
   }
 
+  resetCancel();
+  const delays = opts?.downloadRetryDelaysMs ?? DEFAULT_DOWNLOAD_RETRY_DELAYS_MS;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    if (cancelRequested) {
+      const idle: UpdaterSnapshot = {
+        phase: "available",
+        currentVersion,
+        availableVersion: update.version,
+      };
+      onProgress?.(idle);
+      return idle;
+    }
+    try {
+      await downloadOnce(update, currentVersion, onProgress, attempt + 1);
+      if (cancelRequested) {
+        const idle: UpdaterSnapshot = {
+          phase: "available",
+          currentVersion,
+          availableVersion: update.version,
+        };
+        onProgress?.(idle);
+        return idle;
+      }
+      rememberInstalledUpdate(update.version);
+      pendingUpdate = null;
+      await relaunch();
+      return {
+        phase: "current",
+        currentVersion: update.version,
+      };
+    } catch (err) {
+      lastError = err;
+      // Never retry permanent failures: missing disk, permissions, bad target.
+      if (isPermanentUpdaterCheckError(err) || attempt >= delays.length) break;
+      if (!isTransientCheckError(err)) break;
+      const base = delays[attempt] ?? 0;
+      await sleep(base + Math.floor(Math.random() * 250));
+    }
+  }
+
+  const error = friendlyUpdateError(lastError, locale);
+  const failed: UpdaterSnapshot = {
+    phase: "error",
+    currentVersion,
+    availableVersion: update.version,
+    error,
+  };
+  onProgress?.(failed);
+  if (showDialog) {
+    await message(t(locale, "updater.dialog.install_failed", { error }), {
+      title: t(locale, "updater.dialog.title"),
+    });
+  }
+  return failed;
+}
+
+async function downloadOnce(
+  update: Update,
+  currentVersion: string,
+  onProgress: ((snapshot: UpdaterSnapshot) => void) | undefined,
+  attempt: number,
+): Promise<void> {
   let downloaded = 0;
   let contentLength = 0;
+  let startAt = Date.now();
+  let lastEmitAt = 0;
+  let lastDownloaded = 0;
+  let speedBps: number | undefined;
 
   const downloading: UpdaterSnapshot = {
     phase: "downloading",
     currentVersion,
     availableVersion: update.version,
     progress: 0,
+    downloadedBytes: 0,
+    attempt,
   };
   onProgress?.(downloading);
 
-  try {
-    await update.downloadAndInstall((event: DownloadEvent) => {
-      if (event.event === "Started") {
-        contentLength = event.data.contentLength ?? 0;
-        downloaded = 0;
-      } else if (event.event === "Progress") {
-        downloaded += event.data.chunkLength;
+  await update.downloadAndInstall((event: DownloadEvent) => {
+    const now = Date.now();
+    if (event.event === "Started") {
+      contentLength = event.data.contentLength ?? 0;
+      downloaded = 0;
+      startAt = now;
+      lastEmitAt = now;
+      lastDownloaded = 0;
+      speedBps = undefined;
+    } else if (event.event === "Progress") {
+      downloaded += event.data.chunkLength;
+    } else if (event.event === "Finished") {
+      downloaded = contentLength > 0 ? contentLength : downloaded;
+    }
+
+    // Smooth throughput over ~500ms windows, throttle UI emits.
+    const dt = (now - lastEmitAt) / 1000;
+    if (dt >= 0.5 || event.event === "Finished") {
+      const delta = downloaded - lastDownloaded;
+      if (dt > 0 && delta >= 0) {
+        const instant = delta / dt;
+        speedBps = speedBps == null ? instant : speedBps * 0.7 + instant * 0.3;
       }
+      lastEmitAt = now;
+      lastDownloaded = downloaded;
+    }
 
-      const progress =
-        contentLength > 0
-          ? Math.min(100, Math.round((downloaded / contentLength) * 100))
-          : undefined;
+    const elapsed = Math.max((now - startAt) / 1000, 0.001);
+    const avg = downloaded / elapsed;
+    const effective = speedBps ?? avg;
+    const progress =
+      contentLength > 0
+        ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+        : undefined;
+    const etaSeconds =
+      effective > 0 && contentLength > downloaded
+        ? Math.ceil((contentLength - downloaded) / effective)
+        : undefined;
 
-      onProgress?.({
-        phase: "downloading",
-        currentVersion,
-        availableVersion: update.version,
-        progress,
-      });
-    });
-
-    rememberInstalledUpdate(update.version);
-    pendingUpdate = null;
-    await relaunch();
-    return {
-      phase: "current",
-      currentVersion: update.version,
-    };
-  } catch (err) {
-    const error = friendlyUpdateError(err, locale);
-    const failed: UpdaterSnapshot = {
-      phase: "error",
+    onProgress?.({
+      phase: "downloading",
       currentVersion,
       availableVersion: update.version,
-      error,
-    };
-    onProgress?.(failed);
-    if (showDialog) {
-      await message(t(locale, "updater.dialog.install_failed", { error }), {
-        title: t(locale, "updater.dialog.title"),
-      });
-    }
-    return failed;
-  }
+      progress,
+      downloadedBytes: downloaded,
+      totalBytes: contentLength > 0 ? contentLength : undefined,
+      speedBps: Number.isFinite(effective) ? Math.round(effective) : undefined,
+      etaSeconds,
+      attempt,
+    });
+  });
 }
