@@ -324,6 +324,9 @@ const en = {
   "settings.experimental.empty_session_games.description":
     "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
   "settings.experimental.empty_session_games.toggle": "Empty session games",
+  "settings.experimental.next_steps.suggest.label": "Suggest what to ask next",
+  "settings.experimental.next_steps.suggest.description":
+    "After a turn finishes, ask this session's CLI for two or three follow-ups to try. It uses that CLI's cheap short-text model, not the model you are chatting with, and costs a fraction of one turn. Turn it off to keep only the fixed shortcuts below.",
   "settings.experimental.next_steps.action.jump-to-bottom.label":
     "Jump to latest",
   "settings.experimental.next_steps.action.jump-to-bottom.description":
@@ -1324,6 +1327,10 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.experimental.empty_session_games.description":
     "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
   "settings.experimental.empty_session_games.toggle": "Jogos da sessão vazia",
+  "settings.experimental.next_steps.suggest.label":
+    "Sugerir o que perguntar em seguida",
+  "settings.experimental.next_steps.suggest.description":
+    "Depois que um turno termina, pede à CLI desta sessão duas ou três sugestões para tentar. Usa o modelo barato de texto curto daquela CLI, não o modelo com que você está conversando, e custa uma fração de um turno. Desative para ficar só com os atalhos fixos abaixo.",
   "settings.experimental.next_steps.action.jump-to-bottom.label":
     "Ir para o final",
   "settings.experimental.next_steps.action.jump-to-bottom.description":

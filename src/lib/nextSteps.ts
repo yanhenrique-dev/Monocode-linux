@@ -54,3 +54,30 @@ export function isNextStepCompletionEligible(
     !completion.nativeCommand
   );
 }
+
+/**
+ * Asks the composer to prefill a suggestion.
+ *
+ * A window event rather than a prop chain: the bar sits above the composer
+ * inside SessionPane, but the composer owns its draft and its focus, and it
+ * already listens for this kind of out-of-band instruction.
+ */
+export const COMPOSER_SUGGESTION_EVENT = "monocode:composer-suggestion";
+
+export function requestComposerSuggestion(prompt: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<string>(COMPOSER_SUGGESTION_EVENT, { detail: prompt }),
+  );
+}
+
+export function subscribeComposerSuggestion(
+  onSuggestion: (prompt: string) => void,
+): () => void {
+  const onEvent = (event: Event) => {
+    const prompt = (event as CustomEvent<string>).detail;
+    if (typeof prompt === "string" && prompt) onSuggestion(prompt);
+  };
+  window.addEventListener(COMPOSER_SUGGESTION_EVENT, onEvent);
+  return () => window.removeEventListener(COMPOSER_SUGGESTION_EVENT, onEvent);
+}

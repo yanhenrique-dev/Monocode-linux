@@ -79,6 +79,8 @@ import {
 } from "../lib/settings";
 import { nextStepActions } from "../lib/nextSteps";
 import { NextStepsBar } from "./NextStepsBar";
+import { requestComposerSuggestion } from "../lib/nextSteps";
+import type { NextStepSuggestion } from "../lib/nextStepsPrompt";
 import { resolveModel } from "../lib/models";
 import { isAstraModel } from "../lib/astraWelcome";
 import { AstraWelcome } from "./AstraWelcome";
@@ -107,6 +109,8 @@ type Props = {
   composerFocusToken?: number;
   recents: RecentProject[];
   nextStepGeneration?: number;
+  /** Model suggestions for the current turn, keyed by session and generation. */
+  nextStepSuggestions?: readonly NextStepSuggestion[];
   nextStepDismissedGeneration?: number;
   onDismissNextStep: (sessionId: string, generation: number) => void;
   hideProjectPicker?: boolean;
@@ -199,6 +203,7 @@ const SessionPaneContent = memo(function SessionPaneContent({
   composerFocusToken,
   recents,
   nextStepGeneration,
+  nextStepSuggestions,
   nextStepDismissedGeneration,
   onDismissNextStep,
   hideProjectPicker,
@@ -550,6 +555,14 @@ const SessionPaneContent = memo(function SessionPaneContent({
     dismissNextSteps();
     setTranscriptSearchOpen(true);
   }, [dismissNextSteps]);
+  // Prefill, never send: the user reads the prompt and presses send.
+  const handleNextStepSuggestion = useCallback(
+    (prompt: string) => {
+      dismissNextSteps();
+      requestComposerSuggestion(prompt);
+    },
+    [dismissNextSteps],
+  );
   const handleNextStepReview = useCallback(() => {
     dismissNextSteps();
     onOpenDiff(undefined, { sessionId: session.id, cwd: workCwd });
@@ -964,9 +977,11 @@ const SessionPaneContent = memo(function SessionPaneContent({
             {showNextSteps ? (
               <NextStepsBar
                 actions={nextStepActionList}
+                suggestions={nextStepSuggestions}
                 onJumpToBottom={handleNextStepJump}
                 onSearchTranscript={handleNextStepSearch}
                 onReviewChanges={handleNextStepReview}
+                onSuggestion={handleNextStepSuggestion}
               />
             ) : null}
             <MessageQueue

@@ -72,6 +72,7 @@ import { SessionSurface } from "./surfaces/SessionSurface";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
 import { LinkedWorkItemPanel } from "./surfaces/InboxView";
 import type { SettingsAnchor } from "./lib/settings";
+import { loadNextStepsSuggest } from "./lib/settings";
 import type { InboxSessionPortal } from "./surfaces/InboxDiscussionPanel";
 import type { LinkedSessionUpdate } from "./lib/linkedSessionUpdates";
 
@@ -118,6 +119,9 @@ import { useHistory } from "./app/useHistory";
 import { useProjects } from "./app/useProjects";
 import { useComposer, type ComposerTurnSettlement } from "./app/useComposer";
 import { isNextStepCompletionEligible } from "./lib/nextSteps";
+import { nextStepSuggestionKey } from "./lib/harness/nextStepsText";
+import type { NextStepSuggestion } from "./lib/nextStepsPrompt";
+import { requestNextStepSuggestions } from "./lib/harness/nextStepsText";
 import { useTurnActions } from "./app/useTurnActions";
 import { useSessionBootstrap } from "./app/useSessionBootstrap";
 import { registerBuiltinHarnesses } from "./lib/harness";
@@ -861,11 +865,29 @@ export default function App({
     setProjectTerminals,
     onSelectHistorySession,
   });
+  /**
+   * Suggestions are keyed by session and generation. A late answer for a
+   * superseded turn is dropped rather than shown against the wrong one, and a
+   * failure simply leaves the entry absent, which keeps the static bar.
+   */
+  const [nextStepSuggestions, setNextStepSuggestions] = useState<
+    Record<string, NextStepSuggestion[]>
+  >({});
   const [nextStepGenerations, setNextStepGenerations] = useState<
     Record<string, number>
   >({});
   const [dismissedNextStepGenerations, setDismissedNextStepGenerations] =
     useState<Record<string, number>>({});
+  /** Suggestions for the turn the bar is currently showing, if any. */
+  const nextStepSuggestionsFor = useCallback(
+    (sessionId: string): NextStepSuggestion[] | undefined => {
+      const generation = nextStepGenerations[sessionId];
+      if (generation === undefined) return undefined;
+      return nextStepSuggestions[nextStepSuggestionKey(sessionId, generation)];
+    },
+    [nextStepGenerations, nextStepSuggestions],
+  );
+
   const nextStepsEnabled = useSyncExternalStore(
     subscribeNextSteps,
     loadNextStepsEnabled,
@@ -948,6 +970,28 @@ export default function App({
             [settlement.sessionId]: settlement.generation,
           };
         });
+        // The model call is opt-in on its own: the static bar is free and
+        // local, the suggestions are a side-channel call per completed turn.
+        const settled = loadNextStepsSuggest()
+          ? sessionsRef.current.find(
+              (candidate) => candidate.id === settlement.sessionId,
+            )
+          : undefined;
+        if (settled) {
+          void requestNextStepSuggestions({
+            sessionId: settled.id,
+            generation: settlement.generation,
+            harness: settled.harness,
+            cwd: settled.cwd,
+            providerAccountId: settled.providerAccountId,
+            blocks: settled.blocks,
+            commit: (key, suggestions) =>
+              setNextStepSuggestions((previous) =>
+                // Ignore an answer that arrived after the turn moved on.
+                previous[key] ? previous : { ...previous, [key]: suggestions },
+              ),
+          });
+        }
         setDismissedNextStepGenerations((previous) => {
           if (!(settlement.sessionId in previous)) return previous;
           const next = { ...previous };
@@ -1633,6 +1677,7 @@ export default function App({
                         {...sessionPaneProps}
                         session={session}
                         nextStepGeneration={nextStepGenerations[session.id]}
+                        nextStepSuggestions={nextStepSuggestionsFor(session.id)}
                         nextStepDismissedGeneration={
                           dismissedNextStepGenerations[session.id]
                         }
@@ -1705,18 +1750,12 @@ export default function App({
             ) : null}
             <div
               className={
-                searchViewOpen ||
-                inboxViewOpen ||
-                notesViewOpen ||
-                settingsOpen
+                searchViewOpen || inboxViewOpen || notesViewOpen || settingsOpen
                   ? "hidden"
                   : "contents"
               }
               aria-hidden={
-                searchViewOpen ||
-                inboxViewOpen ||
-                notesViewOpen ||
-                settingsOpen
+                searchViewOpen || inboxViewOpen || notesViewOpen || settingsOpen
               }
             >
               <UsageFooter

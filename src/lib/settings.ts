@@ -365,6 +365,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
       "next steps suggestions shortcuts experimental composer proximos passos sugestoes atalhos",
   },
   {
+    id: "next-step-suggest",
+    section: "experimental",
+    label: "settings.experimental.next_steps.suggest.label",
+    keywords:
+      "next step suggest model llm ai follow ups proximos passos sugerir modelo sugerir",
+  },
+  {
     id: "next-step-jump-to-bottom",
     section: "experimental",
     label: "settings.experimental.next_steps.action.jump-to-bottom.label",
@@ -617,6 +624,14 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
 const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
 
 /**
+ * The model call is separable from the bar. Both are experimental, but they
+ * cost different things: the static shortcuts are free and local, the
+ * suggestions are a short side-channel call on every completed turn.
+ */
+const NEXT_STEPS_SUGGEST_KEY = "monocode.nextSteps.suggest";
+export const NEXT_STEPS_SUGGEST_DEFAULT = true;
+
+/**
  * One flag per action. The previous `monocode.nextStepsCount` was a `2 | 3`
  * number that the caller then filtered down from, so the number lied; naming
  * the actions directly makes the choice explicit and reachable.
@@ -674,6 +689,14 @@ export function saveNextStepsEnabled(value: boolean) {
   writeFlag(NEXT_STEPS_ENABLED_KEY, value);
 }
 
+export function loadNextStepsSuggest(): boolean {
+  return readFlag(NEXT_STEPS_SUGGEST_KEY, NEXT_STEPS_SUGGEST_DEFAULT);
+}
+
+export function saveNextStepsSuggest(value: boolean) {
+  writeFlag(NEXT_STEPS_SUGGEST_KEY, value);
+}
+
 export function loadNextStepAction(action: NextStepAction): boolean {
   return readFlag(
     NEXT_STEP_ACTION_KEYS[action],
@@ -716,6 +739,7 @@ export function subscribeNextSteps(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
     if (
       event.key === NEXT_STEPS_ENABLED_KEY ||
+      event.key === NEXT_STEPS_SUGGEST_KEY ||
       NEXT_STEP_ACTIONS.some(
         (action) => event.key === NEXT_STEP_ACTION_KEYS[action],
       )

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Next-step suggestions are real now. When a turn finishes, the session's own
+  CLI is asked, on its cheap short-text model rather than the model you are
+  chatting with, for two or three follow-ups to try. They appear as labelled
+  buttons in the same bar as the fixed shortcuts, and clicking one prefills
+  the composer for you to read and send -- nothing is ever sent on your
+  behalf. The bar renders immediately with whatever is known and gains the
+  suggestions when they arrive, so you never wait; if the call fails, times
+  out, or the answer is unusable, the fixed shortcuts are simply what stays.
+  Nothing is shown for a cancelled turn, a plan, an orchestrated run, or a
+  harness with no text backend.
+- "Suggest what to ask next" is a separate switch from the bar itself, under
+  Settings > Experimental > Next-step shortcuts. The shortcuts are free and
+  local; the suggestions are a side-channel call on every completed turn, so
+  you can keep one without the other.
+
 ### Removed
 
 - The first-run wizard. The app now opens straight into the workspace

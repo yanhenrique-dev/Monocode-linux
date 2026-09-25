@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPOSER_SUGGESTION_EVENT,
   isNextStepCompletionEligible,
   isNextStepSelectionUsable,
   nextStepActions,
@@ -99,5 +100,11 @@ describe("isNextStepCompletionEligible", () => {
     expect(
       isNextStepCompletionEligible({ ...completion, enabled: false }),
     ).toBe(false);
+  });
+});
+
+describe("COMPOSER_SUGGESTION_EVENT", () => {
+  it("is namespaced like the other window events", () => {
+    expect(COMPOSER_SUGGESTION_EVENT).toBe("monocode:composer-suggestion");
   });
 });

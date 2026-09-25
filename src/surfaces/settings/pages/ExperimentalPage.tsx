@@ -15,10 +15,12 @@ import {
   loadGridArcadeEnabled,
   loadNextStepSelectionRaw,
   loadNextStepsEnabled,
+  loadNextStepsSuggest,
   saveComposerRunner,
   saveGridArcadeEnabled,
   saveNextStepAction,
   saveNextStepsEnabled,
+  saveNextStepsSuggest,
   subscribeNextSteps,
   parseNextStepSelection,
   NEXT_STEP_ACTION_DEFAULTS_RAW,
@@ -47,6 +49,13 @@ export function ExperimentalPage() {
   const onNextStepsEnabled = useCallback((next: boolean) => {
     saveNextStepsEnabled(next);
     setNextStepsEnabled(next);
+  }, []);
+
+  const [nextStepsSuggest, setNextStepsSuggest] =
+    useState(loadNextStepsSuggest);
+  const onNextStepsSuggest = useCallback((next: boolean) => {
+    saveNextStepsSuggest(next);
+    setNextStepsSuggest(next);
   }, []);
 
   // Primitive snapshot: useSyncExternalStore compares with Object.is, so a
@@ -117,6 +126,20 @@ export function ExperimentalPage() {
             label={t("settings.experimental.next_steps.toggle")}
             on={nextStepsEnabled}
             onChange={onNextStepsEnabled}
+          />
+        </Row>
+        <Row
+          id="next-step-suggest"
+          label={t("settings.experimental.next_steps.suggest.label")}
+          description={t(
+            "settings.experimental.next_steps.suggest.description",
+          )}
+        >
+          <Toggle
+            label={t("settings.experimental.next_steps.suggest.label")}
+            on={nextStepsSuggest}
+            disabled={!nextStepsEnabled}
+            onChange={onNextStepsSuggest}
           />
         </Row>
         {NEXT_STEP_ACTIONS.map((action) => (
