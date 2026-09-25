@@ -836,7 +836,7 @@ function SidebarComponent({
       label: t("shell.sidebar.remind_me"),
 
       disabled: !onSetReminders,
-      submenu: sessionReminderPresets(),
+      submenu: sessionReminderPresets(t),
     },
     { kind: "sep" as const },
     {
@@ -1218,13 +1218,13 @@ function SidebarComponent({
             isChangesTab
               ? hasChangeStats
                 ? [
-                    "Changes",
+                    tabLabel(itemId, t),
                     changeAdditions > 0 ? `+${changeAdditions}` : "",
                     changeDeletions > 0 ? `-${changeDeletions}` : "",
                   ]
                     .filter(Boolean)
                     .join(" ")
-                : "Changes"
+                : tabLabel(itemId, t)
               : undefined
           }
           data-tauri-drag-region="false"

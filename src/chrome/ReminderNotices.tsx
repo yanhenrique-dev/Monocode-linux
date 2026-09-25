@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useLocale } from "../lib/locale";
 import { LAYER } from "../lib/layers";
 import {
   loadNotificationsEnabled,
@@ -44,6 +45,7 @@ export function ReminderNotices({
   onOpenSettings: () => void;
   onHeightChange?: (height: number) => void;
 }) {
+  const { t } = useLocale();
   const panelRef = useRef<HTMLElement>(null);
   const [snooze, setSnooze] = useState<{
     reminder: SessionReminder;
@@ -162,7 +164,7 @@ export function ReminderNotices({
         <ExplorerMenu
           x={snooze.x}
           y={snooze.y}
-          items={sessionReminderPresets()}
+          items={sessionReminderPresets(t)}
           ariaLabel="Snooze reminder"
           onClose={() => setSnooze(null)}
           onPick={(id) => {

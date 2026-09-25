@@ -146,10 +146,14 @@ export function ProjectSearch({
       ? t("shell.search.no_results")
       : matchCount === 1 && fileCount === 1
         ? t("shell.search.results_one")
-        : t("shell.search.results_many", {
-            count: matchCount,
-            files: fileCount,
-          });
+        : matchCount === 1
+          ? t("shell.search.results_one_many_files", { files: fileCount })
+          : fileCount === 1
+            ? t("shell.search.results_many_one_file", { count: matchCount })
+            : t("shell.search.results_many", {
+                count: matchCount,
+                files: fileCount,
+              });
 
   if (!cwd || cwd === "~") {
     return (
