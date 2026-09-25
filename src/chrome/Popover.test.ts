@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Popover } from "./Popover";
+import { toBaseAnchor } from "./popoverAnchor";
 
 function renderPopover(
   root: Root,
@@ -22,6 +23,51 @@ function renderPopover(
     );
   });
 }
+
+describe("virtual anchors", () => {
+  it("preserves bare point coordinates", () => {
+    const resolved = toBaseAnchor({ x: 420, y: 260 });
+    if (!resolved) throw new Error("anchor was not resolved");
+
+    const rect = resolved.getBoundingClientRect();
+    expect(rect.x).toBe(420);
+    expect(rect.y).toBe(260);
+    expect(rect.left).toBe(420);
+    expect(rect.top).toBe(260);
+  });
+
+  it("preserves rect coordinates and dimensions", () => {
+    const resolved = toBaseAnchor(new DOMRect(420, 260, 80, 24));
+    if (!resolved) throw new Error("anchor was not resolved");
+
+    const rect = resolved.getBoundingClientRect();
+    expect(rect.x).toBe(420);
+    expect(rect.y).toBe(260);
+    expect(rect.width).toBe(80);
+    expect(rect.height).toBe(24);
+  });
+
+  it("keeps x and y when rect dimensions are negative", () => {
+    const source = {
+      x: 420,
+      y: 260,
+      width: -80,
+      height: -24,
+      left: 340,
+      top: 236,
+      right: 420,
+      bottom: 260,
+    } as DOMRect;
+    const resolved = toBaseAnchor(source);
+    if (!resolved) throw new Error("anchor was not resolved");
+
+    const rect = resolved.getBoundingClientRect();
+    expect(rect.x).toBe(420);
+    expect(rect.y).toBe(260);
+    expect(rect.width).toBe(-80);
+    expect(rect.height).toBe(-24);
+  });
+});
 
 describe("Popover exit animation", () => {
   let container: HTMLDivElement;

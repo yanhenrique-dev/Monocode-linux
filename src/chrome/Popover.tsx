@@ -17,17 +17,12 @@ import type {
   PopoverAlign,
   PopoverSide,
 } from "../lib/popover";
-
-/**
- * A trigger element, a live ref to one, a rect already in viewport
- * coordinates, or a bare point for context menus.
- */
-export type PopoverAnchor =
-  | HTMLElement
-  | { current: HTMLElement | null }
-  | DOMRect
-  | { x: number; y: number }
-  | null;
+import {
+  anchorElement,
+  toBaseAnchor,
+  type PopoverAnchor,
+} from "./popoverAnchor";
+export type { PopoverAnchor } from "./popoverAnchor";
 
 export type PopoverDismissReason = "outside" | "escape";
 
@@ -58,54 +53,6 @@ type Props = Omit<ComponentPropsWithoutRef<"div">, "style"> & {
 
 const FRAME =
   "isolate overflow-hidden rounded-xl border border-content/10 shadow-xl";
-
-/** Floating UI virtual element for rects and bare points. */
-function virtualAnchor(rect: {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-}) {
-  return {
-    getBoundingClientRect: () => DOMRect.fromRect(rect),
-  };
-}
-
-function toBaseAnchor(
-  anchor: PopoverAnchor,
-): Element | { getBoundingClientRect: () => DOMRect } | null {
-  if (!anchor) return null;
-  if (anchor instanceof HTMLElement) return anchor;
-  if ("current" in anchor) return anchor.current;
-  if ("width" in anchor) {
-    const rect = anchor;
-    return virtualAnchor({
-      left: rect.left,
-      top: rect.top,
-      right: rect.right,
-      bottom: rect.bottom,
-      width: rect.width,
-      height: rect.height,
-    });
-  }
-  const { x, y } = anchor;
-  return virtualAnchor({
-    left: x,
-    top: y,
-    right: x,
-    bottom: y,
-    width: 0,
-    height: 0,
-  });
-}
-
-function anchorElement(anchor: PopoverAnchor): HTMLElement | null {
-  if (!anchor) return null;
-  if (anchor instanceof HTMLElement) return anchor;
-  return "current" in anchor ? anchor.current : null;
-}
 
 /**
  * A menu, dropdown, or flyout that escapes its pane: portalled to the body so
