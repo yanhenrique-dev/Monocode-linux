@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use super::constants::MAX_TEXT_FILE_BYTES;
-use super::path::{expand_home, path_to_js};
+use super::path::{canonicalize_with_missing, expand_home, path_to_js, reject_symlink_components};
 use super::write::git_url_repo_name;
 
 #[derive(Debug, Clone, Default)]
@@ -655,7 +655,10 @@ fn add_untracked_map(root: &Path, files: &mut HashMap<String, FileAcc>) {
 }
 
 fn text_line_count(path: &Path) -> i64 {
-    let Ok(meta) = std::fs::metadata(path) else {
+    if reject_symlink_components(path).is_err() {
+        return 0;
+    }
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
         return 0;
     };
     if !meta.is_file() || meta.len() == 0 || meta.len() > MAX_UNTRACKED_BYTES {
@@ -701,24 +704,40 @@ fn mark_cached_and_unstaged(root: &Path, files: &mut HashMap<String, FileAcc>) {
     }
 }
 
+#[cfg(unix)]
+fn read_worktree_file_nofollow(abs: &Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(abs)
+        .ok()?;
+    let meta = file.metadata().ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).ok()?;
+    Some(buf)
+}
+
+#[cfg(not(unix))]
+fn read_worktree_file_nofollow(abs: &Path) -> Option<Vec<u8>> {
+    if abs.is_file() {
+        Some(std::fs::read(abs).unwrap_or_default())
+    } else {
+        None
+    }
+}
+
 pub(crate) fn git_file_diff_for(
     root: &Path,
     relative: &str,
     staged: bool,
 ) -> Result<GitFileDiff, String> {
-    let relative = normalize_diff_path(relative);
-    if relative.is_empty()
-        || relative.starts_with('/')
-        || relative
-            .split('/')
-            .any(|part| part.is_empty() || part == "..")
-    {
-        return Err("Invalid path".into());
-    }
+    let relative = resolve_repo_path(root, relative)?;
     let abs = root.join(&relative);
-    if !abs.starts_with(root) {
-        return Err("Invalid path".into());
-    }
     if !git_is_work_tree(root) {
         return Err("Not a git repository".into());
     }
@@ -729,11 +748,7 @@ pub(crate) fn git_file_diff_for(
         let head_spec = format!("HEAD:{prefix}{relative}");
         (git_blob(root, &head_spec), git_blob(root, &index_spec))
     } else {
-        let current = if abs.is_file() {
-            Some(std::fs::read(&abs).unwrap_or_default())
-        } else {
-            None
-        };
+        let current = read_worktree_file_nofollow(&abs);
         (git_blob(root, &index_spec), current)
     };
     let had_original = original.is_some();
@@ -1017,7 +1032,7 @@ pub(crate) fn git_commit_file_diff_for(
     sha: &str,
     relative: &str,
 ) -> Result<GitFileDiff, String> {
-    let relative = resolve_repo_path(root, relative)?;
+    let relative = validate_repo_relative_path(relative)?;
     if !git_is_work_tree(root) {
         return Err("Not a git repository".into());
     }
@@ -1268,7 +1283,7 @@ pub(crate) fn git_range_context_for(root: &Path) -> Result<GitRangeContext, Stri
     })
 }
 
-pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, String> {
+fn validate_repo_relative_path(relative: &str) -> Result<String, String> {
     let relative = normalize_diff_path(relative);
     if relative.is_empty()
         || relative.starts_with('/')
@@ -1278,9 +1293,15 @@ pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, S
     {
         return Err("Invalid path".into());
     }
-    let abs = root.join(&relative);
-    if !abs.starts_with(root) {
-        return Err("Invalid path".into());
+    Ok(relative)
+}
+
+pub(crate) fn resolve_repo_path(root: &Path, relative: &str) -> Result<String, String> {
+    let relative = validate_repo_relative_path(relative)?;
+    let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let resolved = canonicalize_with_missing(&root.join(&relative))?;
+    if !resolved.starts_with(&canonical_root) {
+        return Err("Path resolves outside the repository".into());
     }
     Ok(relative)
 }
