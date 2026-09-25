@@ -28,6 +28,7 @@ export type CustomPet = {
 };
 
 const CUSTOM_PETS_KEY = "monocode.pets.custom";
+const CUSTOM_PETS_RENAMES_KEY = "monocode.pets.renames";
 const HIDDEN_PETS_KEY = "monocode.pets.hidden";
 
 /** Fired on `window` whenever customs or visibility change. */
@@ -65,6 +66,34 @@ function writeJson(key: string, value: unknown) {
 function writeJsonArray(key: string, value: unknown[]): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readRenameMap(): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(CUSTOM_PETS_RENAMES_KEY) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] =>
+          typeof entry[0] === "string" && typeof entry[1] === "string",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeRenameMap(value: Record<string, string>): boolean {
+  try {
+    localStorage.setItem(CUSTOM_PETS_RENAMES_KEY, JSON.stringify(value));
     return true;
   } catch {
     return false;
@@ -141,17 +170,24 @@ function normalizedEntryName(entry: unknown): string | null {
 export function loadCustomPets(): CustomPet[] {
   const raw = readJsonArray(CUSTOM_PETS_KEY);
   const valid: CustomPet[] = [];
-  const taken = new Set(PROJECT_MASCOTS.map((mascot) => mascot.name));
-  const renames: Record<string, string> = {};
+  const builtInNames = new Set(PROJECT_MASCOTS.map((mascot) => mascot.name));
+  const taken = new Set(builtInNames);
+  const renames = readRenameMap();
   for (const entry of raw) {
     const normalizedName = normalizedEntryName(entry);
-    const collides = normalizedName !== null && taken.has(normalizedName);
+    const collides = normalizedName !== null && builtInNames.has(normalizedName);
+    const pendingReplacement =
+      normalizedName &&
+      Object.prototype.hasOwnProperty.call(renames, normalizedName)
+        ? renames[normalizedName]
+        : null;
+    const replacement =
+      normalizedName && collides
+        ? pendingReplacement ?? availableCustomName(normalizedName, taken)
+        : null;
     const candidate =
-      collides && normalizedName
-        ? {
-            ...(entry as Record<string, unknown>),
-            name: availableCustomName(normalizedName, taken),
-          }
+      replacement && normalizedName
+        ? { ...(entry as Record<string, unknown>), name: replacement }
         : entry;
     const pet = validateCustomPet(candidate, taken);
     if (!pet) continue;
@@ -159,11 +195,11 @@ export function loadCustomPets(): CustomPet[] {
     taken.add(pet.name);
     valid.push(pet);
   }
-  if (
-    Object.keys(renames).length > 0 &&
-    writeJsonArray(CUSTOM_PETS_KEY, valid)
-  ) {
-    migrateTabGroupMascotNames(renames);
+  if (Object.keys(renames).length > 0) {
+    if (!writeRenameMap(renames)) return valid;
+    if (writeJsonArray(CUSTOM_PETS_KEY, valid)) {
+      if (migrateTabGroupMascotNames(renames)) writeRenameMap({});
+    }
   }
   return valid;
 }

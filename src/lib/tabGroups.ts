@@ -254,16 +254,17 @@ export function loadTabGroupMascots(): Record<string, string> {
 
 export function migrateTabGroupMascotNames(
   renames: Readonly<Record<string, string>>,
-): void {
+): boolean {
   const next = loadTabGroupMascots();
   let changed = false;
   for (const [project, name] of Object.entries(next)) {
+    if (!Object.prototype.hasOwnProperty.call(renames, name)) continue;
     const replacement = renames[name];
     if (!replacement) continue;
     next[project] = replacement;
     changed = true;
   }
-  if (changed) writeRecord(MASCOT_KEY, next);
+  return changed ? writeRecord(MASCOT_KEY, next) : true;
 }
 
 /** `null` restores the mascot picked from the project's name. */
