@@ -15,7 +15,6 @@ import {
 import { Sidebar } from "./chrome/Sidebar";
 import { ApprovalToasts } from "./chrome/ApprovalToasts";
 import { WhatsNewDialog } from "./chrome/WhatsNewDialog";
-import { FirstRunDialog } from "./chrome/FirstRunDialog";
 import { ProviderSignInDialog } from "./chrome/ProviderSignInDialog";
 import { DeleteSessionDialog } from "./chrome/DeleteSessionDialog";
 import { useWorktrees, type WorktreeDeletionHooks } from "./app/useWorktrees";
@@ -109,7 +108,6 @@ import {
   type SettingsSectionId,
 } from "./lib/settings";
 import type { InstalledUpdate } from "./lib/updateNotice";
-import { loadFirstRunDone, saveFirstRunDone } from "./lib/firstRun";
 import { type ResumedWorkspace } from "./lib/appLifecycle";
 
 import { useProjectTerminals } from "./app/useProjectTerminals";
@@ -153,14 +151,12 @@ registerBuiltinHarnesses();
 export default function App({
   windowTransfer = null,
   resumed = null,
-  isFirstRun = false,
   installedUpdate = null,
   history: bootHistory = [],
   historyCwd: bootHistoryCwd = null,
 }: {
   windowTransfer?: WindowTransferPayload | null;
   resumed?: ResumedWorkspace | null;
-  isFirstRun?: boolean;
   installedUpdate?: InstalledUpdate | null;
   history?: SessionSummary[];
   historyCwd?: string | null;
@@ -298,9 +294,6 @@ export default function App({
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateNotice, setUpdateNotice] = useState(installedUpdate);
-  const [firstRunOpen, setFirstRunOpen] = useState(
-    () => isFirstRun && !loadFirstRunDone(),
-  );
   const [whatsNewVersion, setWhatsNewVersion] = useState<string | null>(null);
   const [providerSignInRequest, setProviderSignInRequest] = useState<{
     key: string;
@@ -440,9 +433,6 @@ export default function App({
   filePickerOpenRef.current = filePickerOpen;
   const whatsNewVersionRef = useRef(whatsNewVersion);
   whatsNewVersionRef.current = whatsNewVersion;
-  const firstRunOpenRef = useRef(firstRunOpen);
-  firstRunOpenRef.current = firstRunOpen;
-
   const lastPersisted = useRef(new Map<string, string>());
 
   const {
@@ -557,7 +547,6 @@ export default function App({
     inboxViewOpenRef,
     notesViewOpenRef,
     settingsOpenRef,
-    firstRunOpenRef,
     loadedProjectsRef,
     historyErrorCwd,
     loadedProjects,
@@ -746,7 +735,6 @@ export default function App({
     sessionLoads,
     whatsNewVersionRef,
     settingsOpenRef,
-    firstRunOpenRef,
     filePickerOpenRef,
     inboxViewOpenRef,
     notesViewOpenRef,
@@ -1135,21 +1123,6 @@ export default function App({
     onVisitForward,
   });
 
-  const onCloseFirstRun = useCallback(() => {
-    saveFirstRunDone();
-    setFirstRunOpen(false);
-  }, []);
-
-  const onOpenInboxFromFirstRun = useCallback(() => {
-    onCloseFirstRun();
-    onOpenInbox();
-  }, [onCloseFirstRun, onOpenInbox]);
-
-  const onOpenProvidersFromFirstRun = useCallback(() => {
-    onCloseFirstRun();
-    openSettings("providers");
-  }, [onCloseFirstRun, openSettings]);
-
   const openFilePaths = useMemo(() => {
     const paths: string[] = [];
     const seen = new Set<string>();
@@ -1177,7 +1150,6 @@ export default function App({
     notesViewOpenRef,
     settingsOpenRef,
     whatsNewVersionRef,
-    firstRunOpenRef,
     sessionNavigationIdsRef,
     setSidebarTab,
     onSelectHistorySession,
@@ -1806,20 +1778,13 @@ export default function App({
             }
             onHeightChange={setReminderNoticesHeight}
           />
-          {firstRunOpen ? (
-            <FirstRunDialog
-              onClose={onCloseFirstRun}
-              onOpenInbox={onOpenInboxFromFirstRun}
-              onOpenProviders={onOpenProvidersFromFirstRun}
-            />
-          ) : null}
-          {!firstRunOpen && whatsNewVersion ? (
+          {whatsNewVersion ? (
             <WhatsNewDialog
               version={whatsNewVersion}
               onClose={() => setWhatsNewVersion(null)}
             />
           ) : null}
-          {!firstRunOpen && providerSignInRequest ? (
+          {providerSignInRequest ? (
             <ProviderSignInDialog
               key={providerSignInRequest.key}
               harness={providerSignInRequest.harness}

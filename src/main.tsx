@@ -82,7 +82,7 @@ void listen("quit_aborted", () => {
 });
 
 void loadBootWorkspace().then(
-  ({ windowTransfer, resumed, isFirstRun, history, historyCwd }) => {
+  ({ windowTransfer, resumed, history, historyCwd }) => {
     const installedUpdate = windowTransfer ? null : consumeInstalledUpdate();
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
@@ -92,7 +92,6 @@ void loadBootWorkspace().then(
               <App
                 windowTransfer={windowTransfer}
                 resumed={resumed}
-                isFirstRun={isFirstRun}
                 installedUpdate={installedUpdate}
                 history={history}
                 historyCwd={historyCwd}

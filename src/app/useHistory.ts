@@ -79,7 +79,6 @@ export interface HistoryDeps {
   sessionLoads: MutableRefObject<Map<string, Promise<Session | null>>>;
   whatsNewVersionRef: MutableRefObject<string | null>;
   settingsOpenRef: MutableRefObject<boolean>;
-  firstRunOpenRef: MutableRefObject<boolean>;
   filePickerOpenRef: MutableRefObject<boolean>;
   inboxViewOpenRef: MutableRefObject<boolean>;
   notesViewOpenRef: MutableRefObject<boolean>;
@@ -140,7 +139,6 @@ export function useHistory(deps: HistoryDeps) {
     removingSessionIds,
     whatsNewVersionRef,
     settingsOpenRef,
-    firstRunOpenRef,
     filePickerOpenRef,
     inboxViewOpenRef,
     notesViewOpenRef,
@@ -755,8 +753,7 @@ export function useHistory(deps: HistoryDeps) {
             notesViewOpenRef.current ||
             settingsOpenRef.current ||
             filePickerOpenRef.current ||
-            whatsNewVersionRef.current ||
-            firstRunOpenRef.current,
+            whatsNewVersionRef.current,
           ),
         },
         (sessionId) => {

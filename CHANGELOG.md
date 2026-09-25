@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The first-run wizard. The app now opens straight into the workspace
+  and stays responsive from the first frame. Nothing was lost with it:
+  CLI availability is already surfaced in Settings › Providers, in the
+  model picker, and in the composer, and the GitHub connection lives in
+  Settings › Inbox. The gate it installed was blocking every keyboard
+  shortcut, notification click, and tab command while it was open.
+
 ### Changed
 
 - The boot splash holds for a 600ms minimum so a fast boot no longer
