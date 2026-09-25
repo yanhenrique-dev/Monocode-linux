@@ -2590,6 +2590,7 @@ function SubagentMascot({
       <svg
         aria-hidden="true"
         className="size-4 shrink-0 text-content/70"
+        style={color ? { color } : undefined}
         data-loading-indicator="trace"
         fill="none"
         focusable="false"

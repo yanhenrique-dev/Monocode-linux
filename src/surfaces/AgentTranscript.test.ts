@@ -405,7 +405,7 @@ describe("AgentTranscript collapsed work", () => {
     expect(liveMarkup).toContain(
       `style="color:${tabGroupColor("agent-color-1")}"`,
     );
-    expect(liveMarkup).toContain("mascot-active");
+    expect(liveMarkup).toContain('data-loading-indicator="trace"');
 
     const settledMarkup = render(blocks);
     expect(settledMarkup).not.toContain(
