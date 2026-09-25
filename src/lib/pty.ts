@@ -88,6 +88,14 @@ function clearBuffered(id: string) {
   dataBufferBytes.delete(id);
 }
 
+function clearPtyState(id: string) {
+  dataHandlers.delete(id);
+  exitHandlers.delete(id);
+  openedPtys.delete(id);
+  clearBuffered(id);
+  ptyGenerations.delete(id);
+}
+
 function ensureBridge() {
   if (bridge) return;
   bridge = Promise.all([
@@ -140,11 +148,7 @@ export async function spawnPty(
     await invoke("pty_spawn", { id, cwd, cols, rows, generation });
     return generation;
   } catch (error) {
-    if (ptyGenerations.get(id) === generation) {
-      ptyGenerations.delete(id);
-      openedPtys.delete(id);
-      clearBuffered(id);
-    }
+    if (ptyGenerations.get(id) === generation) clearPtyState(id);
     if (import.meta.env.DEV) console.debug("[pty] spawn failed", id, error);
     throw error;
   }
@@ -185,13 +189,7 @@ export async function killPty(
 ): Promise<void> {
   const ownsCurrent =
     generation === undefined || ptyGenerations.get(id) === generation;
-  if (ownsCurrent) {
-    dataHandlers.delete(id);
-    exitHandlers.delete(id);
-    openedPtys.delete(id);
-    clearBuffered(id);
-    ptyGenerations.delete(id);
-  }
+  if (ownsCurrent) clearPtyState(id);
   await invoke(
     "pty_kill",
     generation === undefined ? { id } : { id, generation },
