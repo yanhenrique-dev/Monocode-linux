@@ -20,7 +20,7 @@ function session(id: string, cwd: string): Session {
 
 describe("collectWindowTransfer", () => {
   it("collects tabs, sessions, and dirty files for a group", () => {
-    const s1 = session("s1", "/Users/me/agent-terminal");
+    const s1 = { ...session("s1", "/Users/me/agent-terminal"), revision: 7 };
     const s2 = session("s2", "/Users/me/agent-terminal");
     const tabs: WorkspaceTab[] = [
       { ...newTab("s1"), id: "t1" },
@@ -41,6 +41,7 @@ describe("collectWindowTransfer", () => {
     });
     expect(payload?.tabs.map((tab) => tab.id)).toEqual(["t1", "t2"]);
     expect(payload?.sessions.map((session) => session.id)).toEqual(["s1", "s2"]);
+    expect(payload?.sessions[0]?.revision).toBe(7);
     expect(payload?.projectTerminals).toBeUndefined();
   });
 
