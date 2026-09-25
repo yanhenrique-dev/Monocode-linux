@@ -19,6 +19,21 @@ export default defineConfig(async ({ mode }) => {
       },
     },
     clearScreen: false,
+    build: {
+      sourcemap: false,
+      chunkSizeWarningLimit: 900,
+      reportCompressedSize: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            mermaid: ["mermaid"],
+            xterm: ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-webgl"],
+            streamdown: ["streamdown", "@streamdown/code"],
+            codemirror: ["codemirror", "@codemirror/state", "@codemirror/view"],
+          },
+        },
+      },
+    },
     server: {
       port: 1420,
       strictPort: true,

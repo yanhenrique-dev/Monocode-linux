@@ -2,6 +2,7 @@ import { Folder, LoaderCircle, MessageSquare, Search } from "../chrome/icons";
 import {
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -158,11 +159,13 @@ export function SearchView({
     () => (trimmed ? searchConversationTitles(conversationRows, trimmed) : []),
     [conversationRows, trimmed],
   );
+  const deferredQuery = useDeferredValue(trimmed);
   const liveMessageHits = useMemo(
     () =>
-      trimmed
+      deferredQuery
         ? searchSessionMessages(
-            sessions.map((session) => ({
+            // Cap scan: last 50 sessions bound CPU per keystroke.
+            sessions.slice(-50).map((session) => ({
               id: session.id,
               cwd: session.cwd,
               harness: session.harness,
@@ -170,10 +173,10 @@ export function SearchView({
               updatedAt: Date.now(),
               blocks: session.blocks,
             })),
-            trimmed,
+            deferredQuery,
           )
         : [],
-    [sessions, trimmed],
+    [sessions, deferredQuery],
   );
   const projectHits = useMemo(
     () => (trimmed ? searchRecentProjects(recents, trimmed) : []),

@@ -472,13 +472,15 @@ export function TerminalView({ id, cwd, active, onMetaChange }: Props) {
         });
     };
     refresh();
-    const interval = setInterval(refresh, 1000);
+    // Active tab polls 2s; inactive/hidden backs off to 10s. Each refresh
+    // forks `ps`, so N terminals no longer cost N forks/s.
+    const interval = setInterval(refresh, active ? 2000 : 10_000);
     document.addEventListener("visibilitychange", refresh);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [id, cwd, wantsMeta]);
+  }, [id, cwd, wantsMeta, active]);
 
   useEffect(() => {
     if (!active) return;
