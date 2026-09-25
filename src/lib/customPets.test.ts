@@ -15,6 +15,7 @@ import {
   type CustomPet,
 } from "./customPets";
 import { PROJECT_MASCOTS, projectMascot } from "./projectMascots";
+import { loadTabGroupMascots } from "./tabGroups";
 
 function mockLocalStorage() {
   const data = new Map<string, string>();
@@ -102,6 +103,21 @@ describe("custom pet store", () => {
       JSON.stringify([pet, { name: "bad" }, "nope"]),
     );
     expect(loadCustomPets()).toEqual([pet]);
+  });
+
+  it("renames colliding custom pets and saved mascot selections", () => {
+    localStorage.setItem(
+      "monocode.pets.custom",
+      JSON.stringify([{ name: "bee", rest: REST, talk: TALK }]),
+    );
+    localStorage.setItem(
+      "monocode:tab-group:mascots",
+      JSON.stringify({ "/repo": "bee" }),
+    );
+
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
+    expect(loadTabGroupMascots()["/repo"]).toBe("bee-custom");
+    expect(loadCustomPets().map((pet) => pet.name)).toEqual(["bee-custom"]);
   });
 });
 
