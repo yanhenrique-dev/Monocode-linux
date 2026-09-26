@@ -98,12 +98,16 @@ reviews:
       - name: "Evidencia de validacao no corpo do PR"
         mode: "warning"
         instructions: >
-          The PR body must record the actual commands run and their result:
-          npx tsc --noEmit, npx vitest run, and cargo fmt --check plus
-          cargo clippy --workspace --all-targets -- -D warnings and cargo test
-          when Rust is touched. Fail if a command is listed without a result, or
-          if a claim of a green suite is not backed by a number.
-
+          The PR body must record the commands actually run and their real
+          results, with counts, for whatever the diff touches. If TypeScript is
+          touched, that means npx tsc --noEmit and npx vitest run with the number
+          passing. If Rust is touched, cargo fmt --check, cargo clippy
+          --workspace --all-targets -- -D warnings and cargo test.
+          A change to only configuration, CI or documentation needs no build
+          evidence, but must say so explicitly rather than leaving the question
+          unanswered. Fail if a command is listed without a result, if a claim of
+          a green suite is not backed by a number, or if the evidence does not
+          cover the languages the diff actually changed.
       - name: "Correcao de bug vem com teste que falha sem ela"
         mode: "warning"
         instructions: >
