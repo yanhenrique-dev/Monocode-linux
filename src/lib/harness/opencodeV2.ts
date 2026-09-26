@@ -386,6 +386,21 @@ export function normalizeV2Event(
     };
   }
 
+  if (type === "message.updated") {
+    // V2 puts the role in `type` and the turn body in `content`; the pipeline
+    // reads V1's `role` and `parts`. Applied by shape so it holds whatever the
+    // event ends up being called.
+    const info = asRecord(properties.info);
+    const message = info ? fromV2Message(info) : null;
+    if (message) {
+      return {
+        ...event,
+        type,
+        properties: { ...properties, info: message.info, parts: message.parts },
+      };
+    }
+  }
+
   if (type === "permission.asked") {
     // V2 renamed the request's `permission` to `action` and `patterns` to the
     // `resources` array.

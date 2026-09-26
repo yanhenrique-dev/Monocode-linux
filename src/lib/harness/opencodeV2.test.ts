@@ -282,6 +282,38 @@ describe("normalizeV2Event", () => {
     });
   });
 
+  it("translates a V2 message event onto the V1 envelope", () => {
+    const event = normalizeV2Event({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_1",
+          type: "assistant",
+          agent: "build",
+          time: { created: 10 },
+          tokens: { input: 5, output: 7 },
+          content: [{ type: "text", text: "hello" }],
+        },
+      },
+    });
+
+    // The pipeline meters usage off `info.role` and renders `parts`.
+    const info = event!.properties.info as Record<string, unknown>;
+    expect(info.role).toBe("assistant");
+    expect(info).not.toHaveProperty("type");
+    expect(info).not.toHaveProperty("content");
+    const parts = event!.properties.parts as Array<Record<string, unknown>>;
+    expect(parts[0]).toMatchObject({ type: "text", text: "hello" });
+  });
+
+  it("leaves a message event alone when the payload is already V1", () => {
+    const event = normalizeV2Event({
+      type: "message.updated",
+      properties: { info: { id: "msg_1", role: "assistant" } },
+    });
+    expect(event!.properties.info).toEqual({ id: "msg_1", role: "assistant" });
+  });
+
   it("routes a pending form onto the question pipeline", () => {
     const event = normalizeV2Event({
       type: "form.requested",
