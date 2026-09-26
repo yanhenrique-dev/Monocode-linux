@@ -306,8 +306,87 @@ describe("normalizeV2Event", () => {
     expect(parts[0]).toMatchObject({ type: "text", text: "hello" });
   });
 
-  it("leaves a message event alone when the payload is already V1", () => {
-    const event = normalizeV2Event({
+  it("narrates an agent or model switch instead of dropping it", () => {
+    // V2 reports these as their own contentless messages; without a notice the
+    // turn looks like it began already on the right agent and model.
+    const agent = normalizeV2Event({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_1",
+          type: "agent-switched",
+          time: { created: 1 },
+          agent: "Build",
+        },
+      },
+    });
+    expect(agent!.properties.info).toMatchObject({
+      systemNotice: "Switched agent to Build",
+    });
+    expect(agent!.properties.parts).toEqual([]);
+
+    const model = normalizeV2Event({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_2",
+          type: "model-switched",
+          time: { created: 2 },
+          model: { id: "LongCat 2.5 Preview Free", providerID: "longcat" },
+        },
+      },
+    });
+    expect(model!.properties.info).toMatchObject({
+      systemNotice: "Switched model to LongCat 2.5 Preview Free",
+    });
+  });
+
+  it("carries a subagent's model switch onto the row that shows it", () => {
+    const model = normalizeV2Event({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_3",
+          type: "model-switched",
+          time: { created: 3 },
+          model: { id: "claude-haiku-4-5", providerID: "anthropic" },
+        },
+      },
+    });
+    // The subagent path already reads `modelID`; one lookup then covers V1 and V2.
+    expect(model!.properties.info).toMatchObject({ modelID: "claude-haiku-4-5" });
+  });
+
+  it("strips a provider prefix and keeps the variant on a model notice", () => {
+    const model = normalizeV2Event({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_4",
+          type: "model-switched",
+          time: { created: 4 },
+          model: { id: "openai/gpt-5.4", providerID: "openai", variant: "high" },
+        },
+      },
+    });
+    expect(model!.properties.info).toMatchObject({
+      systemNotice: "Switched model to gpt-5.4 high",
+    });
+  });
+
+  it("passes a system or synthetic message's own text through", () => {
+    for (const type of ["system", "synthetic"]) {
+      const event = normalizeV2Event({
+        type: "message.updated",
+        properties: {
+          info: { id: `msg_${type}`, type, time: { created: 5 }, text: "Reverted." },
+        },
+      });
+      expect(event!.properties.info).toMatchObject({ systemNotice: "Reverted." });
+    }
+  });
+
+  it("leaves a message event alone when the payload is already V1", () => {    const event = normalizeV2Event({
       type: "message.updated",
       properties: { info: { id: "msg_1", role: "assistant" } },
     });

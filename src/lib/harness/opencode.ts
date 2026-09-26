@@ -656,6 +656,14 @@ async function handleEvent(
   switch (type) {
     case "message.updated": {
       const info = asRecord(properties.info);
+      // A switch or narration message is the server telling the turn what
+      // changed. It has no content of its own, so it is surfaced as a status
+      // line instead of falling through to the assistant-text path.
+      const notice = stringField(info, "systemNotice");
+      if (notice) {
+        live.onEvent({ type: "status", text: notice });
+        break;
+      }
       const id = stringField(info, "id");
       const role = stringField(info, "role");
       const agent = stringField(info, "agent");

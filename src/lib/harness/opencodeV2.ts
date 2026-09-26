@@ -198,12 +198,69 @@ function fromV2Message(value: unknown): OpenCodeMessage | null {
     info.role = "assistant";
     info.agent = "compaction";
   }
+  // V2 reports agent, model, and location switches as their own messages, and
+  // the server narrates them in its own turn. They carry no content, so
+  // without this they render as nothing and the turn looks like it started
+  // already on the right agent and model.
+  const notice = v2SystemNotice(rec);
+  if (notice) {
+    // A subagent's own model switch has to reach the row that shows it, and
+    // that path already reads `modelID` for V1. Carrying the name there means
+    // one lookup covers both generations.
+    if (type === "model-switched") {
+      const label = v2ModelLabel(asRecord(rec.model));
+      if (label) info.modelID = label;
+    }
+    for (const key of ["content", "text", "files", "agents", "skills", "type"]) {
+      delete info[key];
+    }
+    return { info: { ...info, systemNotice: notice }, parts: [] };
+  }
   const parts =
     type === "user" ? v2UserParts(rec, id) : v2AssistantParts(rec, id);
   for (const key of ["content", "text", "files", "agents", "skills", "type"]) {
     delete info[key];
   }
   return { info, parts };
+}
+
+/**
+ * The human-readable line a V2 message contributes to the turn, or undefined
+ * when it is ordinary user or assistant content.
+ */
+function v2SystemNotice(rec: Record<string, unknown>): string | undefined {
+  switch (stringField(rec, "type")) {
+    case "agent-switched": {
+      const agent = stringField(rec, "agent");
+      return agent ? `Switched agent to ${agent}` : undefined;
+    }
+    case "model-switched": {
+      const label = v2ModelLabel(asRecord(rec.model));
+      return label ? `Switched model to ${label}` : undefined;
+    }
+    case "location-switched": {
+      const directory = asRecord(rec.location)?.directory;
+      return typeof directory === "string" && directory
+        ? `Switched to ${directory}`
+        : undefined;
+    }
+    case "system":
+    case "synthetic":
+      return stringField(rec, "text");
+    default:
+      return undefined;
+  }
+}
+
+/** `Model.Ref` is `providerID` plus `id`; the TUI shows the model name alone. */
+function v2ModelLabel(model: Record<string, unknown> | null): string | undefined {
+  const id = stringField(model, "id");
+  if (!id) return undefined;
+  // `id` is the model on its own, but a server that echoes the catalog's
+  // `provider/model` slug would otherwise print the provider twice.
+  const name = id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
+  const variant = stringField(model, "variant");
+  return variant ? `${name} ${variant}` : name;
 }
 
 function v2UserParts(
