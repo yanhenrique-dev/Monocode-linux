@@ -7,8 +7,8 @@ import {
   parsePlainModelSlugs,
 } from "./opencodeCatalog";
 import {
+  buildOpenCodeDenyAllRules,
   buildOpenCodePermissionRules,
-  buildOpenCodePermissionRulesV2,
   compareSemver,
   contextUsedFromMessageInfo,
   turnMetricsFromMessageInfo,
@@ -168,42 +168,13 @@ describe("openCode protocol detection", () => {
 });
 
 describe("normalizeServerEvent", () => {
-  it("maps V2 question asks onto the V1 pipeline", () => {
-    expect(
-      normalizeServerEvent({
-        type: "question.v2.asked",
-        properties: {
-          sessionID: "s1",
-          request: {
-            id: "req-9",
-            questions: [{ prompt: "Proceed?" }],
-          },
-        },
-      }),
-    ).toMatchObject({
-      type: "question.asked",
-      properties: {
-        id: "req-9",
-        questions: [{ prompt: "Proceed?" }],
-      },
-    });
-  });
-
-  it("drops durability bookkeeping without V1 meaning", () => {
-    expect(
-      normalizeServerEvent({ type: "question.v2.replied", properties: {} }),
-    ).toBeNull();
-    expect(
-      normalizeServerEvent({
-        type: "session.next.prompt.admitted",
-        properties: {},
-      }),
-    ).toBeNull();
-  });
-
   it("passes V1 events through untouched", () => {
     const event = { type: "permission.asked", properties: { id: "r1" } };
     expect(normalizeServerEvent(event)).toBe(event);
+  });
+
+  it("drops a payload with no event type", () => {
+    expect(normalizeServerEvent({ properties: {} })).toBeNull();
   });
 });
 
@@ -233,13 +204,9 @@ describe("buildOpenCodePermissionRules", () => {
     expect(toOpenCodePermissionReply("deny")).toBe("reject");
   });
 
-  it("shapes V2 permission rules from the V1 builder", () => {
-    expect(buildOpenCodePermissionRulesV2("full-access")).toEqual([
-      { action: "*", resource: "*", effect: "allow" },
-    ]);
-    expect(buildOpenCodePermissionRulesV2("supervised")).toEqual([
-      { action: "*", resource: "*", effect: "ask" },
-      { action: "question", resource: "*", effect: "allow" },
+  it("denies every action for text-only sessions", () => {
+    expect(buildOpenCodeDenyAllRules()).toEqual([
+      { permission: "*", pattern: "*", action: "deny" },
     ]);
   });
 });

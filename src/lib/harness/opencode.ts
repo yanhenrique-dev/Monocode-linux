@@ -62,7 +62,6 @@ import type {
 import {
   questionPromptTitle,
   questionsFromUnknown,
-  selectedAnswerLabels,
   type UserQuestion,
   type UserQuestionReply,
 } from "../userQuestion";
@@ -1191,10 +1190,12 @@ async function waitQuestion(
     await live.client.rejectQuestion(live.openCodeSessionId, id);
     return;
   }
-  const answers = questions.map((question) =>
-    selectedAnswerLabels(question, reply),
-  );
-  await live.client.replyQuestion(live.openCodeSessionId, id, answers);
+  await live.client.replyQuestion({
+    sessionID: live.openCodeSessionId,
+    requestID: id,
+    questions,
+    reply,
+  });
 }
 
 function showNextQuestion(live: Live): void {

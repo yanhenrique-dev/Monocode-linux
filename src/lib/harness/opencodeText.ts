@@ -139,7 +139,11 @@ async function startLive(
     const url = await waitForUrl(() => serverUrl, SERVER_TIMEOUT_MS);
     const client = createOpenCodeClient(url, cwd, protocol);
     const created = await client.createSession({
-      permission: [{ permission: "*", pattern: "*", action: "deny" }],
+      // These sessions only synthesize text (titles, commits, PR bodies), so
+      // every tool is denied. The rules must be built per protocol: the V1
+      // shape is not a V2 rule, and V2 would fall through to its `allow`
+      // default rather than deny.
+      permission: client.denyAllPermissionRules(),
     });
     live = { client, sessionId: created.id, cwd, model };
     return live;

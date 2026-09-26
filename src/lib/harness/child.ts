@@ -3,12 +3,13 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 type LinePayload = { sessionId: string; line: string };
 type ExitPayload = { sessionId: string; code: number | null; pid?: number };
-type SsePayload = { sessionId: string; data: string };
+type SsePayload = { sessionId: string; data: string; name?: string | null };
 type SseEndPayload = { sessionId: string; error?: string | null };
 
 type LineHandler = (line: string) => void;
 type ExitHandler = (code: number | null) => void;
-type SseHandler = (data: string) => void;
+/** `name` is the SSE `event:` field, which V2 uses as the event discriminator. */
+type SseHandler = (data: string, name?: string) => void;
 type SseEndHandler = (error?: string) => void;
 
 const lineHandlers = new Map<string, LineHandler>();
@@ -17,7 +18,7 @@ const lineBuffer = new Map<string, string[]>();
 const stderrHandlers = new Map<string, LineHandler>();
 const sseHandlers = new Map<string, SseHandler>();
 const sseEndHandlers = new Map<string, SseEndHandler>();
-const sseBuffer = new Map<string, string[]>();
+const sseBuffer = new Map<string, Array<{ data: string; name?: string }>>();
 const livePid = new Map<string, number>();
 const pendingExit = new Map<
   string,
@@ -40,10 +41,10 @@ let bridgeAttempt: symbol | null = null;
 let users = 0;
 let teardownTimer: ReturnType<typeof setTimeout> | undefined;
 
-function pushBounded(
-  map: Map<string, string[]>,
+function pushBounded<T>(
+  map: Map<string, T[]>,
   sessionId: string,
-  item: string,
+  item: T,
 ) {
   const queued = map.get(sessionId) ?? [];
   queued.push(item);
@@ -106,13 +107,14 @@ function ensureBridge() {
     ),
     register(
       listen<SsePayload>("harness-sse", (event) => {
-        const { sessionId, data } = event.payload;
+        const { sessionId, data, name } = event.payload;
+        const frame = name ? { data, name } : { data };
         const handler = sseHandlers.get(sessionId);
         if (handler) {
-          handler(data);
+          handler(data, name ?? undefined);
           return;
         }
-        pushBounded(sseBuffer, sessionId, data);
+        pushBounded(sseBuffer, sessionId, frame);
       }),
     ),
     register(
@@ -224,7 +226,7 @@ export function watchSse(
   sseBuffer.delete(sessionId);
   sseHandlers.set(sessionId, onData);
   if (onEnd) sseEndHandlers.set(sessionId, onEnd);
-  if (queued) queued.forEach(onData);
+  if (queued) queued.forEach((frame) => onData(frame.data, frame.name));
 }
 
 export function unwatchSse(sessionId: string) {

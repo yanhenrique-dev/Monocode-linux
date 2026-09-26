@@ -6,10 +6,24 @@ import {
 } from "./child";
 import {
   asRecord,
+  buildOpenCodeDenyAllRules,
   buildOpenCodePermissionRules,
-  buildOpenCodePermissionRulesV2,
 } from "./opencodeProtocol";
 import type { OpenCodeProtocol } from "./opencodeProtocol";
+import {
+  buildV2DenyAllRules,
+  buildV2FormAnswer,
+  buildV2PermissionRules,
+  buildV2PromptBody,
+  buildV2SessionCreateBody,
+  buildV2SessionPatchBody,
+  fromV2MessageList,
+  normalizeV2Event,
+  toV2ModelRef,
+  v2LocationQuery,
+} from "./opencodeV2";
+import { selectedAnswerLabels } from "../userQuestion";
+import type { UserQuestion, UserQuestionReply } from "../userQuestion";
 import type { RuntimeMode } from "../session";
 
 export class OpenCodeHttpError extends Error {
@@ -28,6 +42,8 @@ export type OpenCodeSession = {
   id: string;
   parentID?: string;
   directory?: string;
+  /** V2 reports the owning directory as a Location object. */
+  location?: { directory?: string };
   title?: string;
 };
 
@@ -52,6 +68,8 @@ export type OpenCodeModelRef = {
 export interface OpenCodeClient {
   /** Permission rules in the generation's native shape for session create/update. */
   sessionPermissionRules(runtimeMode: RuntimeMode): unknown;
+  /** Deny-everything rules in the generation's native shape. */
+  denyAllPermissionRules(): unknown;
   getSession(sessionID: string): Promise<OpenCodeSession>;
   getMessages(sessionID: string): Promise<OpenCodeMessage[]>;
   createSession(input: {
@@ -85,13 +103,19 @@ export interface OpenCodeClient {
   replyPermission(
     sessionID: string,
     requestID: string,
-    reply: "once" | "always" | "reject",
+    decision: "once" | "always" | "reject",
   ): Promise<void>;
-  replyQuestion(
-    sessionID: string,
-    requestID: string,
-    answers: string[][],
-  ): Promise<void>;
+  /**
+   * Answer a blocking question. The reply stays structured so each transport
+   * can encode it natively: V1 sends positional label rows, V2 a form answer
+   * keyed by field.
+   */
+  replyQuestion(input: {
+    sessionID: string;
+    requestID: string;
+    questions: UserQuestion[];
+    reply: UserQuestionReply;
+  }): Promise<void>;
   rejectQuestion(sessionID: string, requestID: string): Promise<void>;
   subscribeEvents(
     sessionId: string,
@@ -121,6 +145,11 @@ class OpenCodeClientBase {
     readonly baseUrl: string,
     readonly directory: string,
   ) {}
+
+  /** Query parameters that scope the request to this session's directory. */
+  protected scopeQuery(): Record<string, string> {
+    return { directory: this.directory };
+  }
 
   protected async request<T>(
     method: string,
@@ -176,11 +205,11 @@ class OpenCodeClientBase {
       `${this.apiPrefix}${path}`.replace(/^\//, ""),
       base,
     );
-    url.searchParams.set("directory", this.directory);
-    if (query) {
-      for (const [key, value] of Object.entries(query)) {
-        url.searchParams.set(key, value);
-      }
+    for (const [key, value] of Object.entries({
+      ...this.scopeQuery(),
+      ...query,
+    })) {
+      url.searchParams.set(key, value);
     }
     return url.toString();
   }
@@ -197,6 +226,10 @@ class OpenCodeClientBase {
 export class OpenCodeClientV1 extends OpenCodeClientBase implements OpenCodeClient {
   sessionPermissionRules(runtimeMode: RuntimeMode): unknown {
     return buildOpenCodePermissionRules(runtimeMode);
+  }
+
+  denyAllPermissionRules(): unknown {
+    return buildOpenCodeDenyAllRules();
   }
 
   async getSession(sessionID: string): Promise<OpenCodeSession> {
@@ -329,14 +362,23 @@ export class OpenCodeClientV1 extends OpenCodeClientBase implements OpenCodeClie
     });
   }
 
-  async replyQuestion(
-    _sessionID: string,
-    requestID: string,
-    answers: string[][],
-  ): Promise<void> {
-    await this.request<unknown>("POST", `/question/${enc(requestID)}/reply`, {
-      body: { answers },
-    });
+  async replyQuestion(input: {
+    sessionID: string;
+    requestID: string;
+    questions: UserQuestion[];
+    reply: UserQuestionReply;
+  }): Promise<void> {
+    const { questions, reply } = input;
+    // V1 replies with one row of selected labels per question, in order.
+    const answers =
+      reply.kind === "answered"
+        ? questions.map((question) => selectedAnswerLabels(question, reply))
+        : [];
+    await this.request<unknown>(
+      "POST",
+      `/question/${enc(input.requestID)}/reply`,
+      { body: { answers } },
+    );
   }
 
   async rejectQuestion(
@@ -372,15 +414,30 @@ export class OpenCodeClientV1 extends OpenCodeClientBase implements OpenCodeClie
 }
 
 /**
- * V2 transport (`/api/...`). Shapes follow the generated V2 API reference;
- * every route marked VERIFY was confirmed in docs but still needs a live
- * round-trip against a V2 `serve` before release.
+ * V2 transport (`/api/...`). Routes, request bodies, and field names follow the
+ * published V2 API contract; `opencodeV2` translates everything the session
+ * pipeline consumes back into the V1 vocabulary it was written around.
  */
 export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClient {
   protected override readonly apiPrefix = "/api";
 
+  /** Last model/agent applied per session, so a turn only switches on change. */
+  private readonly appliedTarget = new Map<
+    string,
+    { model: string; variant?: string; agent?: string }
+  >();
+
   sessionPermissionRules(runtimeMode: RuntimeMode): unknown {
-    return buildOpenCodePermissionRulesV2(runtimeMode);
+    return buildV2PermissionRules(runtimeMode);
+  }
+
+  denyAllPermissionRules(): unknown {
+    return buildV2DenyAllRules();
+  }
+
+  /** V2 scopes by Location object; `directory` survives only on session list. */
+  protected override scopeQuery(): Record<string, string> {
+    return { location: v2LocationQuery(this.directory) };
   }
 
   protected override describeHttpError(
@@ -401,27 +458,30 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
   }
 
   async getSession(sessionID: string): Promise<OpenCodeSession> {
-    return this.request<OpenCodeSession>("GET", `/session/${enc(sessionID)}`);
+    const session = await this.request<OpenCodeSession>(
+      "GET",
+      `/session/${enc(sessionID)}`,
+    );
+    return withV2SessionDirectory(session);
   }
 
   async getMessages(sessionID: string): Promise<OpenCodeMessage[]> {
-    return this.request<OpenCodeMessage[]>(
+    const data = await this.request<unknown>(
       "GET",
       `/session/${enc(sessionID)}/message`,
     );
+    return fromV2MessageList(data);
   }
 
   async createSession(input: {
     title?: string;
     permission?: unknown;
   }): Promise<OpenCodeSession> {
-    // VERIFY: permission passthrough shape on V2 (Fase 4 migrates the rules).
     return this.request<OpenCodeSession>("POST", "/session", {
-      body: {
-        ...(input.title ? { title: input.title } : {}),
-        location: { directory: this.directory },
-        ...(input.permission ? { permission: input.permission } : {}),
-      },
+      body: buildV2SessionCreateBody({
+        ...input,
+        directory: this.directory,
+      }),
     });
   }
 
@@ -432,9 +492,7 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     return this.request<OpenCodeSession>(
       "PATCH",
       `/session/${enc(sessionID)}`,
-      {
-        body,
-      },
+      { body: buildV2SessionPatchBody(body) },
     );
   }
 
@@ -442,49 +500,56 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     sessionID: string,
     directory: string,
   ): Promise<OpenCodeSession> {
-    // VERIFY: V2 fork documents a `boundary`; whole-session fork without one
-    // must be confirmed live (falls back to the boundary form in Fase 2 work).
+    // Omitting `before` copies the full history into a child session.
     return this.request<OpenCodeSession>(
       "POST",
       `/session/${enc(sessionID)}/fork`,
-      {
-        query: { directory },
-        body: {},
-      },
+      { body: {}, query: { location: v2LocationQuery(directory) } },
     );
   }
 
   async deleteSession(sessionID: string): Promise<void> {
-    // VERIFY: symmetric with V1 (`DELETE /session/:id` exists there).
     await this.request<unknown>("DELETE", `/session/${enc(sessionID)}`);
+    this.appliedTarget.delete(sessionID);
   }
 
   async abortSession(sessionID: string): Promise<void> {
-    // VERIFY: abort route carried under the prefix.
-    await this.request<unknown>("POST", `/session/${enc(sessionID)}/abort`, {
-      body: {},
-    }).catch(() => undefined);
+    // V2 renamed abort to interrupt; it is a no-op on an idle session, and a
+    // 404 here means the session is already gone, which is fine while tearing
+    // down. `resume` is deliberately omitted: cancelling must stop execution
+    // rather than re-enter pending steering.
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/interrupt`,
+      { body: {} },
+    ).catch(() => undefined);
   }
 
   async revertSession(sessionID: string, messageID: string): Promise<void> {
-    // VERIFY: revert shape carried under the prefix.
-    await this.request<unknown>("POST", `/session/${enc(sessionID)}/revert`, {
-      body: { messageID },
-    });
+    // V2 split revert: stage the boundary, then commit it. `DELETE /revert`
+    // only clears an already-staged revert.
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/revert/stage`,
+      { body: { messageID } },
+    );
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(sessionID)}/revert/commit`,
+    );
   }
 
   async summarizeSession(
     sessionID: string,
     model: OpenCodeModelRef,
   ): Promise<void> {
-    // VERIFY: summarize body carried under the prefix.
+    // V2 renamed summarize to compact, and takes no model: the session model
+    // applies, so switch it first to honour the caller's choice.
+    await this.applyTarget(sessionID, { model });
     await this.request<unknown>(
       "POST",
-      `/session/${enc(sessionID)}/summarize`,
-      {
-        body: model,
-        timeoutMs: 30 * 60_000,
-      },
+      `/session/${enc(sessionID)}/compact`,
+      { body: {}, timeoutMs: 30 * 60_000 },
     );
   }
 
@@ -495,23 +560,7 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     variant?: string;
     parts: OpenCodePromptPart[];
   }): Promise<void> {
-    // Durable admission: the id makes retries safe, resume schedules the run.
-    // `delivery` is left to the server default (immediate); steer/queue
-    // overrides arrive with the follow-up work.
-    await this.request<unknown>(
-      "POST",
-      `/session/${enc(input.sessionID)}/prompt`,
-      {
-        body: {
-          id: crypto.randomUUID(),
-          model: input.model,
-          ...(input.agent ? { agent: input.agent } : {}),
-          ...(input.variant ? { variant: input.variant } : {}),
-          parts: input.parts,
-          resume: true,
-        },
-      },
-    );
+    await this.promptV2(input);
   }
 
   async prompt(input: {
@@ -522,16 +571,14 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     parts: OpenCodePromptPart[];
     timeoutMs?: number;
   }): Promise<{ info?: Record<string, unknown>; parts?: unknown[] }> {
-    // V1 answers inline; V2 admits and runs async, so admit, wait for idle,
-    // then read the fresh messages.
-    await this.promptAsync(input);
+    // V1 answers inline; V2 admits the run and returns immediately, so admit,
+    // wait for the loop to go idle, then read the fresh messages back. The
+    // wait route is the one V2 still serves under `experimental`.
+    await this.promptV2(input);
     await this.request<unknown>(
       "POST",
-      `/session/${enc(input.sessionID)}/wait`,
-      {
-        body: {},
-        timeoutMs: input.timeoutMs,
-      },
+      `/experimental/session/${enc(input.sessionID)}/wait`,
+      { timeoutMs: input.timeoutMs },
     );
     const messages = await this.getMessages(input.sessionID);
     const last = [...messages]
@@ -541,32 +588,95 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     return last;
   }
 
-  async replyPermission(
-    sessionID: string,
-    requestID: string,
-    reply: "once" | "always" | "reject",
-  ): Promise<void> {
+  /**
+   * V2 carries no model or agent on the prompt body, so both are switched on
+   * the session first. The agent goes first so an explicit model still wins
+   * over a model the agent would otherwise impose.
+   */
+  private async promptV2(input: {
+    sessionID: string;
+    model: OpenCodeModelRef;
+    agent?: string;
+    variant?: string;
+    parts: OpenCodePromptPart[];
+  }): Promise<void> {
+    await this.applyTarget(input.sessionID, {
+      model: input.model,
+      variant: input.variant,
+      agent: input.agent,
+    });
     await this.request<unknown>(
       "POST",
-      `/session/${enc(sessionID)}/permission/${enc(requestID)}/reply`,
+      `/session/${enc(input.sessionID)}/prompt`,
       {
-        body: { reply },
+        body: buildV2PromptBody({
+          parts: input.parts,
+          ...(input.agent ? { agent: input.agent } : {}),
+          // V1 `prompt_async` injects into a running turn; V2 spells that
+          // `steer` and leaves queued prompts parked.
+          delivery: "steer",
+          resume: true,
+          // Durable admission id, so a retried admit is not a second turn.
+          id: `msg_${crypto.randomUUID()}`,
+        }),
       },
     );
   }
 
-  async replyQuestion(
+  private async applyTarget(
+    sessionID: string,
+    target: { model?: OpenCodeModelRef; variant?: string; agent?: string },
+  ): Promise<void> {
+    const key = target.model
+      ? `${target.model.providerID}/${target.model.modelID}#${target.variant ?? ""}`
+      : "";
+    const previous = this.appliedTarget.get(sessionID);
+    if (previous && previous.model === key && previous.agent === target.agent) {
+      return;
+    }
+    if (target.agent && previous?.agent !== target.agent) {
+      await this.request<unknown>(
+        "POST",
+        `/session/${enc(sessionID)}/agent`,
+        { body: { agent: target.agent } },
+      );
+    }
+    if (target.model && previous?.model !== key) {
+      await this.request<unknown>(
+        "POST",
+        `/session/${enc(sessionID)}/model`,
+        { body: { model: toV2ModelRef(target.model, target.variant) } },
+      );
+    }
+    this.appliedTarget.set(sessionID, {
+      model: key,
+      ...(target.agent ? { agent: target.agent } : {}),
+    });
+  }
+
+  async replyPermission(
     sessionID: string,
     requestID: string,
-    answers: string[][],
+    decision: "once" | "always" | "reject",
   ): Promise<void> {
-    // VERIFY: V2 ordered-answers shape against the QuestionV2 route.
     await this.request<unknown>(
       "POST",
-      `/session/${enc(sessionID)}/question/request/${enc(requestID)}/reply`,
-      {
-        body: { answers },
-      },
+      `/session/${enc(sessionID)}/permission/${enc(requestID)}/reply`,
+      { body: { decision } },
+    );
+  }
+
+  async replyQuestion(input: {
+    sessionID: string;
+    requestID: string;
+    questions: UserQuestion[];
+    reply: UserQuestionReply;
+  }): Promise<void> {
+    const body = buildV2FormAnswer(input.reply);
+    await this.request<unknown>(
+      "POST",
+      `/session/${enc(input.sessionID)}/form/${enc(input.requestID)}/reply`,
+      { body: body ?? { answer: {} } },
     );
   }
 
@@ -575,11 +685,8 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     requestID: string,
   ): Promise<void> {
     await this.request<unknown>(
-      "POST",
-      `/session/${enc(sessionID)}/question/request/${enc(requestID)}/reject`,
-      {
-        body: {},
-      },
+      "DELETE",
+      `/session/${enc(sessionID)}/form/${enc(requestID)}`,
     );
   }
 
@@ -588,14 +695,16 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     onEvent: (event: Record<string, unknown>) => void,
     onEnd?: (error?: string) => void,
   ): Promise<void> {
-    // Transport only; V2Event name mapping lands in Fase 2.
     const url = this.url("/event");
     watchSse(
       sessionId,
-      (data) => {
-        const parsed = parseJson(data);
-        const rec = asRecord(parsed);
-        if (rec) onEvent(rec);
+      (data, name) => {
+        const rec = asRecord(parseJson(data));
+        if (!rec) return;
+        // V2 frames the discriminator as the SSE event name next to an opaque
+        // payload, so the payload's own `type` wins when it carries one.
+        const event = normalizeV2Event(rec, name);
+        if (event) onEvent(event);
       },
       onEnd,
     );
@@ -609,6 +718,18 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
 
 function enc(value: string): string {
   return encodeURIComponent(value);
+}
+
+/**
+ * V2 reports a session's directory as a `location` object. Surfacing it as
+ * `directory` keeps the resume path's "is this session still in the current
+ * project" check working; without it a session opened in another directory
+ * would be adopted instead of forked.
+ */
+function withV2SessionDirectory(session: OpenCodeSession): OpenCodeSession {
+  const directory = session.location?.directory;
+  if (typeof directory !== "string" || !directory) return session;
+  return { ...session, directory };
 }
 
 function parseJson(raw: string): unknown {
