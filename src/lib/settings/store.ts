@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { readBootMirror, writeBootMirror } from "./bootMirror";
+import { readLocalView } from "./localView";
 import {
   DEFAULT_SETTINGS,
   type AppearanceSettings,
@@ -166,7 +167,7 @@ function toWire(settings: AppSettings): unknown {
     view: {
       projectRailOpen: settings.appearance.projectRailOpen,
       settingsSection: settings.appearance.settingsSection,
-      sidebarTabOrder: [],
+      sidebarTabOrder: [...settings.appearance.sidebarTabOrder],
     },
     runtime: { lastUpdateCheck: 0 },
   };
@@ -291,13 +292,23 @@ export async function hydrateSettings(): Promise<AppSettings> {
       ...fromNative.experimental,
     },
   };
-  // Still owned by localStorage: the mirror is the truth for these until the
-  // migration reaches them. `appearance` is always set two lines above, so the
-  // fallback is unreachable rather than a guess.
+  // Two different owners, deliberately. The thirteen boot keys are still
+  // localStorage's, so the mirror is read last and wins. The three view keys
+  // are localStorage's too, but for the opposite reason: they are not read at
+  // boot, they are read by `loadX` on every call, and Rust cannot tell an
+  // absent field from a defaulted one, so trusting the file here would reset
+  // them for everyone on upgrade. See localView.ts.
+  const localView = readLocalView({
+    projectRailOpen: migrated.appearance?.projectRailOpen ?? true,
+    settingsSection:
+      migrated.appearance?.settingsSection ?? DEFAULT_SETTINGS.appearance.settingsSection,
+    sidebarTabOrder: DEFAULT_SETTINGS.appearance.sidebarTabOrder,
+  });
   const appearance: AppearanceSettings = {
     ...DEFAULT_SETTINGS.appearance,
     ...migrated.appearance,
     ...readBootMirror(),
+    ...localView,
   };
   current = { ...DEFAULT_SETTINGS, ...migrated, appearance };
   writeBootMirror(appearance);

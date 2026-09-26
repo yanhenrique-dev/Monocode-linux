@@ -5,6 +5,14 @@ import {
   applyPreparedNewThreadBackground,
   clearPreparedNewThreadBackground,
 } from "./newThreadBackgroundEffects";
+import {
+  DEFAULT_SIDEBAR_TAB_ORDER as DEFAULT_SIDEBAR_TAB_ORDER_DEFAULT,
+  type SidebarTabId,
+} from "./settings/schema";
+import {
+  PROJECT_RAIL_OPEN_KEY,
+  SIDEBAR_TAB_ORDER_KEY,
+} from "./settings/localView";
 import { bootMirrorPatch } from "./settings/bootMirror";
 import { lastWritePersisted, updateAppearance } from "./settings/store";
 
@@ -14,11 +22,9 @@ const THEME_SATURATION_KEY = "monocode.themeSaturation";
 const THEME_DARK_LIGHTNESS_KEY = "monocode.themeDarkLightness";
 const OPACITY_KEY = "monocode.sidebarOpacity";
 const BLUR_KEY = "monocode.sidebarBlur";
-const PROJECT_RAIL_OPEN_KEY = "monocode.projectRailOpen";
 const BODY_KEY = "monocode.bodyGlass";
 const UI_BLUR_KEY = "monocode.uiBlur";
 const SCHEME_KEY = "monocode.colorScheme";
-const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
@@ -133,13 +139,10 @@ export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
 /** Fired on `window` whenever the transcript layout flips (detail: TranscriptLayout). */
 export const TRANSCRIPT_LAYOUT_CHANGE_EVENT = "monocode:transcriptlayoutchange";
 
-export type SidebarTabId = "files" | "sessions" | "changes" | "inbox";
+export type { SidebarTabId } from "./settings/schema";
 
 const DEFAULT_SIDEBAR_TAB_ORDER: SidebarTabId[] = [
-  "sessions",
-  "inbox",
-  "files",
-  "changes",
+  ...DEFAULT_SIDEBAR_TAB_ORDER_DEFAULT,
 ];
 
 export const THEME_HUE_MIN = 0;
@@ -863,6 +866,9 @@ export function loadProjectRailOpen(): boolean {
 
 export function saveProjectRailOpen(value: boolean) {
   writeFlag(PROJECT_RAIL_OPEN_KEY, value);
+  // The store serialises the whole object on the next save, so a key it does
+  // not know about is a key it will write back stale.
+  updateAppearance({ projectRailOpen: value });
 }
 
 export function loadSidebarTabOrder(): SidebarTabId[] {
@@ -889,6 +895,7 @@ export function saveSidebarTabOrder(order: SidebarTabId[]) {
   } catch {
     // private mode / quota
   }
+  updateAppearance({ sidebarTabOrder: [...order] });
 }
 
 export function loadProjectRailWidth(): number {

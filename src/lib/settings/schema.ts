@@ -18,6 +18,14 @@ export type TranscriptLayout = "full" | "chat";
 export type ChangesView = "list" | "tree";
 export type ChatBackgroundScope = "empty" | "all";
 export type Locale = "en" | "pt-BR";
+/** Declared here, not in appearance.ts, so the store can name it without a cycle. */
+export type SidebarTabId = "files" | "sessions" | "changes" | "inbox";
+export const DEFAULT_SIDEBAR_TAB_ORDER: readonly SidebarTabId[] = [
+  "sessions",
+  "inbox",
+  "files",
+  "changes",
+];
 
 /** One flag per action. See `NextStepActions` in settings.rs for why. */
 export type NextStepSelection = {
@@ -56,6 +64,7 @@ export type AppearanceSettings = {
   changesView: ChangesView;
   /** Which rail section Settings opens on. Not a preference; remembered view. */
   settingsSection: string;
+  sidebarTabOrder: SidebarTabId[];
 };
 
 export type PerformanceSettings = {
@@ -116,6 +125,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     projectRailWidth: 200,
     changesView: "list",
     settingsSection: "general",
+    sidebarTabOrder: [...DEFAULT_SIDEBAR_TAB_ORDER],
   },
   performance: { hardwareAcceleration: true, terminalGpu: true },
   experimental: {

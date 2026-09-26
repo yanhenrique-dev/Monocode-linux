@@ -1,10 +1,12 @@
 import { ALT, MOD, SHIFT } from "./platform";
 import type { NextStepsCount } from "./nextSteps";
 import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
+import { SETTINGS_SECTION_KEY } from "./settings/localView";
+import { updateAppearance } from "./settings/store";
 
 export type { NextStepsCount };
 
-const SECTION_KEY = "monocode.settingsSection";
+
 
 export type SettingsSectionId =
   | "general"
@@ -515,7 +517,7 @@ export function settingsSectionDescription(id: SettingsSectionId): LocaleKey {
 
 export function loadSettingsSection(): SettingsSectionId {
   try {
-    const raw = localStorage.getItem(SECTION_KEY);
+    const raw = localStorage.getItem(SETTINGS_SECTION_KEY);
     return isSettingsSectionId(raw) ? raw : SETTINGS_SECTION_DEFAULT;
   } catch {
     return SETTINGS_SECTION_DEFAULT;
@@ -524,10 +526,11 @@ export function loadSettingsSection(): SettingsSectionId {
 
 export function saveSettingsSection(id: SettingsSectionId) {
   try {
-    localStorage.setItem(SECTION_KEY, id);
+    localStorage.setItem(SETTINGS_SECTION_KEY, id);
   } catch {
     // private mode / quota
   }
+  updateAppearance({ settingsSection: id });
 }
 
 const COMPOSER_RUNNER_KEY = "monocode.composerRunner";
