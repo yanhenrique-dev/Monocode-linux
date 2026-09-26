@@ -205,11 +205,13 @@ function fromV2Message(value: unknown): OpenCodeMessage | null {
   const notice = v2SystemNotice(rec);
   if (notice) {
     // A subagent's own model switch has to reach the row that shows it, and
-    // that path already reads `modelID` for V1. Carrying the name there means
-    // one lookup covers both generations.
-    if (type === "model-switched") {
-      const label = v2ModelLabel(asRecord(rec.model));
-      if (label) info.modelID = label;
+    // that path already reads `modelID` for V1. Keyed off the presence of a
+    // model reference rather than off an event name, because the name that
+    // reaches here has changed once already and the row must not depend on it.
+    const label = v2ModelLabel(asRecord(rec.model));
+    if (label) {
+      info.modelID = label;
+      info.role = "assistant";
     }
     for (const key of ["content", "text", "files", "agents", "skills", "type"]) {
       delete info[key];
@@ -496,28 +498,40 @@ function v2PartEvent(
   return { type: "message.part.updated", properties: { part } };
 }
 
-/** Server narration V2 reports as its own events rather than as content. */
+/**
+ * Server narration V2 reports as its own events rather than as content.
+ *
+ * `extra` rides on the synthesised message info alongside the notice. It exists
+ * for one case: a subagent's own model switch has to reach the row that displays
+ * it, and that path reads `modelID` off an assistant message. `role` is what
+ * admits the event there. The main session path checks `systemNotice` and stops
+ * before `role` is read, so a notice can never stream as assistant prose.
+ */
 function v2NoticeEvent(
   type: string,
   data: Record<string, unknown>,
-): string | undefined {
+): { notice: string; extra?: Record<string, unknown> } | undefined {
   if (type === "session.agent.selected") {
     const agent = stringField(data, "agent");
-    return agent ? `Switched agent to ${agent}` : undefined;
+    return agent ? { notice: `Switched agent to ${agent}` } : undefined;
   }
   if (type === "session.model.selected") {
     const label = v2ModelLabel(asRecord(data.model));
-    return label ? `Switched model to ${label}` : undefined;
+    return label
+      ? { notice: `Switched model to ${label}`, extra: { role: "assistant", modelID: label } }
+      : undefined;
   }
   if (type === "session.synthetic") {
-    return stringField(data, "text");
+    const text = stringField(data, "text");
+    return text ? { notice: text } : undefined;
   }
   if (type === "session.retry.scheduled") {
-    return stringField(asRecord(data.retry), "message");
+    const message = stringField(asRecord(data.retry), "message");
+    return message ? { notice: message } : undefined;
   }
   if (type === "session.skill.activated") {
     const skill = stringField(data, "skill");
-    return skill ? `Using skill ${skill}` : undefined;
+    return skill ? { notice: `Using skill ${skill}` } : undefined;
   }
   return undefined;
 }
@@ -574,7 +588,13 @@ export function normalizeV2Event(
   if (part) return { ...event, type: part.type, properties: { ...properties, ...part.properties } };
 
   const notice = v2NoticeEvent(type, properties);
-  if (notice) return { ...event, type: "message.updated", properties: { ...properties, info: { systemNotice: notice } } };
+  if (notice) {
+    return {
+      ...event,
+      type: "message.updated",
+      properties: { ...properties, info: { systemNotice: notice.notice, ...notice.extra } },
+    };
+  }
 
   switch (type) {
     case "session.message.content.updated": {
