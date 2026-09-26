@@ -56,6 +56,11 @@ cp "$ROOT/usr/bin/monocode" "$STAGE/bin/"
 cp "$ROOT/usr/share/applications/MonoCode.desktop" "$STAGE/share/applications/monocode.desktop"
 # Open files passed on the command line instead of starting a second instance.
 sed -i 's|^Exec=.*|Exec=monocode %U|' "$STAGE/share/applications/monocode.desktop"
+# Pin the launcher's working directory. Without it the app inherits whatever
+# cwd the desktop environment hands it and offers that as the opening project.
+if ! grep -q '^Path=' "$STAGE/share/applications/monocode.desktop"; then
+  printf 'Path=%s\n' "${HOME:-/root}" >> "$STAGE/share/applications/monocode.desktop"
+fi
 cp -a "$ROOT/usr/share/icons/." "$STAGE/share/icons/"
 cp "$REPO_ROOT/LICENSE" "$STAGE/"
 

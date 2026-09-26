@@ -33,11 +33,30 @@ mod worktrees;
 // Phase 1 seam: spawn / kill harness children per MonoCode thread.
 // Adapters own the protocol; this host only supervises processes.
 
+/// True when `dir` holds the running executable, or is inside the folder that
+/// does. Launching the app from a launcher, a desktop entry, or by
+/// double-clicking the extracted binary leaves the process in whatever
+/// directory it was started from, which is often the app's own install folder.
+fn is_install_dir(dir: &std::path::Path) -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    match exe.parent() {
+        Some(parent) => dir.starts_with(parent),
+        None => false,
+    }
+}
+
 /// Project directory for new sessions — prefer cwd, else home.
 #[tauri::command]
 fn default_cwd() -> String {
     if let Ok(cwd) = std::env::current_dir() {
-        return fs::path_to_js(&cwd);
+        // Never offer the app's own install directory as a project: the user
+        // did not choose it, and it would appear in the sidebar as a folder
+        // they never added. Home is the sane starting point instead.
+        if !is_install_dir(&cwd) {
+            return fs::path_to_js(&cwd);
+        }
     }
     dirs_home()
         .map(|home| fs::path_to_js(std::path::Path::new(&home)))
@@ -378,5 +397,25 @@ fn reap_harness_children(handle: &tauri::AppHandle) {
     }
     if let Some(host) = handle.try_state::<pty::PtyHost>() {
         host.kill_all();
+    }
+}
+
+#[cfg(test)]
+mod default_cwd_tests {
+    use super::is_install_dir;
+
+    #[test]
+    fn recognises_the_folder_holding_the_executable() {
+        // The test binary lives under target/<profile>/deps, so its parent is a
+        // real directory that must be recognised.
+        let exe = std::env::current_exe().expect("test exe path");
+        let parent = exe.parent().expect("exe parent").to_path_buf();
+        assert!(is_install_dir(&parent));
+        assert!(is_install_dir(&exe));
+    }
+
+    #[test]
+    fn rejects_an_unrelated_folder() {
+        assert!(!is_install_dir(std::path::Path::new("/")));
     }
 }
