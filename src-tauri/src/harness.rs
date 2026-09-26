@@ -1087,6 +1087,14 @@ const EXEC_ALLOWED_ARGS: &[&[&str]] = &[
     &["models"],
     &["status", "--json"],
     &["agent", "list"],
+    // V2 dropped the `models` and `agent list` subcommands, so its catalog is
+    // read from the server API instead. The `api` subcommand owns service
+    // discovery and auth on the CLI side, which is why it is preferred here
+    // over talking to a server this app would have to spawn and authenticate
+    // to itself. GET only, and only on these two read-only routes: anything
+    // that could write, or reach outside loopback, stays off this list.
+    &["api", "get", "/api/model"],
+    &["api", "get", "/api/agent"],
 ];
 
 fn exec_args_allowed(args: &[String]) -> bool {
