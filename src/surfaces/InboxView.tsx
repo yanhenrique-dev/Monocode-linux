@@ -123,6 +123,8 @@ import {
   useInboxSeenTick,
 } from "../lib/inboxSeen";
 import { markLinkedSessionUpdateSeen } from "../lib/linkedSessionSeen";
+import { inboxNotificationSubject } from "../lib/inboxNotifications";
+import { allowsProjectNotificationIndicator } from "../lib/notificationPreferences";
 import { LIST_PAGE_SIZE, listWindowSize } from "../lib/listWindow";
 import {
   LINEAR_CHANGE_EVENT,
@@ -794,7 +796,20 @@ export function InboxView({
     ) {
       return;
     }
-    if (key !== selectedKey) setSelectedKey(key);
+    if (key === selectedKey) return;
+    // Auto-select is reading too: the detail pane already shows this item,
+    // so clear its dot without demanding another click. The click path marks
+    // with the same stamp and the store keeps the max, so this stays
+    // idempotent when a click follows the auto-select.
+    // Muted or category-disabled items are never auto-consumed: their unread
+    // state survives until an explicit open, matching the indicator contract.
+    if (allowsProjectNotificationIndicator(inboxNotificationSubject(selected))) {
+      markInboxItemSeen({
+        key,
+        updatedAt: resolveSeenMark(selected.updatedAt, selected.updatedAt),
+      });
+    }
+    setSelectedKey(key);
   }, [selected, selectedKey, targetSelectionKey]);
 
   const onFiltersChange = (next: InboxFilters) => {
