@@ -31,6 +31,7 @@ import {
   KNOWN_HIDDEN_AGENTS,
   assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   type OpenCodeProtocol,
   permissionTitle,
@@ -62,7 +63,6 @@ import type {
 import {
   questionPromptTitle,
   questionsFromUnknown,
-  selectedAnswerLabels,
   type UserQuestion,
   type UserQuestionReply,
 } from "../userQuestion";
@@ -377,14 +377,20 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
 
   const liveRef: { current: Live | null } = { current: null };
   let serverUrl = "";
+  let serverPassword = "";
   let serverExited: number | null | undefined;
+  // V2 prints the URL and the password on separate lines; both handlers read
+  // each field so order does not matter.
+  const readServerLine = (line: string) => {
+    const url = parseServerUrlFromOutput(line);
+    if (url) serverUrl = url;
+    const password = parseServerPasswordFromOutput(line);
+    if (password) serverPassword = password;
+  };
 
   watchChild(
     input.sessionId,
-    (line) => {
-      const parsed = parseServerUrlFromOutput(line);
-      if (parsed) serverUrl = parsed;
-    },
+    readServerLine,
     (code) => {
       serverExited = code;
       liveByThread.delete(input.sessionId);
@@ -399,10 +405,7 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
         live.turnFailed = null;
       }
     },
-    (line) => {
-      const parsed = parseServerUrlFromOutput(line);
-      if (parsed) serverUrl = parsed;
-    },
+    readServerLine,
   );
 
   const port = await freeHarnessPort();
@@ -414,12 +417,19 @@ async function ensureLive(input: HarnessSessionInput): Promise<Live> {
   );
 
   try {
-    const url = await waitForServerUrl(
+    const endpoint = await waitForServerEndpoint(
       () => serverUrl,
+      () => serverPassword,
       () => serverExited,
       SERVER_TIMEOUT_MS,
+      protocol,
     );
-    const client = createOpenCodeClient(url, input.cwd, protocol);
+    const client = createOpenCodeClient(
+      endpoint.url,
+      input.cwd,
+      protocol,
+      endpoint.password ? { password: endpoint.password } : undefined,
+    );
     const openCodeSession = await resolveSession(client, {
       resume: canResume ? resume : undefined,
       runtimeMode: input.runtimeMode,
@@ -659,6 +669,9 @@ async function handleEvent(
       // the meter up front in useTurnActions; this keep-previous only governs
       // provider-side auto-compaction mid-turn.)
       if (role === "assistant" && !hidden) emitContext(live, info);
+      // V2 can carry a whole turn's body on the message event itself instead of
+      // emitting a part event per part, so apply whatever parts ride along.
+      applyOpenCodeParts(live, properties.parts);
       break;
     }
     case "message.removed": {
@@ -687,13 +700,7 @@ async function handleEvent(
       break;
     }
     case "message.part.updated": {
-      const part = parsePart(properties.part);
-      if (!part) break;
-      live.partById.set(part.id, part);
-      if (roleForPart(live, part) === "assistant") {
-        emitAssistantText(live, part);
-      }
-      if (part.type === "tool") emitTool(live, part);
+      applyOpenCodePart(live, parsePart(properties.part));
       break;
     }
     case "permission.asked": {
@@ -1054,6 +1061,15 @@ function handleSubagentEvent(
     }
     return;
   }
+  // Same as the parent path: a V2 message event can carry the turn's parts
+  // directly, so mirror those too rather than waiting for part events.
+  if (Array.isArray(properties.parts)) {
+    for (const item of properties.parts) {
+      const part = parsePart(item);
+      if (part) mirrorSubagentPart(live, sessionId, part);
+    }
+    return;
+  }
   let part = type === "message.part.updated" ? parsePart(properties.part) : null;
   if (type === "message.part.delta") {
     const id = stringField(properties, "partID");
@@ -1191,10 +1207,12 @@ async function waitQuestion(
     await live.client.rejectQuestion(live.openCodeSessionId, id);
     return;
   }
-  const answers = questions.map((question) =>
-    selectedAnswerLabels(question, reply),
-  );
-  await live.client.replyQuestion(live.openCodeSessionId, id, answers);
+  await live.client.replyQuestion({
+    sessionID: live.openCodeSessionId,
+    requestID: id,
+    questions,
+    reply,
+  });
 }
 
 function showNextQuestion(live: Live): void {
@@ -1251,6 +1269,21 @@ function parsePart(value: unknown): OpenCodePart | null {
     time: asRecord(rec.time) as OpenCodePart["time"],
     state: asRecord(rec.state) ?? undefined,
   };
+}
+
+/** Applies one part the way a part event would, ignoring an unusable one. */
+function applyOpenCodePart(live: Live, part: OpenCodePart | null): void {
+  if (!part) return;
+  live.partById.set(part.id, part);
+  if (roleForPart(live, part) === "assistant") {
+    emitAssistantText(live, part);
+  }
+  if (part.type === "tool") emitTool(live, part);
+}
+
+function applyOpenCodeParts(live: Live, value: unknown): void {
+  if (!Array.isArray(value)) return;
+  for (const item of value) applyOpenCodePart(live, parsePart(item));
 }
 
 function roleForPart(
@@ -1354,17 +1387,42 @@ async function assertOpenCodeVersion(
   return assertSupportedOpenCodeRelease(output);
 }
 
-function waitForServerUrl(
-  read: () => string,
+/**
+ * V2 `serve` prints a per-process `server password` alongside the listening
+ * URL and then requires HTTP Basic auth on every request; missing credentials
+ * surface as `OpenCode HTTP 401`. V1 servers print no password, so only V2
+ * waits for one — and only briefly, so an unexpected omission fails visibly
+ * instead of hanging startup.
+ */
+const SERVER_PASSWORD_GRACE_MS = 2_000;
+
+function waitForServerEndpoint(
+  readUrl: () => string,
+  readPassword: () => string,
   exited: () => number | null | undefined,
   timeoutMs: number,
-): Promise<string> {
+  protocol: OpenCodeProtocol,
+): Promise<{ url: string; password: string }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
+    let urlFirstSeen: number | null = null;
     const tick = () => {
-      const url = read();
-      if (url) {
-        resolve(url);
+      const url = readUrl();
+      if (url && urlFirstSeen === null) urlFirstSeen = Date.now();
+      const password = readPassword();
+      if (url && (protocol !== "v2" || password)) {
+        resolve({ url, password });
+        return;
+      }
+      // A V2 server that never prints a password still starts; proceed after a
+      // grace period so the session surfaces a real 401 rather than a hang.
+      if (
+        url &&
+        protocol === "v2" &&
+        urlFirstSeen !== null &&
+        Date.now() - urlFirstSeen >= SERVER_PASSWORD_GRACE_MS
+      ) {
+        resolve({ url, password });
         return;
       }
       if (exited() !== undefined) {

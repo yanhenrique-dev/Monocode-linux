@@ -5,10 +5,12 @@ import {
   parseAgentListCliOutput,
   parseModelsCliOutput,
   parsePlainModelSlugs,
+  parseV2AgentApiOutput,
+  parseV2ModelApiOutput,
 } from "./opencodeCatalog";
 import {
+  buildOpenCodeDenyAllRules,
   buildOpenCodePermissionRules,
-  buildOpenCodePermissionRulesV2,
   compareSemver,
   contextUsedFromMessageInfo,
   turnMetricsFromMessageInfo,
@@ -27,6 +29,7 @@ import {
   assertSupportedOpenCodeRelease,
   parseOpenCodeRelease,
   parseOpenCodeVersion,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   sortOpenCodeVariants,
   toOpenCodePermissionReply,
@@ -129,6 +132,154 @@ describe("parseServerUrlFromOutput", () => {
   });
 });
 
+describe("V2 catalog API parsers", () => {
+  it("reads models from the V2 model route", () => {
+    const parsed = parseV2ModelApiOutput(
+      JSON.stringify({
+        location: { directory: "/repo" },
+        data: [
+          {
+            id: "gpt-5.4",
+            modelID: "gpt-5.4",
+            providerID: "openai",
+            name: "GPT-5.4",
+            enabled: true,
+            limit: { context: 400_000, output: 128_000 },
+            variants: [{ id: "high" }, { id: "low" }],
+          },
+        ],
+      }),
+    );
+
+    const provider = parsed.providers.get("openai");
+    expect(parsed.connected).toEqual(["openai"]);
+    expect(provider?.models["gpt-5.4"]?.limit?.context).toBe(400_000);
+    // The native array of variants becomes the map the settings builder reads.
+    expect(Object.keys(provider?.models["gpt-5.4"]?.variants ?? {})).toEqual([
+      "high",
+      "low",
+    ]);
+  });
+
+  it("skips disabled, deprecated, and idless models", () => {
+    const parsed = parseV2ModelApiOutput(
+      JSON.stringify({
+        data: [
+          { modelID: "off", providerID: "openai", enabled: false },
+          { modelID: "old", providerID: "openai", status: "deprecated" },
+          { modelID: "", providerID: "openai" },
+          { modelID: "ok", providerID: "openai" },
+        ],
+      }),
+    );
+    expect(Object.keys(parsed.providers.get("openai")?.models ?? {})).toEqual([
+      "ok",
+    ]);
+  });
+
+  it("canonicalizes legacy provider ids for grouping", () => {
+    const parsed = parseV2ModelApiOutput(
+      JSON.stringify({
+        data: [
+          { modelID: "m", providerID: "google-vertex-anthropic" },
+          { modelID: "m2", providerID: "azure-cognitive-services" },
+        ],
+      }),
+    );
+    expect([...parsed.providers.keys()].sort()).toEqual([
+      "azure",
+      "google-vertex",
+    ]);
+  });
+
+  it("keeps the server's own provider id in the selectable native id", () => {
+    // Grouping may use the canonical id, but `nativeId` goes back to the
+    // server on the model route, which only accepts the id it reported.
+    const models = flattenOpenCodeModels(
+      parseV2ModelApiOutput(
+        JSON.stringify({
+          data: [
+            { modelID: "m", providerID: "google-vertex-anthropic", name: "M" },
+          ],
+        }),
+      ),
+      [],
+    );
+    expect(models[0].nativeId).toBe("google-vertex-anthropic/m");
+    // The display name still comes from the canonical provider.
+    expect(models[0].provider.id).toBe("google-vertex");
+  });
+
+  it("survives non-JSON and empty output", () => {
+    expect(parseV2ModelApiOutput("").providers.size).toBe(0);
+    expect(parseV2ModelApiOutput("error: no service").providers.size).toBe(0);
+    expect(parseV2ModelApiOutput("{}").connected).toEqual([]);
+  });
+
+  it("reads agents from the V2 agent route, keyed by id", () => {
+    const agents = parseV2AgentApiOutput(
+      JSON.stringify({
+        location: { directory: "/repo" },
+        data: [
+          { id: "build", name: "Build", mode: "primary", hidden: false },
+          { id: "plan", name: "Plan", mode: "primary", hidden: false },
+          { id: "title", name: "Title", mode: "all", hidden: false },
+          { name: "NoId", mode: "all" },
+        ],
+      }),
+    );
+
+    // The id is what the session routes accept; the display name is not a
+    // valid substitute, so that is what MonoCode sends.
+    expect(agents.map((agent) => agent.name)).toEqual(["build", "plan", "title"]);
+    expect(agents.map((agent) => agent.mode)).toEqual([
+      "primary",
+      "primary",
+      "all",
+    ]);
+    // `title` is a hidden built-in even when the server does not flag it.
+    expect(agents[2].hidden).toBe(true);
+    // An entry with no id cannot be selected, so it is dropped.
+    expect(agents).toHaveLength(3);
+  });
+
+  it("falls back to the id when the server omits the display name", () => {
+    const agents = parseV2AgentApiOutput(
+      JSON.stringify({ data: [{ id: "build", mode: "primary" }] }),
+    );
+    expect(agents[0].name).toBe("build");
+  });
+
+  it("honors the server's own hidden flag", () => {
+    const agents = parseV2AgentApiOutput(
+      JSON.stringify({
+        data: [{ id: "x", name: "X", mode: "all", hidden: true }],
+      }),
+    );
+    expect(agents[0].hidden).toBe(true);
+  });
+});
+
+describe("parseServerPasswordFromOutput", () => {
+  it("reads the per-process password V2 prints", () => {
+    expect(
+      parseServerPasswordFromOutput("  server password  aBc-123_xYz"),
+    ).toBe("aBc-123_xYz");
+  });
+
+  it("strips trailing punctuation and tolerates casing", () => {
+    expect(parseServerPasswordFromOutput("Server Password: hunter2.")).toBe(
+      "hunter2",
+    );
+  });
+
+  it("returns null when V1 prints no password", () => {
+    expect(
+      parseServerPasswordFromOutput("opencode server listening on http://127.0.0.1:4096"),
+    ).toBeNull();
+  });
+});
+
 describe("parseOpenCodeVersion / compareSemver", () => {
   it("extracts a semver and gates 1.14.19", () => {
     expect(parseOpenCodeVersion("1.14.19")).toBe("1.14.19");
@@ -168,42 +319,13 @@ describe("openCode protocol detection", () => {
 });
 
 describe("normalizeServerEvent", () => {
-  it("maps V2 question asks onto the V1 pipeline", () => {
-    expect(
-      normalizeServerEvent({
-        type: "question.v2.asked",
-        properties: {
-          sessionID: "s1",
-          request: {
-            id: "req-9",
-            questions: [{ prompt: "Proceed?" }],
-          },
-        },
-      }),
-    ).toMatchObject({
-      type: "question.asked",
-      properties: {
-        id: "req-9",
-        questions: [{ prompt: "Proceed?" }],
-      },
-    });
-  });
-
-  it("drops durability bookkeeping without V1 meaning", () => {
-    expect(
-      normalizeServerEvent({ type: "question.v2.replied", properties: {} }),
-    ).toBeNull();
-    expect(
-      normalizeServerEvent({
-        type: "session.next.prompt.admitted",
-        properties: {},
-      }),
-    ).toBeNull();
-  });
-
   it("passes V1 events through untouched", () => {
     const event = { type: "permission.asked", properties: { id: "r1" } };
     expect(normalizeServerEvent(event)).toBe(event);
+  });
+
+  it("drops a payload with no event type", () => {
+    expect(normalizeServerEvent({ properties: {} })).toBeNull();
   });
 });
 
@@ -233,13 +355,9 @@ describe("buildOpenCodePermissionRules", () => {
     expect(toOpenCodePermissionReply("deny")).toBe("reject");
   });
 
-  it("shapes V2 permission rules from the V1 builder", () => {
-    expect(buildOpenCodePermissionRulesV2("full-access")).toEqual([
-      { action: "*", resource: "*", effect: "allow" },
-    ]);
-    expect(buildOpenCodePermissionRulesV2("supervised")).toEqual([
-      { action: "*", resource: "*", effect: "ask" },
-      { action: "question", resource: "*", effect: "allow" },
+  it("denies every action for text-only sessions", () => {
+    expect(buildOpenCodeDenyAllRules()).toEqual([
+      { permission: "*", pattern: "*", action: "deny" },
     ]);
   });
 });

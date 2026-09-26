@@ -93,45 +93,18 @@ export function isTurnDoneStatusEvent(
 }
 
 /**
- * V2 SSE names normalized onto the V1 pipeline. Approvals, questions,
- * subagents, and the turn latch only know V1 names; mapping here keeps one
- * pipeline for both protocols. Returns null to drop events with no V1
- * meaning (durability bookkeeping the wait-route already covers).
+ * Gate for one event before the session pipeline sees it. V1 names already
+ * match what the pipeline routes on, so this only drops frameless payloads and
+ * otherwise passes the event through untouched.
  *
- * VERIFY live: the V2 event catalog is still beta and may rename again.
+ * V2 needs no equivalent here: its transport normalizes events into V1
+ * vocabulary as they cross the client boundary, so the pipeline stays
+ * single-generation.
  */
 export function normalizeServerEvent(
   event: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const type = typeof event.type === "string" ? event.type : "";
-  if (type === "question.v2.asked") {
-    const properties = asRecord(event.properties) ?? {};
-    const request = asRecord(properties.request) ?? {};
-    return {
-      ...event,
-      type: "question.asked",
-      properties: {
-        ...properties,
-        id:
-          stringField(properties, "requestID") ??
-          stringField(request, "id") ??
-          stringField(properties, "id"),
-        questions: properties.questions ?? request.questions ?? [],
-      },
-    };
-  }
-  if (type === "question.v2.replied" || type === "question.v2.rejected") {
-    // Resolution flows through our own reply calls, as in V1.
-    return null;
-  }
-  if (
-    type === "session.next.prompt.admitted" ||
-    type === "session.next.prompt.promoted"
-  ) {
-    // Admission receipts; completion is observed via the wait route.
-    return null;
-  }
-  return event;
+  return typeof event.type === "string" && event.type ? event : null;
 }
 
 const OPENCODE_DEFAULT_TITLE_PATTERN =
@@ -186,6 +159,21 @@ export function parseOpenCodeModelSlug(
     providerID: trimmed.slice(0, separator),
     modelID: trimmed.slice(separator + 1),
   };
+}
+
+/**
+ * V2 `opencode serve` prints a per-process `server password` and then requires
+ * HTTP Basic auth on every request; without it each call answers 401. V1
+ * servers print no password.
+ */
+export function parseServerPasswordFromOutput(output: string): string | null {
+  for (const line of output.split("\n")) {
+    // Tolerate `server password <value>` and `server password: <value>`; the
+    // exact banner has changed across V2 builds.
+    const match = line.match(/server\s+password\s*:?\s*(\S+)/i);
+    if (match?.[1]) return match[1].replace(/[.,;]+$/, "");
+  }
+  return null;
 }
 
 export function parseServerUrlFromOutput(output: string): string | null {
@@ -284,27 +272,12 @@ export function toOpenCodePermissionReply(
   return decision === "allow" ? "once" : "reject";
 }
 
-export type OpenCodePermissionRuleV2 = {
-  action: string;
-  resource: string;
-  effect: "allow" | "deny" | "ask";
-};
-
 /**
- * V2 native permission shape. Field renames follow the migration guide
- * (`permission`→`action`, `pattern`→`resource`, `action`→`effect`); V1 tool
- * names (`question`, `read`, `*`) ride along — V2 warns and continues past
- * unknown actions, so misses stay loud instead of silently open.
- * VERIFY live: exact V2 acceptance of carried-over names.
+ * Deny every action. Used by sessions that only synthesize text (titles,
+ * commit messages, PR bodies) and must not touch the workspace.
  */
-export function buildOpenCodePermissionRulesV2(
-  runtimeMode: RuntimeMode,
-): OpenCodePermissionRuleV2[] {
-  return buildOpenCodePermissionRules(runtimeMode).map((rule) => ({
-    action: rule.permission,
-    resource: rule.pattern,
-    effect: rule.action,
-  }));
+export function buildOpenCodeDenyAllRules(): OpenCodePermissionRule[] {
+  return [{ permission: "*", pattern: "*", action: "deny" }];
 }
 
 export function toFileUrl(path: string): string {

@@ -55,6 +55,12 @@ struct HarnessExit {
 struct HarnessSse {
     session_id: String,
     data: String,
+    /// SSE `event:` name for the frame. V1 carries the discriminator inside the
+    /// JSON payload and leaves this unset; V2 frames an opaque payload under a
+    /// separate name, so the frontend falls back to it when the payload has no
+    /// `type` of its own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -811,13 +817,69 @@ fn read_sse_line<R: BufRead>(reader: &mut R, line: &mut Vec<u8>) -> Result<bool,
     }
 }
 
+/// Accumulates the fields of one SSE frame.
+///
+/// V1 carries the event discriminator inside the JSON payload and leaves the
+/// `event:` field unused, so `name` stays `None` and the frontend reads the
+/// payload. V2 frames an opaque payload under a separate `event:` name, so both
+/// are reported and the frontend prefers whichever carries the type.
+#[derive(Default)]
+struct SseFrame {
+    data: String,
+    name: Option<String>,
+}
+
+impl SseFrame {
+    /// Feeds one line, yielding `(name, data)` once a blank line closes a
+    /// frame. Comments, keep-alives, and incomplete frames yield `None`.
+    fn push(&mut self, line: &str) -> Result<Option<(Option<String>, String)>, String> {
+        if line.starts_with(':') {
+            return Ok(None);
+        }
+        if line.is_empty() {
+            if self.data.is_empty() {
+                // A dataless frame is a keep-alive; its name must not leak into
+                // the next frame.
+                self.name = None;
+                return Ok(None);
+            }
+            return Ok(Some((self.name.take(), std::mem::take(&mut self.data))));
+        }
+        if let Some(rest) = line.strip_prefix("event:") {
+            let value = rest.strip_prefix(' ').unwrap_or(rest);
+            if !value.is_empty() {
+                self.name = Some(value.to_string());
+            }
+            return Ok(None);
+        }
+        if let Some(rest) = line.strip_prefix("data:") {
+            let piece = rest.strip_prefix(' ').unwrap_or(rest);
+            let separator_bytes = usize::from(!self.data.is_empty());
+            if self
+                .data
+                .len()
+                .saturating_add(separator_bytes)
+                .saturating_add(piece.len())
+                > MAX_HARNESS_SSE_EVENT_BYTES
+            {
+                return Err("OpenCode event exceeded the size limit".into());
+            }
+            if !self.data.is_empty() {
+                self.data.push('\n');
+            }
+            self.data.push_str(piece);
+        }
+        Ok(None)
+    }
+}
+
 fn read_sse<R: BufRead>(
     mut reader: R,
     app: &AppHandle,
     session_id: &str,
     stop: &AtomicBool,
 ) -> Result<(), String> {
-    let mut data = String::new();
+    let mut frame = SseFrame::default();
     let mut line = Vec::new();
     loop {
         if stop.load(Ordering::SeqCst) {
@@ -828,39 +890,17 @@ fn read_sse<R: BufRead>(
         }
         let line = String::from_utf8_lossy(&line);
         let line = line.trim_end_matches(['\r', '\n']);
-        if line.starts_with(':') {
+        let Some((name, data)) = frame.push(line)? else {
             continue;
-        }
-        if line.is_empty() {
-            if data.is_empty() {
-                continue;
-            }
-            let payload = std::mem::take(&mut data);
-            let _ = app.emit(
-                SSE_EVENT,
-                HarnessSse {
-                    session_id: session_id.to_string(),
-                    data: payload,
-                },
-            );
-            continue;
-        }
-        if let Some(rest) = line.strip_prefix("data:") {
-            let piece = rest.strip_prefix(' ').unwrap_or(rest);
-            let separator_bytes = usize::from(!data.is_empty());
-            if data
-                .len()
-                .saturating_add(separator_bytes)
-                .saturating_add(piece.len())
-                > MAX_HARNESS_SSE_EVENT_BYTES
-            {
-                return Err("OpenCode event exceeded the size limit".into());
-            }
-            if !data.is_empty() {
-                data.push('\n');
-            }
-            data.push_str(piece);
-        }
+        };
+        let _ = app.emit(
+            SSE_EVENT,
+            HarnessSse {
+                session_id: session_id.to_string(),
+                data,
+                name,
+            },
+        );
     }
     Ok(())
 }
@@ -899,7 +939,8 @@ fn assert_loopback(raw_url: &str) -> Result<(), String> {
 mod loopback_tests {
     use super::{
         assert_http_method, assert_loopback, http_agent, is_success_status, read_limited_body,
-        read_sse_line, MAX_HARNESS_HTTP_BODY_BYTES, MAX_HARNESS_SSE_LINE_BYTES,
+        read_sse_line, SseFrame, MAX_HARNESS_HTTP_BODY_BYTES, MAX_HARNESS_SSE_EVENT_BYTES,
+        MAX_HARNESS_SSE_LINE_BYTES,
     };
     use std::io::{Cursor, Read, Write};
     use std::net::TcpListener;
@@ -983,6 +1024,58 @@ mod loopback_tests {
         let mut reader = Cursor::new(line);
         let mut buffer = Vec::new();
         assert!(read_sse_line(&mut reader, &mut buffer).is_err());
+    }
+
+    fn frames(lines: &[&str]) -> Vec<(Option<String>, String)> {
+        let mut frame = SseFrame::default();
+        let mut out = Vec::new();
+        for line in lines {
+            if let Some(done) = frame.push(line).expect("frame") {
+                out.push(done);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn reports_a_v1_payload_without_an_event_name() {
+        // V1 puts the discriminator in the payload, so no name is reported.
+        let parsed = frames(&["data: {\"type\":\"message.updated\"}", ""]);
+        assert_eq!(
+            parsed,
+            vec![(None, "{\"type\":\"message.updated\"}".to_string())]
+        );
+    }
+
+    #[test]
+    fn reports_a_v2_event_name_beside_its_payload() {
+        let parsed = frames(&["event: session.idle", "data: {}", ""]);
+        assert_eq!(
+            parsed,
+            vec![(Some("session.idle".to_string()), "{}".to_string())]
+        );
+    }
+
+    #[test]
+    fn joins_multiline_payloads_and_splits_frames() {
+        let parsed = frames(&["data: one", "data: two", "", "data: three", ""]);
+        assert_eq!(
+            parsed,
+            vec![(None, "one\ntwo".to_string()), (None, "three".to_string()),]
+        );
+    }
+
+    #[test]
+    fn ignores_comments_and_never_leaks_a_name_past_a_keepalive() {
+        let parsed = frames(&[": keep-alive", "event: stale.name", "", "data: real", ""]);
+        assert_eq!(parsed, vec![(None, "real".to_string())]);
+    }
+
+    #[test]
+    fn rejects_an_oversized_frame() {
+        let mut frame = SseFrame::default();
+        let huge = "x".repeat(MAX_HARNESS_SSE_EVENT_BYTES + 1);
+        assert!(frame.push(&format!("data: {huge}")).is_err());
     }
 }
 
