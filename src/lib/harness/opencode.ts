@@ -669,6 +669,9 @@ async function handleEvent(
       // the meter up front in useTurnActions; this keep-previous only governs
       // provider-side auto-compaction mid-turn.)
       if (role === "assistant" && !hidden) emitContext(live, info);
+      // V2 can carry a whole turn's body on the message event itself instead of
+      // emitting a part event per part, so apply whatever parts ride along.
+      applyOpenCodeParts(live, properties.parts);
       break;
     }
     case "message.removed": {
@@ -697,13 +700,7 @@ async function handleEvent(
       break;
     }
     case "message.part.updated": {
-      const part = parsePart(properties.part);
-      if (!part) break;
-      live.partById.set(part.id, part);
-      if (roleForPart(live, part) === "assistant") {
-        emitAssistantText(live, part);
-      }
-      if (part.type === "tool") emitTool(live, part);
+      applyOpenCodePart(live, parsePart(properties.part));
       break;
     }
     case "permission.asked": {
@@ -1064,6 +1061,15 @@ function handleSubagentEvent(
     }
     return;
   }
+  // Same as the parent path: a V2 message event can carry the turn's parts
+  // directly, so mirror those too rather than waiting for part events.
+  if (Array.isArray(properties.parts)) {
+    for (const item of properties.parts) {
+      const part = parsePart(item);
+      if (part) mirrorSubagentPart(live, sessionId, part);
+    }
+    return;
+  }
   let part = type === "message.part.updated" ? parsePart(properties.part) : null;
   if (type === "message.part.delta") {
     const id = stringField(properties, "partID");
@@ -1263,6 +1269,21 @@ function parsePart(value: unknown): OpenCodePart | null {
     time: asRecord(rec.time) as OpenCodePart["time"],
     state: asRecord(rec.state) ?? undefined,
   };
+}
+
+/** Applies one part the way a part event would, ignoring an unusable one. */
+function applyOpenCodePart(live: Live, part: OpenCodePart | null): void {
+  if (!part) return;
+  live.partById.set(part.id, part);
+  if (roleForPart(live, part) === "assistant") {
+    emitAssistantText(live, part);
+  }
+  if (part.type === "tool") emitTool(live, part);
+}
+
+function applyOpenCodeParts(live: Live, value: unknown): void {
+  if (!Array.isArray(value)) return;
+  for (const item of value) applyOpenCodePart(live, parsePart(item));
 }
 
 function roleForPart(

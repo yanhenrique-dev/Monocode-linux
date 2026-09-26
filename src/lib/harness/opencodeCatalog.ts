@@ -455,7 +455,12 @@ export function flattenOpenCodeModels(
     if (!connected.has(provider.id)) continue;
     for (const [modelId, model] of Object.entries(provider.models)) {
       const name = model.name?.trim() || titleCaseSlug(modelId);
-      const nativeId = `${provider.id}/${model.id ?? modelId}`;
+      // `nativeId` is what gets sent back to the server, so it must echo the
+      // provider id the server itself reported. The bucket key is the
+      // canonical display id, which is not always what the API accepts; the
+      // CLI path carries no `providerID` and keeps the bucket as before.
+      const wireProviderId = model.providerID?.trim() || provider.id;
+      const nativeId = `${wireProviderId}/${model.id ?? modelId}`;
       const contextWindow = model.limit?.context;
       models.push({
         id: `opencode:${nativeId}`,

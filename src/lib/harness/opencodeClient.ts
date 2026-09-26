@@ -658,14 +658,18 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     if (previous && previous.model === key && previous.agent === target.agent) {
       return;
     }
-    if (target.agent && previous?.agent !== target.agent) {
+    const agentChanged = !!target.agent && previous?.agent !== target.agent;
+    if (agentChanged) {
       await this.request<unknown>(
         "POST",
         `/session/${enc(sessionID)}/agent`,
         { body: { agent: target.agent } },
       );
     }
-    if (target.model && previous?.model !== key) {
+    // Switching the agent can impose that agent's own model, so the caller's
+    // explicit choice has to be re-applied after the switch. Without this a
+    // `build` -> `plan` change would silently run on a different model.
+    if (target.model && (agentChanged || previous?.model !== key)) {
       await this.request<unknown>(
         "POST",
         `/session/${enc(sessionID)}/model`,
@@ -696,7 +700,7 @@ export class OpenCodeClientV2 extends OpenCodeClientBase implements OpenCodeClie
     questions: UserQuestion[];
     reply: UserQuestionReply;
   }): Promise<void> {
-    const body = buildV2FormAnswer(input.reply);
+    const body = buildV2FormAnswer(input.reply, input.questions);
     await this.request<unknown>(
       "POST",
       `/session/${enc(input.sessionID)}/form/${enc(input.requestID)}/reply`,

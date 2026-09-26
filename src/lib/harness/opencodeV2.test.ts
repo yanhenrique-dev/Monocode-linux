@@ -391,7 +391,9 @@ describe("v2FormToQuestions", () => {
     expect(questions).toEqual([]);
   });
 
-  it("keeps field keys unique", () => {
+  it("drops a repeated field key rather than renaming it", () => {
+    // The question id doubles as the form answer key, so a renamed id would
+    // post a key the server does not know.
     const questions = v2FormToQuestions({
       id: "frm_1",
       fields: [
@@ -399,22 +401,65 @@ describe("v2FormToQuestions", () => {
         { key: "a", type: "string", title: "Two" },
       ],
     });
-    expect(questions.map((q) => q.id)).toEqual(["a", "a:2"]);
+    expect(questions.map((q) => q.id)).toEqual(["a"]);
   });
 });
 
 describe("buildV2FormAnswer", () => {
-  it("keys answers by question and collapses a single choice", () => {
+  const questions = [
+    {
+      id: "name",
+      prompt: "Name",
+      multiSelect: false,
+      allowCustom: true,
+      options: [],
+    },
+    {
+      id: "tags",
+      prompt: "Tags",
+      multiSelect: true,
+      allowCustom: false,
+      options: [
+        { id: "a", label: "A" },
+        { id: "b", label: "B" },
+      ],
+    },
+  ];
+
+  it("sends free text from the custom map", () => {
+    // A non-multiselect field is free text, so the UI puts the typed value in
+    // `custom`; reading only `answers` would post an empty form.
     expect(
-      buildV2FormAnswer({
-        kind: "answered",
-        answers: { one: ["a"], many: ["x", "y"] },
-      }),
-    ).toEqual({ answer: { one: "a", many: ["x", "y"] } });
+      buildV2FormAnswer(
+        { kind: "answered", answers: {}, custom: { name: "Ada" } },
+        questions,
+      ),
+    ).toEqual({ answer: { name: "Ada" } });
   });
 
-  it("sends an empty answer when nothing was chosen", () => {
-    expect(buildV2FormAnswer({ kind: "answered", answers: {} })).toBeNull();
-    expect(buildV2FormAnswer({ kind: "skipped" })).toBeNull();
+  it("collapses a single choice and keeps a multi-select as an array", () => {
+    expect(
+      buildV2FormAnswer(
+        { kind: "answered", answers: { name: ["Ada"], tags: ["a", "b"] } },
+        questions,
+      ),
+    ).toEqual({ answer: { name: "Ada", tags: ["a", "b"] } });
+  });
+
+  it("sends only ids the field declares", () => {
+    // A stale or synthetic id would not match any option on the server.
+    expect(
+      buildV2FormAnswer(
+        { kind: "answered", answers: { tags: ["a", "not-an-option"] } },
+        questions,
+      ),
+    ).toEqual({ answer: { tags: ["a"] } });
+  });
+
+  it("omits unanswered fields so the server applies its own required rule", () => {
+    expect(
+      buildV2FormAnswer({ kind: "answered", answers: {} }, questions),
+    ).toBeNull();
+    expect(buildV2FormAnswer({ kind: "skipped" }, questions)).toBeNull();
   });
 });

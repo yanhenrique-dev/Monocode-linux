@@ -177,7 +177,7 @@ describe("V2 catalog API parsers", () => {
     ]);
   });
 
-  it("canonicalizes legacy provider ids from the API", () => {
+  it("canonicalizes legacy provider ids for grouping", () => {
     const parsed = parseV2ModelApiOutput(
       JSON.stringify({
         data: [
@@ -186,7 +186,28 @@ describe("V2 catalog API parsers", () => {
         ],
       }),
     );
-    expect([...parsed.providers.keys()].sort()).toEqual(["azure", "google-vertex"]);
+    expect([...parsed.providers.keys()].sort()).toEqual([
+      "azure",
+      "google-vertex",
+    ]);
+  });
+
+  it("keeps the server's own provider id in the selectable native id", () => {
+    // Grouping may use the canonical id, but `nativeId` goes back to the
+    // server on the model route, which only accepts the id it reported.
+    const models = flattenOpenCodeModels(
+      parseV2ModelApiOutput(
+        JSON.stringify({
+          data: [
+            { modelID: "m", providerID: "google-vertex-anthropic", name: "M" },
+          ],
+        }),
+      ),
+      [],
+    );
+    expect(models[0].nativeId).toBe("google-vertex-anthropic/m");
+    // The display name still comes from the canonical provider.
+    expect(models[0].provider.id).toBe("google-vertex");
   });
 
   it("survives non-JSON and empty output", () => {

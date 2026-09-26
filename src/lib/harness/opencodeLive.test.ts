@@ -228,6 +228,64 @@ describe("OpenCode subagent trails", () => {
   });
 });
 
+describe("OpenCode message-carried parts", () => {
+  it("renders parts that ride on the message event instead of a part event", async () => {
+    // V2 can put a whole turn's body on the message event, with no per-part
+    // event to follow. Without consuming these the turn would reach idle with
+    // nothing rendered.
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    onSseEvent?.({
+      type: "message.updated",
+      properties: {
+        info: { id: "msg_1", sessionID: "session_1", role: "assistant" },
+        parts: [
+          { id: "p_text", messageID: "msg_1", type: "text", text: "Answer" },
+          {
+            id: "p_tool",
+            messageID: "msg_1",
+            type: "tool",
+            tool: "read",
+            state: { status: "completed" },
+          },
+        ],
+      },
+    });
+    idle();
+    await done;
+
+    expect(events.some((event) => event.type === "message.delta")).toBe(true);
+    expect(events.some((event) => event.type === "tool.updated")).toBe(true);
+  });
+
+  it("keeps working when the server only sends part events", async () => {
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    onSseEvent?.({
+      type: "message.updated",
+      properties: {
+        info: { id: "msg_1", sessionID: "session_1", role: "assistant" },
+      },
+    });
+    onSseEvent?.({
+      type: "message.part.updated",
+      properties: {
+        part: {
+          id: "p_text",
+          messageID: "msg_1",
+          sessionID: "session_1",
+          type: "text",
+          text: "Answer",
+        },
+      },
+    });
+    idle();
+    await done;
+
+    expect(events.some((event) => event.type === "message.delta")).toBe(true);
+  });
+});
+
 describe("OpenCode event stream recovery", () => {
   it("reverts a rejected file turn before continuing a resumed session", async () => {
     sessionMessages = [

@@ -162,6 +162,37 @@ describe("OpenCodeClientV2", () => {
     expect(lastCall().url).toBe(v2Url("/session/session%2Fa/prompt"));
   });
 
+  it("re-applies the model after the agent changes", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+    const model = { providerID: "openai", modelID: "gpt-5.4" };
+
+    await client.promptAsync({
+      sessionID: "session/a",
+      model,
+      agent: "build",
+      parts: [{ type: "text", text: "one" }],
+    });
+    const before = mocks.harnessHttp.mock.calls.length;
+
+    await client.promptAsync({
+      sessionID: "session/a",
+      model,
+      agent: "plan",
+      parts: [{ type: "text", text: "two" }],
+    });
+
+    // The new agent can impose its own model, so the caller's choice is
+    // re-applied even though the model key is unchanged.
+    const urls = mocks.harnessHttp.mock.calls
+      .slice(before)
+      .map((call) => (call[0] as { url: string }).url);
+    expect(urls).toEqual([
+      v2Url("/session/session%2Fa/agent"),
+      v2Url("/session/session%2Fa/model"),
+      v2Url("/session/session%2Fa/prompt"),
+    ]);
+  });
+
   it("compacts through the V2 route with the session model", async () => {
     const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
 
@@ -222,7 +253,10 @@ describe("OpenCodeClientV2", () => {
           prompt: "Tags",
           multiSelect: true,
           allowCustom: false,
-          options: [],
+          options: [
+            { id: "a", label: "A" },
+            { id: "b", label: "B" },
+          ],
         },
       ],
       reply: {

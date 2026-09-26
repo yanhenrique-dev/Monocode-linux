@@ -467,6 +467,12 @@ export function v2FormToQuestions(
     const key = stringField(field, "key");
     if (!field || !key || !type || type === "external") return [];
     if (field.hidden === true) return [];
+    // The question id doubles as the form answer key, so it has to be the
+    // field's own key. A repeated key cannot be answered unambiguously
+    // against a `{ [key]: value }` map, so the later field is dropped rather
+    // than renamed to something the server does not recognise.
+    if (usedIds.has(key)) return [];
+    usedIds.add(key);
     const title = stringField(field, "title") ?? key;
     const description = stringField(field, "description");
     const options = v2FormOptions(field.options);
@@ -475,7 +481,7 @@ export function v2FormToQuestions(
     const allowCustom =
       field.custom === true || (multiSelect ? options.length === 0 : true);
     const question: UserQuestion = {
-      id: uniqueQuestionId(key, usedIds),
+      id: key,
       header: title,
       prompt: description ? `${title}\n${description}` : title,
       multiSelect,
@@ -504,34 +510,42 @@ function v2FormOptions(value: unknown): UserQuestion["options"] {
   });
 }
 
-function uniqueQuestionId(seed: string, used: Set<string>): string {
-  let next = seed;
-  let n = 2;
-  while (used.has(next)) {
-    next = `${seed}:${n}`;
-    n += 1;
-  }
-  used.add(next);
-  return next;
-}
-
 /**
  * Question reply -> a V2 form answer. V1 sent positional `string[][]`; V2 sends
  * `{ answer: { [key]: value } }` where a multi-select is a string array and
- * everything else a single value. Unanswered questions are omitted so the
- * server can apply its own `required` handling.
+ * everything else a single value.
+ *
+ * The reply is read through `questions` rather than its raw maps because the
+ * answer key has to be the form's own field key: free text arrives in
+ * `reply.custom` (every non-multiselect field is free text), and a
+ * multiselect's selected ids are worth sending only when the field declares
+ * them. Unanswered fields are omitted so the server applies its own `required`
+ * handling.
  */
 export function buildV2FormAnswer(
   reply: UserQuestionReply,
+  questions: UserQuestion[],
 ): { answer: Record<string, unknown> } | null {
   if (reply.kind !== "answered") return null;
   const answer: Record<string, unknown> = {};
-  for (const [id, values] of Object.entries(reply.answers)) {
-    if (values.length === 1) {
-      answer[id] = values[0] ?? "";
+  for (const question of questions) {
+    const key = question.id;
+    const custom = reply.custom?.[key]?.trim();
+    if (custom) {
+      answer[key] = custom;
       continue;
     }
-    if (values.length > 1) answer[id] = values;
+    const selected = reply.answers[key] ?? [];
+    if (selected.length === 0) continue;
+    if (question.multiSelect) {
+      // Only ids the field actually offers; an "other" placeholder carries the
+      // text through `custom` above.
+      const allowed = new Set(question.options.map((option) => option.id));
+      const values = selected.filter((id) => allowed.has(id));
+      if (values.length > 0) answer[key] = values;
+      continue;
+    }
+    answer[key] = selected[0] ?? "";
   }
   return Object.keys(answer).length > 0 ? { answer } : null;
 }
