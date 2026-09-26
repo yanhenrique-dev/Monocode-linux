@@ -5,6 +5,43 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.55] - 2026-09-26
+
+> **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
+> incomplete features, and rough edges — please report issues.
+
+### Fixed
+
+- OpenCode 2.x sessions work end to end. The V2 support in the tree was a
+  skeleton whose routes were marked unverified, and every V2 request was
+  wrong: the prompt body was rejected outright, so no V2 turn could complete.
+  Corrected against the published V2 API and migration guide.
+- OpenCode 2.x prompt admission uses the contract's `text` plus typed
+  `files`/`agents`/`skills`, with the model and agent switched through their
+  own session routes and applied only when they change.
+- OpenCode 2.x request scoping uses the `location` object instead of the V1
+  `directory` parameter; permission rules use the plural key, replies use
+  `decision`, and the renamed actions (`bash`→`shell`, `task`→`subagent`,
+  `write`/`patch`→`edit`) are translated. A stale action name matched no rule
+  and fell through to the `*` allow base policy, so supervised mode could have
+  run shell commands without asking.
+- OpenCode 2.x route renames: `interrupt` for abort, `compact` for summarize,
+  and revert staged then committed. The `wait` route the text prompts depend on
+  is read from `experimental`.
+- OpenCode 2.x sends the per-process password printed by `opencode serve` as
+  HTTP Basic auth, which every V2 route requires.
+- OpenCode 2.x reads its model and agent inventory from the server API. The
+  `models` and `agent list` subcommands it used are gone in V2, so the picker
+  showed only the built-in fallback models. Agents are keyed by the `id` the
+  session routes accept.
+- OpenCode 2.x questions are answered through its Form routes, which replaced
+  the question endpoints; a pending form is recognized by its payload shape.
+- The OpenCode event stream forwards each SSE frame's `event:` name, where V2
+  puts the event discriminator beside its payload.
+- Text-only OpenCode sessions (titles, commit messages, PR bodies) delete their
+  throwaway session on cleanup instead of stranding one per generation in the
+  user's history.
+
 ## [0.2.50] - 2026-09-25
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
