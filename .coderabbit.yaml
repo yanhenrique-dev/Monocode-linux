@@ -1,13 +1,138 @@
+# CodeRabbit configuration.
+#
+# Two things here are not preferences. The first is `auto_review.base_branches`,
+# without which CodeRabbit reviews almost nothing in this repository: it only
+# reviewed PRs targeting `main`, and skipped every stacked PR in the settings
+# work. The second is `knowledge_base.code_guidelines`, because this repo has no
+# AGENTS.md, CLAUDE.md or .cursorrules, so CodeRabbit's auto-detection was
+# finding no project standards at all and reviewing against nothing.
+
 language: "pt-BR"
+
 reviews:
-  profile: "chill"
+  # The bugs worth catching in this codebase are cross-file and delayed: a value
+  # written to localStorage that the settings store never learns about, a number
+  # crossing into Rust in the wrong unit. `chill` trades away exactly the
+  # follow-the-value-through-the-codebase depth that finds those. Drop to
+  # `chill` if the volume becomes a problem rather than a tool.
+  profile: "assertive"
+
+  # Review PRs no matter which branch they target. Our PRs are deliberately
+  # stacked, so the intermediate branches are where most of the reviewable work
+  # lives. `'.*'` matches every branch.
   auto_review:
     enabled: true
     drafts: false
+    base_branches:
+      - ".*"
+    auto_incremental_review: true
+
+  # Makes the walkthrough report which files were ignored and what context was
+  # used, which is the only way to tell a missed file from a deliberate skip.
+  review_details: true
+
+  # Only what CodeRabbit does not already skip. It ignores package-lock.json,
+  # dist/**, node_modules, *.lock (which covers Cargo.lock), generated
+  # directories, binaries, images and archives by default, so listing those
+  # again would be noise that reads as if it were doing something.
+  # Exclusions alone are safe: they keep every other file eligible.
+  path_filters:
+    - "!src-tauri/target/**"
+    - "!**/*.snap"
+
   path_instructions:
-    - path: "src-tauri/**"
-      instructions: "Rust/Tauri: cheque unwrap/expect em input não confiável e comandos que tocam o filesystem."
+    # This is the invariant whose violation caused a real data-loss bug: the
+    # store serialises the whole settings object, so a field it was never told
+    # about gets written back at its default on the next unrelated save.
+    - path: "src/lib/settings/**"
+      instructions: |
+        A store field is a claim that the native file carries the truth about it.
+        When you add a field to toWire(), check that every writer of that value
+        also calls the matching update* function, and that it has a test that
+        fails without the change. A field nothing maintains is worse than an
+        absent one: the file ends up asserting something false about the user.
+        Also check that values crossing to Rust keep the units their owner uses,
+        converting at the boundary rather than changing either side's semantics.
+
+    - path: "src/lib/appearance.ts"
+      instructions: |
+        The thirteen keys the inline boot script in index.html reads must keep
+        exactly one writer: bootMirror.ts, via updateAppearance. Do not write
+        them with localStorage directly. A second writer is a theme that reverts
+        on the next launch and nothing else notices.
+        Note that appearance.ts is deliberately not prettier-formatted; do not
+        reformat lines you are not otherwise changing.
+
+    - path: "src-tauri/src/**"
+      instructions: |
+        Rust/Tauri. Look for unwrap/expect on anything reachable from IPC, and
+        for commands that touch the filesystem. This project is Linux-only, so
+        reject macOS and Windows paths rather than suggesting them.
+        Where a struct is the other end of a TypeScript payload, check the
+        serde rename and the Rust type against what TypeScript actually sends;
+        a unit or type mismatch across that boundary fails silently at runtime
+        rather than at compile time.
+
     - path: "src/lib/harness/**"
-      instructions: "Adapters de protocolo: valide que todo evento do servidor tem fallback e que approvals/questions sempre emitem evento de UI."
+      instructions: |
+        Protocol adapters for external CLIs. Check that every server event has a
+        fallback, that approvals and questions always emit a UI event, and that
+        an unknown event from a newer CLI version is ignored rather than thrown.
+
     - path: "**/*.test.ts"
-      instructions: "Apenas verifique se o teste cobre o comportamento; não exija testes de snapshot."
+      instructions: |
+        Check that the test asserts behaviour rather than implementation. Two
+        specific failure modes to flag: a test that would pass on an empty
+        payload or an empty object, since "does not have the property" is also
+        what "nothing ran" looks like; and a test whose expectation happens to
+        equal the default value, which cannot distinguish hydration from a
+        fallback. Prefer a test that provably fails when the fix is reverted.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # RULES.md is at the repository root, so it applies to every reviewed file.
+    # docs/FRONTEND-UI.md carries the frontend architecture, so it needs an
+    # explicit applyTo: without one, a guideline in docs/ would not reach code
+    # that does not live under docs/.
+    filePatterns:
+      - "RULES.md"
+      - files: "docs/FRONTEND-UI.md"
+        applyTo: "src/**/*.{ts,tsx}"
+
+pre_merge_checks:
+  # Deterministic, so these are safe to surface as findings. `mode: warning`
+  # reports without blocking; raise to `error` once a check has proven itself.
+  override_requested_reviewers_only: false
+  custom_checks:
+    - name: "Evidencia de validacao no corpo do PR"
+      mode: "warning"
+      instructions: >
+        The PR body must record the actual commands run and their result:
+        npx tsc --noEmit, npx vitest run, and cargo fmt --check plus
+        cargo clippy --workspace --all-targets -- -D warnings and cargo test
+        when Rust is touched. Fail if a command is listed without a result, or
+        if a claim of a green suite is not backed by a number.
+
+    - name: "Correcao de bug vem com teste que falha sem ela"
+      mode: "warning"
+      instructions: >
+        If the PR claims to fix a bug, it must add or change a test that fails
+        without the change. Fail if the PR only changes implementation, or if
+        the described test cannot be seen failing against the pre-change code.
+
+    - name: "Nao reintroduz escrita direta de chave do mirror"
+      mode: "warning"
+      instructions: >
+        No file outside src/lib/settings/bootMirror.ts may call
+        localStorage.setItem or localStorage.removeItem with a key from
+        src/lib/settings/bootMirror.ts's BOOT_MIRROR_KEYS list, and a new key
+        the boot script in index.html reads must be added to that list. Fail if
+        either holds.
+
+tools:
+  # Both default to true; stated so that turning one off is a deliberate diff.
+  eslint:
+    enabled: true
+  clippy:
+    enabled: true
