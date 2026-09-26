@@ -5,6 +5,8 @@ import {
   applyPreparedNewThreadBackground,
   clearPreparedNewThreadBackground,
 } from "./newThreadBackgroundEffects";
+import { bootMirrorPatch } from "./settings/bootMirror";
+import { lastWritePersisted, updateAppearance } from "./settings/store";
 
 const ACCENT_COLOR_KEY = "monocode.accentColor";
 const THEME_HUE_KEY = "monocode.themeHue";
@@ -201,6 +203,14 @@ function readNumber(key: string): number | null {
 
 /** True when the value landed in storage. Broadcasts must wait for this. */
 function writeNumber(key: string, value: number): boolean {
+  // A mirrored key belongs to the store, which writes all 13 in one go.
+  // Routing it here is what keeps the pre-React boot script and the native
+  // file agreeing with the value the user is looking at.
+  const patch = bootMirrorPatch(key, value);
+  if (patch) {
+    updateAppearance(patch);
+    return lastWritePersisted();
+  }
   try {
     localStorage.setItem(key, String(value));
     return true;
@@ -223,6 +233,11 @@ function readFlag(key: string): boolean | null {
 }
 
 function writeFlag(key: string, value: boolean): boolean {
+  const patch = bootMirrorPatch(key, value);
+  if (patch) {
+    updateAppearance(patch);
+    return lastWritePersisted();
+  }
   try {
     localStorage.setItem(key, value ? "1" : "0");
     return true;
@@ -261,6 +276,11 @@ export function loadAccentColor(): string | null {
 export function saveAccentColor(value: string | null) {
   try {
     const next = normalizeAccentColor(value);
+    if (bootMirrorPatch(ACCENT_COLOR_KEY, next)) {
+      updateAppearance({ accentColor: next });
+      if (lastWritePersisted()) notifyAppearanceChanged();
+      return;
+    }
     if (next == null) localStorage.removeItem(ACCENT_COLOR_KEY);
     else localStorage.setItem(ACCENT_COLOR_KEY, next);
   } catch {

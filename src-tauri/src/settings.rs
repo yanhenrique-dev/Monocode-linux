@@ -541,4 +541,69 @@ mod tests {
         assert_eq!(mode & 0o077, 0, "expected 0700-ish, got {mode:o}");
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    /// The exact payload `toWire` in `src/lib/settings/store.ts` produces.
+    ///
+    /// Written out by hand rather than generated, so that renaming a field on
+    /// either side of the boundary shows up as a failing test instead of a
+    /// silent fallback to defaults at runtime. Two real bugs came out of this
+    /// shape being agreed on in prose: `sidebarOpacity` was sent as a 0..1
+    /// alpha ratio into a `u8` percent field, which serde cannot deserialize,
+    /// and the TS default was the percent `85` where the app means `0.85`.
+    const TS_PAYLOAD: &str = r#"{
+        "schema": 1,
+        "prefs": {
+            "general": { "locale": "pt-BR" },
+            "appearance": { "colorScheme": "dark", "themeHue": 210, "sidebarOpacity": 85 },
+            "chat": {
+                "nextSteps": {
+                    "enabled": true,
+                    "suggest": false,
+                    "actions": { "jumpToBottom": true, "searchTranscript": true, "reviewChanges": false }
+                }
+            },
+            "diagnostics": { "debugScopes": ["harness"] }
+        },
+        "view": { "projectRailOpen": true, "settingsSection": "general", "sidebarTabOrder": [] },
+        "runtime": { "lastUpdateCheck": 0 }
+    }"#;
+
+    #[test]
+    fn accepts_the_payload_the_typescript_side_sends() {
+        let settings: Settings =
+            serde_json::from_str(TS_PAYLOAD).expect("TS payload must deserialize");
+        assert_eq!(settings.schema, 1);
+        assert_eq!(settings.prefs.general.locale, "pt-BR");
+        assert_eq!(settings.prefs.appearance.theme_hue, 210);
+        assert_eq!(settings.prefs.appearance.sidebar_opacity, 85);
+        assert!(settings.prefs.chat.next_steps.enabled);
+        assert!(!settings.prefs.chat.next_steps.suggest);
+        assert!(settings.prefs.chat.next_steps.actions.jump_to_bottom);
+        assert!(settings.prefs.chat.next_steps.actions.search_transcript);
+        assert!(!settings.prefs.chat.next_steps.actions.review_changes);
+        assert_eq!(settings.prefs.diagnostics.debug_scopes, ["harness"]);
+        assert!(settings.view.project_rail_open);
+        assert_eq!(settings.view.settings_section, "general");
+        assert_eq!(settings.runtime.last_update_check, 0);
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn a_ratio_where_a_percent_belongs_is_rejected_not_silently_accepted() {
+        // The bug this guards: 0.85 is a valid f64 and a perfectly good alpha
+        // ratio, so nothing about it looks wrong until serde meets a u8.
+        let ratio = TS_PAYLOAD.replace("\"sidebarOpacity\": 85", "\"sidebarOpacity\": 0.85");
+        assert!(
+            serde_json::from_str::<Settings>(&ratio).is_err(),
+            "a 0..1 ratio must not quietly deserialize into a percent field"
+        );
+    }
+
+    #[test]
+    fn the_payload_survives_a_round_trip_unchanged() {
+        let settings: Settings = serde_json::from_str(TS_PAYLOAD).expect("deserialize");
+        let back = serde_json::to_string(&settings).expect("serialize");
+        let again: Settings = serde_json::from_str(&back).expect("re-deserialize");
+        assert_eq!(settings, again);
+    }
 }
