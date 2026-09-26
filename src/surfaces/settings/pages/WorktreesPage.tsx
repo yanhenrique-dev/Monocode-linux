@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { CreateWorktreeDialog } from "../chrome/CreateWorktreeDialog";
-import { DeleteWorktreeDialog } from "../chrome/DeleteWorktreeDialog";
-import { SearchableProjectPicker } from "../chrome/SearchableProjectPicker";
-import { SecondaryButton } from "../chrome/SecondaryButton";
-import { Group } from "./settings/SettingsChrome";
+import { CreateWorktreeDialog } from "../../../chrome/CreateWorktreeDialog";
+import { DeleteWorktreeDialog } from "../../../chrome/DeleteWorktreeDialog";
+import { SearchableProjectPicker } from "../../../chrome/SearchableProjectPicker";
+import { SecondaryButton } from "../../../chrome/SecondaryButton";
+import { Group } from "../../settings/SettingsChrome";
 import {
   FolderOpen,
   FolderTree,
@@ -12,19 +12,24 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-} from "../chrome/icons";
-import { revealPath } from "../lib/fs";
-import { useProjectWorktrees } from "../hooks/useProjectWorktrees";
-import { isEqualOrInside, pathKey, prettyCwd, projectName } from "../lib/paths";
-import { loadArchivedProjects, type RecentProject } from "../lib/recents";
-import { useLocale } from "../lib/locale";
-import type { Session } from "../lib/session";
+} from "../../../chrome/icons";
+import { revealPath } from "../../../lib/fs";
+import { useProjectWorktrees } from "../../../hooks/useProjectWorktrees";
+import {
+  isEqualOrInside,
+  pathKey,
+  prettyCwd,
+  projectName,
+} from "../../../lib/paths";
+import { loadArchivedProjects, type RecentProject } from "../../../lib/recents";
+import { useLocale } from "../../../lib/locale";
+import type { Session } from "../../../lib/session";
 import {
   checkWorktreeRemoval,
   worktreeSessionIds,
   type RemoveWorktree,
   type Worktree,
-} from "../lib/worktrees";
+} from "../../../lib/worktrees";
 
 export function WorktreesPage({
   cwd,
@@ -153,120 +158,126 @@ export function WorktreesPage({
               </SecondaryButton>
             </div>
           ) : (
-        <div className="divide-y divide-content/10 overflow-hidden">
-          {worktrees.map((tree) => {
-            const count = worktreeSessionIds(tree, liveSessions).length;
-            const blocked = tree.locked
-              ? t("settings.worktrees.unlock_first")
-              : !tree.branch
-                ? t("settings.worktrees.branch_first")
-                : undefined;
-            return (
-              <div key={tree.path} className="flex items-start gap-4 p-4">
-                <FolderTree className="mt-0.5 size-4 shrink-0 text-content/60" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">
-                      {projectName(tree.path)}
-                    </span>
-                    {pathKey(tree.path) === pathKey(project) && (
-                      <span className="text-xs text-content/60">
-                        {t("settings.worktrees.selected_folder")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 break-all text-xs text-content/60">
-                    {prettyCwd(tree.path)}
-                  </p>
-                  <p className="mt-2 flex items-center gap-2 text-xs text-content/55">
-                    <GitBranch className="size-3 shrink-0" />
-                    <span className="min-w-0 break-all">
-                      {tree.branch
-                        ? t("settings.worktrees.current_branch", {
-                            branch: tree.branch,
-                          })
-                        : t("settings.worktrees.detached_at", {
-                            hash: tree.head.slice(0, 7),
-                          })}
-                    </span>
-                  </p>
-                  <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-content/55">
-                    <span>
-                      {t(
-                        count === 1
-                          ? "settings.worktrees.sessions_using_one"
-                          : "settings.worktrees.sessions_using_other",
-                        { count },
-                      )}
-                    </span>
-                    <span className={tree.dirty ? "text-amber-400" : ""}>
-                      {tree.missing
-                        ? t("settings.worktrees.missing")
-                        : tree.dirty == null
-                          ? t("settings.worktrees.status_unavailable")
-                          : tree.dirty
-                            ? t("settings.worktrees.dirty")
-                            : t("settings.worktrees.clean")}
-                    </span>
-                    {!!tree.unpushed && (
-                      <span>
-                        {t(
-                          tree.unpushed === 1
-                            ? "settings.worktrees.unpushed_one"
-                            : "settings.worktrees.unpushed_other",
-                          { count: tree.unpushed },
+            <div className="divide-y divide-content/10 overflow-hidden">
+              {worktrees.map((tree) => {
+                const count = worktreeSessionIds(tree, liveSessions).length;
+                const blocked = tree.locked
+                  ? t("settings.worktrees.unlock_first")
+                  : !tree.branch
+                    ? t("settings.worktrees.branch_first")
+                    : undefined;
+                return (
+                  <div key={tree.path} className="flex items-start gap-4 p-4">
+                    <FolderTree className="mt-0.5 size-4 shrink-0 text-content/60" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {projectName(tree.path)}
+                        </span>
+                        {pathKey(tree.path) === pathKey(project) && (
+                          <span className="text-xs text-content/60">
+                            {t("settings.worktrees.selected_folder")}
+                          </span>
                         )}
-                      </span>
-                    )}
-                    {tree.locked && (
-                      <span>{t("settings.worktrees.locked")}</span>
-                    )}
-                  </p>
-                  {blocked ? (
-                    <p className="mt-1 text-[11px] text-content/45">{blocked}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  disabled={tree.missing}
-                  aria-label={t("settings.worktrees.reveal_aria", {
-                    name: tree.branch ?? "worktree",
-                  })}
-                  title={t("settings.worktrees.reveal_title")}
-                  onClick={() =>
-                    void revealPath(tree.path).catch((e) => setError(String(e)))
-                  }
-                  className="rounded-md p-2 text-content/60 hover:bg-content/10 hover:text-content disabled:opacity-30"
-                >
-                  <FolderOpen className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!!blocked || refreshingAfterFailure || !!loadError}
-                  aria-label={t("settings.worktrees.delete_aria", {
-                    name: tree.branch ?? "worktree",
-                  })}
-                  title={blocked ?? t("settings.worktrees.delete_title")}
-                  onClick={() => {
-                    setError(undefined);
-                    setDeleting(tree);
-                  }}
-                  className="rounded-md p-2 text-content/60 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-25"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {data && (
-        <p className="break-all text-xs text-content/60">
-          {t("settings.worktrees.created_in", {
-            path: prettyCwd(data.defaultRoot),
-          })}
-        </p>
-      )}
+                      </div>
+                      <p className="mt-1 break-all text-xs text-content/60">
+                        {prettyCwd(tree.path)}
+                      </p>
+                      <p className="mt-2 flex items-center gap-2 text-xs text-content/55">
+                        <GitBranch className="size-3 shrink-0" />
+                        <span className="min-w-0 break-all">
+                          {tree.branch
+                            ? t("settings.worktrees.current_branch", {
+                                branch: tree.branch,
+                              })
+                            : t("settings.worktrees.detached_at", {
+                                hash: tree.head.slice(0, 7),
+                              })}
+                        </span>
+                      </p>
+                      <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-content/55">
+                        <span>
+                          {t(
+                            count === 1
+                              ? "settings.worktrees.sessions_using_one"
+                              : "settings.worktrees.sessions_using_other",
+                            { count },
+                          )}
+                        </span>
+                        <span className={tree.dirty ? "text-amber-400" : ""}>
+                          {tree.missing
+                            ? t("settings.worktrees.missing")
+                            : tree.dirty == null
+                              ? t("settings.worktrees.status_unavailable")
+                              : tree.dirty
+                                ? t("settings.worktrees.dirty")
+                                : t("settings.worktrees.clean")}
+                        </span>
+                        {!!tree.unpushed && (
+                          <span>
+                            {t(
+                              tree.unpushed === 1
+                                ? "settings.worktrees.unpushed_one"
+                                : "settings.worktrees.unpushed_other",
+                              { count: tree.unpushed },
+                            )}
+                          </span>
+                        )}
+                        {tree.locked && (
+                          <span>{t("settings.worktrees.locked")}</span>
+                        )}
+                      </p>
+                      {blocked ? (
+                        <p className="mt-1 text-[11px] text-content/45">
+                          {blocked}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={tree.missing}
+                      aria-label={t("settings.worktrees.reveal_aria", {
+                        name: tree.branch ?? "worktree",
+                      })}
+                      title={t("settings.worktrees.reveal_title")}
+                      onClick={() =>
+                        void revealPath(tree.path).catch((e) =>
+                          setError(String(e)),
+                        )
+                      }
+                      className="rounded-md p-2 text-content/60 hover:bg-content/10 hover:text-content disabled:opacity-30"
+                    >
+                      <FolderOpen className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        !!blocked || refreshingAfterFailure || !!loadError
+                      }
+                      aria-label={t("settings.worktrees.delete_aria", {
+                        name: tree.branch ?? "worktree",
+                      })}
+                      title={blocked ?? t("settings.worktrees.delete_title")}
+                      onClick={() => {
+                        setError(undefined);
+                        setDeleting(tree);
+                      }}
+                      className="rounded-md p-2 text-content/60 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-25"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {data && (
+            <p className="break-all text-xs text-content/60">
+              {t("settings.worktrees.created_in", {
+                path: prettyCwd(data.defaultRoot),
+              })}
+            </p>
+          )}
         </div>
       </Group>
       {creating && (
@@ -294,9 +305,7 @@ export function WorktreesPage({
             try {
               if (sessionIds.length && deleteSessions) {
                 if (!onDeleteSessions) {
-                  throw new Error(
-                    t("settings.worktrees.error_sessions_kept"),
-                  );
+                  throw new Error(t("settings.worktrees.error_sessions_kept"));
                 }
                 if (!(await onDeleteSessions(sessionIds))) {
                   throw new Error(

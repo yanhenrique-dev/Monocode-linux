@@ -4,9 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillsPage } from "./SkillsPage";
-import { SettingsView } from "./SettingsView";
-import type { DiscoveredSkill } from "../lib/fs";
-import { loadDisabledSkillPaths, saveDisabledSkillPaths } from "../lib/skills";
+import { SettingsView } from "../../SettingsView";
+import type { DiscoveredSkill } from "../../../lib/fs";
+import {
+  loadDisabledSkillPaths,
+  saveDisabledSkillPaths,
+} from "../../../lib/skills";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/window", () => ({

@@ -1,3 +1,4 @@
+import { subscribeComposerSuggestion } from "../lib/nextSteps";
 import {
   ArrowUp,
   AiIdea,
@@ -344,8 +345,7 @@ export const Composer = memo(function Composer({
   onEditingLastTurnChange,
   children,
 }: Props) {
-  const initialText =
-    typeof initialDraft === "string" ? initialDraft : "";
+  const initialText = typeof initialDraft === "string" ? initialDraft : "";
   const hasInitialDraft = initialDraft !== undefined;
   const hideProjectPicker = chrome?.hideProjectPicker ?? flatHideProjectPicker;
   const hideBranchPicker = chrome?.hideBranchPicker ?? flatHideBranchPicker;
@@ -1113,6 +1113,20 @@ export const Composer = memo(function Composer({
       ref.current?.focus();
     },
     [onDraftChange, syncHasValue],
+  );
+
+  // A next-step suggestion prefills the draft and focuses, but never sends:
+  // the user reads it and presses send themselves.
+  useEffect(
+    () =>
+      subscribeComposerSuggestion((prompt) => {
+        restoreDraft(prompt, []);
+        setResendEdited(false);
+        onEditingLastTurnChange?.(false);
+        onFocus();
+        ref.current?.focus();
+      }),
+    [onEditingLastTurnChange, onFocus, restoreDraft],
   );
 
   const recallLastTurn = useCallback(() => {

@@ -1,45 +1,22 @@
+import { debugEnabled } from "./debugScopes";
+
 /**
  * Leveled logger.
  *
  * `console.debug` calls scattered through notifications/harness emit noise
  * with no scope and no way to silence them. Route debug output through
- * `logDebug(scope, ...args)`; when `localStorage.monocode.debug` is unset,
- * debug lines stay silent in production and loud in DevTools only for the
- * scopes the developer opts into (`*` or comma-separated scope list).
+ * `logDebug(scope, ...args)`; when debug is off, lines stay silent in
+ * production and loud in DevTools only for the scopes the developer opts into
+ * (`*` or a comma-separated scope list). The gate itself lives in
+ * `debugScopes.ts` so `reportError` can share it.
  */
-
-const DEBUG_KEY = "monocode.debug";
-
-function debugScopes(): string[] | null {
-  try {
-    const raw = window.localStorage.getItem(DEBUG_KEY);
-    if (!raw) return null;
-    const scopes = raw
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
-    return scopes.length > 0 ? scopes : null;
-  } catch {
-    return null;
-  }
-}
-
-function debugEnabled(scope: string): boolean {
-  // SSR/tests without localStorage: keep debug visible, tests assert nothing.
-  // `typeof localStorage` itself can throw when storage is blocked, so gate
-  // on `window` and keep the storage read inside the guarded scope lookup.
-  if (typeof window === "undefined") return true;
-  const scopes = debugScopes();
-  if (!scopes) return false;
-  return scopes.includes("*") || scopes.includes(scope);
-}
-
-/** Scoped debug line. Silent unless `localStorage.monocode.debug` allows it. */
-export function logDebug(scope: string, ...args: unknown[]): void {
-  if (debugEnabled(scope)) console.debug(`[${scope}]`, ...args);
-}
 
 /** Scoped warning. Always emitted. */
 export function logWarn(scope: string, ...args: unknown[]): void {
   console.warn(`[${scope}]`, ...args);
+}
+
+/** Scoped debug line. Silent unless debug scopes allow it. */
+export function logDebug(scope: string, ...args: unknown[]): void {
+  if (debugEnabled(scope)) console.debug(`[${scope}]`, ...args);
 }

@@ -15,7 +15,6 @@ import {
 import { Sidebar } from "./chrome/Sidebar";
 import { ApprovalToasts } from "./chrome/ApprovalToasts";
 import { WhatsNewDialog } from "./chrome/WhatsNewDialog";
-import { FirstRunDialog } from "./chrome/FirstRunDialog";
 import { ProviderSignInDialog } from "./chrome/ProviderSignInDialog";
 import { DeleteSessionDialog } from "./chrome/DeleteSessionDialog";
 import { useWorktrees, type WorktreeDeletionHooks } from "./app/useWorktrees";
@@ -72,7 +71,8 @@ import { SessionPane } from "./surfaces/SessionPane";
 import { SessionSurface } from "./surfaces/SessionSurface";
 import { ProjectTerminalDock } from "./surfaces/ProjectTerminalDock";
 import { LinkedWorkItemPanel } from "./surfaces/InboxView";
-import type { SettingsAnchor } from "./surfaces/SettingsView";
+import type { SettingsAnchor } from "./lib/settings";
+import { loadNextStepsSuggest } from "./lib/settings";
 import type { InboxSessionPortal } from "./surfaces/InboxDiscussionPanel";
 import type { LinkedSessionUpdate } from "./lib/linkedSessionUpdates";
 
@@ -109,7 +109,6 @@ import {
   type SettingsSectionId,
 } from "./lib/settings";
 import type { InstalledUpdate } from "./lib/updateNotice";
-import { loadFirstRunDone, saveFirstRunDone } from "./lib/firstRun";
 import { type ResumedWorkspace } from "./lib/appLifecycle";
 
 import { useProjectTerminals } from "./app/useProjectTerminals";
@@ -120,6 +119,9 @@ import { useHistory } from "./app/useHistory";
 import { useProjects } from "./app/useProjects";
 import { useComposer, type ComposerTurnSettlement } from "./app/useComposer";
 import { isNextStepCompletionEligible } from "./lib/nextSteps";
+import { nextStepSuggestionKey } from "./lib/harness/nextStepsText";
+import type { NextStepSuggestion } from "./lib/nextStepsPrompt";
+import { requestNextStepSuggestions } from "./lib/harness/nextStepsText";
 import { useTurnActions } from "./app/useTurnActions";
 import { useSessionBootstrap } from "./app/useSessionBootstrap";
 import { registerBuiltinHarnesses } from "./lib/harness";
@@ -153,14 +155,12 @@ registerBuiltinHarnesses();
 export default function App({
   windowTransfer = null,
   resumed = null,
-  isFirstRun = false,
   installedUpdate = null,
   history: bootHistory = [],
   historyCwd: bootHistoryCwd = null,
 }: {
   windowTransfer?: WindowTransferPayload | null;
   resumed?: ResumedWorkspace | null;
-  isFirstRun?: boolean;
   installedUpdate?: InstalledUpdate | null;
   history?: SessionSummary[];
   historyCwd?: string | null;
@@ -298,9 +298,6 @@ export default function App({
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateNotice, setUpdateNotice] = useState(installedUpdate);
-  const [firstRunOpen, setFirstRunOpen] = useState(
-    () => isFirstRun && !loadFirstRunDone(),
-  );
   const [whatsNewVersion, setWhatsNewVersion] = useState<string | null>(null);
   const [providerSignInRequest, setProviderSignInRequest] = useState<{
     key: string;
@@ -440,9 +437,6 @@ export default function App({
   filePickerOpenRef.current = filePickerOpen;
   const whatsNewVersionRef = useRef(whatsNewVersion);
   whatsNewVersionRef.current = whatsNewVersion;
-  const firstRunOpenRef = useRef(firstRunOpen);
-  firstRunOpenRef.current = firstRunOpen;
-
   const lastPersisted = useRef(new Map<string, string>());
 
   const {
@@ -557,7 +551,6 @@ export default function App({
     inboxViewOpenRef,
     notesViewOpenRef,
     settingsOpenRef,
-    firstRunOpenRef,
     loadedProjectsRef,
     historyErrorCwd,
     loadedProjects,
@@ -746,7 +739,6 @@ export default function App({
     sessionLoads,
     whatsNewVersionRef,
     settingsOpenRef,
-    firstRunOpenRef,
     filePickerOpenRef,
     inboxViewOpenRef,
     notesViewOpenRef,
@@ -873,11 +865,29 @@ export default function App({
     setProjectTerminals,
     onSelectHistorySession,
   });
+  /**
+   * Suggestions are keyed by session and generation. A late answer for a
+   * superseded turn is dropped rather than shown against the wrong one, and a
+   * failure simply leaves the entry absent, which keeps the static bar.
+   */
+  const [nextStepSuggestions, setNextStepSuggestions] = useState<
+    Record<string, NextStepSuggestion[]>
+  >({});
   const [nextStepGenerations, setNextStepGenerations] = useState<
     Record<string, number>
   >({});
   const [dismissedNextStepGenerations, setDismissedNextStepGenerations] =
     useState<Record<string, number>>({});
+  /** Suggestions for the turn the bar is currently showing, if any. */
+  const nextStepSuggestionsFor = useCallback(
+    (sessionId: string): NextStepSuggestion[] | undefined => {
+      const generation = nextStepGenerations[sessionId];
+      if (generation === undefined) return undefined;
+      return nextStepSuggestions[nextStepSuggestionKey(sessionId, generation)];
+    },
+    [nextStepGenerations, nextStepSuggestions],
+  );
+
   const nextStepsEnabled = useSyncExternalStore(
     subscribeNextSteps,
     loadNextStepsEnabled,
@@ -960,6 +970,28 @@ export default function App({
             [settlement.sessionId]: settlement.generation,
           };
         });
+        // The model call is opt-in on its own: the static bar is free and
+        // local, the suggestions are a side-channel call per completed turn.
+        const settled = loadNextStepsSuggest()
+          ? sessionsRef.current.find(
+              (candidate) => candidate.id === settlement.sessionId,
+            )
+          : undefined;
+        if (settled) {
+          void requestNextStepSuggestions({
+            sessionId: settled.id,
+            generation: settlement.generation,
+            harness: settled.harness,
+            cwd: settled.cwd,
+            providerAccountId: settled.providerAccountId,
+            blocks: settled.blocks,
+            commit: (key, suggestions) =>
+              setNextStepSuggestions((previous) =>
+                // Ignore an answer that arrived after the turn moved on.
+                previous[key] ? previous : { ...previous, [key]: suggestions },
+              ),
+          });
+        }
         setDismissedNextStepGenerations((previous) => {
           if (!(settlement.sessionId in previous)) return previous;
           const next = { ...previous };
@@ -1135,21 +1167,6 @@ export default function App({
     onVisitForward,
   });
 
-  const onCloseFirstRun = useCallback(() => {
-    saveFirstRunDone();
-    setFirstRunOpen(false);
-  }, []);
-
-  const onOpenInboxFromFirstRun = useCallback(() => {
-    onCloseFirstRun();
-    onOpenInbox();
-  }, [onCloseFirstRun, onOpenInbox]);
-
-  const onOpenProvidersFromFirstRun = useCallback(() => {
-    onCloseFirstRun();
-    openSettings("providers");
-  }, [onCloseFirstRun, openSettings]);
-
   const openFilePaths = useMemo(() => {
     const paths: string[] = [];
     const seen = new Set<string>();
@@ -1177,7 +1194,6 @@ export default function App({
     notesViewOpenRef,
     settingsOpenRef,
     whatsNewVersionRef,
-    firstRunOpenRef,
     sessionNavigationIdsRef,
     setSidebarTab,
     onSelectHistorySession,
@@ -1661,6 +1677,7 @@ export default function App({
                         {...sessionPaneProps}
                         session={session}
                         nextStepGeneration={nextStepGenerations[session.id]}
+                        nextStepSuggestions={nextStepSuggestionsFor(session.id)}
                         nextStepDismissedGeneration={
                           dismissedNextStepGenerations[session.id]
                         }
@@ -1733,18 +1750,12 @@ export default function App({
             ) : null}
             <div
               className={
-                searchViewOpen ||
-                inboxViewOpen ||
-                notesViewOpen ||
-                settingsOpen
+                searchViewOpen || inboxViewOpen || notesViewOpen || settingsOpen
                   ? "hidden"
                   : "contents"
               }
               aria-hidden={
-                searchViewOpen ||
-                inboxViewOpen ||
-                notesViewOpen ||
-                settingsOpen
+                searchViewOpen || inboxViewOpen || notesViewOpen || settingsOpen
               }
             >
               <UsageFooter
@@ -1806,20 +1817,13 @@ export default function App({
             }
             onHeightChange={setReminderNoticesHeight}
           />
-          {firstRunOpen ? (
-            <FirstRunDialog
-              onClose={onCloseFirstRun}
-              onOpenInbox={onOpenInboxFromFirstRun}
-              onOpenProviders={onOpenProvidersFromFirstRun}
-            />
-          ) : null}
-          {!firstRunOpen && whatsNewVersion ? (
+          {whatsNewVersion ? (
             <WhatsNewDialog
               version={whatsNewVersion}
               onClose={() => setWhatsNewVersion(null)}
             />
           ) : null}
-          {!firstRunOpen && providerSignInRequest ? (
+          {providerSignInRequest ? (
             <ProviderSignInDialog
               key={providerSignInRequest.key}
               harness={providerSignInRequest.harness}

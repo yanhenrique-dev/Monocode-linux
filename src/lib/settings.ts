@@ -1,8 +1,10 @@
 import { ALT, MOD, SHIFT } from "./platform";
-import type { NextStepsCount } from "./nextSteps";
+import {
+  NEXT_STEP_ACTIONS,
+  type NextStepAction,
+  type NextStepSelection,
+} from "./nextSteps";
 import { loadLocale, t, type Locale, type LocaleKey } from "./locale";
-
-export type { NextStepsCount };
 
 const SECTION_KEY = "monocode.settingsSection";
 
@@ -17,15 +19,19 @@ export type SettingsSectionId =
   | "skills"
   | "inbox"
   | "archive"
-  | "worktrees";
+  | "worktrees"
+  | "experimental";
 
 /** Rail buckets. Sections list in order under their group label. */
-export type SettingsGroupId = "app" | "agents" | "workspace";
+export type SettingsGroupId = "app" | "agents" | "workspace" | "experimental";
 
 export const SETTINGS_GROUPS: { id: SettingsGroupId; label: LocaleKey }[] = [
   { id: "app", label: "settings.group.app" },
   { id: "agents", label: "settings.group.agents" },
   { id: "workspace", label: "settings.group.workspace" },
+  // Last on purpose: the rail renders groups in array order, and unstable
+  // features read better as a bucket at the foot of the list.
+  { id: "experimental", label: "settings.group.experimental" },
 ];
 
 export type SettingsSection = {
@@ -82,7 +88,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     group: "agents",
     label: "settings.section.chat.label",
     description: "settings.section.chat.description",
-    keywords: "transcript composer prompt message diff review layout transcricao conversa mensagem",
+    keywords:
+      "transcript composer prompt message diff review layout transcricao conversa mensagem",
   },
   {
     id: "providers",
@@ -121,6 +128,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     description: "settings.worktrees.description",
     keywords: "git branch worktree working copy project create delete",
   },
+  {
+    id: "experimental",
+    group: "experimental",
+    label: "settings.section.experimental.label",
+    description: "settings.section.experimental.description",
+    keywords: "experimental unstable lab beta try flag instavel beta teste",
+  },
 ];
 
 export function settingsSectionsByGroup(): {
@@ -133,6 +147,12 @@ export function settingsSectionsByGroup(): {
     sections: SETTINGS_SECTIONS.filter((section) => section.group === group.id),
   })).filter((group) => group.sections.length > 0);
 }
+
+/**
+ * The `data-setting-id` Settings should reveal when it opens: one of the ids in
+ * `SETTINGS_INDEX`. Inbox integrations pass their provider id.
+ */
+export type SettingsAnchor = string;
 
 /**
  * One searchable control. `id` is the row's `data-setting-id` in SettingsView,
@@ -163,31 +183,36 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     id: "sounds-turnFinished",
     section: "notifications",
     label: "settings.general.sounds.cue.turnFinished",
-    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo turno finished done flac m4a opus",
+    keywords:
+      "custom sound file audio ogg wav mp3 som personalizado arquivo turno finished done flac m4a opus",
   },
   {
     id: "sounds-inboxUnseen",
     section: "notifications",
     label: "settings.general.sounds.cue.inboxUnseen",
-    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo inbox activity atividade caixa entrada flac m4a opus",
+    keywords:
+      "custom sound file audio ogg wav mp3 som personalizado arquivo inbox activity atividade caixa entrada flac m4a opus",
   },
   {
     id: "sounds-linkedActivity",
     section: "notifications",
     label: "settings.general.sounds.cue.linkedActivity",
-    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo linked pr issue atividade vinculada flac m4a opus",
+    keywords:
+      "custom sound file audio ogg wav mp3 som personalizado arquivo linked pr issue atividade vinculada flac m4a opus",
   },
   {
     id: "sounds-updateAvailable",
     section: "notifications",
     label: "settings.general.sounds.cue.updateAvailable",
-    keywords: "custom sound file audio ogg wav mp3 som personalizado arquivo update available atualizacao flac m4a opus",
+    keywords:
+      "custom sound file audio ogg wav mp3 som personalizado arquivo update available atualizacao flac m4a opus",
   },
   {
     id: "notifications",
     section: "notifications",
     label: "settings.general.notifications.label",
-    keywords: "notify alert toast permission reminder background notificar aviso permissao",
+    keywords:
+      "notify alert toast permission reminder background notificar aviso permissao",
   },
   {
     id: "language",
@@ -218,7 +243,8 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     id: "hardware-acceleration",
     section: "performance",
     label: "settings.general.hardware_acceleration.label",
-    keywords: "gpu webgl terminal performance render aceleracao hardware desempenho",
+    keywords:
+      "gpu webgl terminal performance render aceleracao hardware desempenho",
   },
   {
     id: "terminal-gpu",
@@ -272,7 +298,8 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     id: "interface-blur",
     section: "appearance",
     label: "settings.appearance.interface_blur.label",
-    keywords: "glass blur backdrop popover toast picker dialog performance desfoque interface",
+    keywords:
+      "glass blur backdrop popover toast picker dialog performance desfoque interface",
   },
   {
     id: "main-pane-glass",
@@ -318,8 +345,8 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "experimental-animations",
-    section: "chat",
-    label: "settings.chat.experimental_animations.label",
+    section: "experimental",
+    label: "settings.experimental.experimental_animations.label",
     keywords:
       "experimental animations motion transition enter exit composer strip animacoes movimento transicao",
   },
@@ -327,14 +354,43 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     id: "follow-up",
     section: "chat",
     label: "settings.chat.follow_up.label",
-    keywords: "queue steer interrupt send while running fila redirecionar acompanhamento",
+    keywords:
+      "queue steer interrupt send while running fila redirecionar acompanhamento",
   },
   {
     id: "next-steps",
-    section: "chat",
-    label: "settings.chat.next_steps.label",
+    section: "experimental",
+    label: "settings.experimental.next_steps.label",
     keywords:
       "next steps suggestions shortcuts experimental composer proximos passos sugestoes atalhos",
+  },
+  {
+    id: "next-step-suggest",
+    section: "experimental",
+    label: "settings.experimental.next_steps.suggest.label",
+    keywords:
+      "next step suggest model llm ai follow ups proximos passos sugerir modelo sugerir",
+  },
+  {
+    id: "next-step-jump-to-bottom",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.jump-to-bottom.label",
+    keywords:
+      "next step jump latest scroll bottom scroll to end proximos passos pular final rolar",
+  },
+  {
+    id: "next-step-search-transcript",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.search-transcript.label",
+    keywords:
+      "next step find search transcript text next steps pesquisar buscar transcricao texto",
+  },
+  {
+    id: "next-step-review-changes",
+    section: "experimental",
+    label: "settings.experimental.next_steps.action.review-changes.label",
+    keywords:
+      "next step review diff changes working tree proximos passos revisar diff alteracoes",
   },
   {
     id: "model-controls",
@@ -345,8 +401,8 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "composer-mascot",
-    section: "chat",
-    label: "settings.chat.composer_mascot.label",
+    section: "experimental",
+    label: "settings.experimental.composer_mascot.label",
     keywords: "runner animation coin fun mascote animacao",
   },
   {
@@ -357,9 +413,16 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   },
   {
     id: "empty-session-games",
-    section: "chat",
-    label: "settings.chat.empty_session_games.label",
+    section: "experimental",
+    label: "settings.experimental.empty_session_games.label",
     keywords: "pacman snake arcade grid fun jogos cobrinha",
+  },
+  {
+    id: "debug-logging",
+    section: "experimental",
+    label: "settings.experimental.diagnostics.debug_scopes.label",
+    keywords:
+      "debug logging scopes diagnostics verbose log logs depuracao registro escopos",
   },
   {
     id: "claude-hooks",
@@ -371,7 +434,8 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
     id: "project-notifications",
     section: "notifications",
     label: "settings.inbox.project_notifications.title",
-    keywords: "mute resume sounds banners reminders categories silenciar notificacoes",
+    keywords:
+      "mute resume sounds banners reminders categories silenciar notificacoes",
   },
   {
     id: "github",
@@ -416,7 +480,6 @@ export type SettingsSearchResult = {
 /** Strips combining marks so "desfoque" matches "desfóque" and vice versa. */
 function foldAccents(value: string): string {
   return value.normalize("NFD").replace(/\p{Diacritic}/gu, "");
-
 }
 
 /** Ranks a label/keyword pair against a lowercased needle; `null` means no match. */
@@ -429,10 +492,7 @@ function matchScore(
   const lower = foldAccents(label.toLowerCase());
   if (lower.startsWith(foldedNeedle)) return 0;
   if (lower.includes(foldedNeedle)) return 1;
-  if (
-    keywords &&
-    foldAccents(keywords.toLowerCase()).includes(foldedNeedle)
-  ) {
+  if (keywords && foldAccents(keywords.toLowerCase()).includes(foldedNeedle)) {
     return 2;
   }
   return null;
@@ -562,48 +622,116 @@ export function saveFollowUpBehavior(value: FollowUpBehavior) {
 }
 
 const NEXT_STEPS_ENABLED_KEY = "monocode.nextStepsEnabled";
-const NEXT_STEPS_COUNT_KEY = "monocode.nextStepsCount";
+
+/**
+ * The model call is separable from the bar. Both are experimental, but they
+ * cost different things: the static shortcuts are free and local, the
+ * suggestions are a short side-channel call on every completed turn.
+ */
+const NEXT_STEPS_SUGGEST_KEY = "monocode.nextSteps.suggest";
+export const NEXT_STEPS_SUGGEST_DEFAULT = true;
+
+/**
+ * One flag per action. The previous `monocode.nextStepsCount` was a `2 | 3`
+ * number that the caller then filtered down from, so the number lied; naming
+ * the actions directly makes the choice explicit and reachable.
+ */
+const NEXT_STEP_ACTION_KEYS = {
+  "jump-to-bottom": "monocode.nextSteps.jumpToBottom",
+  "search-transcript": "monocode.nextSteps.searchTranscript",
+  "review-changes": "monocode.nextSteps.reviewChanges",
+} as const satisfies Record<NextStepAction, string>;
+
+/**
+ * Defaults keep the two actions the old count selector could actually show,
+ * and leave `review-changes` off: at a count of 2 it was unreachable, and at 3
+ * it required jump-to-bottom to be visible at the same time.
+ */
+export const NEXT_STEP_ACTION_DEFAULTS: NextStepSelection = {
+  "jump-to-bottom": true,
+  "search-transcript": true,
+  "review-changes": false,
+};
+
+/** The same defaults in snapshot form, for the server/client fallback. */
+export const NEXT_STEP_ACTION_DEFAULTS_RAW = NEXT_STEP_ACTIONS.map((action) =>
+  NEXT_STEP_ACTION_DEFAULTS[action] ? "1" : "0",
+).join("");
+
 export const NEXT_STEPS_CHANGE_EVENT = "monocode:next-steps-change";
 export const NEXT_STEPS_ENABLED_DEFAULT = false;
-export const NEXT_STEPS_COUNT_DEFAULT: NextStepsCount = 2;
 
-export function loadNextStepsEnabled(): boolean {
+function readFlag(key: string, fallback: boolean): boolean {
   try {
-    const raw = localStorage.getItem(NEXT_STEPS_ENABLED_KEY);
-    if (raw == null) return NEXT_STEPS_ENABLED_DEFAULT;
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
     return raw === "1" || raw === "true";
   } catch {
-    return NEXT_STEPS_ENABLED_DEFAULT;
+    return fallback;
   }
+}
+
+function writeFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // private mode / quota
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+}
+
+export function loadNextStepsEnabled(): boolean {
+  return readFlag(NEXT_STEPS_ENABLED_KEY, NEXT_STEPS_ENABLED_DEFAULT);
 }
 
 export function saveNextStepsEnabled(value: boolean) {
-  try {
-    localStorage.setItem(NEXT_STEPS_ENABLED_KEY, value ? "1" : "0");
-  } catch {
-    return;
-  }
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+  writeFlag(NEXT_STEPS_ENABLED_KEY, value);
 }
 
-export function loadNextStepsCount(): NextStepsCount {
-  try {
-    const raw = localStorage.getItem(NEXT_STEPS_COUNT_KEY);
-    return raw === "2" ? 2 : raw === "3" ? 3 : NEXT_STEPS_COUNT_DEFAULT;
-  } catch {
-    return NEXT_STEPS_COUNT_DEFAULT;
-  }
+export function loadNextStepsSuggest(): boolean {
+  return readFlag(NEXT_STEPS_SUGGEST_KEY, NEXT_STEPS_SUGGEST_DEFAULT);
 }
 
-export function saveNextStepsCount(value: NextStepsCount) {
-  try {
-    localStorage.setItem(NEXT_STEPS_COUNT_KEY, String(value));
-  } catch {
-    return;
-  }
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(NEXT_STEPS_CHANGE_EVENT));
+export function saveNextStepsSuggest(value: boolean) {
+  writeFlag(NEXT_STEPS_SUGGEST_KEY, value);
+}
+
+export function loadNextStepAction(action: NextStepAction): boolean {
+  return readFlag(
+    NEXT_STEP_ACTION_KEYS[action],
+    NEXT_STEP_ACTION_DEFAULTS[action],
+  );
+}
+
+export function saveNextStepAction(action: NextStepAction, value: boolean) {
+  writeFlag(NEXT_STEP_ACTION_KEYS[action], value);
+}
+
+/**
+ * Store snapshot: one character per action, in `NEXT_STEP_ACTIONS` order.
+ *
+ * A primitive on purpose. Handing `useSyncExternalStore` a fresh object per
+ * read means `Object.is` never matches and the view re-renders forever;
+ * callers derive the object with `parseNextStepSelection`.
+ */
+export function loadNextStepSelectionRaw(): string {
+  return NEXT_STEP_ACTIONS.map((action) =>
+    readFlag(NEXT_STEP_ACTION_KEYS[action], NEXT_STEP_ACTION_DEFAULTS[action])
+      ? "1"
+      : "0",
+  ).join("");
+}
+
+/** Inverse of `loadNextStepSelectionRaw`, with defaults for a short string. */
+export function parseNextStepSelection(raw: string): NextStepSelection {
+  const selection = { ...NEXT_STEP_ACTION_DEFAULTS };
+  NEXT_STEP_ACTIONS.forEach((action, index) => {
+    const bit = raw[index];
+    if (bit === "1") selection[action] = true;
+    else if (bit === "0") selection[action] = false;
+  });
+  return selection;
 }
 
 export function subscribeNextSteps(onStoreChange: () => void) {
@@ -611,7 +739,10 @@ export function subscribeNextSteps(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
     if (
       event.key === NEXT_STEPS_ENABLED_KEY ||
-      event.key === NEXT_STEPS_COUNT_KEY
+      event.key === NEXT_STEPS_SUGGEST_KEY ||
+      NEXT_STEP_ACTIONS.some(
+        (action) => event.key === NEXT_STEP_ACTION_KEYS[action],
+      )
     ) {
       onStoreChange();
     }
@@ -667,7 +798,7 @@ export function subscribeModelControls(onStoreChange: () => void) {
     window.removeEventListener(MODEL_CONTROLS_CHANGE_EVENT, onStoreChange);
 }
 
-export const COMPOSER_RUNNER_DEFAULT = true;
+export const COMPOSER_RUNNER_DEFAULT = false;
 
 /** Fired on `window` when the composer mascot setting flips. */
 export const COMPOSER_RUNNER_CHANGE_EVENT = "monocode:composer-runner-change";
@@ -813,7 +944,7 @@ export function subscribeReviewAdoptShell(onStoreChange: () => void) {
 
 const GRID_ARCADE_ENABLED_KEY = "monocode.gridArcadeEnabled";
 
-export const GRID_ARCADE_ENABLED_DEFAULT = true;
+export const GRID_ARCADE_ENABLED_DEFAULT = false;
 
 /** Fired on `window` when the empty-session games setting flips. */
 export const GRID_ARCADE_ENABLED_CHANGE_EVENT =
@@ -963,7 +1094,8 @@ export type KeybindingRow = {
 };
 
 /** Human labels for `when` guards; unknown expressions render verbatim. */
-export const KEYBINDING_ALWAYS_KEY = "settings.keybindings.when.always" as const;
+export const KEYBINDING_ALWAYS_KEY =
+  "settings.keybindings.when.always" as const;
 
 const KEYBINDING_WHEN_LABELS: Record<string, LocaleKey> = {
   Always: KEYBINDING_ALWAYS_KEY,
@@ -983,44 +1115,136 @@ export function keybindingWhenLabel(
 }
 
 /**
- * Mirrors the bindings we actually handle: the native menu accelerators in
- * `src-tauri/src/menu.rs`, `tabCommand`, the window key handler in App, and
+ * Mirrors the bindings we actually handle: the menu items and accelerators in
+ * `src/chrome/MenuBar.tsx`, `tabCommand`, the window key handler in App, and
  * focused surface handlers such as the draft composer workspace toggle.
  */
 export const KEYBINDINGS: KeybindingRow[] = [
-  { command: "settings.keybindings.cmd.app_search", keys: `${MOD}K`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_go_to_file", keys: `${MOD}P`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_command_palette", keys: `${MOD}${SHIFT}P`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_find_in_files", keys: `${MOD}${SHIFT}F`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_open_project", keys: `${MOD}O`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_new_window", keys: `${MOD}${SHIFT}N`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_toggle_sidebar", keys: `${MOD}B`, when: "Always" },
-  { command: "settings.keybindings.cmd.app_switch_model", keys: `${MOD}.`, when: "Always" },
+  {
+    command: "settings.keybindings.cmd.app_search",
+    keys: `${MOD}K`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_go_to_file",
+    keys: `${MOD}P`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_command_palette",
+    keys: `${MOD}${SHIFT}P`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_find_in_files",
+    keys: `${MOD}${SHIFT}F`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_open_project",
+    keys: `${MOD}O`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_new_window",
+    keys: `${MOD}${SHIFT}N`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_toggle_sidebar",
+    keys: `${MOD}B`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.app_switch_model",
+    keys: `${MOD}.`,
+    when: "Always",
+  },
   {
     command: "settings.keybindings.cmd.composer_toggle_workspace",
     keys: `${MOD}${SHIFT}G`,
     when: "Draft session composer",
   },
-  { command: "settings.keybindings.cmd.view_reload", keys: `${MOD}${SHIFT}R`, when: "Always" },
-  { command: "settings.keybindings.cmd.view_zoom_in", keys: `${MOD}+`, when: "Always" },
-  { command: "settings.keybindings.cmd.view_zoom_out", keys: `${MOD}-`, when: "Always" },
-  { command: "settings.keybindings.cmd.view_reset_zoom", keys: `${MOD}0`, when: "Always" },
-  { command: "settings.keybindings.cmd.view_toggle_fullscreen", keys: "F11", when: "Always" },
-  { command: "settings.keybindings.cmd.tab_new", keys: `${MOD}T`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_close_others", keys: `${MOD}${ALT}T`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_close_all", keys: `${MOD}${SHIFT}W`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_next", keys: `${MOD}${SHIFT}]`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_previous", keys: `${MOD}${SHIFT}[`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_cycle_next", keys: `${CTRL}Tab`, when: "Always" },
+  {
+    command: "settings.keybindings.cmd.view_reload",
+    keys: `${MOD}${SHIFT}R`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.view_zoom_in",
+    keys: `${MOD}+`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.view_zoom_out",
+    keys: `${MOD}-`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.view_reset_zoom",
+    keys: `${MOD}0`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.view_toggle_fullscreen",
+    keys: "F11",
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_new",
+    keys: `${MOD}T`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_close_others",
+    keys: `${MOD}${ALT}T`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_close_all",
+    keys: `${MOD}${SHIFT}W`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_next",
+    keys: `${MOD}${SHIFT}]`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_previous",
+    keys: `${MOD}${SHIFT}[`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_cycle_next",
+    keys: `${CTRL}Tab`,
+    when: "Always",
+  },
   {
     command: "settings.keybindings.cmd.tab_cycle_previous",
     keys: `${CTRL}${SHIFT}Tab`,
     when: "Always",
   },
-  { command: "settings.keybindings.cmd.tab_back", keys: `${MOD}[`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_forward", keys: `${MOD}]`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_activate_range", keys: `${MOD}1 … ${MOD}8`, when: "Always" },
-  { command: "settings.keybindings.cmd.tab_activate_last", keys: `${MOD}9`, when: "Always" },
+  {
+    command: "settings.keybindings.cmd.tab_back",
+    keys: `${MOD}[`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_forward",
+    keys: `${MOD}]`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_activate_range",
+    keys: `${MOD}1 … ${MOD}8`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.tab_activate_last",
+    keys: `${MOD}9`,
+    when: "Always",
+  },
   {
     command: "settings.keybindings.cmd.session_archive",
     keys: `${MOD}${SHIFT}A`,
@@ -1046,22 +1270,66 @@ export const KEYBINDINGS: KeybindingRow[] = [
     keys: `${MOD}${SHIFT}→`,
     when: "!overlay && (!textFocus || emptyComposer)",
   },
-  { command: "settings.keybindings.cmd.pane_close", keys: `${MOD}W`, when: "Always" },
-  { command: "settings.keybindings.cmd.pane_split_right", keys: `${MOD}D`, when: "!editorFocus" },
+  {
+    command: "settings.keybindings.cmd.pane_close",
+    keys: `${MOD}W`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.pane_split_right",
+    keys: `${MOD}D`,
+    when: "!editorFocus",
+  },
   {
     command: "settings.keybindings.cmd.pane_split_down",
     keys: `${MOD}${SHIFT}D`,
     when: "!editorFocus",
   },
-  { command: "settings.keybindings.cmd.pane_focus_left", keys: `${MOD}${ALT}←`, when: "Always" },
-  { command: "settings.keybindings.cmd.pane_focus_right", keys: `${MOD}${ALT}→`, when: "Always" },
-  { command: "settings.keybindings.cmd.pane_focus_up", keys: `${MOD}${ALT}↑`, when: "Always" },
-  { command: "settings.keybindings.cmd.pane_focus_down", keys: `${MOD}${ALT}↓`, when: "Always" },
-  { command: "settings.keybindings.cmd.terminal_new", keys: `${MOD}\``, when: "Always" },
-  { command: "settings.keybindings.cmd.terminal_new_tab", keys: `${MOD}${SHIFT}\``, when: "Always" },
-  { command: "settings.keybindings.cmd.terminal_toggle_dock", keys: `${MOD}J`, when: "Always" },
-  { command: "settings.keybindings.cmd.editor_find", keys: `${MOD}F`, when: "editorFocus" },
-  { command: "settings.keybindings.cmd.editor_replace", keys: `${MOD}${ALT}F`, when: "editorFocus" },
+  {
+    command: "settings.keybindings.cmd.pane_focus_left",
+    keys: `${MOD}${ALT}←`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.pane_focus_right",
+    keys: `${MOD}${ALT}→`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.pane_focus_up",
+    keys: `${MOD}${ALT}↑`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.pane_focus_down",
+    keys: `${MOD}${ALT}↓`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.terminal_new",
+    keys: `${MOD}\``,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.terminal_new_tab",
+    keys: `${MOD}${SHIFT}\``,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.terminal_toggle_dock",
+    keys: `${MOD}J`,
+    when: "Always",
+  },
+  {
+    command: "settings.keybindings.cmd.editor_find",
+    keys: `${MOD}F`,
+    when: "editorFocus",
+  },
+  {
+    command: "settings.keybindings.cmd.editor_replace",
+    keys: `${MOD}${ALT}F`,
+    when: "editorFocus",
+  },
 ];
 
 export function filterKeybindings(

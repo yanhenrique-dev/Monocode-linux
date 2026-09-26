@@ -296,6 +296,56 @@ const en = {
   "settings.search.results_aria": "Settings search results",
   "settings.search.empty": "No matching settings",
   "settings.search.page_badge": "Page",
+  "settings.group.experimental": "Experimental",
+  "settings.section.experimental.label": "Experimental",
+  "settings.section.experimental.description":
+    "Unstable features. These can change or disappear between releases.",
+  "settings.experimental.features.title": "Features",
+  "settings.experimental.features.description":
+    "Off unless you turn them on. Each one is opt-in.",
+  "settings.experimental.experimental_animations.label":
+    "Experimental animations",
+  "settings.experimental.experimental_animations.description":
+    "Enter and exit motion for panels, rows, and folds. Off keeps the workspace still.",
+  "settings.experimental.experimental_animations.toggle":
+    "Experimental animations",
+  "settings.experimental.next_steps.label": "Next-step shortcuts",
+  "settings.experimental.next_steps.description":
+    "Show a small action bar above the composer after an agent finishes. Choose two or three shortcuts.",
+  "settings.experimental.next_steps.toggle": "Next-step shortcuts",
+  "settings.experimental.next_steps.selector": "Number of next-step shortcuts",
+  "settings.experimental.next_steps.two": "2 shortcuts",
+  "settings.experimental.next_steps.three": "3 shortcuts",
+  "settings.experimental.composer_mascot.label": "Composer mascot",
+  "settings.experimental.composer_mascot.description":
+    "When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin.",
+  "settings.experimental.composer_mascot.toggle": "Composer mascot",
+  "settings.experimental.empty_session_games.label": "Empty session games",
+  "settings.experimental.empty_session_games.description":
+    "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
+  "settings.experimental.empty_session_games.toggle": "Empty session games",
+  "settings.experimental.next_steps.suggest.label": "Suggest what to ask next",
+  "settings.experimental.next_steps.suggest.description":
+    "After a turn finishes, ask this session's CLI for two or three follow-ups to try. It uses that CLI's cheap short-text model, not the model you are chatting with, and costs a fraction of one turn. Turn it off to keep only the fixed shortcuts below.",
+  "settings.experimental.next_steps.action.jump-to-bottom.label":
+    "Jump to latest",
+  "settings.experimental.next_steps.action.jump-to-bottom.description":
+    "Only offered when you have scrolled up, so the floating button is already there. Turn it off and the bar skips it.",
+  "settings.experimental.next_steps.action.search-transcript.label":
+    "Find in transcript",
+  "settings.experimental.next_steps.action.search-transcript.description":
+    "Open full-text search over this conversation.",
+  "settings.experimental.next_steps.action.review-changes.label":
+    "Review changes",
+  "settings.experimental.next_steps.action.review-changes.description":
+    "Open the diff for this session.",
+  "settings.experimental.diagnostics.title": "Diagnostics",
+  "settings.experimental.diagnostics.description":
+    "For reporting a problem. Everything here is off by default.",
+  "settings.experimental.diagnostics.debug_scopes.label": "Debug logging",
+  "settings.experimental.diagnostics.debug_scopes.description":
+    "Comma-separated scopes, or * for everything. Scopes prefix their log lines, so the list narrows what reaches the console. Leave empty to silence debug output.",
+  "settings.experimental.diagnostics.debug_scopes.aria": "Debug logging scopes",
   "settings.group.app": "App",
   "settings.group.agents": "Agents",
   "settings.group.workspace": "Workspace",
@@ -457,10 +507,6 @@ const en = {
   "settings.chat.tasks_pill.description":
     "Pin a compact task summary above the composer while the task list is scrolled out of view. Clicking it jumps back to the full list.",
   "settings.chat.tasks_pill.toggle": "Tasks near chat",
-  "settings.chat.experimental_animations.label": "Experimental animations",
-  "settings.chat.experimental_animations.description":
-    "Smooth enter/exit for sidebars, the file pane, popovers, modals and work folds (180ms in, 150ms out). Off by default; off keeps the instant show and hide.",
-  "settings.chat.experimental_animations.toggle": "Experimental animations",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "What the composer does with what you type.",
@@ -474,13 +520,6 @@ const en = {
   "settings.chat.follow_up.selector": "Follow-up behavior",
   "settings.chat.follow_up.queue": "Queue",
   "settings.chat.follow_up.steer": "Steer",
-  "settings.chat.next_steps.label": "Next-step shortcuts (experimental)",
-  "settings.chat.next_steps.description":
-    "Show a small action bar above the composer after an agent finishes. Choose two or three shortcuts.",
-  "settings.chat.next_steps.toggle": "Next-step shortcuts",
-  "settings.chat.next_steps.selector": "Number of next-step shortcuts",
-  "settings.chat.next_steps.two": "2 shortcuts",
-  "settings.chat.next_steps.three": "3 shortcuts",
   "settings.chat.model_controls.label": "Model controls",
   "settings.chat.model_controls.description":
     "Show model options beside the picker instead of inside the model menu.",
@@ -659,17 +698,6 @@ const en = {
   "settings.chat.diff_view.selector": "Diff view",
   "settings.chat.diff_view.editor": "Editor",
   "settings.chat.diff_view.unified": "Unified",
-  "settings.chat.extras.title": "Extras",
-  "settings.chat.extras.description":
-    "Idle animation, and nothing else. Turn both off for a still workspace.",
-  "settings.chat.composer_mascot.label": "Composer mascot",
-  "settings.chat.composer_mascot.description":
-    "When a turn is running, the project mascot runs along the composer, bonks the scroll-to-latest button the first time, then jumps it, and sometimes grabs a coin.",
-  "settings.chat.composer_mascot.toggle": "Composer mascot",
-  "settings.chat.empty_session_games.label": "Empty session games",
-  "settings.chat.empty_session_games.description":
-    "Pac-man and snake idle on the empty-session grid. Hover the band to take control of whichever is on screen. Turn this off to keep the pane still.",
-  "settings.chat.empty_session_games.toggle": "Empty session games",
   "settings.inbox.github.title": "GitHub",
   "settings.inbox.github.description":
     "Pull requests, reviews, and issues, read through the GitHub CLI.",
@@ -1051,57 +1079,6 @@ const en = {
     "Changed outside the session's edits, pulled in for review. Undo is unavailable; Keep dismisses this card.",
   "session.review.inexact.diverged_hint":
     "Changed again after the session's edit, so the diff mixes both. Undo is unavailable; Keep dismisses this card.",
-  "welcome.title": "Welcome to MonoCode",
-  "welcome.description": "A quick setup check before your first session.",
-  "welcome.progress": "Setup progress",
-  "welcome.loading": "Checking your setup",
-  "welcome.dialog.step": "Step {step} of {total}: {title}",
-  "welcome.version.title": "Version",
-  "welcome.version.body": "MonoCode is ready to open your workspace.",
-  "welcome.version.current": "Current version",
-  "welcome.version.release_notes": "Release notes: {title}",
-  "welcome.version.flatpak": "Flatpak manages updates for this installation.",
-  "welcome.clis.title": "Agent CLIs",
-  "welcome.clis.body": "MonoCode can use one or more installed agent CLIs.",
-  "welcome.clis.ready_count": "{count} of {total} ready",
-  "welcome.clis.ready": "Ready",
-  "welcome.clis.copy": "Copy {name} install command",
-  "welcome.clis.copy_short": "Copy install",
-  "welcome.clis.copied": "Copied",
-  "welcome.github.title": "GitHub CLI",
-  "welcome.github.body": "Connect GitHub to use Inbox items and pull requests.",
-  "welcome.github.checking": "Checking GitHub CLI",
-  "welcome.github.connected": "GitHub CLI authenticated",
-  "welcome.github.auth_needed": "Sign in with GitHub CLI to continue.",
-  "welcome.github.not_installed": "GitHub CLI is not installed.",
-  "welcome.github.rate_limited":
-    "GitHub API rate limit active. Retry in {seconds}s.",
-  "welcome.github.rate_limited_unknown":
-    "GitHub API rate limit active. Try again later.",
-  "welcome.github.open_inbox": "Open Inbox",
-  "welcome.github.open_providers": "Open providers",
-  "welcome.github.retry": "Retry",
-  "welcome.github.checking_button": "Checking",
-  "welcome.github.installation_guide": "Installation guide",
-  "welcome.github.docs_hint": "See docs/linux.md for distro-specific setup.",
-  "welcome.github.optional":
-    "You can use MonoCode without GitHub. Connect it later in Settings.",
-  "welcome.providers.title": "Providers",
-  "welcome.providers.body": "Review what is available before you start.",
-  "welcome.providers.installed": "Installed",
-  "welcome.providers.missing": "Not installed",
-  "welcome.providers.checklist_cli": "At least one agent CLI is ready.",
-  "welcome.providers.no_cli_ready": "No agent CLI is ready yet.",
-  "welcome.providers.checklist_github": "GitHub access is optional.",
-  "welcome.providers.checklist_settings":
-    "Providers can be changed later in Settings.",
-  "welcome.actions.back": "Back",
-  "welcome.actions.continue": "Continue",
-  "welcome.actions.skip": "Skip",
-  "welcome.actions.start": "Start",
-  "welcome.actions.retry": "Retry",
-  "welcome.errors.load": "Could not load setup details.",
-  "welcome.errors.github": "Could not check GitHub CLI.",
 };
 
 export type LocaleKey = keyof typeof en;
@@ -1322,6 +1299,58 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.search.results_aria": "Resultados da pesquisa",
   "settings.search.empty": "Nenhuma configuração encontrada",
   "settings.search.page_badge": "Página",
+  "settings.group.experimental": "Experimental",
+  "settings.section.experimental.label": "Experimental",
+  "settings.section.experimental.description":
+    "Recursos instáveis. Podem mudar ou sumir entre versões.",
+  "settings.experimental.features.title": "Recursos",
+  "settings.experimental.features.description":
+    "Desligados até você ativar. Cada um é opt-in.",
+  "settings.experimental.experimental_animations.label":
+    "Animações experimentais",
+  "settings.experimental.experimental_animations.description":
+    "Movimento de entrada e saída em painéis, linhas e dobras. Desligado mantém o espaço de trabalho estático.",
+  "settings.experimental.experimental_animations.toggle":
+    "Animações experimentais",
+  "settings.experimental.next_steps.label": "Atalhos de próximos passos",
+  "settings.experimental.next_steps.description":
+    "Mostra uma barra de ações acima do composer depois que o agente termina. Escolha dois ou três atalhos.",
+  "settings.experimental.next_steps.toggle": "Atalhos de próximos passos",
+  "settings.experimental.next_steps.selector": "Quantidade de atalhos",
+  "settings.experimental.next_steps.two": "2 atalhos",
+  "settings.experimental.next_steps.three": "3 atalhos",
+  "settings.experimental.composer_mascot.label": "Mascote do composer",
+  "settings.experimental.composer_mascot.description":
+    "Quando um turno está rodando, o mascote do projeto corre pelo composer, esbarra no botão de rolar para o mais recente na primeira vez, depois o salta e às vezes pega uma moeda.",
+  "settings.experimental.composer_mascot.toggle": "Mascote do composer",
+  "settings.experimental.empty_session_games.label": "Jogos da sessão vazia",
+  "settings.experimental.empty_session_games.description":
+    "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
+  "settings.experimental.empty_session_games.toggle": "Jogos da sessão vazia",
+  "settings.experimental.next_steps.suggest.label":
+    "Sugerir o que perguntar em seguida",
+  "settings.experimental.next_steps.suggest.description":
+    "Depois que um turno termina, pede à CLI desta sessão duas ou três sugestões para tentar. Usa o modelo barato de texto curto daquela CLI, não o modelo com que você está conversando, e custa uma fração de um turno. Desative para ficar só com os atalhos fixos abaixo.",
+  "settings.experimental.next_steps.action.jump-to-bottom.label":
+    "Ir para o final",
+  "settings.experimental.next_steps.action.jump-to-bottom.description":
+    "Só aparece quando você rolou para cima, então o botão flutuante já está lá. Desative e a barra pula esta ação.",
+  "settings.experimental.next_steps.action.search-transcript.label":
+    "Pesquisar na transcrição",
+  "settings.experimental.next_steps.action.search-transcript.description":
+    "Abre a busca de texto completo nesta conversa.",
+  "settings.experimental.next_steps.action.review-changes.label":
+    "Revisar alterações",
+  "settings.experimental.next_steps.action.review-changes.description":
+    "Abre o diff desta sessão.",
+  "settings.experimental.diagnostics.title": "Diagnóstico",
+  "settings.experimental.diagnostics.description":
+    "Para reportar um problema. Tudo aqui começa desligado.",
+  "settings.experimental.diagnostics.debug_scopes.label": "Log de depuração",
+  "settings.experimental.diagnostics.debug_scopes.description":
+    "Escopos separados por vírgula, ou * para tudo. Os escopos prefixam suas linhas de log, então a lista restringe o que chega ao console. Deixe vazio para silenciar a saída de depuração.",
+  "settings.experimental.diagnostics.debug_scopes.aria":
+    "Escopos do log de depuração",
   "settings.group.app": "App",
   "settings.group.agents": "Agentes",
   "settings.group.workspace": "Espaço de trabalho",
@@ -1487,10 +1516,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.tasks_pill.description":
     "Fixa um resumo compacto das tarefas acima do composer enquanto a lista está fora da visão. Clicar volta para a lista completa.",
   "settings.chat.tasks_pill.toggle": "Tarefas perto do chat",
-  "settings.chat.experimental_animations.label": "Animações experimentais",
-  "settings.chat.experimental_animations.description":
-    "Entrada/saída suave para sidebars, painel de arquivos, popovers, modais e dobras de trabalho (180ms entrando, 150ms saindo). Desligado por padrão; desligado mantém mostrar e esconder na hora.",
-  "settings.chat.experimental_animations.toggle": "Animações experimentais",
   "settings.chat.composer.title": "Composer",
   "settings.chat.composer.description":
     "O que o composer faz com o que você digita.",
@@ -1504,13 +1529,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.follow_up.selector": "Comportamento de acompanhamento",
   "settings.chat.follow_up.queue": "Enfileirar",
   "settings.chat.follow_up.steer": "Redirecionar",
-  "settings.chat.next_steps.label": "Atalhos de próximos passos (experimental)",
-  "settings.chat.next_steps.description":
-    "Mostra uma barra de ações acima do composer depois que o agente termina. Escolha dois ou três atalhos.",
-  "settings.chat.next_steps.toggle": "Atalhos de próximos passos",
-  "settings.chat.next_steps.selector": "Quantidade de atalhos",
-  "settings.chat.next_steps.two": "2 atalhos",
-  "settings.chat.next_steps.three": "3 atalhos",
   "settings.chat.model_controls.label": "Controles do modelo",
   "settings.chat.model_controls.description":
     "Mostra as opções do modelo ao lado do seletor em vez de dentro do menu.",
@@ -1691,17 +1709,6 @@ const ptBR: Record<LocaleKey, string> = {
   "settings.chat.diff_view.selector": "Visualização de diff",
   "settings.chat.diff_view.editor": "Editor",
   "settings.chat.diff_view.unified": "Unificada",
-  "settings.chat.extras.title": "Extras",
-  "settings.chat.extras.description":
-    "Animação de inatividade, e nada mais. Desative ambas para um espaço de trabalho estático.",
-  "settings.chat.composer_mascot.label": "Mascote do composer",
-  "settings.chat.composer_mascot.description":
-    "Quando um turno está rodando, o mascote do projeto corre pelo composer, esbarra no botão de rolar para o mais recente na primeira vez, depois o salta e às vezes pega uma moeda.",
-  "settings.chat.composer_mascot.toggle": "Mascote do composer",
-  "settings.chat.empty_session_games.label": "Jogos da sessão vazia",
-  "settings.chat.empty_session_games.description":
-    "Pac-man e cobrinha parados na grade da sessão vazia. Passe o mouse sobre a faixa para controlar o que estiver na tela. Desative para manter o painel parado.",
-  "settings.chat.empty_session_games.toggle": "Jogos da sessão vazia",
   "settings.inbox.github.title": "GitHub",
   "settings.inbox.github.description":
     "Pull requests, revisões e issues, lidos via GitHub CLI.",
@@ -2093,62 +2100,6 @@ const ptBR: Record<LocaleKey, string> = {
     "Alterado fora das edições da sessão, incluído para revisão. Desfazer indisponível; Manter dispensa este cartão.",
   "session.review.inexact.diverged_hint":
     "Alterado de novo após a edição da sessão, então o diff mistura os dois. Desfazer indisponível; Manter dispensa este cartão.",
-  "welcome.title": "Bem-vindo ao MonoCode",
-  "welcome.description": "Uma verificação rápida antes da primeira sessão.",
-  "welcome.progress": "Progresso da configuração",
-  "welcome.loading": "Verificando sua configuração",
-  "welcome.dialog.step": "Passo {step} de {total}: {title}",
-  "welcome.version.title": "Versão",
-  "welcome.version.body":
-    "O MonoCode está pronto para abrir seu espaço de trabalho.",
-  "welcome.version.current": "Versão atual",
-  "welcome.version.release_notes": "Notas da versão: {title}",
-  "welcome.version.flatpak":
-    "O Flatpak gerencia as atualizações desta instalação.",
-  "welcome.clis.title": "CLIs de agentes",
-  "welcome.clis.body": "O MonoCode pode usar uma ou mais CLIs instaladas.",
-  "welcome.clis.ready_count": "{count} de {total} prontas",
-  "welcome.clis.ready": "Pronta",
-  "welcome.clis.copy": "Copiar comando de instalação de {name}",
-  "welcome.clis.copy_short": "Copiar instalação",
-  "welcome.clis.copied": "Copiado",
-  "welcome.github.title": "GitHub CLI",
-  "welcome.github.body":
-    "Conecte o GitHub para usar itens da Inbox e pull requests.",
-  "welcome.github.checking": "Verificando GitHub CLI",
-  "welcome.github.connected": "GitHub CLI autenticado",
-  "welcome.github.auth_needed": "Entre com o GitHub CLI para continuar.",
-  "welcome.github.not_installed": "GitHub CLI não está instalado.",
-  "welcome.github.rate_limited":
-    "Limite da API do GitHub ativo. Tente novamente em {seconds}s.",
-  "welcome.github.rate_limited_unknown":
-    "Limite da API do GitHub ativo. Tente novamente mais tarde.",
-  "welcome.github.open_inbox": "Abrir Inbox",
-  "welcome.github.open_providers": "Abrir provedores",
-  "welcome.github.retry": "Tentar novamente",
-  "welcome.github.checking_button": "Verificando",
-  "welcome.github.installation_guide": "Guia de instalação",
-  "welcome.github.docs_hint": "Veja docs/linux.md para instalação por distro.",
-  "welcome.github.optional":
-    "Você pode usar o MonoCode sem GitHub. Conecte depois em Configurações.",
-  "welcome.providers.title": "Provedores",
-  "welcome.providers.body": "Veja o que está disponível antes de começar.",
-  "welcome.providers.installed": "Instalados",
-  "welcome.providers.missing": "Não instalados",
-  "welcome.providers.checklist_cli":
-    "Pelo menos uma CLI de agente está pronta.",
-  "welcome.providers.no_cli_ready": "Nenhuma CLI de agente está pronta ainda.",
-  "welcome.providers.checklist_github": "O acesso ao GitHub é opcional.",
-  "welcome.providers.checklist_settings":
-    "Provedores podem ser alterados depois em Configurações.",
-  "welcome.actions.back": "Voltar",
-  "welcome.actions.continue": "Continuar",
-  "welcome.actions.skip": "Pular",
-  "welcome.actions.start": "Começar",
-  "welcome.actions.retry": "Tentar novamente",
-  "welcome.errors.load":
-    "Não foi possível carregar os detalhes da configuração.",
-  "welcome.errors.github": "Não foi possível verificar o GitHub CLI.",
 };
 
 export const STRINGS: Record<Locale, Record<LocaleKey, string>> = {

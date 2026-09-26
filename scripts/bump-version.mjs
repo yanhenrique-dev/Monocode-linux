@@ -1,7 +1,19 @@
 #!/usr/bin/env node
+/**
+ * Write the project version to every pin listed in version-sources.mjs.
+ *
+ *   npm run set-version -- 0.1.1
+ *
+ * The pin list is shared with check-version.mjs, so a new pin cannot be
+ * checked without also being written, or written without being checked. This
+ * script used to write eight files and print a reminder asking you to handle
+ * two more by hand; the AUR package sat 33 releases behind because of that
+ * reminder, and the Flatpak manifest 55.
+ */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { VERSION_SOURCES } from "./version-sources.mjs";
 
 const version = process.argv[2];
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
@@ -11,55 +23,41 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-function replaceFirst(path, pattern, replacement) {
-  const text = readFileSync(path, "utf8");
-  const next = text.replace(pattern, replacement);
+function writePin(pin, text) {
+  const next = pin.write(text, version);
   if (next === text) {
-    console.error(`failed to update ${path}`);
+    console.error(`failed to update ${pin.label}: no replacement made`);
     process.exit(1);
   }
-  writeFileSync(path, next);
+  writeFileSync(join(root, pin.file), next);
 }
 
-replaceFirst(
-  join(root, "package.json"),
-  /("version": ")[^"]+(")/,
-  `$1${version}$2`,
+let written = 0;
+for (const pin of VERSION_SOURCES) {
+  const path = join(root, pin.file);
+  let text;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    console.error(`failed to update ${pin.label}: cannot read ${pin.file}`);
+    process.exit(1);
+  }
+  // The Flatpak tag is resolved with its commit below; a manifest whose tag
+  // moved but whose commit did not is worse than one left alone.
+  if (pin.file === "packaging/flatpak/com.monocode.desktop.yml") continue;
+  writePin(pin, text);
+  written += 1;
+}
+
+// The Flatpak manifest pins a tag *and* the commit that tag points at, so
+// they have to move together. Resolve the SHA BEFORE writing the tag: a
+// missing tag or a network failure must never leave the pair inconsistent.
+const flatpak = VERSION_SOURCES.find(
+  (pin) => pin.file === "packaging/flatpak/com.monocode.desktop.yml",
 );
-// The lockfile carries the version twice: once at the top and once on the
-// root package. Missing them left npm's lockfile claiming 0.1.0 sixteen
-// releases later. The second pattern is anchored on `packages` because the
-// top-level object repeats the same name/version pair.
-replaceFirst(
-  join(root, "package-lock.json"),
-  /^(\{\n\s*"name": "monocode-desktop",\n\s*"version": ")[^"]+(")/,
-  `$1${version}$2`,
-);
-replaceFirst(
-  join(root, "package-lock.json"),
-  /("packages": \{\n\s*"": \{\n\s*"name": "monocode-desktop",\n\s*"version": ")[^"]+(")/,
-  `$1${version}$2`,
-);
-replaceFirst(
-  join(root, "Cargo.toml"),
-  /^(version = ")[^"]+(")/m,
-  `$1${version}$2`,
-);
-replaceFirst(
-  join(root, "src-tauri/tauri.conf.json"),
-  /("version": ")[^"]+(")/,
-  `$1${version}$2`,
-);
-replaceFirst(
-  join(root, "Cargo.lock"),
-  /(name = "monocode"\nversion = ")[^"]+(")/,
-  `$1${version}$2`,
-);
-// Packaging pins the same version: Flathub manifest tag, native Arch
-// PKGBUILD, and the Flatpak metainfo release entry. Resolve the tag's commit
-// SHA BEFORE writing anything: a missing tag or network failure must never
-// leave `tag` and `commit` pointing at different versions.
-const flatpakSha = await fetch(
+const flatpakPath = join(root, flatpak.file);
+let flatpakText = readFileSync(flatpakPath, "utf8");
+const sha = await fetch(
   `https://api.github.com/repos/yanhenrique-dev/Monocode-linux/git/refs/tags/v${version}`,
   { headers: { "User-Agent": "monocode-bump-version" } },
 )
@@ -69,38 +67,27 @@ const flatpakSha = await fetch(
     console.warn(`could not resolve tag v${version}: ${error.message}`);
     return null;
   });
-if (flatpakSha) {
-  replaceFirst(
-    join(root, "packaging/flatpak/com.monocode.desktop.yml"),
-    /^(\s*tag: v)[\d.]+/m,
-    `$1${version}`,
-  );
-  replaceFirst(
-    join(root, "packaging/flatpak/com.monocode.desktop.yml"),
+
+if (sha) {
+  writePin(flatpak, flatpakText);
+  written += 1;
+  flatpakText = readFileSync(flatpakPath, "utf8").replace(
     /^(\s*commit: )[0-9a-f]{40}/m,
-    `$1${flatpakSha}`,
+    `$1${sha}`,
   );
+  writeFileSync(flatpakPath, flatpakText);
 } else {
-  // Bumping ahead of a release (tag not pushed yet): keep the previous
-  // tag+commit pair untouched so the manifest stays self-consistent.
+  // Bumping ahead of a release: leave tag and commit together rather than
+  // pointing one at a tag the other does not describe.
   console.warn(
-    `tag v${version} not found upstream; Flatpak tag/commit pins untouched`,
+    `tag v${version} not found upstream; Flatpak tag/commit pair left untouched`,
   );
 }
-replaceFirst(
-  join(root, "packaging/archlinux/monocode/PKGBUILD"),
-  /^(pkgver=)[\d.]+/m,
-  `$1${version}`,
-);
-replaceFirst(
-  join(root, "packaging/flatpak/com.monocode.desktop.metainfo.xml"),
-  /(<release version=")[\d.]+(" date=")\d{4}-\d{2}-\d{2}(")/,
-  `$1${version}$2${new Date().toISOString().slice(0, 10)}$3`,
-);
 
-console.log(`version ${version}`);
 console.log(
-  "remember: regen packaging/archlinux/monocode/.SRCINFO on Arch " +
-    "(makepkg --printsrcinfo > .SRCINFO) and bump packaging/aur/monocode-bin " +
-    "separately (docs/aur.md).",
+  `version ${version} written to ${written} of ${VERSION_SOURCES.length} pins`,
+);
+console.log(
+  "remaining: regen packaging/archlinux/monocode/.SRCINFO on Arch " +
+    "(makepkg --printsrcinfo > .SRCINFO) if the PKGBUILD metadata changed",
 );

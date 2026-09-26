@@ -24,6 +24,26 @@ export const WORKSPACE_NUDGE_MS = 150;
 /** Splash removal delay on boot. */
 export const SPLASH_REMOVE_MS = 180;
 
+/**
+ * Splash minimum display. The splash is dismissed on the first paint of the
+ * app, so a fast boot would flash the logo for a couple of frames and read as
+ * a glitch. Holding it this long reads as intentional instead.
+ */
+export const MIN_SPLASH_MS = 600;
+
+/**
+ * How long to keep holding the splash before fading it.
+ *
+ * Returns 0 as soon as the boot has already outlasted the minimum, so a slow
+ * machine never pays the delay twice. A `shownAt` of 0 (no stamp) also
+ * returns 0 rather than guessing: never hold the splash on a missing
+ * measurement.
+ */
+export function splashFadeDelay(shownAt: number, now: number): number {
+  if (!(shownAt > 0)) return 0;
+  return Math.max(0, MIN_SPLASH_MS - Math.max(0, now - shownAt));
+}
+
 /** Watched-files invalidate delay after git changes. */
 export const GIT_INVALIDATE_DELAY_MS = 150;
 

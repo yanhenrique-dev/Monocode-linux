@@ -7,25 +7,36 @@ import {
   type ReactNode,
 } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { Copy, Eye, FolderOpen, RefreshCw, Search, X } from "../chrome/icons";
-import { CreateSkillForm } from "../chrome/SkillPicker";
-import { useLockOverscroll } from "../hooks/useLockOverscroll";
+import {
+  Copy,
+  Eye,
+  FolderOpen,
+  RefreshCw,
+  Search,
+  X,
+} from "../../../chrome/icons";
+import { CreateSkillForm } from "../../../chrome/SkillPicker";
+import { useLockOverscroll } from "../../../hooks/useLockOverscroll";
 import {
   MarkdownModeToggle,
   useMarkdownMode,
-} from "../chrome/MarkdownModeToggle";
-import { MarkdownSource } from "./AgentMarkdown";
-import { SkillDocumentPreview } from "./SkillDocumentPreview";
-import { copyText } from "../lib/clipboard";
-import { useLocale } from "../lib/locale";
-import { listSkills, readTextFile, type DiscoveredSkill } from "../lib/fs";
+} from "../../../chrome/MarkdownModeToggle";
+import { MarkdownSource } from "../../AgentMarkdown";
+import { SkillDocumentPreview } from "../../SkillDocumentPreview";
+import { copyText } from "../../../lib/clipboard";
+import { useLocale } from "../../../lib/locale";
+import {
+  listSkills,
+  readTextFile,
+  type DiscoveredSkill,
+} from "../../../lib/fs";
 import {
   createBlankSkill,
   invalidateSkills,
   loadDisabledSkillPaths,
   saveDisabledSkillPaths,
   SKILLS_CHANGE_EVENT,
-} from "../lib/skills";
+} from "../../../lib/skills";
 
 /** Inspect and manage file skills without modifying provider-owned catalogs. */
 export function SkillsPage({

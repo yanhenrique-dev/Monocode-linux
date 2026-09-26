@@ -1,3 +1,5 @@
+import { debugEnabled } from "./debugScopes";
+
 export const ERROR_EVENT = "monocode-error";
 
 export type ErrorReport = {
@@ -17,19 +19,16 @@ export function errorMessage(error: unknown): string {
   }
 }
 
-function debugEnabled(): boolean {
-  try {
-    if (typeof localStorage !== "undefined" && localStorage.getItem("monocode:debug") === "1")
-      return true;
-  } catch {
-    // Storage may be unavailable (private mode, SSR test); fall through.
-  }
-  return false;
-}
-
-/** DEV-only or opt-in debug log. No-op in production unless `monocode:debug=1`. */
+/**
+ * DEV-only or opt-in debug log.
+ *
+ * `import.meta.env.DEV` still short-circuits for local work. The opt-in path
+ * is the shared `monocode.debug` scope list, the same gate `logDebug` uses --
+ * it used to be a second, unrelated key (`monocode:debug=1`) that setting
+ * either one never affected the other.
+ */
 export function debugLog(scope: string, ...args: unknown[]): void {
-  if (import.meta.env.DEV || debugEnabled()) {
+  if (import.meta.env.DEV || debugEnabled(scope)) {
     console.debug(`[monocode:${scope}]`, ...args);
   }
 }
@@ -44,9 +43,14 @@ export function reportError(scope: string, error: unknown): void {
   const message = errorMessage(error);
   console.error(`[monocode:${scope}]`, error);
   try {
-    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.dispatchEvent === "function"
+    ) {
       window.dispatchEvent(
-        new CustomEvent<ErrorReport>(ERROR_EVENT, { detail: { scope, message } }),
+        new CustomEvent<ErrorReport>(ERROR_EVENT, {
+          detail: { scope, message },
+        }),
       );
     }
   } catch {

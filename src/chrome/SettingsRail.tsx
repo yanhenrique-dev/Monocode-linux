@@ -11,6 +11,7 @@ import {
   Palette,
   SlidersHorizontal,
   Sparkles,
+  WandSparkles,
   type IconComponent,
 } from "./icons";
 import { useLockOverscroll } from "../hooks/useLockOverscroll";
@@ -32,6 +33,7 @@ const SECTION_ICONS: Record<SettingsSectionId, IconComponent> = {
   inbox: Inbox,
   worktrees: FolderTree,
   archive: Archive,
+  experimental: WandSparkles,
 };
 
 type Props = {

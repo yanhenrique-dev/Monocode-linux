@@ -42,6 +42,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throwaway session on cleanup instead of stranding one per generation in the
   user's history.
 
+## [Unreleased]
+
+### Added
+
+- Next-step suggestions are real now. When a turn finishes, the session's own
+  CLI is asked, on its cheap short-text model rather than the model you are
+  chatting with, for two or three follow-ups to try. They appear as labelled
+  buttons in the same bar as the fixed shortcuts, and clicking one prefills
+  the composer for you to read and send -- nothing is ever sent on your
+  behalf. The bar renders immediately with whatever is known and gains the
+  suggestions when they arrive, so you never wait; if the call fails, times
+  out, or the answer is unusable, the fixed shortcuts are simply what stays.
+  Nothing is shown for a cancelled turn, a plan, an orchestrated run, or a
+  harness with no text backend.
+- "Suggest what to ask next" is a separate switch from the bar itself, under
+  Settings > Experimental > Next-step shortcuts. The shortcuts are free and
+  local; the suggestions are a side-channel call on every completed turn, so
+  you can keep one without the other.
+
+### Removed
+
+- The first-run wizard. The app now opens straight into the workspace
+  and stays responsive from the first frame. Nothing was lost with it:
+  CLI availability is already surfaced in Settings › Providers, in the
+  model picker, and in the composer, and the GitHub connection lives in
+  Settings › Inbox. The gate it installed was blocking every keyboard
+  shortcut, notification click, and tab command while it was open.
+
+### Fixed
+
+- The Flatpak manifest pointed at `v0.1.95` while the app was at 0.2.50.
+  Its `tag:` and `commit:` pair was last moved together when the version bump
+  script could reach GitHub; every bump since silently skipped both, because
+  a tag that cannot be resolved must not leave a commit that describes a
+  different one. `npm run check:version` now catches it, and the Flatpak
+  build no longer installs 55 releases of stale code.
+
+### Changed
+
+- Settings gains an Experimental section, its own group at the foot of the
+  rail. Experimental animations, next-step shortcuts, the composer mascot,
+  and the empty-session games move there from Chat, and the section says so
+  plainly: these can change or disappear between releases.
+- **The composer mascot and the empty-session games now default to off.**
+  They were on by default, which does not match what "experimental" means.
+  If you liked them, turn them back on in Settings › Experimental.
+- Next-step shortcuts are chosen by naming them. The `2 | 3` count selector
+  is gone, replaced by one toggle per action, dimmed while the master switch
+  is off. This also fixes a real bug: the bar sliced the count first and
+  then dropped "Jump to latest" when the transcript was already at the
+  bottom, so "2 shortcuts" rendered one button, "3" rendered two, and
+  "Review changes" was unreachable at the default. The last enabled action
+  cannot be switched off, since an all-off selection makes the master
+  switch meaningless.
+- The two debug flags are now one. `monocode.debug` (a scope list) and
+  `monocode:debug` (a plain "1") were unrelated keys, so enabling one did
+  nothing for the other, and neither was reachable from the UI. Settings ›
+  Experimental › Diagnostics edits the shared list directly. A stored
+  `monocode:debug` is ignored.
+
+- The boot splash holds for a 600ms minimum so a fast boot no longer
+  flashes the logo for a couple of frames. A boot that already takes
+  longer than that is not delayed again, so slower machines are
+  unaffected and boot-time regressions stay visible.
+- The splash gains an indeterminate progress bar and a breathing logo.
+  The bar is deliberately not a 0→100% determinate one: the boot has no
+  real progress to report. Both animations are opt-in behind the
+  existing experimental-animations setting and are disabled by
+  `prefers-reduced-motion`.
+
 ## [0.2.50] - 2026-09-25
 
 > **Alpha:** MonoCode Linux is in Alpha. Expect breaking changes,
