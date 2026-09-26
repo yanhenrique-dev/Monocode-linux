@@ -6,6 +6,7 @@ import {
   modelFromFxStatusOutput,
   modelsFromFxOutput,
 } from "./fxProtocol";
+import { HARNESS_EXEC } from "./harnessContract";
 
 let inflight: Promise<void> | null = null;
 
@@ -28,8 +29,8 @@ async function discoverFxModels() {
   const { path } = await resolveFxBinary();
   const cwd = await homeDir();
   const [modelsOutput, statusOutput] = await Promise.all([
-    execChild(path, ["models", "--json"], cwd),
-    execChild(path, ["status", "--json"], cwd).catch(() => ""),
+    execChild(path, HARNESS_EXEC.modelsJson, cwd),
+    execChild(path, HARNESS_EXEC.statusJson, cwd).catch(() => ""),
   ]);
   return mergeFxCatalogModels(
     modelsFromFxOutput(modelsOutput),

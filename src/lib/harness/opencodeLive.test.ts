@@ -258,6 +258,44 @@ describe("OpenCode message-carried parts", () => {
     expect(events.some((event) => event.type === "tool.updated")).toBe(true);
   });
 
+  it("surfaces a V2 switch message as a status line", async () => {
+    // The client hands the pipeline a V2 switch message already translated into
+    // `systemNotice`; this covers the pipeline half, and opencodeV2.test covers
+    // the translation. Without it the turn reads as if it began already on the
+    // right agent and model.
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    for (const notice of [
+      "Switched agent to Build",
+      "Switched model to LongCat 2.5 Preview Free",
+    ]) {
+      onSseEvent?.({
+        type: "message.updated",
+        properties: {
+          info: {
+            id: crypto.randomUUID(),
+            sessionID: "session_1",
+            systemNotice: notice,
+            time: { created: 1 },
+          },
+        },
+      });
+    }
+    idle();
+    await done;
+
+    expect(
+      events
+        .filter((event) => event.type === "status")
+        .map((event) => (event as { text: string }).text),
+    ).toEqual([
+      "Switched agent to Build",
+      "Switched model to LongCat 2.5 Preview Free",
+    ]);
+    // A switch is not prose: it must not stream as assistant text.
+    expect(events.filter((event) => event.type === "message.delta")).toEqual([]);
+  });
+
   it("keeps working when the server only sends part events", async () => {
     const events: HarnessEvent[] = [];
     const { done } = await startTurn(events);

@@ -198,12 +198,69 @@ function fromV2Message(value: unknown): OpenCodeMessage | null {
     info.role = "assistant";
     info.agent = "compaction";
   }
+  // V2 reports agent, model, and location switches as their own messages, and
+  // the server narrates them in its own turn. They carry no content, so
+  // without this they render as nothing and the turn looks like it started
+  // already on the right agent and model.
+  const notice = v2SystemNotice(rec);
+  if (notice) {
+    // A subagent's own model switch has to reach the row that shows it, and
+    // that path already reads `modelID` for V1. Carrying the name there means
+    // one lookup covers both generations.
+    if (type === "model-switched") {
+      const label = v2ModelLabel(asRecord(rec.model));
+      if (label) info.modelID = label;
+    }
+    for (const key of ["content", "text", "files", "agents", "skills", "type"]) {
+      delete info[key];
+    }
+    return { info: { ...info, systemNotice: notice }, parts: [] };
+  }
   const parts =
     type === "user" ? v2UserParts(rec, id) : v2AssistantParts(rec, id);
   for (const key of ["content", "text", "files", "agents", "skills", "type"]) {
     delete info[key];
   }
   return { info, parts };
+}
+
+/**
+ * The human-readable line a V2 message contributes to the turn, or undefined
+ * when it is ordinary user or assistant content.
+ */
+function v2SystemNotice(rec: Record<string, unknown>): string | undefined {
+  switch (stringField(rec, "type")) {
+    case "agent-switched": {
+      const agent = stringField(rec, "agent");
+      return agent ? `Switched agent to ${agent}` : undefined;
+    }
+    case "model-switched": {
+      const label = v2ModelLabel(asRecord(rec.model));
+      return label ? `Switched model to ${label}` : undefined;
+    }
+    case "location-switched": {
+      const directory = asRecord(rec.location)?.directory;
+      return typeof directory === "string" && directory
+        ? `Switched to ${directory}`
+        : undefined;
+    }
+    case "system":
+    case "synthetic":
+      return stringField(rec, "text");
+    default:
+      return undefined;
+  }
+}
+
+/** `Model.Ref` is `providerID` plus `id`; the TUI shows the model name alone. */
+function v2ModelLabel(model: Record<string, unknown> | null): string | undefined {
+  const id = stringField(model, "id");
+  if (!id) return undefined;
+  // `id` is the model on its own, but a server that echoes the catalog's
+  // `provider/model` slug would otherwise print the provider twice.
+  const name = id.includes("/") ? id.slice(id.indexOf("/") + 1) : id;
+  const variant = stringField(model, "variant");
+  return variant ? `${name} ${variant}` : name;
 }
 
 function v2UserParts(
@@ -349,17 +406,137 @@ function v2ToolError(value: unknown): string {
   );
 }
 
+/** Stable id for a streamed block: V2 names it by position, not by id. */
+function v2PartId(data: Record<string, unknown>, fallback: string): string {
+  const messageID = stringField(data, "assistantMessageID");
+  const ordinal = data.ordinal;
+  if (messageID != null && typeof ordinal === "number") {
+    return `${messageID}:${ordinal}`;
+  }
+  const id = stringField(data, "id");
+  return id ? `${messageID ?? "part"}:${id}` : `${messageID ?? "part"}:${fallback}`;
+}
+
+/**
+ * A streamed block, as the `message.part.*` events V1 used. `*.delta` is
+ * ephemeral and live-only; `*.ended` and the tool terminals are durable and
+ * replay on resume, so a resumed turn is rebuilt from those alone.
+ */
+function v2PartEvent(
+  type: string,
+  data: Record<string, unknown>,
+): { type: string; properties: Record<string, unknown> } | "drop" | null {
+  const kind =
+    type.startsWith("session.text.") || type.startsWith("session.reasoning.")
+      ? type.startsWith("session.reasoning.")
+        ? "reasoning"
+        : "text"
+      : type.startsWith("session.tool.")
+        ? "tool"
+        : null;
+  if (!kind) return null;
+
+  const messageID = stringField(data, "assistantMessageID");
+  if (type.endsWith(".started")) {
+    // Nothing to render yet; the pipeline keys its own state off the part id,
+    // so an empty shell would only cost a map entry and a log line.
+    return "drop";
+  }
+
+  if (type.endsWith(".delta")) {
+    return {
+      type: "message.part.delta",
+      properties: {
+        partID: v2PartId(data, "delta"),
+        delta: typeof data.delta === "string" ? data.delta : "",
+        ...(messageID ? { messageID } : {}),
+      },
+    };
+  }
+
+  if (type.endsWith(".ended")) {
+    return {
+      type: "message.part.updated",
+      properties: {
+        part: {
+          id: v2PartId(data, kind),
+          type: kind,
+          messageID,
+          text: typeof data.text === "string" ? data.text : undefined,
+        },
+      },
+    };
+  }
+
+  // Tool terminals. V2 splits input from result, so a running tool arrives on
+  // `called` and its outcome on `success` or `failed`, each carrying the state
+  // the pipeline reads.
+  const status =
+    type === "session.tool.failed"
+      ? "error"
+      : type === "session.tool.progress"
+        ? "running"
+        : type === "session.tool.success"
+          ? "completed"
+          : "running";
+  const part: Record<string, unknown> = {
+    id: v2PartId(data, "tool"),
+    type: "tool",
+    messageID,
+    tool: stringField(data, "name"),
+    callID: stringField(data, "id"),
+    state: {
+      status,
+      ...(data.input !== undefined ? { input: data.input } : {}),
+      ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),
+      ...(status === "completed" ? { output: v2ToolContentText(data.content) } : {}),
+      ...(status === "error" ? { error: v2ToolError(data.error) } : {}),
+    },
+  };
+  return { type: "message.part.updated", properties: { part } };
+}
+
+/** Server narration V2 reports as its own events rather than as content. */
+function v2NoticeEvent(
+  type: string,
+  data: Record<string, unknown>,
+): string | undefined {
+  if (type === "session.agent.selected") {
+    const agent = stringField(data, "agent");
+    return agent ? `Switched agent to ${agent}` : undefined;
+  }
+  if (type === "session.model.selected") {
+    const label = v2ModelLabel(asRecord(data.model));
+    return label ? `Switched model to ${label}` : undefined;
+  }
+  if (type === "session.synthetic") {
+    return stringField(data, "text");
+  }
+  if (type === "session.retry.scheduled") {
+    return stringField(asRecord(data.retry), "message");
+  }
+  if (type === "session.skill.activated") {
+    const skill = stringField(data, "skill");
+    return skill ? `Using skill ${skill}` : undefined;
+  }
+  return undefined;
+}
+
 /**
  * V2 event -> V1 event, or null to drop it.
  *
- * V2 frames the discriminator as an SSE `event:` name alongside an opaque
- * `V2EventEncoded` payload, so `type` may arrive on either; the client passes
- * the frame name as `frameType` and this prefers the payload's own field.
+ * V2's catalog is `session.*`, and the payload sits under `data` rather than
+ * V1's `properties`; both are read from the published V2 schema rather than
+ * inferred. Each event is translated into the V1 name and shape the session
+ * pipeline already routes on, so the pipeline stays single-generation.
  *
- * V2's event catalog is still beta and not enumerated in the published
- * contract, so unknown types pass through untouched: `opencode.ts` ignores
- * what it does not know, and a future rename is a logging change rather than a
- * rewrite. Only the renames the contract does pin down are applied here.
+ * V2 also splits a streamed block across `*.started` / `*.delta` / `*.ended`
+ * and identifies a block by `(assistantMessageID, ordinal)`, where V1 carried
+ * a `partID`. The synthesis below is what gives the pipeline a stable id to key
+ * its per-block state on.
+ *
+ * The SSE frame name is a fallback: the payload carries `type` too, and the
+ * payload wins when both are present.
  */
 export function normalizeV2Event(
   event: Record<string, unknown>,
@@ -368,11 +545,14 @@ export function normalizeV2Event(
   const own = stringField(event, "type");
   const type = own ?? frameType;
   if (!type) return null;
-  const properties = asRecord(event.properties) ?? {};
+  // V2 frames the payload under `data`. Anything already shaped like a V1
+  // event is passed through so a server that speaks both is not mangled.
+  const data = asRecord(event.data) ?? {};
+  const properties = asRecord(event.properties) ?? data;
 
   // V2 replaced the question routes with Forms, so a pending form is what a V1
-  // question ask means. The event name for it is not part of the published
-  // contract, so detect it by the Form.Info shape instead of by name.
+  // question ask means. Detected by the Form.Info shape, since the event that
+  // carries one is not named in the schema.
   const form = v2FormFromProperties(event, properties);
   if (form) {
     return {
@@ -386,46 +566,80 @@ export function normalizeV2Event(
     };
   }
 
-  if (type === "message.updated") {
-    // V2 puts the role in `type` and the turn body in `content`; the pipeline
-    // reads V1's `role` and `parts`. Applied by shape so it holds whatever the
-    // event ends up being called.
-    const info = asRecord(properties.info);
-    const message = info ? fromV2Message(info) : null;
-    if (message) {
+  const part = v2PartEvent(type, properties);
+  // A `*.started` event opens a block but carries nothing to render. Dropping
+  // it is deliberate rather than a fall-through, so it does not reach the
+  // pipeline's ignore-and-log path on every block of every turn.
+  if (part === "drop") return null;
+  if (part) return { ...event, type: part.type, properties: { ...properties, ...part.properties } };
+
+  const notice = v2NoticeEvent(type, properties);
+  if (notice) return { ...event, type: "message.updated", properties: { ...properties, info: { systemNotice: notice } } };
+
+  switch (type) {
+    case "session.message.content.updated": {
+      // V2 puts the role in `type` and the turn body in `content`; the pipeline
+      // reads V1's `role` and `parts`.
+      const message = fromV2Message(asRecord(properties.info));
+      if (!message) return null;
       return {
         ...event,
-        type,
+        type: "message.updated",
         properties: { ...properties, info: message.info, parts: message.parts },
       };
     }
+    case "session.execution.succeeded":
+    case "session.execution.interrupted":
+      // The turn is over. V1 signalled this with `session.idle`.
+      return { ...event, type: "session.idle", properties };
+    case "session.execution.failed":
+      return {
+        ...event,
+        type: "session.error",
+        properties: { ...properties, error: properties.error },
+      };
+    case "session.usage.updated":
+    case "session.usage.recorded":
+      // Usage rides on the message in V1. Forwarded as a message-shaped event
+      // so the context and token meters keep reading it where they already do.
+      return {
+        ...event,
+        type: "message.updated",
+        properties: {
+          ...properties,
+          info: {
+            id: stringField(properties, "assistantMessageID") ?? "",
+            role: "assistant",
+            tokens: properties.tokens,
+          },
+        },
+      };
+    case "permission.asked": {
+      // V2 renamed the request's `permission` to `action` and `patterns` to the
+      // `resources` array.
+      const action = stringField(properties, "action");
+      const resources = Array.isArray(properties.resources)
+        ? properties.resources.filter(
+            (item): item is string => typeof item === "string",
+          )
+        : undefined;
+      return {
+        ...event,
+        type,
+        properties: {
+          ...properties,
+          ...(action ? { permission: toV1PermissionAction(action) } : {}),
+          ...(resources ? { patterns: resources } : {}),
+        },
+      };
+    }
+    case "question.asked":
+      // V2 has no question route to reply on, so a bare V1-shaped ask is
+      // dropped rather than routed at a form endpoint it does not belong to.
+      return null;
+    default:
+      return { ...event, type, properties };
   }
-
-  if (type === "permission.asked") {
-    // V2 renamed the request's `permission` to `action` and `patterns` to the
-    // `resources` array.
-    const action = stringField(properties, "action");
-    const resources = Array.isArray(properties.resources)
-      ? properties.resources.filter(
-          (item): item is string => typeof item === "string",
-        )
-      : undefined;
-    return {
-      ...event,
-      type,
-      properties: {
-        ...properties,
-        ...(action ? { permission: toV1PermissionAction(action) } : {}),
-        ...(resources ? { patterns: resources } : {}),
-      },
-    };
-  }
-  if (type === "question.asked") {
-    // V2 has no question route to reply on, so a bare V1-shaped ask is dropped
-    // rather than routed at a form endpoint it does not belong to.
-    return null;
-  }
-  return { ...event, type, properties };
 }
 
 /** Locates a pending Form.Info anywhere in an event's envelope. */

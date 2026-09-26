@@ -10,6 +10,7 @@ import {
   buildOpenCodePermissionRules,
 } from "./opencodeProtocol";
 import type { OpenCodeProtocol } from "./opencodeProtocol";
+import { SERVE_PASSWORD } from "./harnessContract";
 import {
   buildV2DenyAllRules,
   buildV2FormAnswer,
@@ -144,7 +145,10 @@ export function createOpenCodeClient(
 
 /** V2's Basic auth user is the fixed literal `opencode`. */
 export function openCodeBasicAuth(password: string): string {
-  return `Basic ${toBase64(`opencode:${password}`)}`;
+  // The scheme and username come from the contract, because both are the
+  // server's requirement rather than this client's preference, and getting
+  // either wrong is a 401 on every route including the read-only catalog.
+  return `${SERVE_PASSWORD.scheme} ${toBase64(`${SERVE_PASSWORD.user}:${password}`)}`;
 }
 
 function toBase64(value: string): string {

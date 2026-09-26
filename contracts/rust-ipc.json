@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "description": "Canonical contract for the Rust <-> TypeScript boundary inside the MonoCode app. Both sides read this file; neither keeps its own copy. The provider (Rust, src-tauri) has it compiled in via include_str!, so a change here requires a Rust rebuild. The consumer (TypeScript, src) imports it. `npm run check` fails if either side drifts.",
+  "why": "Four defects in one release cycle came from the two sides disagreeing about this boundary with no shared definition and no test spanning it: a dropped SSE `event:` field, an argument vector the backend refused, a per-process server password the frontend never sent, and a working directory the frontend mistook for a chosen project. Each was a contract disagreement, not a logic error in either language.",
+
+  "boundaries": {
+    "harness_exec": {
+      "provider": "src-tauri/src/contract.rs",
+      "consumers": [
+        "src/lib/harness/claudeCatalog.ts",
+        "src/lib/harness/cursorCatalog.ts",
+        "src/lib/harness/fxCatalog.ts",
+        "src/lib/harness/grokCatalog.ts",
+        "src/lib/harness/opencode.ts",
+        "src/lib/harness/opencodeCatalog.ts",
+        "src/lib/harness/opencodeText.ts"
+      ],
+      "guarantee": "Every argument vector the frontend passes to harness_exec must appear verbatim in allowed_args. The backend rejects anything else and the request fails; it never coerces, truncates, or passes through an unlisted vector. Vectors are compared element by element and are order- and length-sensitive.",
+      "allowed_args": [
+        ["--version"],
+        ["--list-models"],
+        ["models", "--verbose"],
+        ["models", "--json"],
+        ["models"],
+        ["status", "--json"],
+        ["agent", "list"],
+        ["api", "get", "/api/model"],
+        ["api", "get", "/api/agent"]
+      ],
+      "notes": "The two `api get` entries exist because V2 dropped the `models` and `agent list` subcommands, so its catalog is read from the server API. GET only, on two read-only routes: anything that could write, or reach outside loopback, stays off this list by design, not by oversight. A V1-only tuple may be removed from this list only alongside a test proving no consumer still sends it."
+    },
+
+    "harness_sse_open": {
+      "provider": "src-tauri/src/harness.rs",
+      "consumers": ["src/lib/harness/child.ts", "src/lib/harness/opencodeClient.ts"],
+      "guarantee": "Each frame is delivered as a (name, data) pair. `name` is the SSE `event:` field verbatim, or null when the frame carried none. `data` is every `data:` line of the frame joined with newlines and left undecoded, so the consumer parses it. A frame is emitted only when a blank line closes it and at least one `data:` line was seen. Comment lines and keep-alives emit nothing, and a dataless frame's name never leaks into the following frame.",
+      "frame": {
+        "name": "string | null",
+        "data": "string"
+      },
+      "notes": "`name` is not decoration. V2 carries the event discriminator in the SSE `event:` field as well as in the payload, and the consumer falls back to it when a payload omits its own `type`. Dropping it silently disables every event that relies on the frame name."
+    },
+
+    "default_cwd": {
+      "provider": "src-tauri/src/lib.rs",
+      "consumers": ["src/app/useSessions.ts", "src/app/useSessionSync.ts"],
+      "guarantee": "A starting-directory suggestion for a new session. It is the process working directory, unless that is the app's own install directory, in which case it is the user's home. It is never the literal string `~` unless no home directory could be resolved at all.",
+      "is_not": "a project the user chose. A caller must not add this value to the project list, the recent-projects store, or the project rail on the user's behalf. Offering it as a default for a new session is the whole of its meaning.",
+      "notes": "Returning the install directory is what put a phantom `bin` project in a user's sidebar that they had never added. The guard that prevents it lives in the provider; the consumer's obligation not to persist the value is what makes the guard load-bearing."
+    },
+
+    "serve_password": {
+      "provider": "src-tauri/src/harness.rs",
+      "consumers": ["src/lib/harness/opencodeClient.ts", "src/lib/harness/opencode.ts"],
+      "guarantee": "OpenCode V2's `serve` prints one password per process. The provider extracts it from the child's output; the consumer must send it on every request as HTTP Basic auth with the literal username below. V1 prints no password, and its absence means no Authorization header is sent.",
+      "scheme": "Basic",
+      "user": "opencode",
+      "notes": "V2 requires this credential on every route including the read-only catalog calls, so a client that resolves the endpoint but drops the password gets a 401 on its first model fetch. Absence must be distinguishable from an empty password: an empty string is not a valid credential."
+    }
+  }
+}

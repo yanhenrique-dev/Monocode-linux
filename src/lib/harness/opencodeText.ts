@@ -16,6 +16,7 @@ import {
   parseServerUrlFromOutput,
   type OpenCodeProtocol,
 } from "./opencodeProtocol";
+import { HARNESS_EXEC } from "./harnessContract";
 
 const TEXT_CHILD_ID = "monocode-opencode-text";
 const SERVER_TIMEOUT_MS = 30_000;
@@ -103,7 +104,7 @@ async function startLive(
   model: { providerID: string; modelID: string },
 ): Promise<LiveText> {
   const { path } = await resolveOpenCodeBinary();
-  const versionOut = await execChild(path, ["--version"], cwd).catch(() => "");
+  const versionOut = await execChild(path, HARNESS_EXEC.version, cwd).catch(() => "");
   let protocol: OpenCodeProtocol;
   try {
     ({ protocol } = assertSupportedOpenCodeRelease(versionOut));

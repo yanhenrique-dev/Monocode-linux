@@ -66,6 +66,7 @@ import {
   type UserQuestion,
   type UserQuestionReply,
 } from "../userQuestion";
+import { HARNESS_EXEC } from "./harnessContract";
 
 type PendingApproval = {
   id: string;
@@ -656,6 +657,14 @@ async function handleEvent(
   switch (type) {
     case "message.updated": {
       const info = asRecord(properties.info);
+      // A switch or narration message is the server telling the turn what
+      // changed. It has no content of its own, so it is surfaced as a status
+      // line instead of falling through to the assistant-text path.
+      const notice = stringField(info, "systemNotice");
+      if (notice) {
+        live.onEvent({ type: "status", text: notice });
+        break;
+      }
       const id = stringField(info, "id");
       const role = stringField(info, "role");
       const agent = stringField(info, "agent");
@@ -1383,7 +1392,7 @@ async function assertOpenCodeVersion(
   path: string,
   cwd: string,
 ): Promise<{ version: string; protocol: OpenCodeProtocol }> {
-  const output = await execChild(path, ["--version"], cwd).catch(() => "");
+  const output = await execChild(path, HARNESS_EXEC.version, cwd).catch(() => "");
   return assertSupportedOpenCodeRelease(output);
 }
 

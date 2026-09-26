@@ -15,6 +15,7 @@ import {
   sortOpenCodeVariants,
   titleCaseSlug,
 } from "./opencodeProtocol";
+import { HARNESS_EXEC } from "./harnessContract";
 
 const SLUG_LINE_RE = /^(\S+\/\S+)\s*$/;
 const AGENT_HEADER_RE = /^(.+)\s+\((\S+)\)\s*$/;
@@ -113,7 +114,7 @@ export function refreshOpenCodeCatalog(): Promise<void> {
 async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   const { path } = await resolveOpenCodeBinary();
   const cwd = await homeDir();
-  const versionOut = await execChild(path, ["--version"], cwd);
+  const versionOut = await execChild(path, HARNESS_EXEC.version, cwd);
   // Throws for undeterminable output and old V1; V2 passes on protocol.
   const { protocol } = assertSupportedOpenCodeRelease(versionOut);
 
@@ -127,7 +128,7 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
 
   const modelsOut = await execChild(
     path,
-    ["models", "--verbose"],
+    HARNESS_EXEC.modelsVerbose,
     cwd,
   ).catch(() => "");
   let parsed =
@@ -137,12 +138,12 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   if (parsed.connected.length === 0) {
     const plainOut = looksLikePlainSlugList(modelsOut)
       ? modelsOut
-      : await execChild(path, ["models"], cwd).catch(() => "");
+      : await execChild(path, HARNESS_EXEC.models, cwd).catch(() => "");
     if (plainOut.trim()) parsed = parseModelsCliOutput(plainOut);
   }
   let agents: OpenCodeAgent[] = [];
   try {
-    const agentsOut = await execChild(path, ["agent", "list"], cwd);
+    const agentsOut = await execChild(path, HARNESS_EXEC.agentList, cwd);
     agents = parseAgentListCliOutput(agentsOut);
   } catch (error) {
     console.debug("[monocode] opencode agents", error);
@@ -166,7 +167,7 @@ async function discoverOpenCodeModelsV2(
   path: string,
   cwd: string,
 ): Promise<AgentModel[]> {
-  const modelsOut = await execChild(path, ["api", "get", "/api/model"], cwd).catch(
+  const modelsOut = await execChild(path, HARNESS_EXEC.apiGetModel, cwd).catch(
     () => "",
   );
   const parsed = parseV2ModelApiOutput(modelsOut);
@@ -174,7 +175,7 @@ async function discoverOpenCodeModelsV2(
   try {
     const agentsOut = await execChild(
       path,
-      ["api", "get", "/api/agent"],
+      HARNESS_EXEC.apiGetAgent,
       cwd,
     );
     agents = parseV2AgentApiOutput(agentsOut);

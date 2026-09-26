@@ -30,6 +30,7 @@ import {
   parseJsonLine,
   stringField,
 } from "./claudeProtocol";
+import { HARNESS_EXEC } from "./harnessContract";
 
 const EFFORT_LOW_TO_ULTRATHINK: ModelSetting = {
   id: "effort",
@@ -303,7 +304,7 @@ async function discoverViaListModels(): Promise<AgentModel[]> {
 async function discoverViaVersion(): Promise<AgentModel[]> {
   const { path } = await resolveClaudeBinary();
   const cwd = await homeDir();
-  const versionOut = await execChild(path, ["--version"], cwd);
+  const versionOut = await execChild(path, HARNESS_EXEC.version, cwd);
   const version = parseClaudeVersion(versionOut);
   return modelsForClaudeVersion(version);
 }
