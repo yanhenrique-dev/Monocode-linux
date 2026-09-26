@@ -3,10 +3,13 @@ import {
   loadTranscriptLayout,
   loadTranscriptAnchor,
   loadTasksPill,
+  loadTasksLoadingStyle,
+  saveTasksLoadingStyle,
   saveTranscriptLayout,
   saveTranscriptAnchor,
   saveTasksPill,
   TRANSCRIPT_ANCHOR_CHANGE_EVENT,
+  type TasksLoadingStyle,
   type TranscriptLayout,
 } from "../../../lib/appearance";
 import { useLocale } from "../../../lib/locale";
@@ -30,6 +33,8 @@ export function ChatPage() {
   const [transcriptAnchor, setTranscriptAnchor] =
     useState(loadTranscriptAnchor);
   const [tasksPill, setTasksPill] = useState(loadTasksPill);
+  const [tasksLoadingStyle, setTasksLoadingStyle] =
+    useState<TasksLoadingStyle>(loadTasksLoadingStyle);
   const [followUpBehavior, setFollowUpBehavior] =
     useState<FollowUpBehavior>(loadFollowUpBehavior);
   const [modelControls, setModelControls] =
@@ -60,6 +65,11 @@ export function ChatPage() {
   const onTasksPill = (next: boolean) => {
     saveTasksPill(next);
     setTasksPill(next);
+  };
+
+  const onTasksLoadingStyle = (next: TasksLoadingStyle) => {
+    saveTasksLoadingStyle(next);
+    setTasksLoadingStyle(next);
   };
 
   const onFollowUpBehavior = (next: FollowUpBehavior) => {
@@ -172,6 +182,27 @@ export function ChatPage() {
               },
             ]}
             onChange={onModelControls}
+          />
+        </Row>
+        <Row
+          id="tasks-loading-style"
+          label={t("settings.chat.tasks_loading.label")}
+          description={t("settings.chat.tasks_loading.description")}
+        >
+          <Segmented
+            label={t("settings.chat.tasks_loading.selector")}
+            value={tasksLoadingStyle}
+            options={[
+              {
+                value: "classic",
+                label: t("settings.chat.tasks_loading.classic"),
+              },
+              {
+                value: "square",
+                label: t("settings.chat.tasks_loading.square"),
+              },
+            ]}
+            onChange={onTasksLoadingStyle}
           />
         </Row>
       </Group>

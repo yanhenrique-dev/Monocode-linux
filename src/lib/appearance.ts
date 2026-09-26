@@ -21,6 +21,7 @@ const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
 const TASKS_PILL_KEY = "monocode.tasksPill";
+const TASKS_LOADING_STYLE_KEY = "monocode.tasksLoadingStyle";
 const EXPERIMENTAL_ANIMATIONS_KEY = "monocode.experimentalAnimations";
 const CHAT_BACKGROUND_PATH_KEY = "monocode.chatBackgroundPath";
 const CHAT_BACKGROUND_OPACITY_KEY = "monocode.chatBackgroundOpacity";
@@ -41,6 +42,7 @@ export const CHAT_BACKGROUND_BLUR_CHANGE_EVENT =
 export type ColorScheme = "dark" | "light";
 export type ThemePreference = ColorScheme | "system";
 export type TranscriptLayout = "full" | "chat";
+export type TasksLoadingStyle = "classic" | "square";
 export type ChatBackgroundScope = "empty" | "all";
 export type NewThreadBackgroundEffect =
   | "none"
@@ -92,6 +94,12 @@ export const TASKS_PILL_DEFAULT = true;
 
 /** Fired on `window` whenever the tasks pill flips (detail: boolean). */
 export const TASKS_PILL_CHANGE_EVENT = "monocode:taskspillchange";
+
+export const TASKS_LOADING_STYLE_DEFAULT: TasksLoadingStyle = "square";
+
+/** Fired on `window` whenever the tasks loading style flips (detail: TasksLoadingStyle). */
+export const TASKS_LOADING_STYLE_CHANGE_EVENT =
+  "monocode:tasksloadingstylechange";
 
 /**
  * Fired on `window` when a fullscreen overlay (settings/search/inbox/notes)
@@ -961,6 +969,35 @@ export function saveTasksPill(value: boolean) {
   window.dispatchEvent(
     new CustomEvent<boolean>(TASKS_PILL_CHANGE_EVENT, {
       detail: value,
+    }),
+  );
+}
+
+function isTasksLoadingStyle(value: unknown): value is TasksLoadingStyle {
+  return value === "classic" || value === "square";
+}
+
+export function loadTasksLoadingStyle(): TasksLoadingStyle {
+  try {
+    const raw = localStorage.getItem(TASKS_LOADING_STYLE_KEY);
+    return isTasksLoadingStyle(raw) ? raw : TASKS_LOADING_STYLE_DEFAULT;
+  } catch {
+    return TASKS_LOADING_STYLE_DEFAULT;
+  }
+}
+
+export function saveTasksLoadingStyle(value: TasksLoadingStyle) {
+  const next = isTasksLoadingStyle(value) ? value : TASKS_LOADING_STYLE_DEFAULT;
+  try {
+    localStorage.setItem(TASKS_LOADING_STYLE_KEY, next);
+  } catch {
+    // private mode / quota
+    return;
+  }
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<TasksLoadingStyle>(TASKS_LOADING_STYLE_CHANGE_EVENT, {
+      detail: next,
     }),
   );
 }

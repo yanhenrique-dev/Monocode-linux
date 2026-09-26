@@ -1,4 +1,6 @@
-import { Check, ListEnd, LoaderCircle, Minus } from "./icons";
+import { Check, LoaderCircle, Minus } from "./icons";
+import { TraceLoader } from "./TraceLoader";
+import { useTasksLoadingStyle } from "../hooks/useTasksLoadingStyle";
 import type { TaskListItem, TaskListItemStatus } from "../lib/session";
 import { taskListProgressLabel } from "../lib/taskList";
 
@@ -14,10 +16,6 @@ export function TaskListPreview({ items, explanation }: Props) {
       className="mb-2 overflow-hidden rounded-[10px] border border-content/10 bg-content/[0.035]"
     >
       <div className="flex items-start gap-2 border-b border-stroke px-2.5 py-2">
-        <ListEnd
-          className="mt-0.5 size-4 shrink-0 text-content/45"
-          strokeWidth={1.75}
-        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-mono text-[12px] font-medium text-content/85">
@@ -62,6 +60,7 @@ export function TaskListPreview({ items, explanation }: Props) {
 }
 
 function TaskState({ status }: { status: TaskListItemStatus }) {
+  const loadingStyle = useTasksLoadingStyle();
   if (status === "completed") {
     return (
       <span
@@ -78,7 +77,11 @@ function TaskState({ status }: { status: TaskListItemStatus }) {
         aria-label="In progress"
         className="mt-px grid size-4 shrink-0 place-items-center text-sky-300"
       >
-        <LoaderCircle className="size-4 motion-safe:animate-spin" />
+        {loadingStyle === "square" ? (
+          <TraceLoader className="size-4" />
+        ) : (
+          <LoaderCircle className="size-4 motion-safe:animate-spin" />
+        )}
       </span>
     );
   }

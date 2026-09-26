@@ -2571,8 +2571,9 @@ function SubagentPanel({
 }
 
 /**
- * A native trace leads active runs. Settled runs keep their name-hashed mascot,
- * so two agents in a row remain distinct across a session.
+ * O mascote lidera runs ativas e assentadas. Ativas ganham cor determinística
+ * e animação de fala; assentadas mantêm mascote com nome-hashed, assim dois
+ * agentes em sequência seguem distintos na sessão.
  */
 function SubagentMascot({
   name,
@@ -2585,41 +2586,6 @@ function SubagentMascot({
   active?: boolean;
   color?: string;
 }) {
-  if (active) {
-    return (
-      <svg
-        aria-hidden="true"
-        className="size-4 shrink-0 text-content/70"
-        style={color ? { color } : undefined}
-        data-loading-indicator="trace"
-        fill="none"
-        focusable="false"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        viewBox="0 0 20 20"
-      >
-        <rect
-          height="17.5"
-          rx="4"
-          width="17.5"
-          x="1.25"
-          y="1.25"
-          opacity="0.2"
-        />
-        <rect
-          className="zen-trace-dash"
-          height="17.5"
-          rx="4"
-          width="17.5"
-          x="1.25"
-          y="1.25"
-          strokeDasharray="16 47.133"
-          strokeLinecap="butt"
-        />
-      </svg>
-    );
-  }
-
   return (
     <ProjectMascot
       project={name}
