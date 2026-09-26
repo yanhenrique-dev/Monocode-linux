@@ -8,11 +8,11 @@ import {
   __resetSettingsStore,
   getSettings,
   lastWritePersisted,
+  updateGeneral,
   hydrateSettings,
   SETTINGS_CHANGE_EVENT,
   subscribeSettings,
   updateAppearance,
-  updateSettings,
 } from "./store";
 import { readBootMirror } from "./bootMirror";
 import { DEFAULT_SETTINGS } from "./schema";
@@ -139,17 +139,19 @@ describe("native writes", () => {
   });
 
   it("sends the fields the Rust struct actually has", async () => {
+    // `diagnostics.debugScopes` used to be asserted here, and the payload
+    // carried whatever the store happened to hold -- which was never the app's
+    // real debug setting, because nothing writes a scopes array. The app's
+    // switch is the single `monocode.debug` flag. The field is unclaimed until
+    // something owns it; claimedFields.test.ts guards that.
     vi.useFakeTimers();
-    updateSettings({ debugScopes: ["harness"] });
+    updateGeneral({ locale: "pt-BR" });
     vi.advanceTimersByTime(200);
     await vi.runAllTimersAsync();
     const [, payload] = invoke.mock.calls[0] as [string, { settings: unknown }];
     expect(payload.settings).toMatchObject({
       schema: 1,
-      prefs: {
-        general: { locale: "en" },
-        diagnostics: { debugScopes: ["harness"] },
-      },
+      prefs: { general: { locale: "pt-BR" } },
       view: { settingsSection: "general" },
       runtime: { lastUpdateCheck: 0 },
     });

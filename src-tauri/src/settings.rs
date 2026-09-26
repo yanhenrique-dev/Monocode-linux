@@ -550,7 +550,26 @@ mod tests {
     /// shape being agreed on in prose: `sidebarOpacity` was sent as a 0..1
     /// alpha ratio into a `u8` percent field, which serde cannot deserialize,
     /// and the TS default was the percent `85` where the app means `0.85`.
+    /// What `toWire` in `src/lib/settings/store.ts` sends today.
+    ///
+    /// `prefs.chat` and `prefs.diagnostics` are absent on purpose: no code
+    /// owns those values yet, and the store serialises the whole object, so
+    /// sending a default for a setting the user actually changed would write
+    /// the wrong value over the right one. They come back when they have an
+    /// owner; `TS_PAYLOAD_WITH_PENDING_FIELDS` covers that shape so the field
+    /// names stay pinned either way.
     const TS_PAYLOAD: &str = r#"{
+        "schema": 1,
+        "prefs": {
+            "general": { "locale": "pt-BR" },
+            "appearance": { "colorScheme": "dark", "themeHue": 210, "sidebarOpacity": 85 }
+        },
+        "view": { "projectRailOpen": true, "settingsSection": "general", "sidebarTabOrder": [] },
+        "runtime": { "lastUpdateCheck": 0 }
+    }"#;
+
+    /// The same payload once `nextSteps` and `debugScopes` have an owner.
+    const TS_PAYLOAD_WITH_PENDING_FIELDS: &str = r#"{
         "schema": 1,
         "prefs": {
             "general": { "locale": "pt-BR" },
@@ -567,7 +586,6 @@ mod tests {
         "view": { "projectRailOpen": true, "settingsSection": "general", "sidebarTabOrder": [] },
         "runtime": { "lastUpdateCheck": 0 }
     }"#;
-
     #[test]
     fn accepts_the_payload_the_typescript_side_sends() {
         let settings: Settings =
@@ -576,16 +594,22 @@ mod tests {
         assert_eq!(settings.prefs.general.locale, "pt-BR");
         assert_eq!(settings.prefs.appearance.theme_hue, 210);
         assert_eq!(settings.prefs.appearance.sidebar_opacity, 85);
+        assert!(settings.view.project_rail_open);
+        assert_eq!(settings.view.settings_section, "general");
+        assert_eq!(settings.runtime.last_update_check, 0);
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn accepts_next_steps_and_debug_scopes_once_they_have_an_owner() {
+        let settings: Settings = serde_json::from_str(TS_PAYLOAD_WITH_PENDING_FIELDS)
+            .expect("the pending fields must deserialize when they arrive");
         assert!(settings.prefs.chat.next_steps.enabled);
         assert!(!settings.prefs.chat.next_steps.suggest);
         assert!(settings.prefs.chat.next_steps.actions.jump_to_bottom);
         assert!(settings.prefs.chat.next_steps.actions.search_transcript);
         assert!(!settings.prefs.chat.next_steps.actions.review_changes);
         assert_eq!(settings.prefs.diagnostics.debug_scopes, ["harness"]);
-        assert!(settings.view.project_rail_open);
-        assert_eq!(settings.view.settings_section, "general");
-        assert_eq!(settings.runtime.last_update_check, 0);
-        assert!(settings.validate().is_ok());
     }
 
     #[test]

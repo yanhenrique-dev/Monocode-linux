@@ -6,6 +6,7 @@ import {
   type AppearanceSettings,
   type AppSettings,
   type ColorScheme,
+  type GeneralSettings,
   type Locale,
 } from "./schema";
 
@@ -111,6 +112,11 @@ export function updateAppearance(
   return updateSettings({ appearance: { ...current.appearance, ...patch } });
 }
 
+/** General-only, so a language change merges rather than replacing the group. */
+export function updateGeneral(patch: Partial<GeneralSettings>): AppSettings {
+  return updateSettings({ general: { ...current.general, ...patch } });
+}
+
 function scheduleNativeWrite(): void {
   nativeDirty = true;
   if (nativeTimer != null) return;
@@ -149,20 +155,18 @@ function toWire(settings: AppSettings): unknown {
         // each in the units they were written for.
         sidebarOpacity: Math.round(settings.appearance.sidebarOpacity * 100),
       },
-      chat: {
-        nextSteps: {
-          enabled: settings.experimental.nextSteps.enabled,
-          suggest: settings.experimental.nextSteps.suggest,
-          actions: {
-            jumpToBottom: settings.experimental.nextSteps.actions.jumpToBottom,
-            searchTranscript:
-              settings.experimental.nextSteps.actions.searchTranscript,
-            reviewChanges:
-              settings.experimental.nextSteps.actions.reviewChanges,
-          },
-        },
-      },
-      diagnostics: { debugScopes: settings.debugScopes },
+      // `chat.nextSteps` and `diagnostics.debugScopes` are deliberately absent.
+      // A field in this payload is a claim that the file carries the truth
+      // about it, and the store serialises the whole object, so claiming one
+      // that nothing maintains means every save writes the default back over
+      // the user's real setting.
+      //
+      // On this branch the app keeps nextSteps as { enabled, count }; the shape
+      // the store models -- a `suggest` toggle plus three named actions --
+      // arrives with the Experimental settings section. The app's only debug
+      // switch is the single `monocode.debug` flag in logger.ts, and nothing
+      // writes a scopes array. Both are claimed once they have an owner, and
+      // claimedFields.test.ts holds the line until then.
     },
     view: {
       projectRailOpen: settings.appearance.projectRailOpen,

@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { updateGeneral } from "./settings/store";
 
 export type Locale = "en" | "pt-BR";
 
@@ -57,6 +58,9 @@ export function saveLocale(value: Locale): Locale {
   } catch {
     // private mode / quota
   }
+  // The store serialises the whole object on its next save, so a language it
+  // does not know about is a language it writes back at its default.
+  updateGeneral({ locale: next });
   return next;
 }
 
