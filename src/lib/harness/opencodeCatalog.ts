@@ -24,11 +24,15 @@ type OpenCodeModelJson = {
   /** V2 native name for `id`. */
   modelID?: string;
   name?: string;
+  /** Only the V2 API carries this; the CLI prints `provider/model` slugs. */
+  providerID?: string;
   /** V1 object map; V2 uses an array with an `id` (or `name`) per entry. */
   variants?: Record<string, unknown> | { id?: unknown; name?: unknown }[];
   /** V1 `"deprecated"` status / V2 `disabled` both mean skip. */
   status?: string;
   disabled?: boolean;
+  /** V2 reports availability as `enabled`; false means not selectable. */
+  enabled?: boolean;
   limit?: { context?: number; input?: number; output?: number };
 };
 
@@ -62,7 +66,11 @@ function normalizeOpenCodeModelJson(model: OpenCodeModelJson): void {
 }
 
 function isDisabledOpenCodeModel(model: OpenCodeModelJson): boolean {
-  return model.disabled === true || model.status === "deprecated";
+  return (
+    model.disabled === true ||
+    model.enabled === false ||
+    model.status === "deprecated"
+  );
 }
 
 type ParsedProvider = {
@@ -107,7 +115,15 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
   const cwd = await homeDir();
   const versionOut = await execChild(path, ["--version"], cwd);
   // Throws for undeterminable output and old V1; V2 passes on protocol.
-  assertSupportedOpenCodeRelease(versionOut);
+  const { protocol } = assertSupportedOpenCodeRelease(versionOut);
+
+  // V2 dropped the `models` and `agent list` subcommands, so the inventory
+  // comes from the server API instead. Going through `opencode api` keeps the
+  // CLI's own service discovery and authentication, which a spawned server
+  // would otherwise make this code responsible for.
+  if (protocol === "v2") {
+    return discoverOpenCodeModelsV2(path, cwd);
+  }
 
   const modelsOut = await execChild(
     path,
@@ -144,6 +160,123 @@ async function discoverOpenCodeModels(): Promise<AgentModel[]> {
     );
   }
   return models;
+}
+
+async function discoverOpenCodeModelsV2(
+  path: string,
+  cwd: string,
+): Promise<AgentModel[]> {
+  const modelsOut = await execChild(path, ["api", "get", "/api/model"], cwd).catch(
+    () => "",
+  );
+  const parsed = parseV2ModelApiOutput(modelsOut);
+  let agents: OpenCodeAgent[] = [];
+  try {
+    const agentsOut = await execChild(
+      path,
+      ["api", "get", "/api/agent"],
+      cwd,
+    );
+    agents = parseV2AgentApiOutput(agentsOut);
+  } catch (error) {
+    console.debug("[monocode] opencode v2 agents", error);
+  }
+  if (import.meta.env.DEV) {
+    console.debug(
+      `[monocode] opencode v2 catalog: ${[...parsed.providers.values()].reduce(
+        (total, provider) => total + Object.keys(provider.models).length,
+        0,
+      )} models, ${agents.length} agents`,
+    );
+  }
+  return flattenOpenCodeModels(parsed, agents);
+}
+
+/**
+ * `GET /api/model` returns `{ location, data: Model.Info[] }`. Each entry is a
+ * native V2 model, so it feeds the same normalizer as the verbose CLI output.
+ * The query is deliberately unscoped: asking for a project location can return
+ * an empty list, and a catalog is provider-level anyway.
+ */
+export function parseV2ModelApiOutput(stdout: string): {
+  providers: Map<string, ParsedProvider>;
+  connected: string[];
+} {
+  const providers = new Map<string, ParsedProvider>();
+  const data = apiDataArray(stdout);
+  for (const item of data) {
+    const model = asModelJson(item);
+    if (!model) continue;
+    normalizeOpenCodeModelJson(model);
+    if (isDisabledOpenCodeModel(model)) continue;
+    const providerID = canonicalOpenCodeProviderId(
+      typeof model.providerID === "string" ? model.providerID : "",
+    );
+    const modelID =
+      (typeof model.id === "string" ? model.id : "") ||
+      (typeof model.modelID === "string" ? model.modelID : "");
+    // V2 reports availability as `enabled`; a false one is not selectable.
+    if (!providerID || !modelID) continue;
+    if (item && typeof item === "object" && (item as { enabled?: unknown }).enabled === false) {
+      continue;
+    }
+    let provider = providers.get(providerID);
+    if (!provider) {
+      provider = {
+        id: providerID,
+        name: openCodeProviderName(providerID),
+        models: {},
+      };
+      providers.set(providerID, provider);
+    }
+    provider.models[modelID] = model;
+  }
+  return { providers, connected: [...providers.keys()] };
+}
+
+/**
+ * `GET /api/agent` returns `{ location, data: Agent.Info[] }`. The id is what
+ * the server accepts on the session routes; the display name is not a valid
+ * substitute (V2 rejects it), so the id is what MonoCode sends.
+ */
+export function parseV2AgentApiOutput(stdout: string): OpenCodeAgent[] {
+  return apiDataArray(stdout).flatMap((item) => {
+    const rec = asRecord(item);
+    const id = typeof rec?.id === "string" ? rec.id : "";
+    if (!id) return [];
+    const name = typeof rec?.name === "string" ? rec.name : id;
+    const mode = typeof rec?.mode === "string" ? rec.mode : "all";
+    const hidden =
+      rec?.hidden === true || KNOWN_HIDDEN_AGENTS.has(id) || KNOWN_HIDDEN_AGENTS.has(name);
+    return [{ name: id, mode, hidden }];
+  });
+}
+
+function apiDataArray(stdout: string): unknown[] {
+  const trimmed = stdout.trim();
+  if (!trimmed) return [];
+  // The CLI may print a progress line before the JSON body.
+  const start = trimmed.indexOf("{");
+  if (start < 0) return [];
+  try {
+    const parsed = asRecord(JSON.parse(trimmed.slice(start)));
+    const data = parsed?.data;
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asModelJson(value: unknown): OpenCodeModelJson | null {
+  const rec = asRecord(value);
+  if (!rec) return null;
+  return rec as OpenCodeModelJson;
 }
 
 export function parseModelsCliOutput(stdout: string): {

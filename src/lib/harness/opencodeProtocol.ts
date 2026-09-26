@@ -161,6 +161,21 @@ export function parseOpenCodeModelSlug(
   };
 }
 
+/**
+ * V2 `opencode serve` prints a per-process `server password` and then requires
+ * HTTP Basic auth on every request; without it each call answers 401. V1
+ * servers print no password.
+ */
+export function parseServerPasswordFromOutput(output: string): string | null {
+  for (const line of output.split("\n")) {
+    // Tolerate `server password <value>` and `server password: <value>`; the
+    // exact banner has changed across V2 builds.
+    const match = line.match(/server\s+password\s*:?\s*(\S+)/i);
+    if (match?.[1]) return match[1].replace(/[.,;]+$/, "");
+  }
+  return null;
+}
+
 export function parseServerUrlFromOutput(output: string): string | null {
   for (const line of output.split("\n")) {
     const trimmed = line.trim();

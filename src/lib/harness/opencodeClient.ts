@@ -125,14 +125,33 @@ export interface OpenCodeClient {
   closeEvents(sessionId: string): Promise<void>;
 }
 
+export type OpenCodeClientOptions = {
+  /** Per-process `server password` printed by `opencode serve` (V2 requires
+   * HTTP Basic auth on every request; V1 servers have no password). */
+  password?: string;
+};
+
 export function createOpenCodeClient(
   baseUrl: string,
   directory: string,
   protocol: OpenCodeProtocol,
+  options?: OpenCodeClientOptions,
 ): OpenCodeClient {
   return protocol === "v2"
-    ? new OpenCodeClientV2(baseUrl, directory)
-    : new OpenCodeClientV1(baseUrl, directory);
+    ? new OpenCodeClientV2(baseUrl, directory, options?.password)
+    : new OpenCodeClientV1(baseUrl, directory, options?.password);
+}
+
+/** V2's Basic auth user is the fixed literal `opencode`. */
+export function openCodeBasicAuth(password: string): string {
+  return `Basic ${toBase64(`opencode:${password}`)}`;
+}
+
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 
 class OpenCodeClientBase {
@@ -144,6 +163,8 @@ class OpenCodeClientBase {
   constructor(
     readonly baseUrl: string,
     readonly directory: string,
+    /** V2 serve password, sent as HTTP Basic auth. Absent for V1. */
+    readonly password?: string,
   ) {}
 
   /** Query parameters that scope the request to this session's directory. */
@@ -215,8 +236,11 @@ class OpenCodeClientBase {
   }
 
   protected headers(json = false): Record<string, string> {
+    const password = this.password?.trim();
     return {
       ...(json ? { "Content-Type": "application/json" } : {}),
+      // V2 answers 401 on every route without these credentials.
+      ...(password ? { Authorization: openCodeBasicAuth(password) } : {}),
       "x-opencode-directory": encodeURIComponent(this.directory),
     };
   }

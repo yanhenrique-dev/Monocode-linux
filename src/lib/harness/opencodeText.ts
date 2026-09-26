@@ -12,6 +12,7 @@ import { createOpenCodeClient, type OpenCodeClient } from "./opencodeClient";
 import {
   assertSupportedOpenCodeRelease,
   parseOpenCodeModelSlug,
+  parseServerPasswordFromOutput,
   parseServerUrlFromOutput,
   type OpenCodeProtocol,
 } from "./opencodeProtocol";
@@ -30,6 +31,7 @@ type LiveText = {
 let live: LiveText | null = null;
 let turns: Promise<void> = Promise.resolve();
 let serverUrl = "";
+let serverPassword = "";
 
 export async function stopOpenCodeTextPrompt(): Promise<void> {
   await dropLive();
@@ -112,19 +114,20 @@ async function startLive(
   }
 
   serverUrl = "";
+  serverPassword = "";
+  const readServerLine = (line: string) => {
+    const url = parseServerUrlFromOutput(line);
+    if (url) serverUrl = url;
+    const password = parseServerPasswordFromOutput(line);
+    if (password) serverPassword = password;
+  };
   watchChild(
     TEXT_CHILD_ID,
-    (line) => {
-      const parsed = parseServerUrlFromOutput(line);
-      if (parsed) serverUrl = parsed;
-    },
+    readServerLine,
     () => {
       if (live) live = null;
     },
-    (line) => {
-      const parsed = parseServerUrlFromOutput(line);
-      if (parsed) serverUrl = parsed;
-    },
+    readServerLine,
   );
 
   const port = await freeHarnessPort();
@@ -136,8 +139,18 @@ async function startLive(
   );
 
   try {
-    const url = await waitForUrl(() => serverUrl, SERVER_TIMEOUT_MS);
-    const client = createOpenCodeClient(url, cwd, protocol);
+    const endpoint = await waitForEndpoint(
+      () => serverUrl,
+      () => serverPassword,
+      SERVER_TIMEOUT_MS,
+      protocol,
+    );
+    const client = createOpenCodeClient(
+      endpoint.url,
+      cwd,
+      protocol,
+      endpoint.password ? { password: endpoint.password } : undefined,
+    );
     const created = await client.createSession({
       // These sessions only synthesize text (titles, commits, PR bodies), so
       // every tool is denied. The rules must be built per protocol: the V1
@@ -158,6 +171,14 @@ async function dropLive(): Promise<void> {
   live = null;
   if (current) {
     await current.client.abortSession(current.sessionId);
+    // Every text-only run creates a throwaway session, so aborting alone
+    // leaves one stranded in the user's history per title, commit, and PR
+    // body. Best effort: cleanup must not mask the caller's own failure.
+    await current.client
+      .deleteSession(current.sessionId)
+      .catch((error: unknown) =>
+        console.debug("[monocode] opencode text session cleanup", error),
+      );
     await current.client.closeEvents(TEXT_CHILD_ID);
   }
   unwatchChild(TEXT_CHILD_ID);
@@ -194,13 +215,38 @@ export function getOpenCodeTextResponse(parts: unknown[] | undefined): string {
     .trim();
 }
 
-function waitForUrl(read: () => string, timeoutMs: number): Promise<string> {
+/**
+ * V2 `serve` prints a per-process password and requires HTTP Basic auth on
+ * every request, so wait for it alongside the URL. A V2 server that never
+ * prints one still starts, so a short grace period proceeds rather than
+ * hanging; the failure then surfaces as a real 401.
+ */
+const PASSWORD_GRACE_MS = 2_000;
+
+function waitForEndpoint(
+  readUrl: () => string,
+  readPassword: () => string,
+  timeoutMs: number,
+  protocol: OpenCodeProtocol,
+): Promise<{ url: string; password: string }> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
+    let urlFirstSeen: number | null = null;
     const tick = () => {
-      const url = read();
-      if (url) {
-        resolve(url);
+      const url = readUrl();
+      if (url && urlFirstSeen === null) urlFirstSeen = Date.now();
+      const password = readPassword();
+      if (url && (protocol !== "v2" || password)) {
+        resolve({ url, password });
+        return;
+      }
+      if (
+        url &&
+        protocol === "v2" &&
+        urlFirstSeen !== null &&
+        Date.now() - urlFirstSeen >= PASSWORD_GRACE_MS
+      ) {
+        resolve({ url, password });
         return;
       }
       if (Date.now() - started >= timeoutMs) {

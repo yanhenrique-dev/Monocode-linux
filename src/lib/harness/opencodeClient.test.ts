@@ -77,6 +77,7 @@ function callAt(index: number) {
     url: string;
     method: string;
     body?: string;
+    headers?: Record<string, string>;
   };
 }
 const lastCall = () => callAt(mocks.harnessHttp.mock.calls.length - 1);
@@ -246,6 +247,30 @@ describe("OpenCodeClientV2", () => {
     const call = lastCall();
     expect(call.url).toBe(v2Url("/session/session%2Fa/form/frm_1"));
     expect(call.method).toBe("DELETE");
+  });
+
+  it("sends the V2 serve password as Basic auth on every request", async () => {
+    // Without these credentials V2 answers 401 on every route.
+    const client = new OpenCodeClientV2(
+      "http://127.0.0.1:4096",
+      "/repo",
+      "s3cret",
+    );
+
+    await client.getSession("ses_1");
+
+    const call = callAt(0);
+    expect(call.headers?.Authorization).toBe(
+      `Basic ${btoa("opencode:s3cret")}`,
+    );
+  });
+
+  it("omits the auth header when no password was captured", async () => {
+    const client = new OpenCodeClientV2("http://127.0.0.1:4096", "/repo");
+
+    await client.getSession("ses_1");
+
+    expect(callAt(0).headers?.Authorization).toBeUndefined();
   });
 
   it("surfaces a session's V2 location as its directory", async () => {
