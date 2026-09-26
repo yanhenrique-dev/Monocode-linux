@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
 # CodeRabbit configuration.
 #
 # Two things here are not preferences. The first is `auto_review.base_branches`,
@@ -88,6 +90,44 @@ reviews:
         equal the default value, which cannot distinguish hydration from a
         fallback. Prefer a test that provably fails when the fix is reverted.
 
+  pre_merge_checks:
+    # Deterministic, so these are safe to surface as findings. `mode: warning`
+    # reports without blocking; raise to `error` once a check has proven itself.
+    override_requested_reviewers_only: false
+    custom_checks:
+      - name: "Evidencia de validacao no corpo do PR"
+        mode: "warning"
+        instructions: >
+          The PR body must record the actual commands run and their result:
+          npx tsc --noEmit, npx vitest run, and cargo fmt --check plus
+          cargo clippy --workspace --all-targets -- -D warnings and cargo test
+          when Rust is touched. Fail if a command is listed without a result, or
+          if a claim of a green suite is not backed by a number.
+
+      - name: "Correcao de bug vem com teste que falha sem ela"
+        mode: "warning"
+        instructions: >
+          If the PR claims to fix a bug, it must add or change a test that fails
+          without the change. Fail if the PR only changes implementation, or if
+          the described test cannot be seen failing against the pre-change code.
+
+      - name: "Nao reintroduz escrita direta de chave do mirror"
+        mode: "warning"
+        instructions: >
+          No file outside src/lib/settings/bootMirror.ts may call
+          localStorage.setItem or localStorage.removeItem with a key from
+          src/lib/settings/bootMirror.ts's BOOT_MIRROR_KEYS list, and a new key
+          the boot script in index.html reads must be added to that list. Fail if
+          either holds.
+
+  tools:
+    # Both default to true; stated so that turning one off is a deliberate diff.
+    eslint:
+      enabled: true
+    clippy:
+      enabled: true
+
+
 knowledge_base:
   code_guidelines:
     enabled: true
@@ -99,40 +139,3 @@ knowledge_base:
       - "RULES.md"
       - files: "docs/FRONTEND-UI.md"
         applyTo: "src/**/*.{ts,tsx}"
-
-pre_merge_checks:
-  # Deterministic, so these are safe to surface as findings. `mode: warning`
-  # reports without blocking; raise to `error` once a check has proven itself.
-  override_requested_reviewers_only: false
-  custom_checks:
-    - name: "Evidencia de validacao no corpo do PR"
-      mode: "warning"
-      instructions: >
-        The PR body must record the actual commands run and their result:
-        npx tsc --noEmit, npx vitest run, and cargo fmt --check plus
-        cargo clippy --workspace --all-targets -- -D warnings and cargo test
-        when Rust is touched. Fail if a command is listed without a result, or
-        if a claim of a green suite is not backed by a number.
-
-    - name: "Correcao de bug vem com teste que falha sem ela"
-      mode: "warning"
-      instructions: >
-        If the PR claims to fix a bug, it must add or change a test that fails
-        without the change. Fail if the PR only changes implementation, or if
-        the described test cannot be seen failing against the pre-change code.
-
-    - name: "Nao reintroduz escrita direta de chave do mirror"
-      mode: "warning"
-      instructions: >
-        No file outside src/lib/settings/bootMirror.ts may call
-        localStorage.setItem or localStorage.removeItem with a key from
-        src/lib/settings/bootMirror.ts's BOOT_MIRROR_KEYS list, and a new key
-        the boot script in index.html reads must be added to that list. Fail if
-        either holds.
-
-tools:
-  # Both default to true; stated so that turning one off is a deliberate diff.
-  eslint:
-    enabled: true
-  clippy:
-    enabled: true
