@@ -28,13 +28,20 @@ export function rememberInstalledUpdate(
 
 export function consumeInstalledUpdate(
   store?: UpdateNoticeStore,
+  currentVersion?: string,
 ): InstalledUpdate | null {
   try {
     const target = store ?? window.localStorage;
     const stored = target.getItem(INSTALLED_UPDATE_KEY);
     if (stored == null) return null;
     target.removeItem(INSTALLED_UPDATE_KEY);
-    return parseInstalledUpdate(JSON.parse(stored));
+    const parsed = parseInstalledUpdate(JSON.parse(stored));
+    // Health check: only celebrate when running version matches installed
+    // one. Mismatch means rollback/relaunch failed; drop stale notice.
+    if (parsed && currentVersion != null && parsed.version !== currentVersion) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

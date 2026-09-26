@@ -62,6 +62,7 @@ import {
   type Session,
 } from "./lib/session";
 import { useProjectBranches } from "./hooks/useProjectBranches";
+import { useAutoUpdateCheck } from "./hooks/useAutoUpdateCheck";
 
 import { type SessionSummary } from "./lib/sessionStore";
 import { ReminderNotices } from "./chrome/ReminderNotices";
@@ -165,6 +166,10 @@ export default function App({
   history?: SessionSummary[];
   historyCwd?: string | null;
 }) {
+  // Background update poll (startup jitter, 6h interval, focus trigger).
+  // Detected updates land in the shared pendingUpdate slot consumed by
+  // SidebarUpdate and SettingsView install flows.
+  useAutoUpdateCheck();
   const [projectCwd, setProjectCwd] = useState(
     () =>
       windowTransfer?.projectCwd ??
