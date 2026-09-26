@@ -252,27 +252,250 @@ describe("fromV2MessageList", () => {
 });
 
 describe("normalizeV2Event", () => {
+  // V2 frames every event as { id, type, created, data, location?, durable? }.
+  // The payload lives under `data`; V1 called it `properties`.
+  const v2 = (type: string, data: Record<string, unknown>, frameType?: string) =>
+    normalizeV2Event({ id: "evt_1", type, created: 1, data }, frameType);
+
   it("takes the type from the SSE frame when the payload omits it", () => {
-    expect(normalizeV2Event({ foo: 1 }, "session.idle")).toMatchObject({
+    expect(normalizeV2Event({ id: "evt_1", data: {} }, "session.idle")).toMatchObject({
       type: "session.idle",
     });
   });
 
   it("prefers the payload's own type over the frame name", () => {
+    // `session.viewed` is not a type this build translates, so it shows the
+    // payload's name winning over the frame's.
     expect(
-      normalizeV2Event({ type: "message.updated", properties: {} }, "other"),
-    ).toMatchObject({ type: "message.updated" });
+      normalizeV2Event({ type: "session.viewed", data: {} }, "other"),
+    ).toMatchObject({ type: "session.viewed" });
+  });
+
+  it("streams text as a part delta keyed by message and ordinal", () => {
+    // V2 has no partID: a streamed block is (assistantMessageID, ordinal), so
+    // the pipeline needs a stable id synthesised from the pair.
+    const event = v2("session.text.delta", {
+      sessionID: "ses_1",
+      assistantMessageID: "msg_1",
+      ordinal: 0,
+      delta: "Olá",
+    });
+    expect(event).toMatchObject({ type: "message.part.delta" });
+    expect(event!.properties).toMatchObject({
+      partID: "msg_1:0",
+      delta: "Olá",
+      messageID: "msg_1",
+    });
+  });
+
+  it("keeps one id for a block whose message id the server omitted", () => {
+    // `assistantMessageID` is the id a block is normally named by. When a build
+    // omits it the id falls back, and a per-branch fallback would give the delta
+    // and the `ended` different names -- so the block would stream nothing and
+    // then appear twice.
+    const started = v2("session.text.started", { ordinal: 0 })!.properties.part as { id: string };
+    const delta = v2("session.text.delta", { ordinal: 0, delta: "a" })!.properties.partID;
+    const ended = v2("session.text.ended", { ordinal: 0, text: "a" })!.properties.part as { id: string };
+    expect(started.id).toBe(delta);
+    expect(ended.id).toBe(delta);
+  });
+
+  it("keeps one id across a block's started, delta and ended", () => {
+    // The pipeline keys per-block state on this id, and a delta is discarded
+    // unless its part is already known. If `started` and `delta` disagree the
+    // block streams nothing and then appears twice: once empty, once whole.
+    const base = { assistantMessageID: "msg_1", ordinal: 0 };
+    const started = v2("session.text.started", base)!.properties.part as { id: string };
+    const delta = v2("session.text.delta", { ...base, delta: "a" })!.properties.partID;
+    const ended = v2("session.text.ended", { ...base, text: "a" })!.properties.part as { id: string };
+    expect(started.id).toBe(delta);
+    expect(ended.id).toBe(delta);
+  });
+
+  it("keeps one id across a tool's input, called and success", () => {
+    const base = { assistantMessageID: "msg_1", id: "call_1", name: "edit" };
+    const id = (event: Record<string, unknown> | null) =>
+      (event!.properties.part as { id: string }).id;
+    expect(id(v2("session.tool.input.ended", { ...base, text: "{}" }))).toBe("msg_1:call_1");
+    expect(id(v2("session.tool.called", { ...base, input: {} }))).toBe("msg_1:call_1");
+    expect(id(v2("session.tool.success", { ...base, content: [] }))).toBe("msg_1:call_1");
+  });
+
+  it("gives two text blocks in one message distinct ids", () => {
+    const first = v2("session.text.delta", { assistantMessageID: "msg_1", ordinal: 0, delta: "a" });
+    const second = v2("session.text.delta", { assistantMessageID: "msg_1", ordinal: 1, delta: "b" });
+    expect(first!.properties.partID).not.toBe(second!.properties.partID);
+  });
+
+  it("streams reasoning on the same part channel but as its own kind", () => {
+    const event = v2("session.reasoning.delta", {
+      assistantMessageID: "msg_1",
+      ordinal: 0,
+      delta: "thinking",
+    });
+    expect(event).toMatchObject({ type: "message.part.delta" });
+    const ended = v2("session.reasoning.ended", {
+      assistantMessageID: "msg_1",
+      ordinal: 0,
+      text: "thinking",
+    });
+    expect((ended!.properties.part as { type: string }).type).toBe("reasoning");
+  });
+
+  it("closes a text block on the durable ended event", () => {
+    const event = v2("session.text.ended", {
+      assistantMessageID: "msg_1",
+      ordinal: 0,
+      text: "Olá!",
+    });
+    expect(event).toMatchObject({ type: "message.part.updated" });
+    expect(event!.properties.part).toMatchObject({
+      id: "msg_1:0",
+      type: "text",
+      text: "Olá!",
+    });
+  });
+
+  it("registers a started block so its deltas have somewhere to land", () => {
+    // A delta is discarded unless its part is already known, so dropping the
+    // `started` turned every streamed block into a single pop-in at the end.
+    const event = v2("session.text.started", { assistantMessageID: "msg_1", ordinal: 0 });
+    expect(event).toMatchObject({ type: "message.part.updated" });
+    const part = event!.properties.part as { id: string; type: string; text: string };
+    expect(part).toMatchObject({ id: "msg_1:0", type: "text", text: "" });
+  });
+
+  it("drops a tool's argument stream until it is parseable", () => {
+    // The stream is the serialised arguments; `called` carries them parsed, so
+    // nothing is rendered from the fragments.
+    const base = { assistantMessageID: "msg_1", id: "call_1", name: "edit" };
+    expect(v2("session.tool.input.started", base)).toBeNull();
+    expect(v2("session.tool.input.delta", { ...base, delta: '{"path"' })).toBeNull();
+    expect(v2("session.tool.input.ended", { ...base, text: '{"path": "not json' })).toBeNull();
+    // Whole and parseable, it becomes the tool's arguments.
+    const ended = v2("session.tool.input.ended", { ...base, text: '{"path":"a.js"}' });
+    expect(ended).toMatchObject({ type: "message.part.updated" });
+    expect((ended!.properties.part as { state: { input: unknown } }).state).toMatchObject({
+      input: { path: "a.js" },
+    });
+  });
+
+  it("maps the three tool terminals onto one state machine", () => {
+    const called = v2("session.tool.called", {
+      assistantMessageID: "msg_1",
+      id: "call_1",
+      name: "bash",
+      input: { command: "ls" },
+    });
+    expect((called!.properties.part as { state: { status: string } }).state).toMatchObject({
+      status: "running",
+      input: { command: "ls" },
+    });
+    expect(called!.properties.part).toMatchObject({ tool: "bash", callID: "call_1" });
+
+    const done = v2("session.tool.success", {
+      assistantMessageID: "msg_1",
+      id: "call_1",
+      name: "bash",
+      content: [{ type: "text", text: "a.txt" }],
+    });
+    expect((done!.properties.part as { state: { status: string; output: string } }).state).toMatchObject({
+      status: "completed",
+      output: "a.txt",
+    });
+
+    const failed = v2("session.tool.failed", {
+      assistantMessageID: "msg_1",
+      id: "call_1",
+      name: "bash",
+      error: { type: "ToolError", message: "no such file" },
+    });
+    expect((failed!.properties.part as { state: Record<string, unknown> }).state).toMatchObject({
+      status: "error",
+      error: "no such file",
+    });
+  });
+
+  it("keeps a tool's id stable across its terminals", () => {
+    const called = v2("session.tool.called", { assistantMessageID: "msg_1", id: "call_1", name: "bash" });
+    const done = v2("session.tool.success", { assistantMessageID: "msg_1", id: "call_1", name: "bash", content: [] });
+    expect((called!.properties.part as { id: string }).id).toBe(
+      (done!.properties.part as { id: string }).id,
+    );
+  });
+
+  it("ends the turn on the execution events V1 called idle", () => {
+    expect(v2("session.execution.succeeded", { sessionID: "ses_1" })).toMatchObject({
+      type: "session.idle",
+    });
+    expect(v2("session.execution.interrupted", { sessionID: "ses_1", reason: "user" })).toMatchObject({
+      type: "session.idle",
+    });
+  });
+
+  it("surfaces a failed execution as a session error", () => {
+    const event = v2("session.execution.failed", {
+      sessionID: "ses_1",
+      error: { message: "provider exploded" },
+    });
+    expect(event).toMatchObject({ type: "session.error" });
+    expect(event!.properties.error).toMatchObject({ message: "provider exploded" });
+  });
+
+  it("feeds usage to the meters that read it off a message", () => {
+    const event = v2("session.usage.updated", {
+      sessionID: "ses_1",
+      assistantMessageID: "msg_1",
+      tokens: { input: 10, output: 4, cache: { read: 2, write: 0 } },
+    });
+    expect(event).toMatchObject({ type: "message.updated" });
+    expect(event!.properties.info).toMatchObject({
+      role: "assistant",
+      tokens: { input: 10, output: 4 },
+    });
+  });
+
+  it("narrates an agent or model switch", () => {
+    // These are real V2 events, and the turn reads as if it began already on
+    // the right agent and model without them.
+    const agent = v2("session.agent.selected", { sessionID: "ses_1", agent: "Build" });
+    expect(agent!.properties.info).toMatchObject({
+      systemNotice: "Switched agent to Build",
+    });
+
+    const model = v2("session.model.selected", {
+      sessionID: "ses_1",
+      model: { id: "LongCat 2.5 Preview Free", providerID: "longcat" },
+    });
+    expect(model!.properties.info).toMatchObject({
+      systemNotice: "Switched model to LongCat 2.5 Preview Free",
+    });
+  });
+
+  it("strips a provider prefix and keeps the variant on a model notice", () => {
+    const model = v2("session.model.selected", {
+      model: { id: "openai/gpt-5.4", providerID: "openai", variant: "high" },
+    });
+    expect(model!.properties.info).toMatchObject({
+      systemNotice: "Switched model to gpt-5.4 high",
+    });
+  });
+
+  it("narrows an unknown event rather than mangling it", () => {
+    // A V2 type this build has never heard of must not be rewritten into a V1
+    // name it does not mean; the pipeline ignores what it cannot route.
+    const event = v2("session.viewed", { sessionID: "ses_1" });
+    expect(event).toMatchObject({ type: "session.viewed" });
   });
 
   it("renames a permission request onto the V1 vocabulary", () => {
-    const event = normalizeV2Event({
-      type: "permission.asked",
-      properties: {
-        id: "per_1",
-        action: "shell",
-        resources: ["git push *"],
-        metadata: {},
-      },
+    // `permission.asked` is a real V2 event, unchanged in name.
+    const event = v2("permission.asked", {
+      id: "per_1",
+      sessionID: "ses_1",
+      action: "shell",
+      resources: ["git push *"],
+      metadata: {},
     });
     expect(event!.properties).toMatchObject({
       id: "per_1",
@@ -282,73 +505,12 @@ describe("normalizeV2Event", () => {
     });
   });
 
-  it("translates a V2 message event onto the V1 envelope", () => {
-    const event = normalizeV2Event({
-      type: "message.updated",
-      properties: {
-        info: {
-          id: "msg_1",
-          type: "assistant",
-          agent: "build",
-          time: { created: 10 },
-          tokens: { input: 5, output: 7 },
-          content: [{ type: "text", text: "hello" }],
-        },
-      },
-    });
-
-    // The pipeline meters usage off `info.role` and renders `parts`.
-    const info = event!.properties.info as Record<string, unknown>;
-    expect(info.role).toBe("assistant");
-    expect(info).not.toHaveProperty("type");
-    expect(info).not.toHaveProperty("content");
-    const parts = event!.properties.parts as Array<Record<string, unknown>>;
-    expect(parts[0]).toMatchObject({ type: "text", text: "hello" });
-  });
-
   it("leaves a message event alone when the payload is already V1", () => {
     const event = normalizeV2Event({
       type: "message.updated",
       properties: { info: { id: "msg_1", role: "assistant" } },
     });
     expect(event!.properties.info).toEqual({ id: "msg_1", role: "assistant" });
-  });
-
-  it("routes a pending form onto the question pipeline", () => {
-    const event = normalizeV2Event({
-      type: "form.requested",
-      properties: {
-        form: {
-          id: "frm_1",
-          sessionID: "ses_1",
-          title: "Pick a mode",
-          fields: [
-            {
-              key: "mode",
-              type: "multiselect",
-              title: "Mode",
-              options: [{ value: "fast", label: "Fast" }],
-            },
-          ],
-        },
-      },
-    });
-
-    expect(event!.type).toBe("question.asked");
-    expect(event!.properties).toMatchObject({ id: "frm_1" });
-    const questions = event!.properties.questions as Array<
-      Record<string, unknown>
-    >;
-    expect(questions).toHaveLength(1);
-    expect(questions[0]).toMatchObject({
-      id: "mode",
-      multiSelect: true,
-      options: [{ id: "fast", label: "Fast" }],
-    });
-  });
-
-  it("drops a frameless payload", () => {
-    expect(normalizeV2Event({ properties: {} })).toBeNull();
   });
 });
 

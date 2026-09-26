@@ -81,3 +81,35 @@ export function subscribeComposerSuggestion(
   window.addEventListener(COMPOSER_SUGGESTION_EVENT, onEvent);
   return () => window.removeEventListener(COMPOSER_SUGGESTION_EVENT, onEvent);
 }
+
+/**
+ * Which floating controls sit over the transcript, and whether the bar may
+ * repeat them.
+ *
+ * This is one function because the container that draws the floating pair and
+ * the filter that decides whether the next-steps bar repeats the jump button
+ * are the same decision, and they used to be written twice. The two drifted:
+ * the container also honoured `searchOpen`, so a search that was open but not
+ * scrolled-up showed the floating jump button while the bar, reading only
+ * `scrolledUp`, still listed the action -- the same button on screen twice.
+ *
+ * `scrolledUp` is the sole owner of jump-to-bottom. The bar omits the action
+ * exactly when the floating button is showing, so the two can never both claim
+ * it. `searchAvailable` is the user's setting: turning it off removes the
+ * control entirely rather than only dropping it from the bar.
+ */
+export function floatingTranscriptActions(input: {
+  scrolledUp: boolean;
+  searchOpen: boolean;
+  searchAvailable: boolean;
+}): { jumpToBottom: boolean; search: boolean; containerVisible: boolean } {
+  const jumpToBottom = input.scrolledUp;
+  const search = input.searchAvailable;
+  return {
+    jumpToBottom,
+    search,
+    // The pair's container draws nothing unless it has a control to put in it,
+    // so an all-off state leaves no gap in the transcript.
+    containerVisible: jumpToBottom || (search && input.searchOpen),
+  };
+}

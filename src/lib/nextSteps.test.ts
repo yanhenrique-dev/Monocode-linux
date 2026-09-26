@@ -1,3 +1,4 @@
+import { floatingTranscriptActions } from "./nextSteps";
 import { describe, expect, it } from "vitest";
 import {
   COMPOSER_SUGGESTION_EVENT,
@@ -106,5 +107,50 @@ describe("isNextStepCompletionEligible", () => {
 describe("COMPOSER_SUGGESTION_EVENT", () => {
   it("is namespaced like the other window events", () => {
     expect(COMPOSER_SUGGESTION_EVENT).toBe("monocode:composer-suggestion");
+  });
+});
+
+describe("floatingTranscriptActions", () => {
+  const at = (scrolledUp: boolean, searchOpen: boolean, searchAvailable = true) =>
+    floatingTranscriptActions({ scrolledUp, searchOpen, searchAvailable });
+
+  it("gives jump-to-bottom to the scrolled-up case alone", () => {
+    // The bar omits the action exactly when the floating button owns it, so the
+    // two can never both claim the same control.
+    expect(at(true, false).jumpToBottom).toBe(true);
+    expect(at(false, false).jumpToBottom).toBe(false);
+    expect(at(false, true).jumpToBottom).toBe(false);
+  });
+
+  it("hides the search control when its setting is off", () => {
+    // The setting used to reach nothing: the button rendered regardless, so
+    // turning it off left the control on screen.
+    expect(at(false, false, false).search).toBe(false);
+    expect(at(true, false, false).search).toBe(false);
+    expect(at(false, false, true).search).toBe(true);
+  });
+
+  it("draws the container only when it has a control to put in it", () => {
+    expect(at(false, false).containerVisible).toBe(false);
+    expect(at(true, false).containerVisible).toBe(true);
+    // An open search keeps the pair up so the box and its toggle stay together.
+    expect(at(false, true).containerVisible).toBe(true);
+    // But not when the setting removed the search control in the first place,
+    // even if a stale open flag says otherwise.
+    expect(at(false, true, false).containerVisible).toBe(false);
+  });
+
+  it("derives jump-to-bottom from scrolledUp alone, never from the search state", () => {
+    // This is the invariant the duplicate broke. The container used to honour
+    // `searchOpen` and the bar filter did not, so an open search on an
+    // unscrolled transcript showed the floating button while the bar still
+    // listed the action. If jump-to-bottom cannot see the search state, the two
+    // cannot disagree.
+    for (const searchOpen of [false, true]) {
+      for (const searchAvailable of [false, true]) {
+        expect(at(false, searchOpen, searchAvailable).jumpToBottom).toBe(false);
+        expect(at(true, searchOpen, searchAvailable).jumpToBottom).toBe(true);
+      }
+    }
   });
 });

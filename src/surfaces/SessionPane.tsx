@@ -1,3 +1,4 @@
+import { useLocale } from "../lib/locale";
 import { ChevronDown, GripVertical, Search, X } from "../chrome/icons";
 import { searchTranscriptBlocks } from "../lib/transcriptSearch";
 import {
@@ -77,7 +78,7 @@ import {
   parseNextStepSelection,
   NEXT_STEP_ACTION_DEFAULTS_RAW,
 } from "../lib/settings";
-import { nextStepActions } from "../lib/nextSteps";
+import { floatingTranscriptActions, nextStepActions } from "../lib/nextSteps";
 import { NextStepsBar } from "./NextStepsBar";
 import { requestComposerSuggestion } from "../lib/nextSteps";
 import type { NextStepSuggestion } from "../lib/nextStepsPrompt";
@@ -531,6 +532,15 @@ const SessionPaneContent = memo(function SessionPaneContent({
     () => parseNextStepSelection(nextStepSelectionRaw),
     [nextStepSelectionRaw],
   );
+  const searchTranscriptAvailable = nextStepSelection["search-transcript"];
+  // One decision, in one place: `floatingTranscriptActions` owns both the
+  // container and the bar filter, so they cannot disagree about which control
+  // is on screen.
+  const floatingActions = floatingTranscriptActions({
+    scrolledUp: showJumpToBottom,
+    searchOpen: transcriptSearchOpen,
+    searchAvailable: searchTranscriptAvailable,
+  });
   // The bar renders what the toggles selected, minus jump-to-bottom while the
   // transcript is already at the bottom -- the floating button owns that case.
   // Filtering here, after selection, is the whole point: the old code sliced a
@@ -933,28 +943,30 @@ const SessionPaneContent = memo(function SessionPaneContent({
               {animationsEnabled && !reduceMotion ? (
                 <div
                   className={`pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center gap-1 transition-opacity duration-200 ${
-                    showJumpToBottom || transcriptSearchOpen
-                      ? "opacity-100"
-                      : "opacity-0"
+                    floatingActions.containerVisible ? "opacity-100" : "opacity-0"
                   }`}
-                  inert={!showJumpToBottom && !transcriptSearchOpen}
-                  aria-hidden={!showJumpToBottom && !transcriptSearchOpen}
+                  inert={!floatingActions.containerVisible}
+                  aria-hidden={!floatingActions.containerVisible}
                 >
                   <JumpToBottomButton
                     onJump={() => jumpToBottomRef.current?.()}
                   />
-                  <TranscriptSearchButton
-                    onToggle={() => setTranscriptSearchOpen((open) => !open)}
-                  />
+                  {floatingActions.search ? (
+                    <TranscriptSearchButton
+                      onToggle={() => setTranscriptSearchOpen((open) => !open)}
+                    />
+                  ) : null}
                 </div>
-              ) : showJumpToBottom || transcriptSearchOpen ? (
+              ) : floatingActions.containerVisible ? (
                 <div className="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center gap-1">
                   <JumpToBottomButton
                     onJump={() => jumpToBottomRef.current?.()}
                   />
-                  <TranscriptSearchButton
-                    onToggle={() => setTranscriptSearchOpen((open) => !open)}
-                  />
+                  {floatingActions.search ? (
+                    <TranscriptSearchButton
+                      onToggle={() => setTranscriptSearchOpen((open) => !open)}
+                    />
+                  ) : null}
                 </div>
               ) : null}
               {transcriptSearchOpen ? (
@@ -1033,11 +1045,16 @@ function JumpToBottomButton({ onJump }: { onJump: () => void }) {
 }
 
 function TranscriptSearchButton({ onToggle }: { onToggle: () => void }) {
+  // Through the locale, not a literal: this string sat in English inside an
+  // otherwise translated control, next to a setting whose own label is
+  // translated.
+  const { t } = useLocale();
+  const label = t("next_steps.search_transcript");
   return (
     <button
       type="button"
-      title="Find in transcript"
-      aria-label="Find in transcript"
+      title={label}
+      aria-label={label}
       data-transcript-search-toggle
       onClick={onToggle}
       className="pointer-events-auto grid size-6 place-items-center rounded-md border border-content/15 bg-background-base/95 text-content shadow-md hover:bg-content/5"
