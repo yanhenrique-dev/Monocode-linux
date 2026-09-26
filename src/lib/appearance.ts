@@ -5,6 +5,16 @@ import {
   applyPreparedNewThreadBackground,
   clearPreparedNewThreadBackground,
 } from "./newThreadBackgroundEffects";
+import {
+  DEFAULT_SIDEBAR_TAB_ORDER as DEFAULT_SIDEBAR_TAB_ORDER_DEFAULT,
+  type SidebarTabId,
+} from "./settings/schema";
+import {
+  PROJECT_RAIL_OPEN_KEY,
+  SIDEBAR_TAB_ORDER_KEY,
+} from "./settings/localView";
+import { bootMirrorPatch } from "./settings/bootMirror";
+import { lastWritePersisted, updateAppearance } from "./settings/store";
 
 const ACCENT_COLOR_KEY = "monocode.accentColor";
 const THEME_HUE_KEY = "monocode.themeHue";
@@ -12,11 +22,9 @@ const THEME_SATURATION_KEY = "monocode.themeSaturation";
 const THEME_DARK_LIGHTNESS_KEY = "monocode.themeDarkLightness";
 const OPACITY_KEY = "monocode.sidebarOpacity";
 const BLUR_KEY = "monocode.sidebarBlur";
-const PROJECT_RAIL_OPEN_KEY = "monocode.projectRailOpen";
 const BODY_KEY = "monocode.bodyGlass";
 const UI_BLUR_KEY = "monocode.uiBlur";
 const SCHEME_KEY = "monocode.colorScheme";
-const SIDEBAR_TAB_ORDER_KEY = "monocode.sidebarTabOrder";
 const PROJECT_RAIL_WIDTH_KEY = "monocode.projectRailWidth";
 const TRANSCRIPT_LAYOUT_KEY = "monocode.transcriptLayout";
 const TRANSCRIPT_ANCHOR_KEY = "monocode.transcriptAnchor";
@@ -139,13 +147,10 @@ export const TRANSCRIPT_ANCHOR_CHANGE_EVENT = "monocode:transcriptanchorchange";
 /** Fired on `window` whenever the transcript layout flips (detail: TranscriptLayout). */
 export const TRANSCRIPT_LAYOUT_CHANGE_EVENT = "monocode:transcriptlayoutchange";
 
-export type SidebarTabId = "files" | "sessions" | "changes" | "inbox";
+export type { SidebarTabId } from "./settings/schema";
 
 const DEFAULT_SIDEBAR_TAB_ORDER: SidebarTabId[] = [
-  "sessions",
-  "inbox",
-  "files",
-  "changes",
+  ...DEFAULT_SIDEBAR_TAB_ORDER_DEFAULT,
 ];
 
 export const THEME_HUE_MIN = 0;
@@ -209,6 +214,14 @@ function readNumber(key: string): number | null {
 
 /** True when the value landed in storage. Broadcasts must wait for this. */
 function writeNumber(key: string, value: number): boolean {
+  // A mirrored key belongs to the store, which writes all 13 in one go.
+  // Routing it here is what keeps the pre-React boot script and the native
+  // file agreeing with the value the user is looking at.
+  const patch = bootMirrorPatch(key, value);
+  if (patch) {
+    updateAppearance(patch);
+    return lastWritePersisted();
+  }
   try {
     localStorage.setItem(key, String(value));
     return true;
@@ -231,6 +244,11 @@ function readFlag(key: string): boolean | null {
 }
 
 function writeFlag(key: string, value: boolean): boolean {
+  const patch = bootMirrorPatch(key, value);
+  if (patch) {
+    updateAppearance(patch);
+    return lastWritePersisted();
+  }
   try {
     localStorage.setItem(key, value ? "1" : "0");
     return true;
@@ -269,6 +287,11 @@ export function loadAccentColor(): string | null {
 export function saveAccentColor(value: string | null) {
   try {
     const next = normalizeAccentColor(value);
+    if (bootMirrorPatch(ACCENT_COLOR_KEY, next)) {
+      updateAppearance({ accentColor: next });
+      if (lastWritePersisted()) notifyAppearanceChanged();
+      return;
+    }
     if (next == null) localStorage.removeItem(ACCENT_COLOR_KEY);
     else localStorage.setItem(ACCENT_COLOR_KEY, next);
   } catch {
@@ -851,6 +874,9 @@ export function loadProjectRailOpen(): boolean {
 
 export function saveProjectRailOpen(value: boolean) {
   writeFlag(PROJECT_RAIL_OPEN_KEY, value);
+  // The store serialises the whole object on the next save, so a key it does
+  // not know about is a key it will write back stale.
+  updateAppearance({ projectRailOpen: value });
 }
 
 export function loadSidebarTabOrder(): SidebarTabId[] {
@@ -877,6 +903,7 @@ export function saveSidebarTabOrder(order: SidebarTabId[]) {
   } catch {
     // private mode / quota
   }
+  updateAppearance({ sidebarTabOrder: [...order] });
 }
 
 export function loadProjectRailWidth(): number {

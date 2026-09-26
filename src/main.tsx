@@ -17,6 +17,7 @@ import {
   reportQuitPoll,
 } from "./lib/appLifecycle";
 import { consumeInstalledUpdate } from "./lib/updateNotice";
+import { hydrateSettings } from "./lib/settings/store";
 import { SPLASH_REMOVE_MS, splashFadeDelay } from "./lib/uiTimings";
 import "./index.css";
 
@@ -82,8 +83,13 @@ void listen("quit_aborted", () => {
   abortQuit();
 });
 
-void loadBootWorkspace().then(
-  async ({ windowTransfer, resumed, history, historyCwd }) => {
+// Settings hydrate alongside the workspace rather than before it: the inline
+// script in index.html has already read the mirror to paint the first frame,
+// so a slow settings file must not hold up the window. What it must beat is
+// the first React render, since that is where a component would read a default
+// and paint it over the correct value.
+void Promise.all([loadBootWorkspace(), hydrateSettings()]).then(
+  async ([{ windowTransfer, resumed, history, historyCwd }]) => {
     // Running version validates the post-install marker: without it a stale
     // marker from another version would show a wrong "updated" notice.
     let currentVersion: string | undefined;

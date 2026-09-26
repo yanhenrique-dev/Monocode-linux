@@ -24,6 +24,7 @@ mod rate_limits;
 mod reminders;
 mod search;
 mod session_store;
+mod settings;
 mod skills;
 mod window;
 mod window_transfer;
@@ -191,6 +192,9 @@ pub fn run() {
             reminders::reminder_take_open,
             reminders::reminder_register_window,
             reminders::reminder_open,
+            settings::settings_load,
+            settings::settings_save,
+            settings::settings_reset,
             external_editor::list_external_editors,
             external_editor::open_in_external_editor,
             external_url::open_external_url,
