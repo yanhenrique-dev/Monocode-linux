@@ -2,6 +2,7 @@ import { Folder, LoaderCircle, MessageSquare, Search } from "../chrome/icons";
 import {
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -158,23 +159,28 @@ export function SearchView({
     () => (trimmed ? searchConversationTitles(conversationRows, trimmed) : []),
     [conversationRows, trimmed],
   );
-  const liveMessageHits = useMemo(
-    () =>
-      trimmed
-        ? searchSessionMessages(
-            sessions.map((session) => ({
-              id: session.id,
-              cwd: session.cwd,
-              harness: session.harness,
-              title: session.title,
-              updatedAt: Date.now(),
-              blocks: session.blocks,
-            })),
-            trimmed,
-          )
-        : [],
-    [sessions, trimmed],
-  );
+  const deferredQuery = useDeferredValue(trimmed);
+  const liveMessageHits = useMemo(() => {
+    if (!deferredQuery) return [];
+    // Explicit recency: history carries real updatedAt; in-memory-only
+    // sessions (unsaved work) sort as newest so the 50-cap never drops them.
+    const recency = new Map(conversationRows.map((row) => [row.id, row.updatedAt]));
+    const at = (id: string) => recency.get(id) ?? Date.now();
+    const ranked = [...sessions]
+      .sort((a, b) => at(b.id) - at(a.id))
+      .slice(0, 50);
+    return searchSessionMessages(
+      ranked.map((session) => ({
+        id: session.id,
+        cwd: session.cwd,
+        harness: session.harness,
+        title: session.title,
+        updatedAt: at(session.id),
+        blocks: session.blocks,
+      })),
+      deferredQuery,
+    );
+  }, [sessions, conversationRows, deferredQuery]);
   const projectHits = useMemo(
     () => (trimmed ? searchRecentProjects(recents, trimmed) : []),
     [recents, trimmed],
@@ -244,11 +250,14 @@ export function SearchView({
 
   const hits = useMemo(() => {
     if (!trimmed) return [];
+    // Deferred hits belong to the previous query while typing: hide them
+    // until the deferred value settles, so stale results can't be opened.
+    const settledLiveHits = deferredQuery === trimmed ? liveMessageHits : [];
     return flattenGrouped(
       groupHits(
         mergeHits(
           titleHits,
-          liveMessageHits,
+          settledLiveHits,
           remoteHits,
           fileHits,
           contentHits,
@@ -259,6 +268,7 @@ export function SearchView({
     );
   }, [
     contentHits,
+    deferredQuery,
     fileHits,
     liveMessageHits,
     projectHits,

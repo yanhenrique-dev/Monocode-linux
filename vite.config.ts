@@ -19,6 +19,24 @@ export default defineConfig(async ({ mode }) => {
       },
     },
     clearScreen: false,
+    build: {
+      sourcemap: false,
+      chunkSizeWarningLimit: 900,
+      reportCompressedSize: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            mermaid: ["mermaid"],
+            xterm: ["@xterm/xterm", "@xterm/addon-fit"],
+            // WebGL stays on-demand: TerminalView imports it dynamically and
+            // skips it when GPU is disabled, so it must not ride the xterm chunk.
+            xtermWebgl: ["@xterm/addon-webgl"],
+            streamdown: ["streamdown", "@streamdown/code"],
+            codemirror: ["codemirror", "@codemirror/state", "@codemirror/view"],
+          },
+        },
+      },
+    },
     server: {
       port: 1420,
       strictPort: true,
