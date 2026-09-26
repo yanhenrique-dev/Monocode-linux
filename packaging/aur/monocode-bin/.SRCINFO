@@ -1,6 +1,6 @@
 pkgbase = monocode-bin
 	pkgdesc = MonoCode Linux — interface desktop para agentes de código (Tauri + React)
-	pkgver = 0.2.50
+	pkgver = 0.2.55
 	pkgrel = 1
 	url = https://github.com/yanhenrique-dev/Monocode-linux
 	arch = x86_64

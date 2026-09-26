@@ -98,8 +98,8 @@ modules:
       # switch to: `type: dir, path: ../..`
       - type: git
         url: https://github.com/yanhenrique-dev/Monocode-linux.git
-        tag: v0.2.50
+        tag: v0.2.55
         # Pinned commit for the tag above (clears the linter's
         # no-commit-with-tag warning; bump together with `tag:`).
-        commit: bb62062f1d630c33e0faff6cc4af9e529d66e4a9
+        commit: a7f01e9dd64c2c633fe64877b309624e3cca7002
         disable-shallow-clone: true

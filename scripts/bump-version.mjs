@@ -24,12 +24,18 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function writePin(pin, text) {
+  // A pin already at the target is left alone. Re-running the bump for a
+  // version that is partly written is the normal way to finish a release, and
+  // the writer used to abort on the first pin that needed no change, which
+  // made its own suggested remedy impossible to run.
+  if (pin.read(text) === version) return false;
   const next = pin.write(text, version);
   if (next === text) {
     console.error(`failed to update ${pin.label}: no replacement made`);
     process.exit(1);
   }
   writeFileSync(join(root, pin.file), next);
+  return true;
 }
 
 let written = 0;
@@ -45,8 +51,7 @@ for (const pin of VERSION_SOURCES) {
   // The Flatpak tag is resolved with its commit below; a manifest whose tag
   // moved but whose commit did not is worse than one left alone.
   if (pin.file === "packaging/flatpak/com.monocode.desktop.yml") continue;
-  writePin(pin, text);
-  written += 1;
+  if (writePin(pin, text)) written += 1;
 }
 
 // The Flatpak manifest pins a tag *and* the commit that tag points at, so
