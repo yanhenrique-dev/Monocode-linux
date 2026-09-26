@@ -288,6 +288,39 @@ describe("normalizeV2Event", () => {
     });
   });
 
+  it("keeps one id for a block whose message id the server omitted", () => {
+    // `assistantMessageID` is the id a block is normally named by. When a build
+    // omits it the id falls back, and a per-branch fallback would give the delta
+    // and the `ended` different names -- so the block would stream nothing and
+    // then appear twice.
+    const started = v2("session.text.started", { ordinal: 0 })!.properties.part as { id: string };
+    const delta = v2("session.text.delta", { ordinal: 0, delta: "a" })!.properties.partID;
+    const ended = v2("session.text.ended", { ordinal: 0, text: "a" })!.properties.part as { id: string };
+    expect(started.id).toBe(delta);
+    expect(ended.id).toBe(delta);
+  });
+
+  it("keeps one id across a block's started, delta and ended", () => {
+    // The pipeline keys per-block state on this id, and a delta is discarded
+    // unless its part is already known. If `started` and `delta` disagree the
+    // block streams nothing and then appears twice: once empty, once whole.
+    const base = { assistantMessageID: "msg_1", ordinal: 0 };
+    const started = v2("session.text.started", base)!.properties.part as { id: string };
+    const delta = v2("session.text.delta", { ...base, delta: "a" })!.properties.partID;
+    const ended = v2("session.text.ended", { ...base, text: "a" })!.properties.part as { id: string };
+    expect(started.id).toBe(delta);
+    expect(ended.id).toBe(delta);
+  });
+
+  it("keeps one id across a tool's input, called and success", () => {
+    const base = { assistantMessageID: "msg_1", id: "call_1", name: "edit" };
+    const id = (event: Record<string, unknown> | null) =>
+      (event!.properties.part as { id: string }).id;
+    expect(id(v2("session.tool.input.ended", { ...base, text: "{}" }))).toBe("msg_1:call_1");
+    expect(id(v2("session.tool.called", { ...base, input: {} }))).toBe("msg_1:call_1");
+    expect(id(v2("session.tool.success", { ...base, content: [] }))).toBe("msg_1:call_1");
+  });
+
   it("gives two text blocks in one message distinct ids", () => {
     const first = v2("session.text.delta", { assistantMessageID: "msg_1", ordinal: 0, delta: "a" });
     const second = v2("session.text.delta", { assistantMessageID: "msg_1", ordinal: 1, delta: "b" });
@@ -323,8 +356,28 @@ describe("normalizeV2Event", () => {
     });
   });
 
-  it("drops a started event, which carries nothing to render", () => {
-    expect(v2("session.text.started", { assistantMessageID: "msg_1", ordinal: 0 })).toBeNull();
+  it("registers a started block so its deltas have somewhere to land", () => {
+    // A delta is discarded unless its part is already known, so dropping the
+    // `started` turned every streamed block into a single pop-in at the end.
+    const event = v2("session.text.started", { assistantMessageID: "msg_1", ordinal: 0 });
+    expect(event).toMatchObject({ type: "message.part.updated" });
+    const part = event!.properties.part as { id: string; type: string; text: string };
+    expect(part).toMatchObject({ id: "msg_1:0", type: "text", text: "" });
+  });
+
+  it("drops a tool's argument stream until it is parseable", () => {
+    // The stream is the serialised arguments; `called` carries them parsed, so
+    // nothing is rendered from the fragments.
+    const base = { assistantMessageID: "msg_1", id: "call_1", name: "edit" };
+    expect(v2("session.tool.input.started", base)).toBeNull();
+    expect(v2("session.tool.input.delta", { ...base, delta: '{"path"' })).toBeNull();
+    expect(v2("session.tool.input.ended", { ...base, text: '{"path": "not json' })).toBeNull();
+    // Whole and parseable, it becomes the tool's arguments.
+    const ended = v2("session.tool.input.ended", { ...base, text: '{"path":"a.js"}' });
+    expect(ended).toMatchObject({ type: "message.part.updated" });
+    expect((ended!.properties.part as { state: { input: unknown } }).state).toMatchObject({
+      input: { path: "a.js" },
+    });
   });
 
   it("maps the three tool terminals onto one state machine", () => {

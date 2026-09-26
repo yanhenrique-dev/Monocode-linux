@@ -87,7 +87,7 @@ const {
 import type { HarnessEvent } from "./types";
 // Dynamic: apply.ts reaches ./child through models/session/availability,
 // so a static import would run the mock factory before these declarations.
-const { applyHarnessEvent } = await import("./apply");
+const { applyHarnessEvent, appendUser } = await import("./apply");
 const { newSession } = await import("../session");
 
 const waitFor = async (predicate: () => boolean, label: string) => {
@@ -114,14 +114,16 @@ function turn(
 }
 
 async function startTurn(events: HarnessEvent[]) {
+  // Counted, not matched: a second turn in the same test would otherwise match
+  // the first turn's already-recorded call and resolve before its own prompt
+  // was sent, so the turn's events would race ahead of it.
+  const before = harnessHttp.mock.calls.length;
   const done = turn(events);
   await waitFor(
     () =>
-      harnessHttp.mock.calls.some(([input]) =>
-        input.url.includes("/prompt_async") ||
-        input.url.includes("/message") ||
-        input.url.includes("/prompt"),
-      ),
+      harnessHttp.mock.calls
+        .slice(before)
+        .some(([input]) => input.url.includes("/prompt") || input.url.includes("/message")),
     "prompt",
   );
   return { done };
@@ -1106,4 +1108,116 @@ describe("OpenCode child permission routing", () => {
       });
     },
   );
+});
+
+describe("OpenCode V2 streaming", () => {
+  /** A V2 event, in the envelope the server actually sends. */
+  const v2 = (type: string, data: Record<string, unknown>) =>
+    onSseEvent?.({ id: `evt_${Math.random().toString(36).slice(2)}`, type, created: 1, data });
+
+  /** One streamed text block, exactly as V2 frames it. */
+  const v2Text = (messageID: string, ordinal: number, chunks: string[], final: string) => {
+    v2("session.text.started", { sessionID: "session_1", assistantMessageID: messageID, ordinal });
+    for (const chunk of chunks) {
+      v2("session.text.delta", { sessionID: "session_1", assistantMessageID: messageID, ordinal, delta: chunk });
+    }
+    v2("session.text.ended", { sessionID: "session_1", assistantMessageID: messageID, ordinal, text: final });
+  };
+
+  const assistantTexts = (events: HarnessEvent[]) =>
+    events
+      .filter((event): event is HarnessEvent & { type: "message.delta"; text: string } =>
+        event.type === "message.delta")
+      .map((event) => event.text)
+      .join("");
+
+  it("keeps both turns of a V2 conversation as separate messages", async () => {
+    // The regression this pins: one turn's text replacing or merging into the
+    // other's, so an earlier reply silently stops being its own message.
+    openCodeVersion = "opencode 2.0.0";
+    const events: HarnessEvent[] = [];
+
+    const first = await startTurn(events);
+    v2Text("msg_1", 0, ["Agora vou adicionar ", "tooltips"], "Agora vou adicionar tooltips aos botões da topbar:");
+    v2("session.execution.succeeded", { sessionID: "session_1" });
+    await first.done;
+    const afterFirst = events.length;
+
+    const second = await startTurn(events);
+    v2Text("msg_2", 0, ["Agora vou melhorar ", "o feedback"], "Agora vou melhorar o feedback de progresso e adicionar tooltip com caminho completo:");
+    v2("session.execution.succeeded", { sessionID: "session_1" });
+    await second.done;
+
+    // The user block between turns belongs to the composer, not the harness.
+    // `patchStreaming` appends to the last block whenever it is still the last
+    // one, and a real prompt always interrupts with a user block first, so
+    // reducing one flat event list without it would assert a shape the app never
+    // produces -- and would blame V2 for a harness rule.
+    let session = newSession("opencode", "/repo");
+    session = appendUser(session, "primeiro pedido");
+    session = events.slice(0, afterFirst).reduce(applyHarnessEvent, session);
+    session = appendUser(session, "segundo pedido");
+    session = events.slice(afterFirst).reduce(applyHarnessEvent, session);
+
+    const texts = session.blocks
+      .filter((block) => block.role === "assistant")
+      .map((block) => block.text);
+    expect(texts).toEqual([
+      "Agora vou adicionar tooltips aos botões da topbar:",
+      "Agora vou melhorar o feedback de progresso e adicionar tooltip com caminho completo:",
+    ]);
+  });
+
+  it("streams V2 text incrementally instead of only at the end", async () => {
+    // A delta is dropped unless its part is already known, so a build that
+    // discards `session.text.started` shows nothing until the block closes.
+    openCodeVersion = "opencode 2.0.0";
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    v2("session.text.started", { sessionID: "session_1", assistantMessageID: "msg_1", ordinal: 0 });
+    v2("session.text.delta", { sessionID: "session_1", assistantMessageID: "msg_1", ordinal: 0, delta: "parcial" });
+    expect(assistantTexts(events)).toBe("parcial");
+    idle();
+    await done;
+  });
+
+  it("keeps a tool's raw input out of the assistant text", async () => {
+    // V2 streams a tool's input on its own channel. Falling through to the text
+    // channel prints the input JSON into the transcript as prose.
+    openCodeVersion = "opencode 2.0.0";
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    v2("session.tool.input.started", { sessionID: "session_1", assistantMessageID: "msg_1", id: "call_1", name: "edit" });
+    v2("session.tool.input.delta", { sessionID: "session_1", assistantMessageID: "msg_1", id: "call_1", delta: '{"path":"a.js"' });
+    v2("session.tool.input.ended", { sessionID: "session_1", assistantMessageID: "msg_1", id: "call_1", text: '{"path":"a.js","oldString":"x","newString":"y"}' });
+    v2("session.tool.called", { sessionID: "session_1", assistantMessageID: "msg_1", id: "call_1", name: "edit", input: { path: "a.js" } });
+    v2("session.tool.success", { sessionID: "session_1", assistantMessageID: "msg_1", id: "call_1", name: "edit", content: [{ type: "text", text: "ok" }] });
+    idle();
+    await done;
+
+    expect(assistantTexts(events)).toBe("");
+    expect(
+      events.some(
+        (event) => event.type === "tool.updated" && event.status === "completed",
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts a V2 message event in the shape the server sends", async () => {
+    // The event carries `messageID` and `content`, not an `info` object. Reading
+    // a field that does not exist dropped the event, and with it the only
+    // statement of which message the content belongs to.
+    openCodeVersion = "opencode 2.0.0";
+    const events: HarnessEvent[] = [];
+    const { done } = await startTurn(events);
+    v2("session.message.content.updated", {
+      sessionID: "session_1",
+      messageID: "msg_1",
+      content: [{ type: "text", text: " delivered whole " }],
+    });
+    idle();
+    await done;
+
+    expect(assistantTexts(events)).toContain("delivered whole");
+  });
 });

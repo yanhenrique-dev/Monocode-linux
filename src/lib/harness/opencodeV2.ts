@@ -408,15 +408,80 @@ function v2ToolError(value: unknown): string {
   );
 }
 
-/** Stable id for a streamed block: V2 names it by position, not by id. */
-function v2PartId(data: Record<string, unknown>, fallback: string): string {
+/**
+ * Stable id for a streamed block.
+ *
+ * V2 names a text or reasoning block by position -- `(assistantMessageID,
+ * ordinal)` -- and a tool by its call id, where V1 carried a `partID` for both.
+ * The synthesised id is what the pipeline keys per-block state on, so it has to
+ * be the same for a block's `started`, `delta` and `ended`; hence one function
+ * and one fallback rather than a per-branch literal.
+ */
+function v2PartId(data: Record<string, unknown>, kind: string): string {
   const messageID = stringField(data, "assistantMessageID");
   const ordinal = data.ordinal;
   if (messageID != null && typeof ordinal === "number") {
     return `${messageID}:${ordinal}`;
   }
   const id = stringField(data, "id");
-  return id ? `${messageID ?? "part"}:${id}` : `${messageID ?? "part"}:${fallback}`;
+  // The fallback is the block kind, never something branch-specific: a delta
+  // and the `ended` that closes it have to land on the same id.
+  return `${messageID ?? "part"}:${id ?? kind}`;
+}
+
+/**
+ * The `content` array of a V2 message, as V1 parts.
+ *
+ * The array is ordered and each item is a tagged union, so the index is the
+ * ordinal a streamed block would have used. That is what keeps a text block
+ * here and the same block arriving later as `session.text.ended` on one id,
+ * instead of the two rendering as separate blocks.
+ */
+function v2ContentToParts(
+  messageID: string,
+  value: unknown,
+): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  const parts: Array<Record<string, unknown>> = [];
+  value.forEach((item, index) => {
+    const rec = asRecord(item);
+    if (!rec) return;
+    const type = stringField(rec, "type");
+    if (type === "text" || type === "reasoning") {
+      parts.push({
+        id: `${messageID}:${index}`,
+        type,
+        messageID,
+        text: stringField(rec, "text") ?? "",
+      });
+      return;
+    }
+    if (type === "tool") {
+      const callID = stringField(rec, "id");
+      parts.push({
+        id: `${messageID}:${callID ?? index}`,
+        type: "tool",
+        messageID,
+        tool: stringField(rec, "name"),
+        callID,
+        state: asRecord(rec.state) ?? { status: "pending" },
+      });
+    }
+  });
+  return parts;
+}
+
+/** A tool's argument stream arrives as serialised JSON; recover the object. */
+function v2JsonObject(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    return asRecord(JSON.parse(value));
+  } catch {
+    // A provider may send a partial or non-JSON argument stream. The structured
+    // arguments arrive on `called`, so losing this costs a preview and nothing
+    // else -- which is why a parse failure is not worth surfacing.
+    return null;
+  }
 }
 
 /**
@@ -428,28 +493,59 @@ function v2PartEvent(
   type: string,
   data: Record<string, unknown>,
 ): { type: string; properties: Record<string, unknown> } | "drop" | null {
-  const kind =
-    type.startsWith("session.text.") || type.startsWith("session.reasoning.")
-      ? type.startsWith("session.reasoning.")
-        ? "reasoning"
-        : "text"
+  const messageID = stringField(data, "assistantMessageID");
+
+  // V2 splits a tool's argument stream from its result. `input.*` is the live
+  // serialisation of the arguments, and `called` carries them parsed, so this
+  // stream must never reach the text channel: it printed the arguments as raw
+  // JSON in the middle of the assistant's prose.
+  if (type.startsWith("session.tool.input.")) {
+    if (!type.endsWith(".ended")) return "drop";
+    const input = v2JsonObject(data.text);
+    if (!input) return "drop";
+    return {
+      type: "message.part.updated",
+      properties: {
+        part: {
+          id: v2PartId(data, "tool"),
+          type: "tool",
+          messageID,
+          tool: stringField(data, "name"),
+          callID: stringField(data, "id"),
+          state: { status: "running", input },
+        },
+      },
+    };
+  }
+
+  const kind = type.startsWith("session.reasoning.")
+    ? "reasoning"
+    : type.startsWith("session.text.")
+      ? "text"
       : type.startsWith("session.tool.")
         ? "tool"
         : null;
   if (!kind) return null;
 
-  const messageID = stringField(data, "assistantMessageID");
   if (type.endsWith(".started")) {
-    // Nothing to render yet; the pipeline keys its own state off the part id,
-    // so an empty shell would only cost a map entry and a log line.
-    return "drop";
+    if (kind === "tool") {
+      // A tool has no body to show until `called` arrives with its arguments.
+      return "drop";
+    }
+    // Register the block so its deltas have somewhere to land. A delta is
+    // discarded unless its part is already known, so dropping this turned every
+    // V2 text block into a single pop-in at the end instead of a stream.
+    return {
+      type: "message.part.updated",
+      properties: { part: { id: v2PartId(data, kind), type: kind, messageID, text: "" } },
+    };
   }
 
   if (type.endsWith(".delta")) {
     return {
       type: "message.part.delta",
       properties: {
-        partID: v2PartId(data, "delta"),
+        partID: v2PartId(data, kind),
         delta: typeof data.delta === "string" ? data.delta : "",
         ...(messageID ? { messageID } : {}),
       },
@@ -497,7 +593,6 @@ function v2PartEvent(
   };
   return { type: "message.part.updated", properties: { part } };
 }
-
 /**
  * Server narration V2 reports as its own events rather than as content.
  *
@@ -598,14 +693,20 @@ export function normalizeV2Event(
 
   switch (type) {
     case "session.message.content.updated": {
-      // V2 puts the role in `type` and the turn body in `content`; the pipeline
-      // reads V1's `role` and `parts`.
-      const message = fromV2Message(asRecord(properties.info));
-      if (!message) return null;
+      // The payload is `{ sessionID, messageID, content }`. There is no `info`
+      // object: reading one dropped this event, and with it the only statement
+      // of which message the content belongs to. The role is implied -- the
+      // schema types the content as assistant content.
+      const messageID = stringField(properties, "messageID");
+      if (!messageID) return null;
       return {
         ...event,
         type: "message.updated",
-        properties: { ...properties, info: message.info, parts: message.parts },
+        properties: {
+          ...properties,
+          info: { ...(asRecord(properties.info) ?? {}), id: messageID, role: "assistant" },
+          parts: v2ContentToParts(messageID, properties.content),
+        },
       };
     }
     case "session.execution.succeeded":
