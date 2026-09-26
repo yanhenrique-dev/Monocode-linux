@@ -361,8 +361,11 @@ export function closeHarnessSse(sessionId: string): Promise<void> {
 
 export function execChild(
   command: string,
-  args: string[],
+  // Readonly because nothing here mutates it, and the argument vectors come
+  // from `HARNESS_EXEC`, which is a shared frozen table. A mutable parameter
+  // would force every call site to copy a literal the contract already owns.
+  args: readonly string[],
   cwd?: string,
 ): Promise<string> {
-  return invoke("harness_exec", { command, args, cwd });
+  return invoke("harness_exec", { command, args: [...args], cwd });
 }

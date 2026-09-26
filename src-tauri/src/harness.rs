@@ -1079,29 +1079,10 @@ mod loopback_tests {
     }
 }
 
-const EXEC_ALLOWED_ARGS: &[&[&str]] = &[
-    &["--version"],
-    &["--list-models"],
-    &["models", "--verbose"],
-    &["models", "--json"],
-    &["models"],
-    &["status", "--json"],
-    &["agent", "list"],
-    // V2 dropped the `models` and `agent list` subcommands, so its catalog is
-    // read from the server API instead. The `api` subcommand owns service
-    // discovery and auth on the CLI side, which is why it is preferred here
-    // over talking to a server this app would have to spawn and authenticate
-    // to itself. GET only, and only on these two read-only routes: anything
-    // that could write, or reach outside loopback, stays off this list.
-    &["api", "get", "/api/model"],
-    &["api", "get", "/api/agent"],
-];
-
-fn exec_args_allowed(args: &[String]) -> bool {
-    EXEC_ALLOWED_ARGS
-        .iter()
-        .any(|a| a.len() == args.len() && a.iter().zip(args).all(|(x, y)| x == y))
-}
+/// Whether this harness invocation is permitted. The policy lives in
+/// `contracts/rust-ipc.json` so the frontend is checked against the same list;
+/// see `docs/CONTRACTS.md`.
+use crate::contract::exec_args_allowed;
 
 /// Must be a path a resolver would hand back, not an arbitrary binary
 /// that merely shares a file name.
@@ -3033,35 +3014,6 @@ mod tests {
         let id = passwd_identity().expect("passwd");
         assert!(!id.user.is_empty());
         assert!(PathBuf::from(&id.home).is_dir());
-    }
-}
-
-#[cfg(test)]
-mod exec_allowlist_tests {
-    use super::*;
-
-    fn args(items: &[&str]) -> Vec<String> {
-        items.iter().map(|s| (*s).to_string()).collect()
-    }
-
-    #[test]
-    fn allows_known_catalog_args() {
-        assert!(exec_args_allowed(&args(&["--version"])));
-        assert!(exec_args_allowed(&args(&["--list-models"])));
-        assert!(exec_args_allowed(&args(&["models", "--verbose"])));
-        assert!(exec_args_allowed(&args(&["models", "--json"])));
-        assert!(exec_args_allowed(&args(&["models"])));
-        assert!(exec_args_allowed(&args(&["status", "--json"])));
-        assert!(exec_args_allowed(&args(&["agent", "list"])));
-    }
-
-    #[test]
-    fn rejects_other_args() {
-        assert!(!exec_args_allowed(&args(&[])));
-        assert!(!exec_args_allowed(&args(&["--help"])));
-        assert!(!exec_args_allowed(&args(&["--version", "--json"])));
-        assert!(!exec_args_allowed(&args(&["-c", "id"])));
-        assert!(!exec_args_allowed(&args(&["agent", "list", "--json"])));
     }
 }
 

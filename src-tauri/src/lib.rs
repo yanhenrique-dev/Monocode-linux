@@ -4,6 +4,7 @@ mod chat_background;
 mod checkpoint;
 mod clipboard;
 mod composer_draft;
+mod contract;
 mod control;
 pub mod control_cli;
 mod cursor_store;

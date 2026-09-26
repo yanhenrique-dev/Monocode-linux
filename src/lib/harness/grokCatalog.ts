@@ -17,6 +17,7 @@ import {
   modelsFromInitialize,
   modelsFromSessionNew,
 } from "./grokProtocol";
+import { HARNESS_EXEC } from "./harnessContract";
 
 const PROBE_ID = "monocode-grok-probe";
 const DISCOVERY_TIMEOUT_MS = 15_000;
@@ -121,7 +122,7 @@ async function discoverViaAcp() {
 async function discoverViaCli() {
   const { path } = await resolveGrokBinary();
   const cwd = await homeDir();
-  const stdout = await execChild(path, ["models"], cwd);
+  const stdout = await execChild(path, HARNESS_EXEC.models, cwd);
   return modelsFromGrokModelsOutput(stdout);
 }
 

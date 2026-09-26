@@ -69,4 +69,29 @@ export default tseslint.config(
       complexity: "off",
     },
   },
+  {
+    // Build and release scripts run in Node, not the browser, and they are
+    // release-critical: the version pins, the updater manifest, and the Flatpak
+    // gate all decide what ships. They sat outside `npm run lint` entirely, so
+    // nothing checked them. Declaring the environment is what makes them
+    // lintable rather than merely included -- without it `no-undef` fires on
+    // every Node global they legitimately use.
+    files: ["scripts/**/*.mjs", "scripts/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: "module",
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        fetch: "readonly",
+      },
+    },
+  },
 );

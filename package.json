@@ -20,7 +20,7 @@
     "check": "npm run check:web && npm run check:rust",
     "check:web": "vitest run && tsc --noEmit",
     "check:web:tests": "tsc --noEmit -p tsconfig.test.json",
-    "lint": "eslint src",
+    "lint": "eslint src scripts",
     "lint:report": "eslint src -f json -o /tmp/opencode/eslint-report.json || true",
     "knip": "knip",
     "check:rust": "cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test",

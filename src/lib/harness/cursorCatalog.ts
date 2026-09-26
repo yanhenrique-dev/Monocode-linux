@@ -14,6 +14,7 @@ import {
   unwatchChild,
   watchChild,
 } from "./child";
+import { HARNESS_EXEC } from "./harnessContract";
 
 const PROBE_ID = "monocode-cursor-probe";
 const DISCOVERY_TIMEOUT_MS = 15_000;
@@ -115,7 +116,7 @@ async function discoverViaAcp(): Promise<AgentModel[]> {
 async function discoverViaCli(): Promise<AgentModel[]> {
   const { path } = await resolveCursorBinary();
   const cwd = await homeDir();
-  const stdout = await execChild(path, ["--list-models"], cwd);
+  const stdout = await execChild(path, HARNESS_EXEC.listModels, cwd);
   return modelsFromListModelsOutput(stdout);
 }
 

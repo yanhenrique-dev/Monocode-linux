@@ -66,6 +66,7 @@ import {
   type UserQuestion,
   type UserQuestionReply,
 } from "../userQuestion";
+import { HARNESS_EXEC } from "./harnessContract";
 
 type PendingApproval = {
   id: string;
@@ -1391,7 +1392,7 @@ async function assertOpenCodeVersion(
   path: string,
   cwd: string,
 ): Promise<{ version: string; protocol: OpenCodeProtocol }> {
-  const output = await execChild(path, ["--version"], cwd).catch(() => "");
+  const output = await execChild(path, HARNESS_EXEC.version, cwd).catch(() => "");
   return assertSupportedOpenCodeRelease(output);
 }
 
